@@ -1,0 +1,46 @@
+schema_version = 1
+intervention = "none"
+repetitions = 1
+output_dir = "runs"
+
+[benchmark]
+name = "terminal-bench"
+version = "2.1"
+repository = "https://github.com/harbor-framework/terminal-bench-2-1.git"
+revision = "7131e4375048a0e408a8fb404b5f499d726b695b"
+task = "openssl-selfsigned-cert"
+image = "alexgshaw/openssl-selfsigned-cert@sha256:4c948a4e630af2435ae0a19108fc0814a946ac2fa29a512469e0fc77b38c8c12"
+judge = "native"
+
+[model]
+provider = "ollama"
+name = "qwen3.5:4b"
+manifest_sha256 = "2a654d98e6fba55d452b7043684e9b57a947e393bbffa62485a7aac05ee4eefd"
+server_image = "ollama/ollama@sha256:57a73f11f75b32b97b59b003f351445c9c2a8af4b9d586ecdc928dee6150ef26"
+context_tokens = 8192
+max_output_tokens = 2048
+temperature = 0.0
+reasoning_effort = "none"
+credential_env_names = []
+
+[runner]
+harbor_version = "0.22.0"
+agent = "terminus-2"
+agent_timeout_seconds = 300
+verifier_timeout_seconds = 180
+setup_timeout_seconds = 900
+
+[retry]
+max_attempts_per_call = 2
+http_statuses = [429]
+delay_seconds = 1.0
+max_delay_seconds = 10.0
+
+[limits]
+api_cost_usd = 0.0
+max_calls_per_repetition = 12
+request_timeout_seconds = 120
+
+[expect]
+reward_min = 1.0
+reward_max = 1.0

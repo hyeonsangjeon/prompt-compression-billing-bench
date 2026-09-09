@@ -1,0 +1,438 @@
+{
+  "schema_version": 1,
+  "record_type": "run_summary",
+  "kind": "calculated",
+  "source": "recorded_provider_attempts_and_native_verifier",
+  "run_id": "20260909T040048Z-ff7200bb",
+  "started_at": "2026-09-09T04:00:48.576803+00:00",
+  "status": "passed",
+  "ledger_sha256": "05cca8c853ca3c7be7d2b32675d085ca85cb4d82e77d6bae47d0a7782d79088f",
+  "source_sha256": "37df813ca3c0c7c655402eb57b9bd2b193273f3b0ec1c4231b592795ec90455c",
+  "source_files": {
+    "run.py": "cf7621b6fc8cb5596ccee6ba4a51d9a8fc967a2ef872ad52aeeb30058011726b",
+    "accounting.py": "b3ffcb1ff6b6cb0b98b07e106230de8814a3f0e6147f3fb794367b5dc598f516",
+    "pyproject.toml": "707841279388a6618da3a34424ba1bc57089d62d1510bf94ad20b58e9f187b4b",
+    "uv.lock": "a1b2d72b45bf1c115e7a8d6961061818ea486641f06b722a380e0b536be928c4"
+  },
+  "model": "qwen3.5:4b",
+  "tokenizer": "unverified",
+  "intervention": "none",
+  "repetitions": 1,
+  "environment": {
+    "kernel": "6.17.0-1022-azure",
+    "platform": "linux/amd64",
+    "cpus": 8,
+    "memory_bytes": 33650143232,
+    "docker_version": "29.1.3",
+    "harbor_version": "0.22.0"
+  },
+  "not_proven": [
+    "Provider billing or paid API spending",
+    "Compression effectiveness",
+    "Repeated-run stability",
+    "Performance on other Terminal-Bench tasks"
+  ],
+  "model_cache_present_before_run": true,
+  "ollama_version": "0.33.3",
+  "model_manifest_sha256": "2a654d98e6fba55d452b7043684e9b57a947e393bbffa62485a7aac05ee4eefd",
+  "finished_at": "2026-09-09T04:06:22.256440+00:00",
+  "elapsed_seconds": 333.67939223999974,
+  "usage_totals": {
+    "kind": "calculated",
+    "source": "unique_successful_provider_attempts",
+    "http_attempts": 7,
+    "http_429": 0,
+    "retries": 0,
+    "responses_with_usage": 7,
+    "input_tokens": 22733,
+    "output_tokens": 2175,
+    "included_attempt_ids": [
+      "r001-call-0001-attempt-01",
+      "r001-call-0002-attempt-01",
+      "r001-call-0003-attempt-01",
+      "r001-call-0004-attempt-01",
+      "r001-call-0005-attempt-01",
+      "r001-call-0006-attempt-01",
+      "r001-call-0007-attempt-01"
+    ],
+    "token_accounting": "local_runtime_not_billable",
+    "api_cost_usd": {
+      "value": 0.0,
+      "kind": "calculated",
+      "source": "local_only_execution",
+      "scope": "API spending only; hardware, electricity and VM costs excluded"
+    }
+  },
+  "disclosure": "sanitized_measurements",
+  "raw_summary_sha256": "ac9c69b09902b9d81e7cf7df558f6f1c9b98e6c3fd6994ed8efe760298f16340",
+  "attempts": [
+    {
+      "schema_version": 1,
+      "run_id": "20260909T040048Z-ff7200bb",
+      "repetition": 1,
+      "ledger_sha256": "05cca8c853ca3c7be7d2b32675d085ca85cb4d82e77d6bae47d0a7782d79088f",
+      "source_sha256": "37df813ca3c0c7c655402eb57b9bd2b193273f3b0ec1c4231b592795ec90455c",
+      "model": "qwen3.5:4b",
+      "benchmark": "terminal-bench",
+      "task": "openssl-selfsigned-cert",
+      "tokenizer": "unverified",
+      "intervention": "none",
+      "record_type": "provider_attempt",
+      "kind": "measured",
+      "source": "ollama_response",
+      "call_id": "r001-call-0001",
+      "attempt_id": "r001-call-0001-attempt-01",
+      "attempt_number": 1,
+      "is_retry": false,
+      "started_at": "2026-09-09T04:01:05.434797+00:00",
+      "finished_at": "2026-09-09T04:01:56.937362+00:00",
+      "http_status": 200,
+      "error": null,
+      "elapsed_seconds": 51.50256708100005,
+      "elapsed_source": "runner_monotonic_clock",
+      "request_sha256": "76908f8f7ff6c918cd0079dca4a470f327bf5776cb7fe6b554f2367d036926f4",
+      "response_sha256": "99cbdb50ef8935b328802bb475f8b7b45836c1b4600ebba4d8a7b13b8fe65442",
+      "provider_usage": {
+        "prompt_tokens": 1040,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens": 399,
+        "total_tokens": 1439
+      },
+      "provider_response_id": "chatcmpl-553",
+      "usage_status": "reported",
+      "tokens": {
+        "input_tokens": 1040,
+        "output_tokens": 399,
+        "cached_input_tokens": 0,
+        "cache_status": "reported"
+      },
+      "included_in_totals": true,
+      "token_accounting": "local_runtime_not_billable",
+      "provider_reported_cost_usd": null
+    },
+    {
+      "schema_version": 1,
+      "run_id": "20260909T040048Z-ff7200bb",
+      "repetition": 1,
+      "ledger_sha256": "05cca8c853ca3c7be7d2b32675d085ca85cb4d82e77d6bae47d0a7782d79088f",
+      "source_sha256": "37df813ca3c0c7c655402eb57b9bd2b193273f3b0ec1c4231b592795ec90455c",
+      "model": "qwen3.5:4b",
+      "benchmark": "terminal-bench",
+      "task": "openssl-selfsigned-cert",
+      "tokenizer": "unverified",
+      "intervention": "none",
+      "record_type": "provider_attempt",
+      "kind": "measured",
+      "source": "ollama_response",
+      "call_id": "r001-call-0002",
+      "attempt_id": "r001-call-0002-attempt-01",
+      "attempt_number": 1,
+      "is_retry": false,
+      "started_at": "2026-09-09T04:01:59.435246+00:00",
+      "finished_at": "2026-09-09T04:02:24.543214+00:00",
+      "http_status": 200,
+      "error": null,
+      "elapsed_seconds": 25.10797592500012,
+      "elapsed_source": "runner_monotonic_clock",
+      "request_sha256": "23d5cc3cc9b7e5b4778cdb6491232c4f7fc7e22a87853b74c866f5a79be31826",
+      "response_sha256": "0c8548dc223ea031626656475a2c5d2a0d83e2e7f8579a1744bc851b7329c8be",
+      "provider_usage": {
+        "prompt_tokens": 1676,
+        "prompt_tokens_details": {
+          "cached_tokens": 1036
+        },
+        "completion_tokens": 191,
+        "total_tokens": 1867
+      },
+      "provider_response_id": "chatcmpl-826",
+      "usage_status": "reported",
+      "tokens": {
+        "input_tokens": 1676,
+        "output_tokens": 191,
+        "cached_input_tokens": 1036,
+        "cache_status": "reported"
+      },
+      "included_in_totals": true,
+      "token_accounting": "local_runtime_not_billable",
+      "provider_reported_cost_usd": null
+    },
+    {
+      "schema_version": 1,
+      "run_id": "20260909T040048Z-ff7200bb",
+      "repetition": 1,
+      "ledger_sha256": "05cca8c853ca3c7be7d2b32675d085ca85cb4d82e77d6bae47d0a7782d79088f",
+      "source_sha256": "37df813ca3c0c7c655402eb57b9bd2b193273f3b0ec1c4231b592795ec90455c",
+      "model": "qwen3.5:4b",
+      "benchmark": "terminal-bench",
+      "task": "openssl-selfsigned-cert",
+      "tokenizer": "unverified",
+      "intervention": "none",
+      "record_type": "provider_attempt",
+      "kind": "measured",
+      "source": "ollama_response",
+      "call_id": "r001-call-0003",
+      "attempt_id": "r001-call-0003-attempt-01",
+      "attempt_number": 1,
+      "is_retry": false,
+      "started_at": "2026-09-09T04:02:25.320320+00:00",
+      "finished_at": "2026-09-09T04:03:45.216788+00:00",
+      "http_status": 200,
+      "error": null,
+      "elapsed_seconds": 79.89647576000016,
+      "elapsed_source": "runner_monotonic_clock",
+      "request_sha256": "f265e2bc2d48c2690f8d1a4385f7c5d39d073ca1db0b5e90a9d74f262a45cfb0",
+      "response_sha256": "e0e82fcaab6150aa06acb96dcd310002bf3cf58f90b1dfa6165b04ca1f6917f1",
+      "provider_usage": {
+        "prompt_tokens": 2124,
+        "prompt_tokens_details": {
+          "cached_tokens": 1672
+        },
+        "completion_tokens": 736,
+        "total_tokens": 2860
+      },
+      "provider_response_id": "chatcmpl-537",
+      "usage_status": "reported",
+      "tokens": {
+        "input_tokens": 2124,
+        "output_tokens": 736,
+        "cached_input_tokens": 1672,
+        "cache_status": "reported"
+      },
+      "included_in_totals": true,
+      "token_accounting": "local_runtime_not_billable",
+      "provider_reported_cost_usd": null
+    },
+    {
+      "schema_version": 1,
+      "run_id": "20260909T040048Z-ff7200bb",
+      "repetition": 1,
+      "ledger_sha256": "05cca8c853ca3c7be7d2b32675d085ca85cb4d82e77d6bae47d0a7782d79088f",
+      "source_sha256": "37df813ca3c0c7c655402eb57b9bd2b193273f3b0ec1c4231b592795ec90455c",
+      "model": "qwen3.5:4b",
+      "benchmark": "terminal-bench",
+      "task": "openssl-selfsigned-cert",
+      "tokenizer": "unverified",
+      "intervention": "none",
+      "record_type": "provider_attempt",
+      "kind": "measured",
+      "source": "ollama_response",
+      "call_id": "r001-call-0004",
+      "attempt_id": "r001-call-0004-attempt-01",
+      "attempt_number": 1,
+      "is_retry": false,
+      "started_at": "2026-09-09T04:03:46.496430+00:00",
+      "finished_at": "2026-09-09T04:04:29.043089+00:00",
+      "http_status": 200,
+      "error": null,
+      "elapsed_seconds": 42.54666548400019,
+      "elapsed_source": "runner_monotonic_clock",
+      "request_sha256": "6e86ad0cb41e27a66467097dfa61e20f105956e1d1501f9c63de0ad9c8191239",
+      "response_sha256": "0dcf28177d832899b99d08eab7c24c1cfceb37ed8296d3206f2cf8da11ab2b34",
+      "provider_usage": {
+        "prompt_tokens": 3571,
+        "prompt_tokens_details": {
+          "cached_tokens": 2120
+        },
+        "completion_tokens": 233,
+        "total_tokens": 3804
+      },
+      "provider_response_id": "chatcmpl-91",
+      "usage_status": "reported",
+      "tokens": {
+        "input_tokens": 3571,
+        "output_tokens": 233,
+        "cached_input_tokens": 2120,
+        "cache_status": "reported"
+      },
+      "included_in_totals": true,
+      "token_accounting": "local_runtime_not_billable",
+      "provider_reported_cost_usd": null
+    },
+    {
+      "schema_version": 1,
+      "run_id": "20260909T040048Z-ff7200bb",
+      "repetition": 1,
+      "ledger_sha256": "05cca8c853ca3c7be7d2b32675d085ca85cb4d82e77d6bae47d0a7782d79088f",
+      "source_sha256": "37df813ca3c0c7c655402eb57b9bd2b193273f3b0ec1c4231b592795ec90455c",
+      "model": "qwen3.5:4b",
+      "benchmark": "terminal-bench",
+      "task": "openssl-selfsigned-cert",
+      "tokenizer": "unverified",
+      "intervention": "none",
+      "record_type": "provider_attempt",
+      "kind": "measured",
+      "source": "ollama_response",
+      "call_id": "r001-call-0005",
+      "attempt_id": "r001-call-0005-attempt-01",
+      "attempt_number": 1,
+      "is_retry": false,
+      "started_at": "2026-09-09T04:04:29.235213+00:00",
+      "finished_at": "2026-09-09T04:04:57.600648+00:00",
+      "http_status": 200,
+      "error": null,
+      "elapsed_seconds": 28.365437828999802,
+      "elapsed_source": "runner_monotonic_clock",
+      "request_sha256": "a7346b2bb231718e661bc5b43ed033c97f39aabf3610af7b750bcb34b26e1ecc",
+      "response_sha256": "de9a7192dc83069f8357a6f9266aca3042da15613acf6e4153d273c10d467e05",
+      "provider_usage": {
+        "prompt_tokens": 3886,
+        "prompt_tokens_details": {
+          "cached_tokens": 3567
+        },
+        "completion_tokens": 224,
+        "total_tokens": 4110
+      },
+      "provider_response_id": "chatcmpl-598",
+      "usage_status": "reported",
+      "tokens": {
+        "input_tokens": 3886,
+        "output_tokens": 224,
+        "cached_input_tokens": 3567,
+        "cache_status": "reported"
+      },
+      "included_in_totals": true,
+      "token_accounting": "local_runtime_not_billable",
+      "provider_reported_cost_usd": null
+    },
+    {
+      "schema_version": 1,
+      "run_id": "20260909T040048Z-ff7200bb",
+      "repetition": 1,
+      "ledger_sha256": "05cca8c853ca3c7be7d2b32675d085ca85cb4d82e77d6bae47d0a7782d79088f",
+      "source_sha256": "37df813ca3c0c7c655402eb57b9bd2b193273f3b0ec1c4231b592795ec90455c",
+      "model": "qwen3.5:4b",
+      "benchmark": "terminal-bench",
+      "task": "openssl-selfsigned-cert",
+      "tokenizer": "unverified",
+      "intervention": "none",
+      "record_type": "provider_attempt",
+      "kind": "measured",
+      "source": "ollama_response",
+      "call_id": "r001-call-0006",
+      "attempt_id": "r001-call-0006-attempt-01",
+      "attempt_number": 1,
+      "is_retry": false,
+      "started_at": "2026-09-09T04:04:58.481408+00:00",
+      "finished_at": "2026-09-09T04:05:39.134369+00:00",
+      "http_status": 200,
+      "error": null,
+      "elapsed_seconds": 40.65296751300002,
+      "elapsed_source": "runner_monotonic_clock",
+      "request_sha256": "7e82d7c249372bd057a9bb0e96f719a5d4d1540bad3a171ae29d253dbd1a2a6f",
+      "response_sha256": "84b79cb4e40ce6b67f50a972a9a5f4255688a0713b0bc8afd394c4cf0e06b356",
+      "provider_usage": {
+        "prompt_tokens": 5067,
+        "prompt_tokens_details": {
+          "cached_tokens": 3882
+        },
+        "completion_tokens": 220,
+        "total_tokens": 5287
+      },
+      "provider_response_id": "chatcmpl-518",
+      "usage_status": "reported",
+      "tokens": {
+        "input_tokens": 5067,
+        "output_tokens": 220,
+        "cached_input_tokens": 3882,
+        "cache_status": "reported"
+      },
+      "included_in_totals": true,
+      "token_accounting": "local_runtime_not_billable",
+      "provider_reported_cost_usd": null
+    },
+    {
+      "schema_version": 1,
+      "run_id": "20260909T040048Z-ff7200bb",
+      "repetition": 1,
+      "ledger_sha256": "05cca8c853ca3c7be7d2b32675d085ca85cb4d82e77d6bae47d0a7782d79088f",
+      "source_sha256": "37df813ca3c0c7c655402eb57b9bd2b193273f3b0ec1c4231b592795ec90455c",
+      "model": "qwen3.5:4b",
+      "benchmark": "terminal-bench",
+      "task": "openssl-selfsigned-cert",
+      "tokenizer": "unverified",
+      "intervention": "none",
+      "record_type": "provider_attempt",
+      "kind": "measured",
+      "source": "ollama_response",
+      "call_id": "r001-call-0007",
+      "attempt_id": "r001-call-0007-attempt-01",
+      "attempt_number": 1,
+      "is_retry": false,
+      "started_at": "2026-09-09T04:05:39.320727+00:00",
+      "finished_at": "2026-09-09T04:06:03.451924+00:00",
+      "http_status": 200,
+      "error": null,
+      "elapsed_seconds": 24.131205469999713,
+      "elapsed_source": "runner_monotonic_clock",
+      "request_sha256": "23c666d1262e1dccb5128027fbd08bc5c9a00059ac57bc9f6b5ea3424a619591",
+      "response_sha256": "237dbacb8e4409ea71c8234ec248df28b7f267d07fefc49da08215f325d5ee8c",
+      "provider_usage": {
+        "prompt_tokens": 5369,
+        "prompt_tokens_details": {
+          "cached_tokens": 5063
+        },
+        "completion_tokens": 172,
+        "total_tokens": 5541
+      },
+      "provider_response_id": "chatcmpl-71",
+      "usage_status": "reported",
+      "tokens": {
+        "input_tokens": 5369,
+        "output_tokens": 172,
+        "cached_input_tokens": 5063,
+        "cache_status": "reported"
+      },
+      "included_in_totals": true,
+      "token_accounting": "local_runtime_not_billable",
+      "provider_reported_cost_usd": null
+    }
+  ],
+  "expect": {
+    "reward_min": 1.0,
+    "reward_max": 1.0
+  },
+  "error_type": null,
+  "whole_command_time": {
+    "kind": "measured",
+    "source": "external_time_command",
+    "seconds": 333.82,
+    "raw_sha256": "d391656090db33e0bd2b0b04cd57f882fdcb9a6abef66b6f20947ccc13676b94"
+  },
+  "trials": [
+    {
+      "kind": "measured",
+      "source": "terminal_bench_native_verifier",
+      "repetition": 1,
+      "reward": 1.0,
+      "native_result_sha256": "3c77a9b09971ce98c6136412c2cc0d83f4701dab681fdacc2f83baa7d1959403",
+      "tests": [
+        {
+          "name": "test_outputs.py::test_directory_structure",
+          "status": "passed"
+        },
+        {
+          "name": "test_outputs.py::test_key_file",
+          "status": "passed"
+        },
+        {
+          "name": "test_outputs.py::test_certificate_file",
+          "status": "passed"
+        },
+        {
+          "name": "test_outputs.py::test_combined_pem_file",
+          "status": "passed"
+        },
+        {
+          "name": "test_outputs.py::test_verification_file",
+          "status": "passed"
+        },
+        {
+          "name": "test_outputs.py::test_python_verification_script",
+          "status": "passed"
+        }
+      ]
+    }
+  ]
+}

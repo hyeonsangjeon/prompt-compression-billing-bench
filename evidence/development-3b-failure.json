@@ -1,0 +1,637 @@
+{
+  "schema_version": 1,
+  "record_type": "run_summary",
+  "kind": "calculated",
+  "source": "recorded_provider_attempts_and_native_verifier",
+  "run_id": "20260909T033220Z-b7a65384",
+  "started_at": "2026-09-09T03:32:20.589631+00:00",
+  "status": "failed",
+  "ledger_sha256": "9a9950ede13ea5c0cf70dca76f3bd440c4c1615068400adeff7ee5b5d9378559",
+  "source_sha256": "c8e13d92c7557d919f3e2ebd0ab2bc13b291910e793d79908ec4d291c3fa74b1",
+  "source_files": {
+    "run.py": "a4194cfce63a5c785b0b3cd1a1384b9b558b3ff0ace22e8871612e8a30c6d382",
+    "accounting.py": "f9978c1cfd657e1ee54885346c9111ec8b346e2277f8cc886f0ce6f5a3586cc4",
+    "pyproject.toml": "707841279388a6618da3a34424ba1bc57089d62d1510bf94ad20b58e9f187b4b",
+    "uv.lock": "a1b2d72b45bf1c115e7a8d6961061818ea486641f06b722a380e0b536be928c4"
+  },
+  "model": "qwen2.5-coder:3b",
+  "tokenizer": "unverified",
+  "intervention": "none",
+  "repetitions": 1,
+  "environment": {
+    "kernel": "6.17.0-1022-azure",
+    "platform": "linux/amd64",
+    "cpus": 8,
+    "memory_bytes": 33650143232,
+    "docker_version": "29.1.3",
+    "harbor_version": "0.22.0"
+  },
+  "not_proven": [
+    "Provider billing or paid API spending",
+    "Compression effectiveness",
+    "Repeated-run stability",
+    "Performance on other Terminal-Bench tasks"
+  ],
+  "model_cache_present_before_run": false,
+  "ollama_version": "0.33.3",
+  "model_manifest_sha256": "f72c60cabf6237b07f6e632b2c48d533cef25eda2efbd34bed21c5e9c01e6225",
+  "finished_at": "2026-09-09T03:39:45.417366+00:00",
+  "elapsed_seconds": 444.8275150630001,
+  "usage_totals": {
+    "kind": "calculated",
+    "source": "unique_successful_provider_attempts",
+    "http_attempts": 12,
+    "http_429": 0,
+    "retries": 0,
+    "responses_with_usage": 12,
+    "input_tokens": 48502,
+    "output_tokens": 2517,
+    "included_attempt_ids": [
+      "r001-call-0001-attempt-01",
+      "r001-call-0002-attempt-01",
+      "r001-call-0003-attempt-01",
+      "r001-call-0004-attempt-01",
+      "r001-call-0005-attempt-01",
+      "r001-call-0006-attempt-01",
+      "r001-call-0007-attempt-01",
+      "r001-call-0008-attempt-01",
+      "r001-call-0009-attempt-01",
+      "r001-call-0010-attempt-01",
+      "r001-call-0011-attempt-01",
+      "r001-call-0012-attempt-01"
+    ],
+    "token_accounting": "local_runtime_not_billable",
+    "api_cost_usd": {
+      "value": 0.0,
+      "kind": "calculated",
+      "source": "local_only_execution",
+      "scope": "API spending only; hardware, electricity and VM costs excluded"
+    }
+  },
+  "disclosure": "sanitized_measurements",
+  "raw_summary_sha256": "b64c41cdecebb3743cb8ff704da6beb3e2d13b5df247a0da89be5908c8d98a2a",
+  "attempts": [
+    {
+      "schema_version": 1,
+      "run_id": "20260909T033220Z-b7a65384",
+      "repetition": 1,
+      "ledger_sha256": "9a9950ede13ea5c0cf70dca76f3bd440c4c1615068400adeff7ee5b5d9378559",
+      "source_sha256": "c8e13d92c7557d919f3e2ebd0ab2bc13b291910e793d79908ec4d291c3fa74b1",
+      "model": "qwen2.5-coder:3b",
+      "tokenizer": "unverified",
+      "intervention": "none",
+      "record_type": "provider_attempt",
+      "kind": "measured",
+      "source": "ollama_response",
+      "call_id": "r001-call-0001",
+      "attempt_id": "r001-call-0001-attempt-01",
+      "attempt_number": 1,
+      "is_retry": false,
+      "started_at": "2026-09-09T03:35:06.833776+00:00",
+      "finished_at": "2026-09-09T03:35:52.882222+00:00",
+      "http_status": 200,
+      "error": null,
+      "elapsed_seconds": 46.048456705000035,
+      "elapsed_source": "runner_monotonic_clock",
+      "request_sha256": "b27a6429a51f2076872cd23dafe38779b5fdbca320865239a3014bf46c1d4cd4",
+      "response_sha256": "fa7739ed67d38bfb8ff691f78969864b8429c5ae54c6b593d66f922b879984d5",
+      "provider_usage": {
+        "prompt_tokens": 1016,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens": 558,
+        "total_tokens": 1574
+      },
+      "usage_status": "reported",
+      "tokens": {
+        "input_tokens": 1016,
+        "output_tokens": 558,
+        "cached_input_tokens": 0,
+        "cache_status": "reported"
+      },
+      "included_in_totals": true,
+      "token_accounting": "local_runtime_not_billable",
+      "provider_reported_cost_usd": null
+    },
+    {
+      "schema_version": 1,
+      "run_id": "20260909T033220Z-b7a65384",
+      "repetition": 1,
+      "ledger_sha256": "9a9950ede13ea5c0cf70dca76f3bd440c4c1615068400adeff7ee5b5d9378559",
+      "source_sha256": "c8e13d92c7557d919f3e2ebd0ab2bc13b291910e793d79908ec4d291c3fa74b1",
+      "model": "qwen2.5-coder:3b",
+      "tokenizer": "unverified",
+      "intervention": "none",
+      "record_type": "provider_attempt",
+      "kind": "measured",
+      "source": "ollama_response",
+      "call_id": "r001-call-0002",
+      "attempt_id": "r001-call-0002-attempt-01",
+      "attempt_number": 1,
+      "is_retry": false,
+      "started_at": "2026-09-09T03:35:58.505483+00:00",
+      "finished_at": "2026-09-09T03:36:21.608247+00:00",
+      "http_status": 200,
+      "error": null,
+      "elapsed_seconds": 23.102772058000028,
+      "elapsed_source": "runner_monotonic_clock",
+      "request_sha256": "23b4b318a7379829958d1f97e3d3c6f940168ce8f94f42c83464599da62f12e2",
+      "response_sha256": "e0a15d64cb6f341a04ef485d67b7203e5675dd134ad90d95b5a03af7a44e2529",
+      "provider_usage": {
+        "prompt_tokens": 2561,
+        "prompt_tokens_details": {
+          "cached_tokens": 1573
+        },
+        "completion_tokens": 189,
+        "total_tokens": 2750
+      },
+      "usage_status": "reported",
+      "tokens": {
+        "input_tokens": 2561,
+        "output_tokens": 189,
+        "cached_input_tokens": 1573,
+        "cache_status": "reported"
+      },
+      "included_in_totals": true,
+      "token_accounting": "local_runtime_not_billable",
+      "provider_reported_cost_usd": null
+    },
+    {
+      "schema_version": 1,
+      "run_id": "20260909T033220Z-b7a65384",
+      "repetition": 1,
+      "ledger_sha256": "9a9950ede13ea5c0cf70dca76f3bd440c4c1615068400adeff7ee5b5d9378559",
+      "source_sha256": "c8e13d92c7557d919f3e2ebd0ab2bc13b291910e793d79908ec4d291c3fa74b1",
+      "model": "qwen2.5-coder:3b",
+      "tokenizer": "unverified",
+      "intervention": "none",
+      "record_type": "provider_attempt",
+      "kind": "measured",
+      "source": "ollama_response",
+      "call_id": "r001-call-0003",
+      "attempt_id": "r001-call-0003-attempt-01",
+      "attempt_number": 1,
+      "is_retry": false,
+      "started_at": "2026-09-09T03:36:22.896857+00:00",
+      "finished_at": "2026-09-09T03:36:38.124300+00:00",
+      "http_status": 200,
+      "error": null,
+      "elapsed_seconds": 15.227448093000021,
+      "elapsed_source": "runner_monotonic_clock",
+      "request_sha256": "95cd4b18f7f864151281b9ca74d137a1eec0c9c00fec51774cca10f143877a80",
+      "response_sha256": "bde442fdbb91fdb4149caf4c2af828c51b98030f310ae253b4d77bbacecb116b",
+      "provider_usage": {
+        "prompt_tokens": 2922,
+        "prompt_tokens_details": {
+          "cached_tokens": 2749
+        },
+        "completion_tokens": 177,
+        "total_tokens": 3099
+      },
+      "usage_status": "reported",
+      "tokens": {
+        "input_tokens": 2922,
+        "output_tokens": 177,
+        "cached_input_tokens": 2749,
+        "cache_status": "reported"
+      },
+      "included_in_totals": true,
+      "token_accounting": "local_runtime_not_billable",
+      "provider_reported_cost_usd": null
+    },
+    {
+      "schema_version": 1,
+      "run_id": "20260909T033220Z-b7a65384",
+      "repetition": 1,
+      "ledger_sha256": "9a9950ede13ea5c0cf70dca76f3bd440c4c1615068400adeff7ee5b5d9378559",
+      "source_sha256": "c8e13d92c7557d919f3e2ebd0ab2bc13b291910e793d79908ec4d291c3fa74b1",
+      "model": "qwen2.5-coder:3b",
+      "tokenizer": "unverified",
+      "intervention": "none",
+      "record_type": "provider_attempt",
+      "kind": "measured",
+      "source": "ollama_response",
+      "call_id": "r001-call-0004",
+      "attempt_id": "r001-call-0004-attempt-01",
+      "attempt_number": 1,
+      "is_retry": false,
+      "started_at": "2026-09-09T03:36:39.409408+00:00",
+      "finished_at": "2026-09-09T03:36:55.070109+00:00",
+      "http_status": 200,
+      "error": null,
+      "elapsed_seconds": 15.660706597999933,
+      "elapsed_source": "runner_monotonic_clock",
+      "request_sha256": "a3afaa2a9bc8304524727fa8380ccd8681372563e3b5d887a474f12a0d2caf1a",
+      "response_sha256": "c90e5afb3bc02d8c26f6b7d0ee476cd3906a3817061888c0c7f8db5bd9ddb9fd",
+      "provider_usage": {
+        "prompt_tokens": 3271,
+        "prompt_tokens_details": {
+          "cached_tokens": 3098
+        },
+        "completion_tokens": 177,
+        "total_tokens": 3448
+      },
+      "usage_status": "reported",
+      "tokens": {
+        "input_tokens": 3271,
+        "output_tokens": 177,
+        "cached_input_tokens": 3098,
+        "cache_status": "reported"
+      },
+      "included_in_totals": true,
+      "token_accounting": "local_runtime_not_billable",
+      "provider_reported_cost_usd": null
+    },
+    {
+      "schema_version": 1,
+      "run_id": "20260909T033220Z-b7a65384",
+      "repetition": 1,
+      "ledger_sha256": "9a9950ede13ea5c0cf70dca76f3bd440c4c1615068400adeff7ee5b5d9378559",
+      "source_sha256": "c8e13d92c7557d919f3e2ebd0ab2bc13b291910e793d79908ec4d291c3fa74b1",
+      "model": "qwen2.5-coder:3b",
+      "tokenizer": "unverified",
+      "intervention": "none",
+      "record_type": "provider_attempt",
+      "kind": "measured",
+      "source": "ollama_response",
+      "call_id": "r001-call-0005",
+      "attempt_id": "r001-call-0005-attempt-01",
+      "attempt_number": 1,
+      "is_retry": false,
+      "started_at": "2026-09-09T03:36:56.350536+00:00",
+      "finished_at": "2026-09-09T03:37:12.383879+00:00",
+      "http_status": 200,
+      "error": null,
+      "elapsed_seconds": 16.033348198000112,
+      "elapsed_source": "runner_monotonic_clock",
+      "request_sha256": "2ac49de0288c8f9a8b7dccbff8bc0315be5becb07dcf392ac12ba3050e6d6e5e",
+      "response_sha256": "e72378810b3b9f7c7593eea94e7cb32f0a64b2ac1dfc4f684ed4f375bb30e79c",
+      "provider_usage": {
+        "prompt_tokens": 3620,
+        "prompt_tokens_details": {
+          "cached_tokens": 3447
+        },
+        "completion_tokens": 177,
+        "total_tokens": 3797
+      },
+      "usage_status": "reported",
+      "tokens": {
+        "input_tokens": 3620,
+        "output_tokens": 177,
+        "cached_input_tokens": 3447,
+        "cache_status": "reported"
+      },
+      "included_in_totals": true,
+      "token_accounting": "local_runtime_not_billable",
+      "provider_reported_cost_usd": null
+    },
+    {
+      "schema_version": 1,
+      "run_id": "20260909T033220Z-b7a65384",
+      "repetition": 1,
+      "ledger_sha256": "9a9950ede13ea5c0cf70dca76f3bd440c4c1615068400adeff7ee5b5d9378559",
+      "source_sha256": "c8e13d92c7557d919f3e2ebd0ab2bc13b291910e793d79908ec4d291c3fa74b1",
+      "model": "qwen2.5-coder:3b",
+      "tokenizer": "unverified",
+      "intervention": "none",
+      "record_type": "provider_attempt",
+      "kind": "measured",
+      "source": "ollama_response",
+      "call_id": "r001-call-0006",
+      "attempt_id": "r001-call-0006-attempt-01",
+      "attempt_number": 1,
+      "is_retry": false,
+      "started_at": "2026-09-09T03:37:13.676438+00:00",
+      "finished_at": "2026-09-09T03:37:30.060775+00:00",
+      "http_status": 200,
+      "error": null,
+      "elapsed_seconds": 16.384346513999844,
+      "elapsed_source": "runner_monotonic_clock",
+      "request_sha256": "a9e4fbcca9152e53c1ac7e40bf74704b370e95280de73d1f479a9a9d57488b8b",
+      "response_sha256": "fde3cf9bc2011f887b2fed491cf41fbb9ed4c58b3f9b2acf5cc971d22fba3ab1",
+      "provider_usage": {
+        "prompt_tokens": 3969,
+        "prompt_tokens_details": {
+          "cached_tokens": 3796
+        },
+        "completion_tokens": 177,
+        "total_tokens": 4146
+      },
+      "usage_status": "reported",
+      "tokens": {
+        "input_tokens": 3969,
+        "output_tokens": 177,
+        "cached_input_tokens": 3796,
+        "cache_status": "reported"
+      },
+      "included_in_totals": true,
+      "token_accounting": "local_runtime_not_billable",
+      "provider_reported_cost_usd": null
+    },
+    {
+      "schema_version": 1,
+      "run_id": "20260909T033220Z-b7a65384",
+      "repetition": 1,
+      "ledger_sha256": "9a9950ede13ea5c0cf70dca76f3bd440c4c1615068400adeff7ee5b5d9378559",
+      "source_sha256": "c8e13d92c7557d919f3e2ebd0ab2bc13b291910e793d79908ec4d291c3fa74b1",
+      "model": "qwen2.5-coder:3b",
+      "tokenizer": "unverified",
+      "intervention": "none",
+      "record_type": "provider_attempt",
+      "kind": "measured",
+      "source": "ollama_response",
+      "call_id": "r001-call-0007",
+      "attempt_id": "r001-call-0007-attempt-01",
+      "attempt_number": 1,
+      "is_retry": false,
+      "started_at": "2026-09-09T03:37:31.341326+00:00",
+      "finished_at": "2026-09-09T03:37:48.243176+00:00",
+      "http_status": 200,
+      "error": null,
+      "elapsed_seconds": 16.901858751999953,
+      "elapsed_source": "runner_monotonic_clock",
+      "request_sha256": "ea843658a525227f88eaf8a8c47458afd6db012efbb5ccae660939d0693a6d15",
+      "response_sha256": "7e8d7cd4bee3318429ca497599b43249587ddfe27d124159364507068d8f65a9",
+      "provider_usage": {
+        "prompt_tokens": 4318,
+        "prompt_tokens_details": {
+          "cached_tokens": 4145
+        },
+        "completion_tokens": 177,
+        "total_tokens": 4495
+      },
+      "usage_status": "reported",
+      "tokens": {
+        "input_tokens": 4318,
+        "output_tokens": 177,
+        "cached_input_tokens": 4145,
+        "cache_status": "reported"
+      },
+      "included_in_totals": true,
+      "token_accounting": "local_runtime_not_billable",
+      "provider_reported_cost_usd": null
+    },
+    {
+      "schema_version": 1,
+      "run_id": "20260909T033220Z-b7a65384",
+      "repetition": 1,
+      "ledger_sha256": "9a9950ede13ea5c0cf70dca76f3bd440c4c1615068400adeff7ee5b5d9378559",
+      "source_sha256": "c8e13d92c7557d919f3e2ebd0ab2bc13b291910e793d79908ec4d291c3fa74b1",
+      "model": "qwen2.5-coder:3b",
+      "tokenizer": "unverified",
+      "intervention": "none",
+      "record_type": "provider_attempt",
+      "kind": "measured",
+      "source": "ollama_response",
+      "call_id": "r001-call-0008",
+      "attempt_id": "r001-call-0008-attempt-01",
+      "attempt_number": 1,
+      "is_retry": false,
+      "started_at": "2026-09-09T03:37:49.528834+00:00",
+      "finished_at": "2026-09-09T03:38:06.753034+00:00",
+      "http_status": 200,
+      "error": null,
+      "elapsed_seconds": 17.224204562000068,
+      "elapsed_source": "runner_monotonic_clock",
+      "request_sha256": "7da1cf60f11493b8d0d6fc4c9d94459ce5e195c8ccc353f63d662d5a1940b711",
+      "response_sha256": "b82a623b11cb993aac95ffc50199597df78bdf6dd1646f0cc7801fe8363e20c7",
+      "provider_usage": {
+        "prompt_tokens": 4667,
+        "prompt_tokens_details": {
+          "cached_tokens": 4494
+        },
+        "completion_tokens": 177,
+        "total_tokens": 4844
+      },
+      "usage_status": "reported",
+      "tokens": {
+        "input_tokens": 4667,
+        "output_tokens": 177,
+        "cached_input_tokens": 4494,
+        "cache_status": "reported"
+      },
+      "included_in_totals": true,
+      "token_accounting": "local_runtime_not_billable",
+      "provider_reported_cost_usd": null
+    },
+    {
+      "schema_version": 1,
+      "run_id": "20260909T033220Z-b7a65384",
+      "repetition": 1,
+      "ledger_sha256": "9a9950ede13ea5c0cf70dca76f3bd440c4c1615068400adeff7ee5b5d9378559",
+      "source_sha256": "c8e13d92c7557d919f3e2ebd0ab2bc13b291910e793d79908ec4d291c3fa74b1",
+      "model": "qwen2.5-coder:3b",
+      "tokenizer": "unverified",
+      "intervention": "none",
+      "record_type": "provider_attempt",
+      "kind": "measured",
+      "source": "ollama_response",
+      "call_id": "r001-call-0009",
+      "attempt_id": "r001-call-0009-attempt-01",
+      "attempt_number": 1,
+      "is_retry": false,
+      "started_at": "2026-09-09T03:38:08.040196+00:00",
+      "finished_at": "2026-09-09T03:38:25.722220+00:00",
+      "http_status": 200,
+      "error": null,
+      "elapsed_seconds": 17.682027373999972,
+      "elapsed_source": "runner_monotonic_clock",
+      "request_sha256": "f5609be6fe7c3eacc5cb1bfddec4a48d33dfb729549d7ac49048af134ca28275",
+      "response_sha256": "529161ee3937b11ef9211d5f80d4fa48e588e2d343b0f2823a04698047089749",
+      "provider_usage": {
+        "prompt_tokens": 5016,
+        "prompt_tokens_details": {
+          "cached_tokens": 4843
+        },
+        "completion_tokens": 177,
+        "total_tokens": 5193
+      },
+      "usage_status": "reported",
+      "tokens": {
+        "input_tokens": 5016,
+        "output_tokens": 177,
+        "cached_input_tokens": 4843,
+        "cache_status": "reported"
+      },
+      "included_in_totals": true,
+      "token_accounting": "local_runtime_not_billable",
+      "provider_reported_cost_usd": null
+    },
+    {
+      "schema_version": 1,
+      "run_id": "20260909T033220Z-b7a65384",
+      "repetition": 1,
+      "ledger_sha256": "9a9950ede13ea5c0cf70dca76f3bd440c4c1615068400adeff7ee5b5d9378559",
+      "source_sha256": "c8e13d92c7557d919f3e2ebd0ab2bc13b291910e793d79908ec4d291c3fa74b1",
+      "model": "qwen2.5-coder:3b",
+      "tokenizer": "unverified",
+      "intervention": "none",
+      "record_type": "provider_attempt",
+      "kind": "measured",
+      "source": "ollama_response",
+      "call_id": "r001-call-0010",
+      "attempt_id": "r001-call-0010-attempt-01",
+      "attempt_number": 1,
+      "is_retry": false,
+      "started_at": "2026-09-09T03:38:27.002634+00:00",
+      "finished_at": "2026-09-09T03:38:45.208041+00:00",
+      "http_status": 200,
+      "error": null,
+      "elapsed_seconds": 18.205415494999897,
+      "elapsed_source": "runner_monotonic_clock",
+      "request_sha256": "45d5d2ed0478d760bd75a61885a90976fa50a3ae82957c41fdcd5a9356710616",
+      "response_sha256": "da62f8261cf96c226c43154fe5380be189adbfb14d16b14876ecc2126f3a321f",
+      "provider_usage": {
+        "prompt_tokens": 5365,
+        "prompt_tokens_details": {
+          "cached_tokens": 5192
+        },
+        "completion_tokens": 177,
+        "total_tokens": 5542
+      },
+      "usage_status": "reported",
+      "tokens": {
+        "input_tokens": 5365,
+        "output_tokens": 177,
+        "cached_input_tokens": 5192,
+        "cache_status": "reported"
+      },
+      "included_in_totals": true,
+      "token_accounting": "local_runtime_not_billable",
+      "provider_reported_cost_usd": null
+    },
+    {
+      "schema_version": 1,
+      "run_id": "20260909T033220Z-b7a65384",
+      "repetition": 1,
+      "ledger_sha256": "9a9950ede13ea5c0cf70dca76f3bd440c4c1615068400adeff7ee5b5d9378559",
+      "source_sha256": "c8e13d92c7557d919f3e2ebd0ab2bc13b291910e793d79908ec4d291c3fa74b1",
+      "model": "qwen2.5-coder:3b",
+      "tokenizer": "unverified",
+      "intervention": "none",
+      "record_type": "provider_attempt",
+      "kind": "measured",
+      "source": "ollama_response",
+      "call_id": "r001-call-0011",
+      "attempt_id": "r001-call-0011-attempt-01",
+      "attempt_number": 1,
+      "is_retry": false,
+      "started_at": "2026-09-09T03:38:46.490878+00:00",
+      "finished_at": "2026-09-09T03:39:05.097590+00:00",
+      "http_status": 200,
+      "error": null,
+      "elapsed_seconds": 18.60672096600001,
+      "elapsed_source": "runner_monotonic_clock",
+      "request_sha256": "02442caa81817e536b3326f952a30486e1abffa5d821e579090e247eeb013853",
+      "response_sha256": "e4f336ec977c184515f85ca3da9d4003ca8d5ce15720306132d37a7a6de822bf",
+      "provider_usage": {
+        "prompt_tokens": 5714,
+        "prompt_tokens_details": {
+          "cached_tokens": 5541
+        },
+        "completion_tokens": 177,
+        "total_tokens": 5891
+      },
+      "usage_status": "reported",
+      "tokens": {
+        "input_tokens": 5714,
+        "output_tokens": 177,
+        "cached_input_tokens": 5541,
+        "cache_status": "reported"
+      },
+      "included_in_totals": true,
+      "token_accounting": "local_runtime_not_billable",
+      "provider_reported_cost_usd": null
+    },
+    {
+      "schema_version": 1,
+      "run_id": "20260909T033220Z-b7a65384",
+      "repetition": 1,
+      "ledger_sha256": "9a9950ede13ea5c0cf70dca76f3bd440c4c1615068400adeff7ee5b5d9378559",
+      "source_sha256": "c8e13d92c7557d919f3e2ebd0ab2bc13b291910e793d79908ec4d291c3fa74b1",
+      "model": "qwen2.5-coder:3b",
+      "tokenizer": "unverified",
+      "intervention": "none",
+      "record_type": "provider_attempt",
+      "kind": "measured",
+      "source": "ollama_response",
+      "call_id": "r001-call-0012",
+      "attempt_id": "r001-call-0012-attempt-01",
+      "attempt_number": 1,
+      "is_retry": false,
+      "started_at": "2026-09-09T03:39:06.380856+00:00",
+      "finished_at": "2026-09-09T03:39:25.372828+00:00",
+      "http_status": 200,
+      "error": null,
+      "elapsed_seconds": 18.99197505699999,
+      "elapsed_source": "runner_monotonic_clock",
+      "request_sha256": "25e21734ac597aa22de7b5e61a5fa95bfb79f75452c9d030ae868ae2d0e2f15f",
+      "response_sha256": "196d029fbd2f39f7d9c7a031f1b12cc06f3ff8475f673bd44351f957c0b1bff0",
+      "provider_usage": {
+        "prompt_tokens": 6063,
+        "prompt_tokens_details": {
+          "cached_tokens": 5890
+        },
+        "completion_tokens": 177,
+        "total_tokens": 6240
+      },
+      "usage_status": "reported",
+      "tokens": {
+        "input_tokens": 6063,
+        "output_tokens": 177,
+        "cached_input_tokens": 5890,
+        "cache_status": "reported"
+      },
+      "included_in_totals": true,
+      "token_accounting": "local_runtime_not_billable",
+      "provider_reported_cost_usd": null
+    }
+  ],
+  "expect": {
+    "reward_min": 1.0,
+    "reward_max": 1.0
+  },
+  "error_type": null,
+  "whole_command_time": {
+    "kind": "measured",
+    "source": "external_time_command",
+    "seconds": 446.71,
+    "raw_sha256": "a2971f7c4e89184d3d92ddd91f7bf13718a0bf6bafda530c2ceb5c38a4f57a5f"
+  },
+  "trials": [
+    {
+      "kind": "measured",
+      "source": "terminal_bench_native_verifier",
+      "repetition": 1,
+      "reward": 0.0,
+      "native_result_sha256": "ca7746b5ffa23a65cb0bcc20d23c446d7003dc35f330ca6a3da7db4c2a18e705",
+      "tests": [
+        {
+          "name": "test_outputs.py::test_directory_structure",
+          "status": "passed"
+        },
+        {
+          "name": "test_outputs.py::test_key_file",
+          "status": "passed"
+        },
+        {
+          "name": "test_outputs.py::test_certificate_file",
+          "status": "passed"
+        },
+        {
+          "name": "test_outputs.py::test_combined_pem_file",
+          "status": "passed"
+        },
+        {
+          "name": "test_outputs.py::test_verification_file",
+          "status": "failed"
+        },
+        {
+          "name": "test_outputs.py::test_python_verification_script",
+          "status": "failed"
+        }
+      ]
+    }
+  ]
+}
