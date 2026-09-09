@@ -20,9 +20,17 @@ Whole command: **333.82 seconds**.
 
 [Machine-readable evidence](evidence/local-baseline.json) is the source of these values.
 
-That measurement used cached images, model and dependencies.
-The five-minute target is **not met**. Earlier failed runs are retained, not replaced
-with an oracle, a recorded answer, or a mock response. [Current readiness](STATUS.md).
+<!-- repeat-result -->
+One unchanged repeat took **371.99 seconds** and ended with **AgentTimeoutError**
+(execution `error`, native checks **5/6**).
+<!-- /repeat-result -->
+
+Both measurements used cached images, model and dependencies on the same Linux
+8-vCPU / 32-GiB VM. The ledger, execution source, model manifest and runtime versions
+matched. **This is not a slow first download followed by a fast run.**
+The five-minute target is **not met**. [Timing breakdown and task choice](STATUS.md#unchanged-repeat-and-timing)
+and [repeat evidence](evidence/local-baseline-repeat.json) retain the unsuccessful result.
+Earlier development failures are also preserved, not replaced with an oracle or mock response.
 
 ## Quickstart: real local model, no cloud account
 
@@ -62,8 +70,9 @@ For a missing Docker dependency, use `--check`; for download/model-pin failures,
 read `summary.json` and its phase log; for HTTP/usage errors, read `attempts.jsonl`.
 Interrupted-command recovery and resume are not implemented.
 
-This proves one ledger-to-native-verdict path. It **does not prove** cloud billing,
-compression savings, repeated-run stability, or broader benchmark performance.
+This demonstrates that a ledger-to-native-verdict run can pass, not that it always passes.
+It **does not prove** cloud billing, compression savings, repeated-run stability,
+or broader benchmark performance.
 There is no compression implementation, second benchmark, or general benchmark adapter.
 The zero API-spending figure excludes hardware, electricity and VM charges.
 Raw runs may contain generated private keys and full prompts: do not publish them.

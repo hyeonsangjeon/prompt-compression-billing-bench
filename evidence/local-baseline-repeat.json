@@ -3,9 +3,9 @@
   "record_type": "run_summary",
   "kind": "calculated",
   "source": "recorded_provider_attempts_and_native_verifier",
-  "run_id": "20260909T040048Z-ff7200bb",
-  "started_at": "2026-09-09T04:00:48.576803+00:00",
-  "status": "passed",
+  "run_id": "20260909T064145Z-21d76464",
+  "started_at": "2026-09-09T06:41:45.705703+00:00",
+  "status": "error",
   "ledger_sha256": "05cca8c853ca3c7be7d2b32675d085ca85cb4d82e77d6bae47d0a7782d79088f",
   "source_sha256": "37df813ca3c0c7c655402eb57b9bd2b193273f3b0ec1c4231b592795ec90455c",
   "source_files": {
@@ -35,8 +35,8 @@
   "model_cache_present_before_run": true,
   "ollama_version": "0.33.3",
   "model_manifest_sha256": "2a654d98e6fba55d452b7043684e9b57a947e393bbffa62485a7aac05ee4eefd",
-  "finished_at": "2026-09-09T04:06:22.256440+00:00",
-  "elapsed_seconds": 333.67939223999974,
+  "finished_at": "2026-09-09T06:47:57.004820+00:00",
+  "elapsed_seconds": 371.298918909,
   "usage_totals": {
     "kind": "calculated",
     "source": "unique_successful_provider_attempts",
@@ -44,8 +44,8 @@
     "http_429": 0,
     "retries": 0,
     "responses_with_usage": 7,
-    "input_tokens": 22733,
-    "output_tokens": 2175,
+    "input_tokens": 22820,
+    "output_tokens": 2426,
     "included_attempt_ids": [
       "r001-call-0001-attempt-01",
       "r001-call-0002-attempt-01",
@@ -64,11 +64,11 @@
     }
   },
   "disclosure": "sanitized_measurements",
-  "raw_summary_sha256": "ac9c69b09902b9d81e7cf7df558f6f1c9b98e6c3fd6994ed8efe760298f16340",
+  "raw_summary_sha256": "48aab066609bb069e9e1525c3327f342e1758015336fb026494c83cd8e66805e",
   "attempts": [
     {
       "schema_version": 1,
-      "run_id": "20260909T040048Z-ff7200bb",
+      "run_id": "20260909T064145Z-21d76464",
       "repetition": 1,
       "ledger_sha256": "05cca8c853ca3c7be7d2b32675d085ca85cb4d82e77d6bae47d0a7782d79088f",
       "source_sha256": "37df813ca3c0c7c655402eb57b9bd2b193273f3b0ec1c4231b592795ec90455c",
@@ -84,27 +84,27 @@
       "attempt_id": "r001-call-0001-attempt-01",
       "attempt_number": 1,
       "is_retry": false,
-      "started_at": "2026-09-09T04:01:05.434797+00:00",
-      "finished_at": "2026-09-09T04:01:56.937362+00:00",
+      "started_at": "2026-09-09T06:42:21.217401+00:00",
+      "finished_at": "2026-09-09T06:43:41.375771+00:00",
       "http_status": 200,
       "error": null,
-      "elapsed_seconds": 51.50256708100005,
+      "elapsed_seconds": 80.15837291899999,
       "elapsed_source": "runner_monotonic_clock",
-      "request_sha256": "76908f8f7ff6c918cd0079dca4a470f327bf5776cb7fe6b554f2367d036926f4",
-      "response_sha256": "99cbdb50ef8935b328802bb475f8b7b45836c1b4600ebba4d8a7b13b8fe65442",
+      "request_sha256": "4fff65926b2ef0b58891b5c887a20bb02b4a716bf07bdd3e898649e4491d8088",
+      "response_sha256": "f5ab9ffc6d4e96cbb94a3c8c4d402ac1f8b4ce9dd811f4ded4c0bcb11a394099",
       "provider_usage": {
-        "prompt_tokens": 1040,
+        "prompt_tokens": 1041,
         "prompt_tokens_details": {
           "cached_tokens": 0
         },
-        "completion_tokens": 399,
+        "completion_tokens": 398,
         "total_tokens": 1439
       },
-      "provider_response_id": "chatcmpl-553",
+      "provider_response_id": "chatcmpl-479",
       "usage_status": "reported",
       "tokens": {
-        "input_tokens": 1040,
-        "output_tokens": 399,
+        "input_tokens": 1041,
+        "output_tokens": 398,
         "cached_input_tokens": 0,
         "cache_status": "reported"
       },
@@ -114,7 +114,7 @@
     },
     {
       "schema_version": 1,
-      "run_id": "20260909T040048Z-ff7200bb",
+      "run_id": "20260909T064145Z-21d76464",
       "repetition": 1,
       "ledger_sha256": "05cca8c853ca3c7be7d2b32675d085ca85cb4d82e77d6bae47d0a7782d79088f",
       "source_sha256": "37df813ca3c0c7c655402eb57b9bd2b193273f3b0ec1c4231b592795ec90455c",
@@ -130,28 +130,28 @@
       "attempt_id": "r001-call-0002-attempt-01",
       "attempt_number": 1,
       "is_retry": false,
-      "started_at": "2026-09-09T04:01:59.435246+00:00",
-      "finished_at": "2026-09-09T04:02:24.543214+00:00",
+      "started_at": "2026-09-09T06:43:43.855794+00:00",
+      "finished_at": "2026-09-09T06:44:16.537586+00:00",
       "http_status": 200,
       "error": null,
-      "elapsed_seconds": 25.10797592500012,
+      "elapsed_seconds": 32.68179847699997,
       "elapsed_source": "runner_monotonic_clock",
-      "request_sha256": "23d5cc3cc9b7e5b4778cdb6491232c4f7fc7e22a87853b74c866f5a79be31826",
-      "response_sha256": "0c8548dc223ea031626656475a2c5d2a0d83e2e7f8579a1744bc851b7329c8be",
+      "request_sha256": "c7731c2ed02f43e0e8c80ab449a387c208c1d5904fa2d7710cdfdc29d2b3f964",
+      "response_sha256": "1c561ba6c41a8db7ca4c12003f2fb3c7d4f59c65041412cb296d593780853c33",
       "provider_usage": {
-        "prompt_tokens": 1676,
+        "prompt_tokens": 1682,
         "prompt_tokens_details": {
-          "cached_tokens": 1036
+          "cached_tokens": 1037
         },
-        "completion_tokens": 191,
-        "total_tokens": 1867
+        "completion_tokens": 295,
+        "total_tokens": 1977
       },
-      "provider_response_id": "chatcmpl-826",
+      "provider_response_id": "chatcmpl-282",
       "usage_status": "reported",
       "tokens": {
-        "input_tokens": 1676,
-        "output_tokens": 191,
-        "cached_input_tokens": 1036,
+        "input_tokens": 1682,
+        "output_tokens": 295,
+        "cached_input_tokens": 1037,
         "cache_status": "reported"
       },
       "included_in_totals": true,
@@ -160,7 +160,7 @@
     },
     {
       "schema_version": 1,
-      "run_id": "20260909T040048Z-ff7200bb",
+      "run_id": "20260909T064145Z-21d76464",
       "repetition": 1,
       "ledger_sha256": "05cca8c853ca3c7be7d2b32675d085ca85cb4d82e77d6bae47d0a7782d79088f",
       "source_sha256": "37df813ca3c0c7c655402eb57b9bd2b193273f3b0ec1c4231b592795ec90455c",
@@ -176,28 +176,28 @@
       "attempt_id": "r001-call-0003-attempt-01",
       "attempt_number": 1,
       "is_retry": false,
-      "started_at": "2026-09-09T04:02:25.320320+00:00",
-      "finished_at": "2026-09-09T04:03:45.216788+00:00",
+      "started_at": "2026-09-09T06:44:18.303087+00:00",
+      "finished_at": "2026-09-09T06:45:33.952530+00:00",
       "http_status": 200,
       "error": null,
-      "elapsed_seconds": 79.89647576000016,
+      "elapsed_seconds": 75.649450801,
       "elapsed_source": "runner_monotonic_clock",
-      "request_sha256": "f265e2bc2d48c2690f8d1a4385f7c5d39d073ca1db0b5e90a9d74f262a45cfb0",
-      "response_sha256": "e0e82fcaab6150aa06acb96dcd310002bf3cf58f90b1dfa6165b04ca1f6917f1",
+      "request_sha256": "e93e5c3a7d850381282839a80e460aff9a4153357f83386bb64ff00553c12892",
+      "response_sha256": "56a650a0295ad9832100d75ed6d83bb7a1ee45b903836b8e1652fe8ecf9ecb3c",
       "provider_usage": {
-        "prompt_tokens": 2124,
+        "prompt_tokens": 2228,
         "prompt_tokens_details": {
-          "cached_tokens": 1672
+          "cached_tokens": 1678
         },
-        "completion_tokens": 736,
-        "total_tokens": 2860
+        "completion_tokens": 743,
+        "total_tokens": 2971
       },
-      "provider_response_id": "chatcmpl-537",
+      "provider_response_id": "chatcmpl-25",
       "usage_status": "reported",
       "tokens": {
-        "input_tokens": 2124,
-        "output_tokens": 736,
-        "cached_input_tokens": 1672,
+        "input_tokens": 2228,
+        "output_tokens": 743,
+        "cached_input_tokens": 1678,
         "cache_status": "reported"
       },
       "included_in_totals": true,
@@ -206,7 +206,7 @@
     },
     {
       "schema_version": 1,
-      "run_id": "20260909T040048Z-ff7200bb",
+      "run_id": "20260909T064145Z-21d76464",
       "repetition": 1,
       "ledger_sha256": "05cca8c853ca3c7be7d2b32675d085ca85cb4d82e77d6bae47d0a7782d79088f",
       "source_sha256": "37df813ca3c0c7c655402eb57b9bd2b193273f3b0ec1c4231b592795ec90455c",
@@ -222,28 +222,28 @@
       "attempt_id": "r001-call-0004-attempt-01",
       "attempt_number": 1,
       "is_retry": false,
-      "started_at": "2026-09-09T04:03:46.496430+00:00",
-      "finished_at": "2026-09-09T04:04:29.043089+00:00",
+      "started_at": "2026-09-09T06:45:35.307959+00:00",
+      "finished_at": "2026-09-09T06:46:14.177644+00:00",
       "http_status": 200,
       "error": null,
-      "elapsed_seconds": 42.54666548400019,
+      "elapsed_seconds": 38.86969285800001,
       "elapsed_source": "runner_monotonic_clock",
-      "request_sha256": "6e86ad0cb41e27a66467097dfa61e20f105956e1d1501f9c63de0ad9c8191239",
-      "response_sha256": "0dcf28177d832899b99d08eab7c24c1cfceb37ed8296d3206f2cf8da11ab2b34",
+      "request_sha256": "9ef7d1f54fbfca88729a37033ecf2c9f6d74f610845b3957ade54d6e709b3bf0",
+      "response_sha256": "297307861f250b3ed126f6808173a68d0c48a1a1250fccb17c5b9585dae0f28a",
       "provider_usage": {
-        "prompt_tokens": 3571,
+        "prompt_tokens": 3763,
         "prompt_tokens_details": {
-          "cached_tokens": 2120
+          "cached_tokens": 2224
         },
-        "completion_tokens": 233,
-        "total_tokens": 3804
+        "completion_tokens": 232,
+        "total_tokens": 3995
       },
-      "provider_response_id": "chatcmpl-91",
+      "provider_response_id": "chatcmpl-237",
       "usage_status": "reported",
       "tokens": {
-        "input_tokens": 3571,
-        "output_tokens": 233,
-        "cached_input_tokens": 2120,
+        "input_tokens": 3763,
+        "output_tokens": 232,
+        "cached_input_tokens": 2224,
         "cache_status": "reported"
       },
       "included_in_totals": true,
@@ -252,7 +252,7 @@
     },
     {
       "schema_version": 1,
-      "run_id": "20260909T040048Z-ff7200bb",
+      "run_id": "20260909T064145Z-21d76464",
       "repetition": 1,
       "ledger_sha256": "05cca8c853ca3c7be7d2b32675d085ca85cb4d82e77d6bae47d0a7782d79088f",
       "source_sha256": "37df813ca3c0c7c655402eb57b9bd2b193273f3b0ec1c4231b592795ec90455c",
@@ -268,28 +268,28 @@
       "attempt_id": "r001-call-0005-attempt-01",
       "attempt_number": 1,
       "is_retry": false,
-      "started_at": "2026-09-09T04:04:29.235213+00:00",
-      "finished_at": "2026-09-09T04:04:57.600648+00:00",
+      "started_at": "2026-09-09T06:46:16.445985+00:00",
+      "finished_at": "2026-09-09T06:46:45.911892+00:00",
       "http_status": 200,
       "error": null,
-      "elapsed_seconds": 28.365437828999802,
+      "elapsed_seconds": 29.46591513300001,
       "elapsed_source": "runner_monotonic_clock",
-      "request_sha256": "a7346b2bb231718e661bc5b43ed033c97f39aabf3610af7b750bcb34b26e1ecc",
-      "response_sha256": "de9a7192dc83069f8357a6f9266aca3042da15613acf6e4153d273c10d467e05",
+      "request_sha256": "f09a76b5cc208af35a19b70380d5fde116e3936aa6a9010735298fbaa9b1e631",
+      "response_sha256": "2c55a644a90b5ca9ea103e07a976be12dd317d973e3fa895fb1ef2847f02cd18",
       "provider_usage": {
-        "prompt_tokens": 3886,
+        "prompt_tokens": 4282,
         "prompt_tokens_details": {
-          "cached_tokens": 3567
+          "cached_tokens": 3759
         },
-        "completion_tokens": 224,
-        "total_tokens": 4110
+        "completion_tokens": 230,
+        "total_tokens": 4512
       },
-      "provider_response_id": "chatcmpl-598",
+      "provider_response_id": "chatcmpl-241",
       "usage_status": "reported",
       "tokens": {
-        "input_tokens": 3886,
-        "output_tokens": 224,
-        "cached_input_tokens": 3567,
+        "input_tokens": 4282,
+        "output_tokens": 230,
+        "cached_input_tokens": 3759,
         "cache_status": "reported"
       },
       "included_in_totals": true,
@@ -298,7 +298,7 @@
     },
     {
       "schema_version": 1,
-      "run_id": "20260909T040048Z-ff7200bb",
+      "run_id": "20260909T064145Z-21d76464",
       "repetition": 1,
       "ledger_sha256": "05cca8c853ca3c7be7d2b32675d085ca85cb4d82e77d6bae47d0a7782d79088f",
       "source_sha256": "37df813ca3c0c7c655402eb57b9bd2b193273f3b0ec1c4231b592795ec90455c",
@@ -314,28 +314,28 @@
       "attempt_id": "r001-call-0006-attempt-01",
       "attempt_number": 1,
       "is_retry": false,
-      "started_at": "2026-09-09T04:04:58.481408+00:00",
-      "finished_at": "2026-09-09T04:05:39.134369+00:00",
+      "started_at": "2026-09-09T06:46:47.576283+00:00",
+      "finished_at": "2026-09-09T06:47:15.622326+00:00",
       "http_status": 200,
       "error": null,
-      "elapsed_seconds": 40.65296751300002,
+      "elapsed_seconds": 28.046050621000006,
       "elapsed_source": "runner_monotonic_clock",
-      "request_sha256": "7e82d7c249372bd057a9bb0e96f719a5d4d1540bad3a171ae29d253dbd1a2a6f",
-      "response_sha256": "84b79cb4e40ce6b67f50a972a9a5f4255688a0713b0bc8afd394c4cf0e06b356",
+      "request_sha256": "25905b8006800840fdd5efc30312617196444437b00b425c224f061a30d330c6",
+      "response_sha256": "6ff4103b592c3b4bd3f5346f4cf782252cca9b557acd4d7275bcf282473c0ea0",
       "provider_usage": {
-        "prompt_tokens": 5067,
+        "prompt_tokens": 4684,
         "prompt_tokens_details": {
-          "cached_tokens": 3882
+          "cached_tokens": 4278
         },
-        "completion_tokens": 220,
-        "total_tokens": 5287
+        "completion_tokens": 223,
+        "total_tokens": 4907
       },
-      "provider_response_id": "chatcmpl-518",
+      "provider_response_id": "chatcmpl-700",
       "usage_status": "reported",
       "tokens": {
-        "input_tokens": 5067,
-        "output_tokens": 220,
-        "cached_input_tokens": 3882,
+        "input_tokens": 4684,
+        "output_tokens": 223,
+        "cached_input_tokens": 4278,
         "cache_status": "reported"
       },
       "included_in_totals": true,
@@ -344,7 +344,7 @@
     },
     {
       "schema_version": 1,
-      "run_id": "20260909T040048Z-ff7200bb",
+      "run_id": "20260909T064145Z-21d76464",
       "repetition": 1,
       "ledger_sha256": "05cca8c853ca3c7be7d2b32675d085ca85cb4d82e77d6bae47d0a7782d79088f",
       "source_sha256": "37df813ca3c0c7c655402eb57b9bd2b193273f3b0ec1c4231b592795ec90455c",
@@ -360,28 +360,28 @@
       "attempt_id": "r001-call-0007-attempt-01",
       "attempt_number": 1,
       "is_retry": false,
-      "started_at": "2026-09-09T04:05:39.320727+00:00",
-      "finished_at": "2026-09-09T04:06:03.451924+00:00",
+      "started_at": "2026-09-09T06:47:17.291492+00:00",
+      "finished_at": "2026-09-09T06:47:56.651860+00:00",
       "http_status": 200,
       "error": null,
-      "elapsed_seconds": 24.131205469999713,
+      "elapsed_seconds": 39.360378837999974,
       "elapsed_source": "runner_monotonic_clock",
-      "request_sha256": "23c666d1262e1dccb5128027fbd08bc5c9a00059ac57bc9f6b5ea3424a619591",
-      "response_sha256": "237dbacb8e4409ea71c8234ec248df28b7f267d07fefc49da08215f325d5ee8c",
+      "request_sha256": "b904c92bab965996d7bb378a2c42b13bab8616ca936b3372c470ef08e85fa172",
+      "response_sha256": "fcfe598b0c6019efe8ada6c3912ee4f1271f0ac21029c6c4c1aa36e663d9f384",
       "provider_usage": {
-        "prompt_tokens": 5369,
+        "prompt_tokens": 5140,
         "prompt_tokens_details": {
-          "cached_tokens": 5063
+          "cached_tokens": 4680
         },
-        "completion_tokens": 172,
-        "total_tokens": 5541
+        "completion_tokens": 305,
+        "total_tokens": 5445
       },
-      "provider_response_id": "chatcmpl-71",
+      "provider_response_id": "chatcmpl-415",
       "usage_status": "reported",
       "tokens": {
-        "input_tokens": 5369,
-        "output_tokens": 172,
-        "cached_input_tokens": 5063,
+        "input_tokens": 5140,
+        "output_tokens": 305,
+        "cached_input_tokens": 4680,
         "cache_status": "reported"
       },
       "included_in_totals": true,
@@ -393,21 +393,21 @@
     "reward_min": 1.0,
     "reward_max": 1.0
   },
-  "error_type": null,
+  "error_type": "ValueError",
   "whole_command_time": {
     "kind": "measured",
     "source": "external_time_command",
-    "seconds": 333.82,
-    "raw_sha256": "d391656090db33e0bd2b0b04cd57f882fdcb9a6abef66b6f20947ccc13676b94"
+    "seconds": 371.99,
+    "raw_sha256": "9c4c1377f5c8be6d199158d53ff6e269c921703a349b067ee69e11b35dc0da6d"
   },
   "trials": [
     {
       "kind": "measured",
       "source": "terminal_bench_native_verifier",
       "repetition": 1,
-      "reward": 1.0,
-      "native_result_sha256": "3c77a9b09971ce98c6136412c2cc0d83f4701dab681fdacc2f83baa7d1959403",
-      "native_exception_type": null,
+      "reward": 0.0,
+      "native_result_sha256": "232f3f13d553426e8a12a3c0b6ebc3bf9cfb4b4d092a5af2ee1aa73d93cc7d1e",
+      "native_exception_type": "AgentTimeoutError",
       "tests": [
         {
           "name": "test_outputs.py::test_directory_structure",
@@ -427,7 +427,7 @@
         },
         {
           "name": "test_outputs.py::test_verification_file",
-          "status": "passed"
+          "status": "failed"
         },
         {
           "name": "test_outputs.py::test_python_verification_script",
@@ -441,27 +441,27 @@
     "source": "runner_clocks_and_native_phase_timestamps",
     "unit": "seconds",
     "components": {
-      "image_preparation": 1.179909014000259,
-      "ollama_start": 0.565148555000178,
-      "model_pull_or_cache_check": 0.2878196400001798,
-      "environment_setup": 1.377248,
-      "agent_setup": 9.951352,
-      "agent_execution": 298.620501,
-      "verifier": 5.774412,
-      "other": 16.063609790999408
+      "image_preparation": 1.2297409589999972,
+      "ollama_start": 0.7651178890000097,
+      "model_pull_or_cache_check": 0.7772168429999908,
+      "environment_setup": 1.549416,
+      "agent_setup": 11.09725,
+      "agent_execution": 300.00326,
+      "verifier": 6.932507,
+      "other": 49.63549130900003
     },
     "runner_timers": {
-      "ollama_image": 0.6650066170000173,
-      "task_image": 0.5149023970002418,
-      "ollama_start": 0.565148555000178,
-      "model_download": 0.2878196400001798
+      "ollama_image": 0.7150253679999992,
+      "task_image": 0.5147155909999981,
+      "ollama_start": 0.7651178890000097,
+      "model_download": 0.7772168429999908
     },
     "native_timers": [
       {
-        "environment_setup": 1.377248,
-        "agent_setup": 9.951352,
-        "agent_execution": 298.620501,
-        "verifier": 5.774412
+        "environment_setup": 1.549416,
+        "agent_setup": 11.09725,
+        "agent_execution": 300.00326,
+        "verifier": 6.932507
       }
     ],
     "note": "Agent execution includes local inference and commands. Other is a subtraction, not an isolated timer."

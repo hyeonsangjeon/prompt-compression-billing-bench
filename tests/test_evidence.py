@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from accounting import totals
-from evidence import check, result_text, validate_public_files
+from evidence import check, repeat_result_text, result_text, timing_comparison_text, validate_public_files
 
 
 class EvidenceContractTests(unittest.TestCase):
@@ -83,6 +83,41 @@ class HeadlineContractTests(unittest.TestCase):
         readme = (root / "README.md").read_text()
         actual = readme.split("<!-- measured-result -->", 1)[1].split("<!-- /measured-result -->", 1)[0].strip()
         self.assertEqual(actual, result_text(data))
+
+    def test_status_timing_table_matches_recorded_phases(self):
+        root = Path(__file__).resolve().parents[1]
+        first = check(root / "evidence/local-baseline.json")
+        second = check(root / "evidence/local-baseline-repeat.json")
+        status = (root / "STATUS.md").read_text()
+        actual = status.split("<!-- measured-timing -->", 1)[1].split("<!-- /measured-timing -->", 1)[0].strip()
+        self.assertEqual(actual, timing_comparison_text(first, second))
+
+    def test_readme_does_not_hide_the_failed_repeat(self):
+        root = Path(__file__).resolve().parents[1]
+        second = check(root / "evidence/local-baseline-repeat.json")
+        readme = (root / "README.md").read_text()
+        actual = readme.split("<!-- repeat-result -->", 1)[1].split("<!-- /repeat-result -->", 1)[0].strip()
+        self.assertEqual(actual, repeat_result_text(second))
+
+    def test_timing_components_cannot_drift_in_either_direction(self):
+        root = Path(__file__).resolve().parents[1]
+        first = check(root / "evidence/local-baseline.json")
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "evidence.json"
+            for difference in (-1, 1):
+                changed = copy.deepcopy(first)
+                changed["phase_timings"]["components"]["agent_execution"] += difference
+                path.write_text(json.dumps(changed))
+                with self.assertRaisesRegex(ValueError, "timing|Timing"):
+                    check(path)
+
+    def test_changed_ledger_is_not_an_unchanged_repeat(self):
+        root = Path(__file__).resolve().parents[1]
+        first = check(root / "evidence/local-baseline.json")
+        second = check(root / "evidence/local-baseline-repeat.json")
+        second["ledger_sha256"] = "different"
+        with self.assertRaisesRegex(ValueError, "conditions differ"):
+            timing_comparison_text(first, second)
 
 
 if __name__ == "__main__":

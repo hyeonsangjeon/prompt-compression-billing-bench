@@ -2,8 +2,10 @@
 
 import argparse
 import json
+import math
 import subprocess
 import tomllib
+from datetime import datetime
 from pathlib import Path
 
 from accounting import read_attempts, sha256, totals
@@ -32,7 +34,50 @@ PUBLIC_FILES = {
     "tests/test_accounting.py", "tests/test_evidence.py", ".github/workflows/check.yml",
     "evidence/local-baseline.json", "evidence/development-3b-failure.json",
     "evidence/development-7b-timeout.json", "evidence/development-reasoning-timeout.json",
+    "evidence/local-baseline-repeat.json",
 }
+
+TIMING_ROWS = (
+    ("image_preparation", "Image availability checks / cached pulls"),
+    ("ollama_start", "Ollama container start"),
+    ("model_pull_or_cache_check", "Model pull / cached-model check"),
+    ("environment_setup", "Task environment start"),
+    ("agent_setup", "Agent setup"),
+    ("agent_execution", "Agent execution"),
+    ("verifier", "Native verifier"),
+    ("other", "Other startup, response drain and cleanup (remainder)"),
+)
+
+
+def phase_timings(source: dict, native_results: list[dict], whole_seconds: float) -> dict:
+    phases = source["phases"]
+    runner_timers = {
+        name: phases[name]["elapsed_seconds"]
+        for name in ("ollama_image", "task_image", "ollama_start", "model_download")
+    }
+    native_timers = []
+    for result in native_results:
+        native_timers.append({
+            name: (
+                datetime.fromisoformat(result[name]["finished_at"])
+                - datetime.fromisoformat(result[name]["started_at"])
+            ).total_seconds()
+            for name in ("environment_setup", "agent_setup", "agent_execution", "verifier")
+        })
+    components = {
+        "image_preparation": runner_timers["ollama_image"] + runner_timers["task_image"],
+        "ollama_start": runner_timers["ollama_start"],
+        "model_pull_or_cache_check": runner_timers["model_download"],
+        **{name: sum(timer[name] for timer in native_timers)
+           for name in ("environment_setup", "agent_setup", "agent_execution", "verifier")},
+    }
+    components["other"] = whole_seconds - sum(components.values())
+    return {
+        "kind": "calculated", "source": "runner_clocks_and_native_phase_timestamps",
+        "unit": "seconds", "components": components,
+        "runner_timers": runner_timers, "native_timers": native_timers,
+        "note": "Agent execution includes local inference and commands. Other is a subtraction, not an isolated timer.",
+    }
 
 
 def validate_public_files(paths: list[str]) -> None:
@@ -69,15 +114,21 @@ def export(directory: Path, target: Path) -> None:
             "seconds": float(values["real"]), "raw_sha256": sha256(timing.read_bytes()),
         }
     output["trials"] = []
+    native_results = []
     for trial in source["trials"]:
+        result = json.loads((directory / trial["native_result"]).read_text())
+        native_results.append(result)
         ctrf_path = (directory / trial["native_result"]).parent / "verifier/ctrf.json"
         tests = json.loads(ctrf_path.read_text())["results"]
         output["trials"].append({
             "kind": "measured", "source": "terminal_bench_native_verifier",
             "repetition": trial["repetition"], "reward": trial["reward"],
             "native_result_sha256": trial["native_result_sha256"],
+            "native_exception_type": (result.get("exception_info") or {}).get("exception_type"),
             "tests": [{"name": test["name"], "status": test["status"]} for test in tests["tests"]],
         })
+    if "whole_command_time" in output and native_results:
+        output["phase_timings"] = phase_timings(source, native_results, output["whole_command_time"]["seconds"])
     if target.exists():
         raise ValueError("Evidence exists; choose a new filename rather than overwriting it")
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -90,6 +141,7 @@ def check(path: Path) -> dict:
     if set(data) - (SUMMARY_FIELDS | {
         "disclosure", "raw_summary_sha256", "attempts", "trials", "expect", "error_type",
         "whole_command_time",
+        "phase_timings",
     }):
         raise ValueError("Non-allowlisted data in the public summary")
     if data["disclosure"] != "sanitized_measurements":
@@ -119,6 +171,26 @@ def check(path: Path) -> dict:
     )
     if data["status"] != "error" and (data["status"] == "passed") != met_expectation:
         raise ValueError("Execution status differs from the declared native reward contract")
+    if "phase_timings" in data:
+        timing = data["phase_timings"]
+        components = timing["components"]
+        if set(components) != {name for name, _ in TIMING_ROWS}:
+            raise ValueError("Unknown or missing phase timing")
+        if any(type(value) not in (int, float) or not math.isfinite(value) or value < 0
+               for value in components.values()):
+            raise ValueError("Phase timings must be finite nonnegative seconds")
+        timers = timing["runner_timers"]
+        expected = {
+            "image_preparation": timers["ollama_image"] + timers["task_image"],
+            "ollama_start": timers["ollama_start"],
+            "model_pull_or_cache_check": timers["model_download"],
+            **{name: sum(timer[name] for timer in timing["native_timers"])
+               for name in ("environment_setup", "agent_setup", "agent_execution", "verifier")},
+        }
+        expected["other"] = data["whole_command_time"]["seconds"] - sum(expected.values())
+        if any(not math.isclose(components[name], value, abs_tol=1e-6)
+               for name, value in expected.items()):
+            raise ValueError("Timing breakdown differs from the recorded timers")
     return data
 
 
@@ -135,6 +207,40 @@ def result_text(data: dict) -> str:
         f"HTTP 429: **{usage['http_429']}**; retries: **{usage['retries']}**.\n"
         f"Whole command: **{data['whole_command_time']['seconds']:.2f} seconds**."
     )
+
+
+def repeat_result_text(data: dict) -> str:
+    tests = [test for trial in data["trials"] for test in trial["tests"]]
+    passed = sum(test["status"] == "passed" for test in tests)
+    exception = data["trials"][0]["native_exception_type"]
+    return (
+        f"One unchanged repeat took **{data['whole_command_time']['seconds']:.2f} seconds** "
+        f"and ended with **{exception}**\n"
+        f"(execution `{data['status']}`, native checks **{passed}/{len(tests)}**)."
+    )
+
+
+def timing_comparison_text(first: dict, second: dict) -> str:
+    for field in (
+        "ledger_sha256", "source_sha256", "source_files", "environment", "model",
+        "model_manifest_sha256", "ollama_version", "intervention", "repetitions",
+    ):
+        if first[field] != second[field]:
+            raise ValueError(f"Timing comparison conditions differ: {field}")
+    lines = [
+        "| Phase (seconds) | Earlier accepted run | One unchanged repeat |",
+        "|---|---:|---:|",
+    ]
+    for name, label in TIMING_ROWS:
+        lines.append(
+            f"| {label} | {first['phase_timings']['components'][name]:.2f} "
+            f"| {second['phase_timings']['components'][name]:.2f} |"
+        )
+    lines.append(
+        f"| **Whole command** | **{first['whole_command_time']['seconds']:.2f}** "
+        f"| **{second['whole_command_time']['seconds']:.2f}** |"
+    )
+    return "\n".join(lines)
 
 
 def main() -> None:
