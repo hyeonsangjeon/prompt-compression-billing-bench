@@ -1,0 +1,21 @@
+{
+  "kind": "classification_aggregation",
+  "disclosure": "aggregate_only",
+  "source_records_sha256": "afd5c09e766c9fa00a647c756d5b516f97ffc68349601cf9ea73b12815c00c38",
+  "source_segments_sha256": "26140ce14eb79e91fdb0f65a88ce9fba50f8ca171186c909f716cddcf177c425",
+  "aggregate_sha256": "8c533f044db177681cf9c868347bfdf3539240c6e6668b0281336b27068c6a19",
+  "selection": "5 purpose-selected Terminal tasks, 3 historical runs each, 56 successful HTTP request occurrences including retransmitted history",
+  "scope": "Identified candidate range, not a validated upper bound; excludes code and code-containing mixed spans",
+  "not_proven": [
+    "provider billed-token savings",
+    "native quality under compression",
+    "representative task-population savings"
+  ],
+  "expected_totals": {
+    "historical_runs": 15,
+    "successful_http_requests": 56,
+    "message_content_utf8_bytes": 824301,
+    "round1_candidate_utf8_bytes": 74592,
+    "round2_candidate_utf8_bytes": 127114
+  }
+}

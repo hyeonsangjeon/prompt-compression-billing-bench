@@ -1,0 +1,10 @@
+{
+  "model": "not-called-synthetic-fixture",
+  "temperature": 0,
+  "reasoning_effort": "none",
+  "messages": [
+    {"role": "user", "content": "Synthetic contract fixture. No model or benchmark task is executed."},
+    {"role": "assistant", "content": "def preserve_marker():\n    return 'unchanged'\n"},
+    {"role": "user", "content": "[2026-01-01T00:00:01Z] INFO build step completed\n[2026-01-01T00:00:02Z] INFO build step completed\n[2026-01-01T00:00:03Z] INFO build step completed\n[2026-01-01T00:00:04Z] INFO build step completed\n[2026-01-01T00:00:05Z] INFO build step completed\n[2026-01-01T00:00:06Z] INFO build step completed\n[2026-01-01T00:00:07Z] INFO build step completed\n[2026-01-01T00:00:08Z] INFO build step completed\n[2026-01-01T00:00:09Z] INFO build step completed\n[2026-01-01T00:00:10Z] INFO build step completed\n[2026-01-01T00:00:11Z] INFO build step completed\n[2026-01-01T00:00:12Z] INFO build step completed\n"}
+  ]
+}

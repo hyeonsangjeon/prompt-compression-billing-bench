@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Static compression record; never provider billing or native quality",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "record_type", "kind", "source", "input_kind", "run_id", "source_commit", "source_sha256", "ledger_sha256", "manifest_sha256", "compressor", "sample", "measured_local", "reductions", "deletion_reference", "tool_reported", "patterns", "protection", "measured_billed", "judge", "model_calls", "artifacts"],
+  "properties": {
+    "schema_version": {"const": 2}, "record_type": {"enum": ["static_request", "static_summary"]},
+    "kind": {"const": "measured"}, "source": {"const": "local_compressor_on_frozen_requests"},
+    "input_kind": {"enum": ["historical_requests", "synthetic_fixture"]}, "run_id": {"type": "string", "minLength": 1},
+    "source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "source_sha256": {"$ref": "#/$defs/sha"}, "ledger_sha256": {"$ref": "#/$defs/sha"}, "manifest_sha256": {"$ref": "#/$defs/sha"},
+    "compressor": {
+      "type": "object", "additionalProperties": false, "required": ["name", "version", "binary_sha256", "options", "target"],
+      "properties": {"name": {"enum": ["none", "squeez"]}, "version": {"enum": ["unavailable", "1.48.4"]}, "binary_sha256": {"oneOf": [{"$ref": "#/$defs/sha"}, {"type": "null"}]}, "options": {"type": "object"}, "target": {"const": "identified_log_spans"}}
+    },
+    "sample": {
+      "type": "object", "additionalProperties": false,
+      "required": ["tasks", "historical_runs", "request_ids", "requests", "static_passes", "selection", "retransmitted_history"],
+      "properties": {"tasks": {"$ref": "#/$defs/identifiers"}, "historical_runs": {"$ref": "#/$defs/identifiers"}, "request_ids": {"$ref": "#/$defs/identifiers"}, "requests": {"type": "integer", "minimum": 1}, "static_passes": {"const": 1}, "selection": {"enum": ["purpose_selected", "synthetic_fixture"]}, "retransmitted_history": {"type": "boolean"}}
+    },
+    "measured_local": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "source", "tokenizer", "tiktoken_version", "tokenizer_table_sha256", "scope", "units", "before", "after"],
+      "properties": {
+        "kind": {"const": "measured"}, "source": {"const": "local_utf8_and_tiktoken"}, "tokenizer": {"const": "o200k_base"}, "tiktoken_version": {"const": "0.14.0"}, "tokenizer_table_sha256": {"$ref": "#/$defs/sha"},
+        "scope": {"const": "message_content_only; no role framing, tools schema or provider billing"}, "units": {"$ref": "#/$defs/units"}, "before": {"$ref": "#/$defs/counts"}, "after": {"$ref": "#/$defs/counts"}
+      }
+    },
+    "reductions": {
+      "type": "object", "additionalProperties": false, "required": ["kind", "source", "saved", "saved_percent", "units"],
+      "properties": {"kind": {"const": "calculated"}, "source": {"const": "measured_local.before_minus_after"}, "saved": {"$ref": "#/$defs/signed_counts"}, "saved_percent": {"$ref": "#/$defs/percentages"}, "units": {"$ref": "#/$defs/units"}}
+    },
+    "deletion_reference": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "method", "after_message_content_tokens", "after_message_content_utf8_bytes", "saved_tokens", "saved_percent", "token_unit", "percent_unit", "not_an_achievable_or_end_to_end_upper_bound"],
+      "properties": {"kind": {"const": "calculated"}, "method": {"const": "retokenize_messages_after_hypothetical_complete_candidate_deletion"}, "after_message_content_tokens": {"type": "integer", "minimum": 0}, "after_message_content_utf8_bytes": {"type": "integer", "minimum": 0}, "saved_tokens": {"type": "integer"}, "saved_percent": {"type": ["number", "null"]}, "token_unit": {"const": "o200k_base message-content tokens"}, "percent_unit": {"const": "percent_of_original_message_content_tokens"}, "not_an_achievable_or_end_to_end_upper_bound": {"const": true}}
+    },
+    "tool_reported": {
+      "type": "object", "additionalProperties": false, "required": ["kind", "status", "observations", "not_provider_usage"],
+      "properties": {
+        "kind": {"const": "tool_reported"}, "status": {"enum": ["reported", "not_reported", "not_applicable"]}, "not_provider_usage": {"const": true},
+        "observations": {
+          "type": "array", "items": {
+            "type": "object", "additionalProperties": false, "required": ["request_id", "span_index", "input_sha256", "output_sha256", "report"],
+            "properties": {"request_id": {"type": "string"}, "span_index": {"type": "integer", "minimum": 0}, "input_sha256": {"$ref": "#/$defs/sha"}, "output_sha256": {"$ref": "#/$defs/sha"}, "report": {"$ref": "#/$defs/tool_report"}}
+          }
+        }
+      }
+    },
+    "patterns": {
+      "type": "object", "additionalProperties": false, "required": ["kind", "observations"],
+      "properties": {
+        "kind": {"const": "classification"},
+        "observations": {"type": "array", "items": {
+          "type": "object", "additionalProperties": false,
+          "required": ["request_id", "span_index", "kind", "method", "before", "after", "original_lines_not_retained_verbatim", "original_line_bytes_not_retained_verbatim", "changed", "does_not_prove"],
+          "properties": {
+            "request_id": {"type": "string"}, "span_index": {"type": "integer", "minimum": 0}, "kind": {"const": "classification"}, "method": {"const": "regex_counts_and_exact_line_multiset_difference"}, "before": {"$ref": "#/$defs/pattern_counts"}, "after": {"$ref": "#/$defs/pattern_counts"}, "original_lines_not_retained_verbatim": {"type": "integer", "minimum": 0}, "original_line_bytes_not_retained_verbatim": {"type": "integer", "minimum": 0}, "changed": {"type": "boolean"},
+            "does_not_prove": {"const": "Missing verbatim lines may be rewritten, summarized or removed; pattern counts do not establish the compressor's internal rule or semantic safety."}
+          }
+        }}
+      }
+    },
+    "protection": {
+      "type": "object", "additionalProperties": false, "required": ["kind", "status", "candidate_segments", "candidate_utf8_bytes", "protected_segments", "protected_utf8_bytes"],
+      "properties": {"kind": {"const": "verification"}, "status": {"const": "passed"}, "candidate_segments": {"type": "integer", "minimum": 0}, "candidate_utf8_bytes": {"type": "integer", "minimum": 0}, "protected_segments": {"type": "integer", "minimum": 0}, "protected_utf8_bytes": {"type": "integer", "minimum": 0}}
+    },
+    "measured_billed": {"const": {"kind": "unavailable", "status": "not_measured", "source": "no_provider_calls", "input_tokens": null, "cached_input_tokens": null, "output_tokens": null, "cost_usd": null, "token_unit": "provider_usage_tokens", "cost_unit": "USD"}},
+    "judge": {"const": {"kind": "unavailable", "status": "not_run", "score": null}}, "model_calls": {"const": 0},
+    "artifacts": {"type": "object", "propertyNames": {"pattern": "^(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+$"}, "additionalProperties": {"$ref": "#/$defs/sha"}}
+  },
+  "$defs": {
+    "sha": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "identifiers": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "units": {"const": {"message_content_utf8_bytes": "UTF-8 bytes", "message_content_tokens": "o200k_base tokens, message content only", "candidate_utf8_bytes": "UTF-8 bytes", "candidate_tokens_separately": "o200k_base tokens, each span encoded separately"}},
+    "counts": {
+      "type": "object", "additionalProperties": false, "required": ["message_content_utf8_bytes", "message_content_tokens", "candidate_utf8_bytes", "candidate_tokens_separately"],
+      "properties": {"message_content_utf8_bytes": {"type": "integer", "minimum": 0}, "message_content_tokens": {"type": "integer", "minimum": 0}, "candidate_utf8_bytes": {"type": "integer", "minimum": 0}, "candidate_tokens_separately": {"type": "integer", "minimum": 0}}
+    },
+    "signed_counts": {
+      "type": "object", "additionalProperties": false, "required": ["message_content_utf8_bytes", "message_content_tokens", "candidate_utf8_bytes", "candidate_tokens_separately"],
+      "properties": {"message_content_utf8_bytes": {"type": "integer"}, "message_content_tokens": {"type": "integer"}, "candidate_utf8_bytes": {"type": "integer"}, "candidate_tokens_separately": {"type": "integer"}}
+    },
+    "percentages": {
+      "type": "object", "additionalProperties": false, "required": ["message_content_utf8_bytes", "message_content_tokens", "candidate_utf8_bytes", "candidate_tokens_separately"],
+      "properties": {"message_content_utf8_bytes": {"type": ["number", "null"]}, "message_content_tokens": {"type": ["number", "null"]}, "candidate_utf8_bytes": {"type": ["number", "null"]}, "candidate_tokens_separately": {"type": ["number", "null"]}}
+    },
+    "pattern_counts": {
+      "type": "object", "additionalProperties": false,
+      "required": ["iso_timestamp_prefix", "ansi_escape", "carriage_return", "percentage_progress_line", "package_install_line", "unix_long_listing_line", "absolute_path_line", "duplicate_nonempty_line_excess"],
+      "properties": {"iso_timestamp_prefix": {"type": "integer", "minimum": 0}, "ansi_escape": {"type": "integer", "minimum": 0}, "carriage_return": {"type": "integer", "minimum": 0}, "percentage_progress_line": {"type": "integer", "minimum": 0}, "package_install_line": {"type": "integer", "minimum": 0}, "unix_long_listing_line": {"type": "integer", "minimum": 0}, "absolute_path_line": {"type": "integer", "minimum": 0}, "duplicate_nonempty_line_excess": {"type": "integer", "minimum": 0}}
+    },
+    "tool_report": {
+      "type": "object", "additionalProperties": false, "required": ["kind", "status", "headers", "metrics", "not_provider_usage"],
+      "properties": {"kind": {"const": "tool_reported"}, "status": {"enum": ["reported", "not_reported", "not_applicable"]}, "headers": {"type": "array", "items": {"type": "string"}}, "not_provider_usage": {"const": true}, "metrics": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["name", "value", "unit", "kind"], "properties": {"name": {"enum": ["input_display", "output_display", "change_display"]}, "value": {"type": "number"}, "unit": {"enum": ["squeez_input_estimate", "squeez_output_estimate", "percent_tool_defined"]}, "kind": {"const": "tool_reported"}}}}}
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "dataset": "synthetic-contract-example",
+  "kind": "synthetic_fixture",
+  "selection": "synthetic_fixture",
+  "retransmitted_history": false,
+  "classification_source_sha256": "d895ed875a3441f6af10c39cba53cb69386e0b001ec9304cd8b73aed70c4cd54",
+  "requests": [
+    {
+      "record_id": "synthetic-request-1",
+      "task": "synthetic-contract-example",
+      "historical_run": "synthetic-input-1",
+      "sequence": 1,
+      "path": "requests/0000.json",
+      "sha256": "d895ed875a3441f6af10c39cba53cb69386e0b001ec9304cd8b73aed70c4cd54",
+      "segments": [
+        {
+          "message_index": 0,
+          "char_start": 0,
+          "char_end": 67,
+          "utf8_bytes": 67,
+          "sha256": "7795dded19e0229e778b8c4f000bb1720e4a2356fc5a4b463c49ec7a87094ec2",
+          "category": "task_instruction",
+          "candidate": false
+        },
+        {
+          "message_index": 1,
+          "char_start": 0,
+          "char_end": 46,
+          "utf8_bytes": 46,
+          "sha256": "ae9c71e97b0d64748bc74ae8de0bad6325e913b6bbdddce3baba96e04572a796",
+          "category": "code",
+          "candidate": false
+        },
+        {
+          "message_index": 2,
+          "char_start": 0,
+          "char_end": 588,
+          "utf8_bytes": 588,
+          "sha256": "14bb129b347170dac4db666ce438918a9e54d195de5ae851d250f6b04aa5091c",
+          "category": "log",
+          "candidate": true
+        }
+      ]
+    }
+  ]
+}

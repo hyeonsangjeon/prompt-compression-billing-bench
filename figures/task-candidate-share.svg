@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="470" viewBox="0 0 920 470" role="img" aria-labelledby="title desc">
+<title id="title">Identified log-candidate bytes by task, two classification rounds</title>
+<desc id="desc">5 purpose-selected Terminal tasks, 3 historical runs each, 56 successful HTTP request occurrences including retransmitted history. Identified candidate range, not a validated upper bound; excludes code and code-containing mixed spans.</desc>
+<rect width="920" height="470" fill="#ffffff"/>
+<g font-family="sans-serif" fill="#17202a">
+<text x="32" y="34" font-size="21">Identified log candidates, not achieved compression</text>
+<text x="32" y="60" font-size="13">UTF-8 candidate bytes / complete message-content bytes, including retransmitted history</text>
+<rect x="32" y="79" width="14" height="10" fill="#9aafc9"/><text x="53" y="89" font-size="13">Round 1 classification</text>
+<rect x="260" y="79" width="14" height="10" fill="#295f99"/><text x="281" y="89" font-size="13">Round 2 classification</text>
+<path d="M315.00,115 V382" stroke="#dce1e6" stroke-dasharray="3 4"/>
+<text x="315.00" y="401" text-anchor="middle" font-size="12">0%</text>
+<path d="M442.50,115 V382" stroke="#dce1e6" stroke-dasharray="3 4"/>
+<text x="442.50" y="401" text-anchor="middle" font-size="12">10%</text>
+<path d="M570.00,115 V382" stroke="#dce1e6" stroke-dasharray="3 4"/>
+<text x="570.00" y="401" text-anchor="middle" font-size="12">20%</text>
+<path d="M697.50,115 V382" stroke="#dce1e6" stroke-dasharray="3 4"/>
+<text x="697.50" y="401" text-anchor="middle" font-size="12">30%</text>
+<path d="M825.00,115 V382" stroke="#dce1e6" stroke-dasharray="3 4"/>
+<text x="825.00" y="401" text-anchor="middle" font-size="12">40%</text>
+<text x="32" y="140" font-size="14">cancel-async-tasks</text>
+<text x="32" y="158" font-size="11" fill="#526171">3 runs; 9 request occurrences</text>
+<rect x="315" y="130" width="5.950" height="12" fill="#9aafc9"/>
+<text x="326.950" y="141" font-size="12">0.47%</text>
+<rect x="315" y="147" width="6.159" height="12" fill="#295f99"/>
+<text x="327.159" y="158" font-size="12">0.48%</text>
+<text x="32" y="192" font-size="14">log-summary-date-ranges</text>
+<text x="32" y="210" font-size="11" fill="#526171">3 runs; 13 request occurrences</text>
+<rect x="315" y="182" width="328.157" height="12" fill="#9aafc9"/>
+<text x="649.157" y="193" font-size="12">25.74%</text>
+<rect x="315" y="199" width="449.886" height="12" fill="#295f99"/>
+<text x="770.886" y="210" font-size="12">35.29%</text>
+<text x="32" y="244" font-size="14">multi-source-data-merger</text>
+<text x="32" y="262" font-size="11" fill="#526171">3 runs; 15 request occurrences</text>
+<rect x="315" y="234" width="18.125" height="12" fill="#9aafc9"/>
+<text x="339.125" y="245" font-size="12">1.42%</text>
+<rect x="315" y="251" width="21.945" height="12" fill="#295f99"/>
+<text x="342.945" y="262" font-size="12">1.72%</text>
+<text x="32" y="296" font-size="14">nginx-request-logging</text>
+<text x="32" y="314" font-size="11" fill="#526171">3 runs; 11 request occurrences</text>
+<rect x="315" y="286" width="89.618" height="12" fill="#9aafc9"/>
+<text x="410.618" y="297" font-size="12">7.03%</text>
+<rect x="315" y="303" width="354.835" height="12" fill="#295f99"/>
+<text x="675.835" y="314" font-size="12">27.83%</text>
+<text x="32" y="348" font-size="14">openssl-selfsigned-cert</text>
+<text x="32" y="366" font-size="11" fill="#526171">3 runs; 8 request occurrences</text>
+<rect x="315" y="338" width="17.224" height="12" fill="#9aafc9"/>
+<text x="338.224" y="349" font-size="12">1.35%</text>
+<rect x="315" y="355" width="17.224" height="12" fill="#295f99"/>
+<text x="338.224" y="366" font-size="12">1.35%</text>
+<text x="32" y="433" font-size="12">5 purpose-selected tasks, 15 historical runs, 56 successful HTTP request occurrences; not a population estimate.</text>
+<text x="32" y="454" font-size="12">Code and code-containing mixed spans remain protected. Identified candidate range, not a validated upper bound.</text>
+</g></svg>

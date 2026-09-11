@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Hash-bound text requests and complete ordered span partitions",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "dataset", "kind", "selection", "retransmitted_history", "classification_source_sha256", "requests"],
+  "properties": {
+    "schema_version": {"const": 1}, "dataset": {"type": "string", "minLength": 1},
+    "kind": {"enum": ["historical_requests", "synthetic_fixture"]},
+    "selection": {"enum": ["purpose_selected", "synthetic_fixture"]},
+    "retransmitted_history": {"type": "boolean"}, "classification_source_sha256": {"$ref": "#/$defs/sha"},
+    "requests": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["record_id", "task", "historical_run", "sequence", "path", "sha256", "segments"],
+        "properties": {
+          "record_id": {"type": "string", "minLength": 1}, "task": {"type": "string", "minLength": 1}, "historical_run": {"type": "string", "minLength": 1},
+          "sequence": {"type": "integer", "minimum": 0}, "path": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/sha"},
+          "segments": {
+            "type": "array",
+            "items": {
+              "type": "object", "additionalProperties": false,
+              "required": ["message_index", "char_start", "char_end", "utf8_bytes", "sha256", "category", "candidate"],
+              "properties": {
+                "message_index": {"type": "integer", "minimum": 0}, "char_start": {"type": "integer", "minimum": 0}, "char_end": {"type": "integer", "minimum": 1},
+                "utf8_bytes": {"type": "integer", "minimum": 1}, "sha256": {"$ref": "#/$defs/sha"}, "category": {"type": "string", "minLength": 1}, "candidate": {"type": "boolean"}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {"sha": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

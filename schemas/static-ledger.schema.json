@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Offline frozen-input execution ledger",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "mode", "output_dir", "inputs", "execution", "compressor", "measurement", "limits", "expect"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "mode": {"const": "frozen_static"},
+    "output_dir": {"type": "string", "minLength": 1},
+    "inputs": {
+      "type": "object", "additionalProperties": false,
+      "required": ["root_env", "manifest_sha256", "dataset", "kind", "tasks", "historical_runs", "request_count", "candidate_segments", "protected_segments"],
+      "properties": {
+        "root_env": {"$ref": "#/$defs/env"}, "manifest_sha256": {"$ref": "#/$defs/sha"},
+        "dataset": {"type": "string", "minLength": 1}, "kind": {"enum": ["historical_requests", "synthetic_fixture"]},
+        "tasks": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "historical_runs": {"type": "integer", "minimum": 1}, "request_count": {"type": "integer", "minimum": 1},
+        "candidate_segments": {"type": "integer", "minimum": 0}, "protected_segments": {"type": "integer", "minimum": 0}
+      }
+    },
+    "execution": {
+      "type": "object", "additionalProperties": false,
+      "required": ["passes", "judge", "request_settings", "concurrency"],
+      "properties": {"passes": {"const": 1}, "judge": {"const": "not_run"}, "request_settings": {"const": "preserve_exactly"}, "concurrency": {"const": 1}}
+    },
+    "compressor": {
+      "type": "object", "additionalProperties": false, "required": ["name", "target", "tools"],
+      "properties": {
+        "name": {"enum": ["none", "squeez"]}, "target": {"const": "identified_log_spans"},
+        "tools": {
+          "type": "object", "additionalProperties": false, "required": ["none", "squeez"],
+          "properties": {
+            "none": {"type": "object", "additionalProperties": false, "required": ["version", "options"], "properties": {"version": {"const": "unavailable"}, "options": {"const": {}}}},
+            "squeez": {
+              "type": "object", "additionalProperties": false, "required": ["version", "binary_env", "sha256", "options"],
+              "properties": {
+                "version": {"const": "1.48.4"}, "binary_env": {"$ref": "#/$defs/env"}, "sha256": {"$ref": "#/$defs/sha"},
+                "options": {
+                  "type": "object", "additionalProperties": false,
+                  "required": ["invocation", "state", "timeout_seconds", "output"],
+                  "properties": {"invocation": {"const": "wrap_cat_input_txt"}, "state": {"const": "fresh_home_per_span"}, "timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 60}, "output": {"const": "complete_stdout"}}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "measurement": {
+      "type": "object", "additionalProperties": false,
+      "required": ["tokenizer", "tiktoken_version", "cache_env", "table_sha256"],
+      "properties": {"tokenizer": {"const": "o200k_base"}, "tiktoken_version": {"const": "0.14.0"}, "cache_env": {"$ref": "#/$defs/env"}, "table_sha256": {"const": "446a9538cb6c348e3516120d7c08b09f57c36495e2acfffe59a5bf8b0cfb1a2d"}}
+    },
+    "limits": {
+      "type": "object", "additionalProperties": false,
+      "required": ["model_calls", "api_cost_usd", "max_wall_seconds", "max_input_bytes"],
+      "properties": {"model_calls": {"const": 0}, "api_cost_usd": {"const": 0}, "max_wall_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 3600}, "max_input_bytes": {"type": "integer", "minimum": 1, "maximum": 100000000}}
+    },
+    "expect": {
+      "type": "object", "additionalProperties": false,
+      "required": ["message_content_utf8_bytes", "message_content_tokens", "deleted_content_tokens", "candidate_utf8_bytes"],
+      "properties": {"message_content_utf8_bytes": {"type": "integer", "minimum": 0}, "message_content_tokens": {"type": "integer", "minimum": 0}, "deleted_content_tokens": {"type": "integer", "minimum": 0}, "candidate_utf8_bytes": {"type": "integer", "minimum": 0}}
+    }
+  },
+  "$defs": {"sha": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "env": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"}}
+}

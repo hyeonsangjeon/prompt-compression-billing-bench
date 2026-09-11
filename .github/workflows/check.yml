@@ -1,0 +1,32 @@
+name: Record contracts
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+      - name: Install only static dependencies
+        run: uv sync --locked
+      - name: Prepare the hash-checked tokenizer table, no model calls
+        run: uv run --locked python run.py static --prepare-tokenizer "$RUNNER_TEMP/tokenizer"
+      - name: Test accounting and failure contracts without model calls
+        env:
+          TIKTOKEN_CACHE_DIR: ${{ runner.temp }}/tokenizer
+        run: uv run --locked python -m unittest discover -s tests -v
+      - name: Check recorded evidence in both directions
+        run: |
+          for file in evidence/*.json; do
+            uv run --locked python evidence.py check "$file"
+          done
+      - name: Verify aggregate EDA figure in both directions
+        run: uv run --locked python -m src.eda --check
+      - name: Refuse files without a publication grade
+        run: uv run --locked python evidence.py audit-files .

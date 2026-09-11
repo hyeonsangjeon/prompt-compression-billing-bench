@@ -1,0 +1,57 @@
+schema_version = 2
+mode = "frozen_static"
+output_dir = "runs"
+
+[inputs]
+root_env = "FROZEN_INPUT_ROOT"
+manifest_sha256 = "5a8c238d86543c8bd0d48380c7744cfdb89f0c3ef9f9de759ab082268f0f466a"
+dataset = "synthetic-contract-example"
+kind = "synthetic_fixture"
+tasks = ["synthetic-contract-example"]
+historical_runs = 1
+request_count = 1
+candidate_segments = 1
+protected_segments = 2
+
+[execution]
+passes = 1
+judge = "not_run"
+request_settings = "preserve_exactly"
+concurrency = 1
+
+[compressor]
+name = "none"
+target = "identified_log_spans"
+
+[compressor.tools.none]
+version = "unavailable"
+options = {}
+
+[compressor.tools.squeez]
+version = "1.48.4"
+binary_env = "SQUEEZ_BINARY"
+sha256 = "ef956365ace3aa5f362847afc000aa008d5b4a26db4ee2c5bcc0d2718d043773"
+
+[compressor.tools.squeez.options]
+invocation = "wrap_cat_input_txt"
+state = "fresh_home_per_span"
+timeout_seconds = 10
+output = "complete_stdout"
+
+[measurement]
+tokenizer = "o200k_base"
+tiktoken_version = "0.14.0"
+cache_env = "TIKTOKEN_CACHE_DIR"
+table_sha256 = "446a9538cb6c348e3516120d7c08b09f57c36495e2acfffe59a5bf8b0cfb1a2d"
+
+[limits]
+model_calls = 0
+api_cost_usd = 0
+max_wall_seconds = 180
+max_input_bytes = 20000000
+
+[expect]
+message_content_utf8_bytes = 701
+message_content_tokens = 262
+deleted_content_tokens = 22
+candidate_utf8_bytes = 588
