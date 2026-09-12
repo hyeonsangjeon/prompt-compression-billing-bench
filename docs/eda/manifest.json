@@ -1,0 +1,866 @@
+{
+  "schema_version": 1,
+  "kind": "existing_eda_assembly",
+  "new_model_calls": false,
+  "new_compression_measurement": false,
+  "figures": [
+    {
+      "id": "figure-1",
+      "path": "figures/round2/01-task-types.svg",
+      "sha256": "8a2f83048fcdc865b36152c96ead0f796a125bb5e208af9483bda14f51328236",
+      "alt": "주 종류 분포. 공식 영어 지시문 DeepSWE n=113, Terminal n=89. 주 종류 하나로 집계하며 리뷰·수정 혼합 한 과제는 보조 라벨에 남긴다.",
+      "caption": "공식 113·89과제의 공통 주 종류 분포와 모호함",
+      "metadata": [
+        [
+          "표본",
+          "DeepSWE n=113 · Terminal n=89"
+        ],
+        [
+          "분모 · 단위",
+          "각 벤치마크 과제 수 · 과제 / %"
+        ],
+        [
+          "성격",
+          "분류 판단·집계"
+        ]
+      ],
+      "visible_text_sha256": "6edbd1862ebfd24d4a2adc6a84ae7ea57d191cf9fa4846b65a2c488069ab4b74"
+    },
+    {
+      "id": "figure-2",
+      "path": "figures/round1/05-corpus-bias.svg",
+      "sha256": "29e95d987133ac1405a85a0d77a9249783eb7136d16242d8b66cf66cc14887f7",
+      "alt": "DeepSWE 113과제의 저장소·주 언어와 Terminal 89과제의 종류·난이도 분포. 난이도는 저자 메타데이터이지 이번 모델의 성능 측정이 아니다.",
+      "caption": "DeepSWE 저장소·언어와 Terminal 작성자 category·난이도 분포",
+      "metadata": [
+        [
+          "표본",
+          "DeepSWE n=113 · Terminal n=89"
+        ],
+        [
+          "분모 · 단위",
+          "각 벤치마크 과제 수 · 과제 / %"
+        ],
+        [
+          "성격",
+          "계산 · 메타데이터 집계"
+        ]
+      ],
+      "visible_text_sha256": "cd337fefa1a841a5b4fe332b5abd5458a4cc5608d23491066f63751f581f58b7"
+    },
+    {
+      "id": "figure-3",
+      "path": "figures/round1/01-input-size.svg",
+      "sha256": "0e031cbf23bcfdfb4ed0f689c484fde0d185d88fc7e65730032bb18851c0dd7f",
+      "alt": "공식 DeepSWE 113과제와 Terminal 89과제의 지시문 UTF-8 바이트 및 로컬 토큰 분포. API 청구 토큰이 아니다.",
+      "caption": "공식 DeepSWE 113·Terminal 89 지시문의 UTF-8 바이트와 로컬 토큰 히스토그램",
+      "metadata": [
+        [
+          "표본",
+          "공식 DeepSWE n=113 · Terminal n=89"
+        ],
+        [
+          "분모 · 단위",
+          "공식 지시문 파일 · UTF-8 바이트 / 로컬 o200k_base 토큰"
+        ],
+        [
+          "성격",
+          "측정 · 분위수 계산"
+        ]
+      ],
+      "visible_text_sha256": "49bd9a78a82ad48001fd2e1263791091587d983b109d02ea4f7035bfc150b59c"
+    },
+    {
+      "id": "figure-4",
+      "path": "figures/round2/03-input-size-by-type.svg",
+      "sha256": "e86b10585914a2d2e8f70c2ddfaaebb1d3bc1ac9729d4429a9bc000a431abf60",
+      "alt": "입력 크기 분포. 정적 DeepSWE n=113과제와 Terminal n=89과제, 과거 Terminal n=56요청을 분리했다. UTF-8 바이트와 로컬 o200k_base 토큰이며 API 토큰이 아니다.",
+      "caption": "공식 두 집합과 Terminal 56요청을 나눈 종류별 바이트/로컬 토큰 상자·개별점",
+      "metadata": [
+        [
+          "표본",
+          "공식 DeepSWE 113 · Terminal 89 · 과거 Terminal 56요청"
+        ],
+        [
+          "분모 · 단위",
+          "지시문 / 요청 본문 · UTF-8 바이트 / 로컬 토큰"
+        ],
+        [
+          "성격",
+          "측정 · 분위수 계산"
+        ]
+      ],
+      "visible_text_sha256": "c482b8e56ca1d3c8298581477c757923c8ec1db3e19f99d691175fe57edf9157"
+    },
+    {
+      "id": "figure-5",
+      "path": "figures/round1/02-input-composition.svg",
+      "sha256": "57aa286750015af99651a230834ed458a20936a0afa189cbcb8c32bb9a98440c",
+      "alt": "정적 지시문 113개·89개와 기존 Terminal 실제 요청 56개의 본문 구간 비중. 각 층의 UTF-8 바이트 합계를 분모로 하며 미분류도 별도 표시한다.",
+      "caption": "공식 두 집합과 과거 Terminal 56요청의 본문 구성",
+      "metadata": [
+        [
+          "표본",
+          "공식 지시문 113개·89개 · Terminal 실제 요청 56개"
+        ],
+        [
+          "분모 · 단위",
+          "각 입력층의 본문 UTF-8 바이트 합계 · %"
+        ],
+        [
+          "성격",
+          "분류 판단·바이트 집계"
+        ]
+      ],
+      "visible_text_sha256": "17dda5a8d0c7fa1853b3aca5680c0560ee4d5d9a361e13338b6681af7aa984db"
+    },
+    {
+      "id": "figure-6",
+      "path": "figures/round1/03-compressible-share.svg",
+      "sha256": "dea914de8808b7ec7746d01f0b60af449a38ada5473cfce3f3ca4f49ee52f5f6",
+      "alt": "Terminal 5과제, 각 3실행에서 기록된 요청 56개의 과제별 로그 후보·미분류·보호 구간 비중. 압축 결과가 아니라 본문 바이트 구성이다.",
+      "caption": "Terminal 5과제의 1차 식별 후보·미분류·보호 비중",
+      "metadata": [
+        [
+          "표본",
+          "5과제 · 각 n=3실행 · 56요청"
+        ],
+        [
+          "분모 · 단위",
+          "과제별 본문 UTF-8 바이트 합계 · %"
+        ],
+        [
+          "성격",
+          "분류 판단·바이트 집계"
+        ]
+      ],
+      "visible_text_sha256": "5d8a68f4acc99d17a05c7b87538e59deebe28bbd7c68ec1aac7ad0de5b18d463"
+    },
+    {
+      "id": "figure-7",
+      "path": "figures/round2/04-unknown-decomposition.svg",
+      "sha256": "47970d1c9203dc4d838930271e9e8c6518725c1289aa77fd4d5d6a04a07bc841",
+      "alt": "미분류 분해. 서로 다른 58종, 재전송 포함 168회·158,258바이트를 전수 검토했다. 기존 과거 요청 n=56, 과제 n=5이며 API 토큰이나 실제 절감률이 아니다.",
+      "caption": "옛 미분류 158,258바이트의 7범주 분해",
+      "metadata": [
+        [
+          "표본",
+          "58종 · 재전송 포함 168회 · 56요청·5과제"
+        ],
+        [
+          "분모 · 단위",
+          "미분류 158,258바이트 / 전체 본문 824,301바이트"
+        ],
+        [
+          "성격",
+          "분류 판단·바이트 집계"
+        ]
+      ],
+      "visible_text_sha256": "7fc03e1054920b576a89f8a8513a85e2d570c42854bacc658dca25117b8e6840"
+    },
+    {
+      "id": "figure-8",
+      "path": "figures/round2/02-candidate-share-by-type.svg",
+      "sha256": "89cfaf57fc4c59ff8afd5c71fa6f64bf2c5c7fbf044fd799c21d29f0b0d3ff61",
+      "alt": "종류별 후보와 본문 구성. 과거 Terminal n=5과제, 15실행, 56요청. UTF-8 바이트 기준이며 디버깅·리뷰 등 무표본 종류는 미측정이다.",
+      "caption": "Terminal 종류별 1차→2차 후보와 코드 혼합을 보호한 전체 구성",
+      "metadata": [
+        [
+          "표본",
+          "Terminal 5과제 · 15실행 · 56요청"
+        ],
+        [
+          "분모 · 단위",
+          "종류별 본문 UTF-8 바이트 합계 · %"
+        ],
+        [
+          "성격",
+          "분류 판단·바이트 집계"
+        ]
+      ],
+      "visible_text_sha256": "5a94f044e36b385fd9100db65a2cf834ecf64db46dd94be6566a4e71abdeac07"
+    },
+    {
+      "id": "figure-9",
+      "path": "figures/round1/06-api-token-calibration.svg",
+      "sha256": "70b9a531e5bfa66d5264fd04241c229f0b4ac04b03f923373a567ed11ae48cca",
+      "alt": "기존 Terminal 5과제·15실행·56요청의 로컬 메시지 본문 토큰과 실제 API 입력 토큰 대조. 점선은 계산상 y=x이며 오른쪽은 차이 분포다.",
+      "caption": "같은 Terminal 56요청의 API 입력과 로컬 본문 토큰 대조·차이 분포",
+      "metadata": [
+        [
+          "표본",
+          "Terminal 5과제 · 15실행 · 56요청"
+        ],
+        [
+          "분모 · 단위",
+          "요청 / 실행 · API usage 토큰 / 로컬 본문 토큰"
+        ],
+        [
+          "성격",
+          "과거 API·로컬 측정 · 통계 계산"
+        ]
+      ],
+      "visible_text_sha256": "27989fb625e8bad274f5556f639c1deced657f0d26b9356a45dd57272102db9c"
+    },
+    {
+      "id": "figure-10",
+      "path": "figures/round1/04-shared-prefix.svg",
+      "sha256": "da89ae87d02d0361c5dfdd9109e01b4e8b9fe98e4effa432faa87ced32ea3f47",
+      "alt": "공식 지시문 과제 쌍과 실제 Terminal 요청 쌍의 공통 선두 로컬 token ID 길이 분포. 1,024 점선은 Azure GPT-5.4 기준이며 서비스 캐시 접두부 실측이 아니다.",
+      "caption": "정적 지시문/첫 요청/인접 요청 쌍의 공통 로컬 token ID 길이 누적분포",
+      "metadata": [
+        [
+          "표본",
+          "정적 지시문 쌍 6,328 / 3,916 · 과거 요청 쌍 41 / 10 / 15"
+        ],
+        [
+          "분모 · 단위",
+          "비교층별 쌍 수 · 공통 선두 로컬 token ID 길이"
+        ],
+        [
+          "성격",
+          "측정 · 통계 계산"
+        ]
+      ],
+      "visible_text_sha256": "ce8e37bebc2c5e58ed9a4716618f8fae5359d0d60c54783fe6f59bc31b6bce74"
+    }
+  ],
+  "tables": [
+    {
+      "id": "table-1",
+      "source": "1차 분석",
+      "source_table": 1,
+      "rows_sha256": "43627aab6d97b9f8a9e0c936a5e9c962d146d4b509d5df7d186938e9c1fdc20d",
+      "metadata": [
+        [
+          "표본",
+          "공식 지시문 113/113과제 · 89/89과제"
+        ],
+        [
+          "분모 · 단위",
+          "instruction.md 본문"
+        ],
+        [
+          "성격",
+          "측정 조건"
+        ]
+      ]
+    },
+    {
+      "id": "table-2",
+      "source": "1차 분석",
+      "source_table": 2,
+      "rows_sha256": "fc64ccd541e202387e312fcf0eabce4b0152d0bd4ec45c49add896d9e3a8f1e6",
+      "metadata": [
+        [
+          "표본",
+          "5과제 × 3실행 · 56요청"
+        ],
+        [
+          "분모 · 단위",
+          "과거 실제 API 요청"
+        ],
+        [
+          "성격",
+          "측정 조건"
+        ]
+      ]
+    },
+    {
+      "id": "table-3",
+      "source": "1차 분석",
+      "source_table": 3,
+      "rows_sha256": "11e63d883b86c7dc4af841faa6d18df6791b0a50f025fd639af4e5ddee8fc730",
+      "metadata": [
+        [
+          "표본",
+          "정적 지시문 / 실제 요청"
+        ],
+        [
+          "분모 · 단위",
+          "본문 바이트 / 로컬 토큰 / API usage"
+        ],
+        [
+          "성격",
+          "측정 방법 · 가정 계산의 구분"
+        ]
+      ]
+    },
+    {
+      "id": "table-4",
+      "source": "2차 분석",
+      "source_table": 1,
+      "rows_sha256": "e9e84ea42be07cc9d92f905cd7759cc71450396a3c5ba6a34f9457ceb7785e76",
+      "metadata": [
+        [
+          "표본",
+          "공식 202과제 · 과거 5과제 × 3실행·56요청"
+        ],
+        [
+          "분모 · 단위",
+          "2026-09-11 NAS 정적 재분석"
+        ],
+        [
+          "성격",
+          "측정 조건"
+        ]
+      ]
+    },
+    {
+      "id": "table-5",
+      "source": "2차 분석",
+      "source_table": 2,
+      "rows_sha256": "27493ad2d1e89808f277818860801184742b7d185e5813f466fe531b2ad68dbd",
+      "metadata": [
+        [
+          "표본",
+          "DeepSWE n=113 · Terminal n=89"
+        ],
+        [
+          "분모 · 단위",
+          "각 벤치마크 과제 수 · 과제 / %"
+        ],
+        [
+          "성격",
+          "분류 판단·집계"
+        ]
+      ]
+    },
+    {
+      "id": "table-6",
+      "source": "1차 측정표",
+      "source_table": 14,
+      "rows_sha256": "850e5f4b9a620d87c409780ae8ee1a08131d0400340a769a97ac21b7643a4855",
+      "metadata": [
+        [
+          "표본",
+          "DeepSWE n=113과제 · 91개 저장소"
+        ],
+        [
+          "분모 · 단위",
+          "113과제 · 과제 / %"
+        ],
+        [
+          "성격",
+          "계산 · 메타데이터 집계"
+        ]
+      ]
+    },
+    {
+      "id": "table-7",
+      "source": "1차 측정표",
+      "source_table": 8,
+      "rows_sha256": "10b40ec095753d33253ccd1b970eb8fc918d1c43a73545334d903f02d4109308",
+      "metadata": [
+        [
+          "표본",
+          "DeepSWE n=113과제"
+        ],
+        [
+          "분모 · 단위",
+          "113과제 · 과제 / %"
+        ],
+        [
+          "성격",
+          "계산 · 메타데이터 집계"
+        ]
+      ]
+    },
+    {
+      "id": "table-8",
+      "source": "1차 측정표",
+      "source_table": 12,
+      "rows_sha256": "d714f308811d103fc0fd6d568cf3f4a947bf3e2d838f262e3f6a7bfa127fc631",
+      "metadata": [
+        [
+          "표본",
+          "Terminal n=89과제"
+        ],
+        [
+          "분모 · 단위",
+          "89과제 · 과제 / %"
+        ],
+        [
+          "성격",
+          "계산 · 메타데이터 집계"
+        ]
+      ]
+    },
+    {
+      "id": "table-9",
+      "source": "1차 측정표",
+      "source_table": 13,
+      "rows_sha256": "50c08d311e7198a3f24d9cacb942e237735179203566bdc9c13df17c096a8160",
+      "metadata": [
+        [
+          "표본",
+          "Terminal n=89과제"
+        ],
+        [
+          "분모 · 단위",
+          "89과제 · 과제 / %"
+        ],
+        [
+          "성격",
+          "계산 · 저자 메타데이터 집계"
+        ]
+      ]
+    },
+    {
+      "id": "table-10",
+      "source": "1차 측정표",
+      "source_table": 9,
+      "rows_sha256": "dc48e293e93ad2a2a44f37a3044294c0edca288087ca014ea50d972047ea2919",
+      "metadata": [
+        [
+          "표본",
+          "DeepSWE n=113 · Terminal n=89"
+        ],
+        [
+          "분모 · 단위",
+          "각 벤치마크 과제 수 · 과제 / %"
+        ],
+        [
+          "성격",
+          "계산 · 메타데이터 집계"
+        ]
+      ]
+    },
+    {
+      "id": "table-11",
+      "source": "1차 측정표",
+      "source_table": 10,
+      "rows_sha256": "00d2c837b1bd5426b299bc2db305dba5935f9ff36cb895dbbbff49c2d507f2ed",
+      "metadata": [
+        [
+          "표본",
+          "DeepSWE n=113 · Terminal n=89"
+        ],
+        [
+          "분모 · 단위",
+          "각 벤치마크 과제 수 · 과제 / %"
+        ],
+        [
+          "성격",
+          "계산 · 메타데이터 집계"
+        ]
+      ]
+    },
+    {
+      "id": "table-12",
+      "source": "1차 측정표",
+      "source_table": 11,
+      "rows_sha256": "d8760a5a6aac8c64c0bd679b2146999107e6a8541af70e7ab71a3066194adbcf",
+      "metadata": [
+        [
+          "표본",
+          "DeepSWE n=113 · Terminal n=89"
+        ],
+        [
+          "분모 · 단위",
+          "각 벤치마크 과제 수 · 과제 / %"
+        ],
+        [
+          "성격",
+          "계산 · 메타데이터 집계"
+        ]
+      ]
+    },
+    {
+      "id": "table-13",
+      "source": "1차 측정표",
+      "source_table": 1,
+      "rows_sha256": "5d41a0a5590836de5e412c04211641331498ae07f10151e73a80d8cf34cae894",
+      "metadata": [
+        [
+          "표본",
+          "공식 DeepSWE 113 · Terminal 89 · 이관 영어/한국어 각 113"
+        ],
+        [
+          "분모 · 단위",
+          "각 지시문 파일 · 바이트 / 로컬 o200k_base 토큰"
+        ],
+        [
+          "성격",
+          "측정 · 분위수 계산"
+        ]
+      ]
+    },
+    {
+      "id": "table-14",
+      "source": "2차 측정표",
+      "source_table": 1,
+      "rows_sha256": "4bdd33891c06da704b777b8664ea2d8118ccb7e3795d08f58f83b4aea69fdb22",
+      "metadata": [
+        [
+          "표본",
+          "DeepSWE n=113과제"
+        ],
+        [
+          "분모 · 단위",
+          "각 공식 지시문 · UTF-8 바이트 / 로컬 토큰"
+        ],
+        [
+          "성격",
+          "측정 · 분위수 계산"
+        ]
+      ]
+    },
+    {
+      "id": "table-15",
+      "source": "2차 측정표",
+      "source_table": 3,
+      "rows_sha256": "c278dd48ed59cb38ac524add12796767b5619eeedb9a5796f0cdacc46f43ceec",
+      "metadata": [
+        [
+          "표본",
+          "Terminal n=89과제"
+        ],
+        [
+          "분모 · 단위",
+          "각 공식 지시문 · UTF-8 바이트 / 로컬 토큰"
+        ],
+        [
+          "성격",
+          "측정 · 분위수 계산"
+        ]
+      ]
+    },
+    {
+      "id": "table-16",
+      "source": "2차 측정표",
+      "source_table": 6,
+      "rows_sha256": "eaacb062ca5559972bb08a6c463327d198c96a77197f24f320369c45156b65b3",
+      "metadata": [
+        [
+          "표본",
+          "Terminal 5과제 · 56요청"
+        ],
+        [
+          "분모 · 단위",
+          "각 요청 본문 · UTF-8 바이트 / 로컬 토큰"
+        ],
+        [
+          "성격",
+          "측정 · 분위수 계산"
+        ]
+      ]
+    },
+    {
+      "id": "table-17",
+      "source": "1차 측정표",
+      "source_table": 2,
+      "rows_sha256": "3af75ca2dba59283e484cffc7e1c9c154eaa4a76ab34f0211b02d38a5a63963b",
+      "metadata": [
+        [
+          "표본",
+          "공식 지시문 113개·89개 · Terminal 실제 요청 56개"
+        ],
+        [
+          "분모 · 단위",
+          "각 입력층의 본문 UTF-8 바이트 합계 · %"
+        ],
+        [
+          "성격",
+          "분류 판단·바이트 집계"
+        ]
+      ]
+    },
+    {
+      "id": "table-18",
+      "source": "1차 측정표",
+      "source_table": 3,
+      "rows_sha256": "1642ba217bd2fa03f77851fc4d68b8f268d8a4b57120b4a8e6f3b99012245e24",
+      "metadata": [
+        [
+          "표본",
+          "공식 지시문 113개·89개 · Terminal 56요청"
+        ],
+        [
+          "분모 · 단위",
+          "각 지시문 / 요청 본문 UTF-8 바이트 · %"
+        ],
+        [
+          "성격",
+          "분류 판단 · 분위수 계산"
+        ]
+      ]
+    },
+    {
+      "id": "table-19",
+      "source": "2차 측정표",
+      "source_table": 2,
+      "rows_sha256": "f9a150d18840934eb835370805f2b39426290da14d3cc0c7141207eff7520f1b",
+      "metadata": [
+        [
+          "표본",
+          "DeepSWE n=113과제"
+        ],
+        [
+          "분모 · 단위",
+          "종류별 공식 지시문 UTF-8 바이트 합계 · %"
+        ],
+        [
+          "성격",
+          "분류 판단·바이트 집계"
+        ]
+      ]
+    },
+    {
+      "id": "table-20",
+      "source": "2차 측정표",
+      "source_table": 4,
+      "rows_sha256": "1e76b1dc6be5ec18d6156c450852d36cf1193b467d7844e267091425155300c3",
+      "metadata": [
+        [
+          "표본",
+          "Terminal n=89과제"
+        ],
+        [
+          "분모 · 단위",
+          "종류별 공식 지시문 UTF-8 바이트 합계 · %"
+        ],
+        [
+          "성격",
+          "분류 판단·바이트 집계"
+        ]
+      ]
+    },
+    {
+      "id": "table-21",
+      "source": "1차 측정표",
+      "source_table": 4,
+      "rows_sha256": "1edb26685e411d601e79206730ea374c2665b7594020af3262f301d5fe448023",
+      "metadata": [
+        [
+          "표본",
+          "5과제 · 각 n=3실행 · 56요청"
+        ],
+        [
+          "분모 · 단위",
+          "과제별 본문 UTF-8 바이트 합계 · %"
+        ],
+        [
+          "성격",
+          "분류 판단·바이트 집계"
+        ]
+      ]
+    },
+    {
+      "id": "table-22",
+      "source": "미분류 검토",
+      "source_table": 1,
+      "rows_sha256": "159c32ec6746312c0aa4ba8e59d06d2cb96afdf450aeb893d8d25ce75a19b615",
+      "metadata": [
+        [
+          "표본",
+          "58종 · 재전송 포함 168회 · 56요청·5과제"
+        ],
+        [
+          "분모 · 단위",
+          "미분류 158,258바이트 / 전체 본문 824,301바이트"
+        ],
+        [
+          "성격",
+          "분류 판단·바이트 집계"
+        ]
+      ]
+    },
+    {
+      "id": "table-23",
+      "source": "2차 분석",
+      "source_table": 3,
+      "rows_sha256": "84fe57ac1a4d293651ba27d72365adaace9d7b95c740833817fe0b08b351a2bf",
+      "metadata": [
+        [
+          "표본",
+          "Terminal 5과제 · 15실행 · 56요청"
+        ],
+        [
+          "분모 · 단위",
+          "본문 UTF-8 바이트 / 로컬 본문 242,937토큰"
+        ],
+        [
+          "성격",
+          "분류 판단 · 후보 전부 삭제 가정 계산"
+        ]
+      ]
+    },
+    {
+      "id": "table-24",
+      "source": "2차 측정표",
+      "source_table": 8,
+      "rows_sha256": "f5f8db77ee9df054f8ba7b5435476d0678029c0fc01d9b59f78222e615f33738",
+      "metadata": [
+        [
+          "표본",
+          "5과제 · 각 n=3실행 · 56요청"
+        ],
+        [
+          "분모 · 단위",
+          "과제별 본문 바이트 / 로컬 토큰 · %"
+        ],
+        [
+          "성격",
+          "분류 판단 · 삭제 가정 계산"
+        ]
+      ]
+    },
+    {
+      "id": "table-25",
+      "source": "2차 측정표",
+      "source_table": 5,
+      "rows_sha256": "9013ed4750e9f69184ffb5366288747c4b1b241e31c26dc99c3388b25bae34dd",
+      "metadata": [
+        [
+          "표본",
+          "Terminal 5과제 · 15실행 · 56요청"
+        ],
+        [
+          "분모 · 단위",
+          "본문 UTF-8 바이트 / 로컬 본문 242,937토큰"
+        ],
+        [
+          "성격",
+          "분류 판단 · 후보 전부 삭제 가정 계산"
+        ]
+      ]
+    },
+    {
+      "id": "table-26",
+      "source": "2차 측정표",
+      "source_table": 7,
+      "rows_sha256": "5c55184d36df14b7f489af9d568c582e70f781835d80abd0ad3b26c4f4adb434",
+      "metadata": [
+        [
+          "표본",
+          "Terminal 5과제 · 15실행 · 56요청"
+        ],
+        [
+          "분모 · 단위",
+          "종류별 본문 UTF-8 바이트 합계 · %"
+        ],
+        [
+          "성격",
+          "분류 판단·바이트 집계"
+        ]
+      ]
+    },
+    {
+      "id": "table-27",
+      "source": "2차 측정표",
+      "source_table": 9,
+      "rows_sha256": "1a3757235de43d94f59ee85e2eb783716f8763f2058dd302eac3b069f15ada70",
+      "metadata": [
+        [
+          "표본",
+          "Terminal n=15실행"
+        ],
+        [
+          "분모 · 단위",
+          "실행별 본문 바이트 / 로컬 토큰 · %"
+        ],
+        [
+          "성격",
+          "분류 판단 · 삭제 가정 계산"
+        ]
+      ]
+    },
+    {
+      "id": "table-28",
+      "source": "1차 측정표",
+      "source_table": 7,
+      "rows_sha256": "46a374e77f202247074157325f9093acbaf801045e82b9aa40c05ffd13869939",
+      "metadata": [
+        [
+          "표본",
+          "공식 지시문 113개·89개 · Terminal 56요청"
+        ],
+        [
+          "분모 · 단위",
+          "각 문서 / 요청 · UTF-8 바이트 / 출현 수"
+        ],
+        [
+          "성격",
+          "측정 · 패턴 계수"
+        ]
+      ]
+    },
+    {
+      "id": "table-34",
+      "source": "1차 측정표",
+      "source_table": 5,
+      "rows_sha256": "b689e65f3b7cde8674f3241bd0abb8a7b305a837c6c87bb60a34da95490c930e",
+      "metadata": [
+        [
+          "표본",
+          "Terminal 5과제 · 15실행 · 56요청"
+        ],
+        [
+          "분모 · 단위",
+          "요청 / 실행 · API usage 토큰 / 로컬 본문 토큰"
+        ],
+        [
+          "성격",
+          "과거 API·로컬 측정 · 통계 계산"
+        ]
+      ]
+    },
+    {
+      "id": "table-35",
+      "source": "2차 측정표",
+      "source_table": 10,
+      "rows_sha256": "3b1f94cebeb86e4755f7e53279812dddf9b6960a86c77a674ad2bececb88bf63",
+      "metadata": [
+        [
+          "표본",
+          "Terminal 5과제 · 15실행 · 56요청"
+        ],
+        [
+          "분모 · 단위",
+          "요청 / 실행 · API usage 토큰 / 로컬 본문 토큰"
+        ],
+        [
+          "성격",
+          "과거 API·로컬 측정 · 통계 계산"
+        ]
+      ]
+    },
+    {
+      "id": "table-36",
+      "source": "1차 측정표",
+      "source_table": 6,
+      "rows_sha256": "99b0dbed923799be80ada4c93c513795c7822035e8572bb4e4e447da6471f84d",
+      "metadata": [
+        [
+          "표본",
+          "표의 각 비교층별 쌍 수"
+        ],
+        [
+          "분모 · 단위",
+          "공통 선두 로컬 token ID · 토큰 / 쌍"
+        ],
+        [
+          "성격",
+          "측정 · 통계 계산"
+        ]
+      ]
+    }
+  ],
+  "explanation_ids": [
+    "figure-1",
+    "figure-2",
+    "figure-3",
+    "figure-4",
+    "figure-5",
+    "figure-8"
+  ],
+  "required_caveats": [
+    "식별된 후보 범위이지 검증된 상한이 아니다.",
+    "독립적인 사람 라벨 검증은 하지 않았다.",
+    "공식 원문과 이관 번역은 별개다.",
+    "과제 쌍은 서로 독립 표본이 아니다.",
+    "이 설정이 결정론이나 무손실 관측을 보장하지 않는다",
+    "DeepSWE 실제 실행 이력은 이번에 수집하지 않았다."
+  ]
+}

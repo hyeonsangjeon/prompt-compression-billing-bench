@@ -20,6 +20,10 @@ The chart describes an **identified candidate range, not a validated upper bound
 It is generated from [aggregate bytes and sample counts](data/eda/task-candidate-share.csv),
 not from a new compression or billing experiment.
 
+The [two-round EDA review (Korean)](docs/eda/README.md) collects the existing
+benchmark/input figures and tables with sample counts, denominators and measurement
+labels. Its ten figures use relative paths; tool-behavior experiments are separate.
+
 ## Try the static path
 
 Run from a clean committed checkout on Linux with Python 3.12+ and `uv`.

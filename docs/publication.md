@@ -14,6 +14,7 @@ the audit, including force-added ignored material.
 | Source/configuration | `src/__init__.py`, `src/compressors.py`, `src/pipeline.py`, `src/protection.py` | Only none/squeez, shared frozen-observation path and designated-span checks |
 | Source/configuration | `src/contracts.py`, `src/provenance.py`, `src/measurement.py`, `src/static_run.py`, `src/compare.py` | Local schemas, source snapshots, distinct measurement units, static execution and name-only comparison |
 | Source/configuration | `src/eda.py` | Recompute the published candidate-share chart from reviewed aggregates; no private layout dependency |
+| Source/configuration | `src/eda_report.py`, `tests/test_eda_report.py` | Offline checks of reviewed EDA table cells, samples, denominators, figure bytes/text, limitations and sensitive-pattern regressions |
 | Source/configuration | `schemas/frozen-input.schema.json`, `schemas/static-ledger.schema.json`, `schemas/static-result.schema.json` | Frozen input partitions, one selected ledger and typed per-record provenance |
 | Source/configuration | `ledgers/demo.toml`, `ledgers/static.toml` | Synthetic and private historical input profiles; no resource address or credential value |
 | Source/configuration | `tests/test_accounting.py`, `tests/test_evidence.py`, `tests/test_run.py`, `tests/test_protection.py`, `tests/test_static.py`, `tests/test_compare.py`, `tests/test_eda.py` | Synthetic transport/protection/source fixtures and aggregate contracts; optional real-binary test is explicitly selected |
@@ -22,6 +23,9 @@ the audit, including force-added ignored material.
 | Synthetic source fixture | `examples/static/manifest.json`, `examples/static/requests/0000.json` | Hand-authored fake instruction/code/log input, labeled synthetic; never native or customer evidence |
 | Aggregate only | `data/eda/task-candidate-share.csv`, `data/eda/lineage.json` | Five task-level byte/count aggregates for two classification rounds, original table hashes and explicit limitations; no request bodies |
 | Aggregate visualization | `figures/task-candidate-share.svg` | Generated two-round candidate byte shares, denominators and sample caveats; not achieved compression |
+| Reviewed EDA assembly | `docs/eda/README.md`, `docs/eda/manifest.json` | Existing first/second-round tables and explanations, original table ordinals and cell/figure hashes; no raw requests or new experiment results |
+| Reviewed EDA figures | `docs/eda/figures/round1/01-input-size.svg`, `docs/eda/figures/round1/02-input-composition.svg`, `docs/eda/figures/round1/03-compressible-share.svg`, `docs/eda/figures/round1/04-shared-prefix.svg`, `docs/eda/figures/round1/05-corpus-bias.svg`, `docs/eda/figures/round1/06-api-token-calibration.svg` | Byte-identical SVG copies: instruction sizes, composition, candidates, shared prefixes, corpus bias and API/local calibration |
+| Reviewed EDA figures | `docs/eda/figures/round2/01-task-types.svg`, `docs/eda/figures/round2/02-candidate-share-by-type.svg`, `docs/eda/figures/round2/03-input-size-by-type.svg`, `docs/eda/figures/round2/04-unknown-decomposition.svg` | Byte-identical SVG copies: task classifications, candidates by type, sizes by type and unknown-span decomposition |
 | Historical sanitized measurements | `evidence/local-baseline.json`, `evidence/local-baseline-repeat.json`, `evidence/development-3b-failure.json`, `evidence/development-7b-timeout.json`, `evidence/development-reasoning-timeout.json` | Previously allowlisted local-provider usage, outcomes and artifact hashes, including failures; no prompt/response bodies or deployed endpoints |
 
 The historical native records have no execution commit SHA. They are not assigned
@@ -38,7 +42,7 @@ Local-provider tokens are not billed cloud tokens.
 | Private request attachments, retained in place | Root `prompt_eda_round2.md`, `prompt_eda_round2 (1).md`, `prompt_design_final.md`, `prompt_repo_first_commit.md` | Only these exact filenames are ignored; the first two are identical request copies. No wildcard approval for future attachments |
 | Local resource/cache/credentials | `.cache/`, `.venv/`, `.env`, `__pycache__/`, `*.pyc` | Not source or publishable evidence |
 | System metadata | `@eaDir/` directories at any depth, `.DS_Store` | Synology/Finder metadata, ignored while untracked and forbidden if force-added |
-| Deferred EDA candidates | Remaining original EDA scripts, first/second-round figures and row-level catalogs under `_work/` | Private path/fixture coupling, classification context and each figure's source data need a separate port/review; the aggregate renderer is not claimed to reproduce all EDA |
+| Private EDA originals | Original EDA scripts, figures and row-level catalogs under `_work/` | Only the exact reviewed copies listed above are graded. Raw sources, classification records and the standalone review HTML stay private; the aggregate renderer does not reproduce all EDA |
 | Unresolved distribution/reuse | Third-party binaries and unapproved assets | No vendored squeez executable, imported dependency tree or silently assumed redistribution/license grant |
 
 Raw and transformed hashes are retained in private run snapshots. Public aggregate
@@ -53,8 +57,14 @@ git diff --check
 git diff --cached --stat
 ```
 
-The audit includes tracked and nonignored untracked files. It is an exact **file
-grade** check, not a secret scanner or a license/legal review. Inspect staged blobs
+The audit includes tracked and nonignored untracked files. It performs an exact
+**file grade** check and, when present, validates the reviewed EDA assembly against
+its manifest: table cells, samples/denominators/kinds, required limitations, SVG
+bytes and visible text. It scans that assembly for common private-path/account
+patterns and rejects active or externally loaded SVG content. The same check runs
+with `python -m src.eda_report`; it does not reconstruct private source data.
+
+This is not a general secret scanner or a license/legal review. Inspect staged blobs
 for customer identifiers, internal paths, resource addresses, credentials, fixture
 specificity and internal commentary separately. A zero-match pattern scan is not
 a proof that arbitrary material is safe. Keep licensing and public release as
