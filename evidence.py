@@ -10,6 +10,7 @@ from pathlib import Path
 
 from accounting import read_attempts, sha256, totals
 from run import save, verify
+from src.eda_report import audit_report
 
 
 ATTEMPT_FIELDS = {
@@ -35,6 +36,23 @@ PUBLIC_FILES = {
     "evidence/local-baseline.json", "evidence/development-3b-failure.json",
     "evidence/development-7b-timeout.json", "evidence/development-reasoning-timeout.json",
     "evidence/local-baseline-repeat.json",
+    "data/eda/lineage.json",
+    "data/eda/task-candidate-share.csv",
+    "docs/eda/README.md",
+    "docs/eda/figures/round1/01-input-size.svg",
+    "docs/eda/figures/round1/02-input-composition.svg",
+    "docs/eda/figures/round1/03-compressible-share.svg",
+    "docs/eda/figures/round1/04-shared-prefix.svg",
+    "docs/eda/figures/round1/05-corpus-bias.svg",
+    "docs/eda/figures/round1/06-api-token-calibration.svg",
+    "docs/eda/figures/round2/01-task-types.svg",
+    "docs/eda/figures/round2/02-candidate-share-by-type.svg",
+    "docs/eda/figures/round2/03-input-size-by-type.svg",
+    "docs/eda/figures/round2/04-unknown-decomposition.svg",
+    "docs/eda/manifest.json",
+    "docs/publication.md",
+    "src/eda_report.py",
+    "tests/test_eda_report.py",
 }
 
 TIMING_ROWS = (
@@ -91,6 +109,8 @@ def audit_files(root: Path) -> None:
         ["git", "-C", str(root), "ls-files", "--cached", "--others", "--exclude-standard", "-z"]
     ).decode().split("\0")
     validate_public_files([path for path in paths if path])
+    if any(path.startswith("docs/eda/") for path in paths):
+        audit_report(root)
 
 
 def export(directory: Path, target: Path) -> None:

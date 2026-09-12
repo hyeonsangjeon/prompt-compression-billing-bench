@@ -6,6 +6,13 @@ Run one pinned Terminal-Bench task from one ledger, retaining every model attemp
 HTTP status, retry, provider-reported token count, and native verdict.
 The current path uses real local Ollama inference. **Its token counts are not billable tokens.**
 
+## Benchmark input EDA
+
+The [two-round EDA review (Korean)](docs/eda/README.md) collects the existing
+benchmark/input figures and tables with sample counts, denominators and measurement
+labels. Its ten figures use relative paths; tool-behavior experiments are separate.
+See the [EDA publication boundaries](docs/publication.md) for what is included.
+
 ## First result
 
 Task: Terminal-Bench 2.1 `openssl-selfsigned-cert`.
