@@ -34,6 +34,14 @@ PRIVATE_PATTERNS = (
     r"\b(?:tenant|subscription|client|account)[_-]?id\s*[:=]",
     r"\b(?:api[_-]?key|authorization|access[_-]?token)\s*[:=]",
 )
+WORK_ENVIRONMENT_PATTERNS = (
+    r"\bNAS\b",
+    r"\bAzure\b",
+    r"\bFoundry\b",
+    r"\bVM\b",
+    r"\bHarbor(?!-framework\b)\b",
+    r"\bterminus-2\b",
+)
 
 
 def scan_public_text(content: str, source: str) -> None:
@@ -41,6 +49,9 @@ def scan_public_text(content: str, source: str) -> None:
     for pattern in PRIVATE_PATTERNS:
         if re.search(pattern, decoded, re.IGNORECASE):
             raise ValueError(f"Possible private path or identifier in {source}")
+    for pattern in WORK_ENVIRONMENT_PATTERNS:
+        if re.search(pattern, decoded, re.IGNORECASE):
+            raise ValueError(f"Possible work environment name in {source}")
 
 
 def json_digest(value: object) -> str:

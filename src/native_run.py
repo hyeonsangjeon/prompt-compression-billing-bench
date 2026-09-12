@@ -1,0 +1,516 @@
+"""Opt-in, commit-bound native runner; no provider access during validation."""
+
+import argparse
+from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
+import importlib.metadata
+import json
+import os
+from pathlib import Path
+import re
+import secrets
+import signal
+import subprocess
+import sys
+import time
+import tomllib
+
+from accounting import now
+from .baseline import baseline_summary, compare_quality
+from .compressors import make_compressor
+from .contracts import safe_child, save_json
+from .live_observations import POLICY
+from .live_transport import DeploymentQueue, FoundrySender, LiveRecorder, ManagedIdentity, start_live_proxy
+from .measurement import load_encoder
+from .native_contract import TASKS, load_native_ledger, require_operational_values
+from .native_judge import collect_native_outcome
+from .protection import digest
+from .provenance import ROOT, capture, git, verify_snapshot
+from .task_metrics import collect_trial_metrics
+
+
+def runtime_environment(proxy_key: str) -> dict:
+    allowed = ("PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CONFIG",
+               "DOCKER_TLS_VERIFY", "DOCKER_CERT_PATH", "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "TIKTOKEN_CACHE_DIR")
+    environment = {name: os.environ[name] for name in allowed if name in os.environ}
+    environment.update({
+        "OPENAI_API_KEY": proxy_key, "LITELLM_LOCAL_MODEL_COST_MAP": "true",
+        "LITELLM_LOG": "ERROR", "DO_NOT_TRACK": "1", "PYTHONPATH": str(ROOT),
+    })
+    return environment
+
+
+def benchmark_sources(ledger: dict) -> tuple[Path, dict[str, dict[str, bytes]]]:
+    specification = ledger["benchmark"]
+    value = os.environ.get(specification["root_env"])
+    if not value:
+        raise ValueError(f"Set {specification['root_env']} to the pinned benchmark checkout")
+    root = Path(value).resolve(strict=True)
+    if git(root, "rev-parse", "--show-toplevel").decode().strip() != str(root) or git(root, "rev-parse", "HEAD").decode().strip() != specification["revision"]:
+        raise ValueError("Benchmark checkout differs from the ledger revision")
+    tasks = {}
+    for task in TASKS:
+        prefix = f"tasks/{task}/"
+        names = git(root, "ls-tree", "-r", "--name-only", specification["revision"], "--", prefix).decode().splitlines()
+        if not names:
+            raise ValueError("A fixed task is absent from the pinned benchmark")
+        files = {}
+        for name in names:
+            path = safe_child(root, name)
+            if (root / name).is_symlink() or not path.is_file():
+                raise ValueError("Benchmark task files must be regular committed files")
+            content = path.read_bytes()
+            if content != git(root, "show", f"{specification['revision']}:{name}"):
+                raise ValueError(f"Benchmark file changed: {name}")
+            files[name.removeprefix(prefix)] = content
+        if not {"task.toml", "instruction.md", "tests/test.sh", "tests/test_outputs.py"} <= files.keys():
+            raise ValueError("Task is missing its instruction or native judge")
+        tasks[task] = files
+    return root, tasks
+
+
+def prepare_task(files: dict[str, bytes], target: Path, image: str) -> dict:
+    before = tomllib.loads(files["task.toml"].decode())
+    text, count = re.subn(r'(?m)^docker_image\s*=\s*"[^"\n]+"\s*$', f'docker_image = "{image}"', files["task.toml"].decode())
+    after = tomllib.loads(text)
+    expected = deepcopy(before)
+    expected["environment"]["docker_image"] = image
+    if count != 1 or after != expected:
+        raise ValueError("Task image pinning would change another task setting")
+    effective = {**files, "task.toml": text.encode(), "environment/Dockerfile": f"FROM {image}\n".encode()}
+    target.mkdir(parents=True, exist_ok=False)
+    for name, content in effective.items():
+        path = safe_child(target, name)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+    return {
+        "source_files": {name: digest(content) for name, content in files.items()},
+        "effective_files": {name: digest(content) for name, content in effective.items()},
+        "only_environment_image_is_overridden": True, "native_judge_modified": False,
+        "pinned_image": image,
+    }
+
+
+def harbor_config(ledger: dict, task_path: Path, jobs: Path, trial_id: str, api_base: str) -> dict:
+    runner, model = ledger["runner"], ledger["model"]
+    return {
+        "job_name": trial_id, "jobs_dir": str(jobs), "n_attempts": 1, "n_concurrent_trials": 1,
+        "retry": {"max_retries": 0}, "quiet": True,
+        "environment": {"type": "docker", "force_build": False, "delete": True},
+        "verifier": {"override_timeout_sec": runner["verifier_timeout_seconds"], "disable": False},
+        "tasks": [{"path": str(task_path)}],
+        "agents": [{
+            "import_path": runner["agent_import_path"], "model_name": "openai/" + model["name"],
+            "override_timeout_sec": runner["agent_timeout_seconds"],
+            "override_setup_timeout_sec": runner["setup_timeout_seconds"], "n_concurrent": 1,
+            "kwargs": {
+                "api_base": api_base, "max_turns": runner["max_turns"], "enable_summarize": False,
+                "use_responses_api": False, "store_all_messages": True,
+                "temperature": model["temperature"], "reasoning_effort": model["reasoning_effort"],
+                "llm_kwargs": {"max_completion_tokens": model["max_completion_tokens"], "num_retries": 0},
+            },
+        }],
+    }
+
+
+def terminate_group(process, grace_seconds: float = 2) -> None:
+    try:
+        os.killpg(process.pid, signal.SIGINT)
+    except ProcessLookupError:
+        return
+    try:
+        process.wait(timeout=grace_seconds)
+    except subprocess.TimeoutExpired:
+        pass
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    process.wait(timeout=5)
+
+
+def supervise(command: list[str], log: Path, recorder, timeout: float, environment: dict) -> dict:
+    recorder.check()
+    started, started_at = time.monotonic(), now()
+    timed_out = stopped = False
+    with log.open("xb") as output:
+        process = subprocess.Popen(command, stdout=output, stderr=subprocess.STDOUT,
+                                   env=environment, cwd=ROOT, start_new_session=True, stdin=subprocess.DEVNULL)
+        try:
+            while process.poll() is None:
+                stopped = recorder.stopped.is_set()
+                timed_out = time.monotonic() - started >= timeout or time.time() >= recorder.deadline
+                if stopped or timed_out:
+                    if timed_out:
+                        recorder.stop("NativeProcessDeadline")
+                    terminate_group(process)
+                    break
+                time.sleep(0.05)
+        except BaseException:
+            recorder.stop("NativeSupervisorInterrupted")
+            terminate_group(process)
+            raise
+    return {"returncode": process.returncode, "timed_out": timed_out, "stopped_by_guard": stopped,
+            "started_at": started_at, "finished_at": now(), "elapsed_seconds": time.monotonic() - started,
+            "docker_cleanup_verified": False}
+
+
+def runtime_versions() -> dict:
+    packages = tomllib.loads((ROOT / "uv.lock").read_text())["package"]
+    versions = {}
+    for name in ("harbor", "litellm", "openai", "httpx", "pydantic", "tiktoken"):
+        expected = {package["version"] for package in packages if package["name"] == name}
+        installed = importlib.metadata.version(name)
+        if expected != {installed}:
+            raise ValueError(f"Runtime {name} differs from uv.lock; sync the locked native extra")
+        versions[name] = installed
+    return versions
+
+
+def preflight(ledger: dict, ledger_path: Path, source_commit: str) -> dict:
+    deadline = require_operational_values(ledger)
+    provenance, snapshots = capture(ledger_path, source_commit)
+    versions = runtime_versions()
+    from harbor.models.job.config import JobConfig
+
+    JobConfig.model_validate(harbor_config(ledger, ROOT / "placeholder", ROOT / "runs", "check", "http://127.0.0.1:1/check/v1"))
+    encoder = load_encoder(ledger["measurement"])
+    benchmark_root, tasks = benchmark_sources(ledger)
+    endpoint = os.environ.get(ledger["model"]["endpoint_env"], "")
+    sender = FoundrySender(endpoint, ledger["limits"]["request_timeout_seconds"], ManagedIdentity(), deadline=deadline)
+    queue_value = os.environ.get(ledger["queue"]["state_path_env"])
+    if not queue_value or not Path(queue_value).is_absolute():
+        raise ValueError("Use the same absolute queue file for every deployment caller")
+    if Path(queue_value).resolve().is_relative_to(ROOT / "runs"):
+        raise ValueError("A per-run queue cannot coordinate the deployment")
+    binary = os.environ.get(ledger["compressor"]["tools"]["squeez"]["binary_env"], "")
+    if not binary or digest(Path(binary).read_bytes()) != ledger["compressor"]["tools"]["squeez"]["sha256"]:
+        raise ValueError("Both arms require the reviewed squeez binary to be available")
+    return {"provenance": provenance, "snapshots": snapshots, "encoder": encoder, "tasks": tasks,
+            "benchmark_root": str(benchmark_root), "sender": sender, "queue_path": Path(queue_value).resolve(),
+            "runtime_versions": versions}
+
+
+def verify_native_run(directory: Path) -> dict:
+    summary = json.loads((directory / "summary.json").read_bytes())
+    if summary.get("kind") != "native_measurement" or summary.get("mode") != "native_log_truncation":
+        raise ValueError("Synthetic or static records cannot serve as a native baseline")
+    source = verify_snapshot(directory)
+    if source["source_commit"] != summary["source_commit"] or source["ledger_sha256"] != summary["ledger_sha256"]:
+        raise ValueError("Native result and source provenance differ")
+    ledger = load_native_ledger(directory / "ledger.toml")
+    execution = json.loads((directory / "execution.json").read_bytes())
+    deployment_limits = {
+        "rpm": ledger["queue"]["rpm"], "tpm": ledger["queue"]["tpm"],
+        "checked_at_utc": ledger["queue"]["limits_checked_at_utc"],
+        "source_reference": ledger["queue"]["limits_source_reference"],
+    }
+    if summary.get("concurrency") != ledger["runner"]["concurrency"] or summary.get("deployment_limits") != deployment_limits:
+        raise ValueError("Native result concurrency or deployment limits differ from the ledger")
+    if execution.get("concurrency") != ledger["runner"]["concurrency"] or execution.get("deployment_limits") != deployment_limits:
+        raise ValueError("Native execution metadata concurrency or limits differ from the ledger")
+    manifest_path = directory / "artifacts.json"
+    if digest(manifest_path.read_bytes()) != summary["artifact_manifest_sha256"]:
+        raise ValueError("Native artifact manifest changed")
+    files = json.loads(manifest_path.read_bytes())["files"]
+    actual = {path.relative_to(directory).as_posix() for path in directory.rglob("*") if path.is_file() or path.is_symlink()}
+    if set(files) != actual - {"artifacts.json", "summary.json"}:
+        raise ValueError("Native artifact inventory is incomplete or has extra files")
+    for name, expected in files.items():
+        if (directory / name).is_symlink() or digest(safe_child(directory, name).read_bytes()) != expected:
+            raise ValueError(f"Native artifact changed: {name}")
+    if {name for name in files if re.fullmatch(r"trials/[^/]+/trial.json", name)} != {trial["record_path"] for trial in summary["trials"]}:
+        raise ValueError("Summary must include every recorded native trial")
+    if summary["condition"] not in ("none", "squeez") or summary["status"] not in ("complete", "inconclusive", "stopped"):
+        raise ValueError("Unexpected native condition or completion state")
+    repetitions, rewards, incomplete_repetition = [], {}, False
+    for index, trial in enumerate(summary["trials"]):
+        repetition, task = index // len(TASKS) + 1, TASKS[index % len(TASKS)]
+        trial_id = f"r{repetition:02d}-{task}"
+        if (trial["task"], trial["repetition"], trial["trial_id"], trial["source_commit"], trial["condition"], trial["kind"]) != (
+            task, repetition, trial_id, summary["source_commit"], summary["condition"], summary["kind"]
+        ) or trial["record_path"] != f"trials/{trial_id}/trial.json" or trial["record_path"] not in files:
+            raise ValueError("Native trial lineage or fixed task order differs")
+        if json.loads(safe_child(directory, trial["record_path"]).read_bytes()) != {key: value for key, value in trial.items() if key != "record_path"}:
+            raise ValueError("Summary differs from the native trial record")
+        process = trial["process"]
+        job = directory / "jobs" / trial_id
+        outcome = collect_native_outcome(job, process=process, transport_failure=trial["transport_failure"])
+        completed = not process["timed_out"] and not process["stopped_by_guard"] and process["returncode"] == 0
+        metrics = collect_trial_metrics(job, directory / "transport", trial_id, process_complete=completed)
+        if outcome != trial["native_outcome"] or metrics != trial["metrics"]:
+            raise ValueError("Native outcome or metrics differ from their recorded evidence")
+        if outcome["quality_valid"] and metrics["measurement_complete"]:
+            if not incomplete_repetition:
+                rewards[task] = int(outcome["native_reward"])
+            if not incomplete_repetition and len(rewards) == len(TASKS):
+                repetitions.append(rewards)
+                rewards = {}
+        else:
+            incomplete_repetition = True
+        if incomplete_repetition and task == TASKS[-1]:
+            rewards = {}
+    if incomplete_repetition and summary["status"] != "stopped":
+        raise ValueError("An invalid trial must stop the run, not become a zero")
+    if summary["repetitions"] != repetitions:
+        raise ValueError("Native repetitions differ from the individual trial rewards")
+    if summary["condition"] == "none" and summary["status"] in ("complete", "inconclusive"):
+        if len(repetitions) not in (10, 20) or rewards:
+            raise ValueError("A completed baseline requires complete repetitions")
+        if len(repetitions) == 20 and baseline_summary(repetitions[:10], list(TASKS))["status"] == "observed_range_stabilized":
+            raise ValueError("Baseline continued past its predeclared ten-repetition stop")
+        decision = baseline_summary(repetitions, list(TASKS))
+        decision["rule_status"] = "accepted_in_execution_ledger"
+        if summary.get("baseline_decision") != json.loads(json.dumps(decision)):
+            raise ValueError("Baseline stopping decision differs from the native rewards")
+        informative = decision["status"] == "observed_range_stabilized" and decision["comparison_informative"]
+        if (summary["status"] == "complete") != informative:
+            raise ValueError("Uninformative baseline cannot be labeled complete")
+    if summary["condition"] == "squeez" and summary["status"] == "complete":
+        reference_bytes = (directory / "baseline-summary.json").read_bytes()
+        if digest(reference_bytes) != summary["baseline"]["summary_sha256"]:
+            raise ValueError("Verified baseline snapshot changed")
+        reference = json.loads(reference_bytes)
+        if reference["source_commit"] != summary["source_commit"] or reference["condition"] != "none" or reference["status"] != "complete" or rewards:
+            raise ValueError("Comparison needs the same complete native baseline")
+        changed = sum(trial["metrics"]["changed_candidate_occurrences"] for trial in summary["trials"])
+        comparison = compare_quality(reference["repetitions"], repetitions, list(TASKS), changed)
+        comparison["rule_status"] = "accepted_in_execution_ledger"
+        if summary.get("quality_comparison") != comparison:
+            raise ValueError("Quality comparison differs from the recorded native rewards")
+    return summary
+
+
+def baseline_for_comparison(directory: Path, ledger: dict, source_commit: str) -> dict:
+    summary = verify_native_run(directory)
+    original_ledger = load_native_ledger(directory / "ledger.toml")
+    for key in ("benchmark", "model", "runner", "measurement", "compressor", "stability", "raw_retrieval", "queue"):
+        if original_ledger[key] != ledger[key]:
+            raise ValueError(f"Comparison differs from baseline {key}")
+    for key in ("max_calls_per_trial", "request_timeout_seconds", "max_request_bytes", "max_attempts_per_call", "max_retry_wait_seconds", "protocol_token_allowance"):
+        if original_ledger["limits"][key] != ledger["limits"][key]:
+            raise ValueError(f"Comparison differs from baseline limits.{key}")
+    if summary["condition"] != "none" or summary["source_commit"] != source_commit or summary["status"] != "complete":
+        raise ValueError("Use a complete none baseline from the same execution SHA")
+    decision = baseline_summary(summary["repetitions"], list(TASKS))
+    if decision["status"] != "observed_range_stabilized" or not decision["comparison_informative"]:
+        raise ValueError("Baseline is inconclusive or has no detectable degradation range")
+    return summary
+
+
+def run_trial(directory: Path, ledger: dict, recorder, server, key: str, task: str, repetition: int) -> dict:
+    trial_id = f"r{repetition:02d}-{task}"
+    trial_directory = directory / "trials" / trial_id
+    trial_directory.mkdir(parents=True)
+    save_json(trial_directory / "started.json", {"trial_id": trial_id, "started_at": now(),
+                                                "source_commit": recorder.source_commit, "kind": recorder.evidence_kind})
+    process = {"returncode": None, "timed_out": False, "stopped_by_guard": False}
+    try:
+        api_base = f"http://127.0.0.1:{server.server_port}/{trial_id}/v1"
+        config = harbor_config(ledger, directory / "tasks" / task, directory / "jobs", trial_id, api_base)
+        config_path = trial_directory / "harbor-config.json"
+        save_json(config_path, config)
+        command = [str(Path(sys.executable).with_name("harbor")), "run", "--config", str(config_path)]
+        process = supervise(command, trial_directory / "harbor.log", recorder,
+                            ledger["runner"]["trial_timeout_seconds"], runtime_environment(key))
+    except BaseException as error:
+        recorder.stop("NativeTrialExecutionError", {"trial_id": trial_id, "error_type": type(error).__name__})
+        process.update(stopped_by_guard=True, error_type=type(error).__name__)
+    finally:
+        recorder.close_trial(trial_id)
+    job = directory / "jobs" / trial_id
+    transport_failure = deepcopy(recorder.failure)
+    outcome = collect_native_outcome(job, process=process, transport_failure=transport_failure)
+    completed = not process["timed_out"] and not process["stopped_by_guard"] and process["returncode"] == 0
+    metrics = collect_trial_metrics(job, directory / "transport", trial_id, process_complete=completed)
+    trial = {"kind": recorder.evidence_kind, "source_commit": recorder.source_commit, "condition": recorder.condition,
+             "task": task, "repetition": repetition, "trial_id": trial_id, "transport_failure": transport_failure,
+             "native_outcome": outcome, "metrics": metrics, "process": process}
+    path = trial_directory / "trial.json"
+    save_json(path, trial)
+    return {**trial, "record_path": path.relative_to(directory).as_posix()}
+
+
+def trial_is_complete(trial: dict) -> bool:
+    return trial["native_outcome"]["quality_valid"] and trial["metrics"]["measurement_complete"]
+
+
+def run_trial_plans(directory: Path, ledger: dict, recorder, server, key: str,
+                    plans: list[tuple[str, int]]) -> list[dict]:
+    concurrency = ledger["runner"]["concurrency"]
+    completed = []
+    for offset in range(0, len(plans), concurrency):
+        recorder.check()
+        wave = plans[offset:offset + concurrency]
+        for task, repetition in wave:
+            recorder.register_trial(f"r{repetition:02d}-{task}", task, repetition)
+        with ThreadPoolExecutor(max_workers=len(wave), thread_name_prefix="native-trial") as executor:
+            futures = [executor.submit(run_trial, directory, ledger, recorder, server, key, task, repetition)
+                       for task, repetition in wave]
+            trials = [future.result() for future in futures]
+        completed.extend(trials)
+        if any(not trial_is_complete(trial) for trial in trials):
+            recorder.stop("NativeOutcomeOrMandatoryMetricsIncomplete", {
+                "trial_ids": [trial["trial_id"] for trial in trials if not trial_is_complete(trial)]})
+            break
+    return completed
+
+
+def run_repetition_block(directory: Path, ledger: dict, recorder, server, key: str,
+                         first: int, last: int) -> tuple[list[dict], list[dict], bool]:
+    plans = [(task, repetition) for repetition in range(first, last + 1) for task in TASKS]
+    trials = run_trial_plans(directory, ledger, recorder, server, key, plans)
+    expected = (last - first + 1) * len(TASKS)
+    repetitions = []
+    for offset in range(0, len(trials), len(TASKS)):
+        group = trials[offset:offset + len(TASKS)]
+        if len(group) != len(TASKS) or any(not trial_is_complete(trial) for trial in group):
+            break
+        repetitions.append({trial["task"]: int(trial["native_outcome"]["native_reward"])
+                            for trial in group})
+    complete = len(trials) == expected and all(trial_is_complete(trial) for trial in trials)
+    return trials, repetitions, complete
+
+
+def execute_native(ledger_path: Path, ledger: dict, source_commit: str, condition: str,
+                   baseline_path: Path | None = None) -> Path:
+    if condition not in ledger["conditions"] or (condition == "squeez") != (baseline_path is not None):
+        raise ValueError("Run none first; squeez requires its verified native baseline")
+    baseline = baseline_for_comparison(baseline_path, ledger, source_commit) if baseline_path else None
+    setup = preflight(ledger, ledger_path, source_commit)
+    deployment = digest((setup["sender"].endpoint + "/" + ledger["model"]["name"]).encode())
+    if baseline:
+        original_execution = json.loads((baseline_path / "execution.json").read_bytes())
+        if original_execution["deployment_sha256"] != deployment or original_execution["queue_path"] != str(setup["queue_path"]):
+            raise ValueError("Comparison must share the baseline deployment and queue")
+    run_id = f"native-{condition}-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}-{secrets.token_hex(4)}"
+    directory = ROOT / ledger["output_dir"] / run_id
+    directory.mkdir(parents=True, exist_ok=False)
+    os.chmod(directory, 0o700)
+    for name, content in setup["snapshots"].items():
+        path = safe_child(directory, name)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+    save_json(directory / "provenance.json", setup["provenance"])
+    if baseline is not None:
+        (directory / "baseline-summary.json").write_bytes((baseline_path / "summary.json").read_bytes())
+    summary = {
+        "schema_version": 1, "kind": setup.get("evidence_kind", "native_measurement"), "mode": ledger["mode"], "run_id": run_id,
+        "source_commit": source_commit, "ledger_sha256": setup["provenance"]["ledger_sha256"],
+        "condition": condition, "status": "running", "started_at": now(), "trials": [], "repetitions": [],
+        "classification_policy": POLICY, "determinism_controlled": False, "cache_controlled": False,
+        "concurrency": ledger["runner"]["concurrency"], "deployment_limits": {
+            "rpm": ledger["queue"]["rpm"], "tpm": ledger["queue"]["tpm"],
+            "checked_at_utc": ledger["queue"]["limits_checked_at_utc"],
+            "source_reference": ledger["queue"]["limits_source_reference"],
+        },
+        "raw_retrieval": ledger["raw_retrieval"], "baseline": None if baseline is None else {
+            "run_id": baseline["run_id"], "summary_sha256": digest((baseline_path / "summary.json").read_bytes())},
+    }
+    queue = recorder = server = None
+    try:
+        queue = DeploymentQueue(setup["queue_path"], deployment, ledger["queue"]["rpm"], ledger["queue"]["tpm"])
+        compressor_specification = {**ledger["compressor"], "name": condition}
+        compressor = make_compressor(compressor_specification, directory / "compressor")
+        recorder = LiveRecorder(directory / "transport", ledger, source_commit, compressor, setup["encoder"], queue,
+                                setup["sender"], condition=condition, evidence_kind=summary["kind"])
+        setup["sender"].deadline = recorder.deadline
+        key = secrets.token_urlsafe(32)
+        server = start_live_proxy(recorder, key)
+        task_sources = {task: prepare_task(files, directory / "tasks" / task, ledger["benchmark"]["images"][task])
+                        for task, files in setup["tasks"].items()}
+        save_json(directory / "task-sources.json", task_sources)
+        save_json(directory / "execution.json", {
+            "source_commit": source_commit, "condition": condition, "compressor": compressor.metadata,
+            "classification_policy": POLICY, "task_order": list(TASKS),
+            "concurrency": ledger["runner"]["concurrency"],
+            "concurrency_unit": "simultaneous_native_trial_processes",
+            "harbor_concurrency_per_process": 1, "agent_concurrency_per_trial": 1,
+            "scheduling": "contiguous_trial_waves_across_repetition_boundaries",
+            "deployment_limits": summary["deployment_limits"],
+            "queue_path": str(setup["queue_path"]), "deployment_sha256": deployment,
+            "queue_scope": "cooperating_callers_on_one_host_using_this_exclusive_queue",
+            "external_callers_independently_verified": False,
+            "deployment_isolation_reference": ledger["queue"]["deployment_isolation_reference"],
+            "effective_deadline_utc_epoch": recorder.deadline, "benchmark_root": setup["benchmark_root"],
+            "runtime_versions": setup["runtime_versions"], "python": sys.version,
+        })
+        minimum = ledger["stability"]["minimum_repetitions"]
+        maximum = len(baseline["repetitions"]) if baseline else ledger["stability"]["maximum_repetitions"]
+        trials, repetitions, complete = run_repetition_block(
+            directory, ledger, recorder, server, key, 1, minimum if baseline is None else maximum)
+        summary["trials"].extend(trials)
+        summary["repetitions"].extend(repetitions)
+        if not complete:
+            raise ValueError("Native outcome or required metrics are incomplete; no task replacement")
+        if condition == "none":
+            decision = baseline_summary(summary["repetitions"], list(TASKS))
+            if decision["status"] == "extend_to_total_20":
+                trials, repetitions, complete = run_repetition_block(
+                    directory, ledger, recorder, server, key, minimum + 1, maximum)
+                summary["trials"].extend(trials)
+                summary["repetitions"].extend(repetitions)
+                if not complete:
+                    raise ValueError("Native outcome or required metrics are incomplete; no task replacement")
+                decision = baseline_summary(summary["repetitions"], list(TASKS))
+            decision["rule_status"] = "accepted_in_execution_ledger"
+            summary["baseline_decision"] = decision
+        summary["status"] = "complete"
+        if condition == "none" and (summary["baseline_decision"]["status"] != "observed_range_stabilized" or not summary["baseline_decision"]["comparison_informative"]):
+            summary["status"] = "inconclusive"
+        if baseline:
+            changed = sum(trial["metrics"]["changed_candidate_occurrences"] for trial in summary["trials"])
+            summary["quality_comparison"] = compare_quality(baseline["repetitions"], summary["repetitions"], list(TASKS), changed)
+            summary["quality_comparison"]["rule_status"] = "accepted_in_execution_ledger"
+    except BaseException as error:
+        summary.update(status="stopped", error={"type": type(error).__name__, "message": str(error)})
+        if recorder is not None:
+            recorder.stop(type(error).__name__)
+    finally:
+        if server is not None:
+            server.shutdown()
+            server.server_close()
+        if recorder is not None:
+            with recorder.lock:
+                summary["stop_reason"] = recorder.failure
+                summary["budget_used_or_reserved_usd"] = recorder.budget_used_usd
+        if queue is not None:
+            queue.close()
+        summary["finished_at"] = now()
+        artifacts = {path.relative_to(directory).as_posix(): digest(path.read_bytes())
+                     for path in sorted(directory.rglob("*")) if path.is_file() and not path.is_symlink()}
+        save_json(directory / "artifacts.json", {"kind": "private_artifact_hash_manifest", "files": artifacts})
+        summary["artifact_manifest_sha256"] = digest((directory / "artifacts.json").read_bytes())
+        save_json(directory / "summary.json", summary)
+    return directory
+
+
+def main(arguments=None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("ledger", nargs="?", type=Path, default=ROOT / "ledgers/native.template.toml")
+    parser.add_argument("--source-commit", required=True)
+    parser.add_argument("--condition", choices=("none", "squeez"), default="none")
+    parser.add_argument("--baseline", type=Path)
+    parser.add_argument("--execute", action="store_true", help="Explicitly opt in only after baseline approval")
+    parser.add_argument("--check", action="store_true", help="Validate local inputs without starting Harbor or calling a model")
+    args = parser.parse_args(arguments)
+    try:
+        ledger = load_native_ledger(args.ledger)
+        if args.execute and args.check:
+            raise ValueError("Choose either validation or execution")
+        if not args.execute:
+            checked = preflight(ledger, args.ledger.resolve(), args.source_commit)
+            print(json.dumps({"status": "local_preflight_passed", "model_calls": 0,
+                              "source_commit": checked["provenance"]["source_commit"]}))
+            return 0
+        directory = execute_native(args.ledger.resolve(), ledger, args.source_commit, args.condition, args.baseline)
+        summary = verify_native_run(directory)
+        print(json.dumps({"directory": str(directory), "status": summary["status"]}))
+        return 0 if summary["status"] == "complete" else 3
+    except (ValueError, OSError, subprocess.SubprocessError, importlib.metadata.PackageNotFoundError) as error:
+        print(f"Native preflight or verification failed: {error}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

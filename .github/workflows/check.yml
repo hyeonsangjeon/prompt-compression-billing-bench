@@ -30,3 +30,20 @@ jobs:
         run: uv run --locked python -m src.eda --check
       - name: Refuse files without a publication grade
         run: uv run --locked python evidence.py audit-files .
+  native-contracts:
+    runs-on: ubuntu-latest
+    env:
+      LITELLM_LOCAL_MODEL_COST_MAP: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+      - name: Install pinned native dependencies without starting services
+        run: uv sync --locked --extra native
+      - name: Exercise actual Harbor code with synthetic responses only
+        run: |
+          for test_file in test_harbor_transport.py test_native_contract.py test_task_metrics.py test_native_run.py; do
+            uv run --locked --extra native python -m unittest discover -s tests -p "$test_file" -v
+          done

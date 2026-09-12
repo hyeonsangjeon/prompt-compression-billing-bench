@@ -11,6 +11,7 @@ from src.eda_report import (
     COUNTING_METHOD_FACTS,
     COUNTING_METHOD_SUMMARY,
     REMOVED_WORK_HISTORY,
+    WORK_ENVIRONMENT_PATTERNS,
     audit_report,
     check_svg,
     json_digest,
@@ -48,6 +49,21 @@ class EdaReportTests(unittest.TestCase):
         for content in REMOVED_WORK_HISTORY:
             with self.subTest(content=content):
                 self.assertNotIn(content, self.markdown)
+        self.assertIn("gpt-5.4-2026-03-05", self.markdown)
+        self.assertIn("tiktoken 0.14.0", self.markdown)
+        self.assertIn("o200k_base", self.markdown)
+
+    def test_work_environment_names_are_rejected(self):
+        for content in ("NAS", "Azure VM", "Foundry", "worker VM", "Harbor 0.22.0", "terminus-2"):
+            with self.subTest(content=content), self.assertRaisesRegex(ValueError, "work environment name"):
+                scan_public_text(content, "synthetic")
+        self.assertEqual(len(WORK_ENVIRONMENT_PATTERNS), 6)
+
+    def test_public_benchmark_source_is_not_a_work_environment(self):
+        scan_public_text(
+            "https://github.com/harbor-framework/terminal-bench-2-1",
+            "public benchmark source",
+        )
 
     def test_numeric_drift_in_either_direction(self):
         for replacement in ("1,974", "1,976"):

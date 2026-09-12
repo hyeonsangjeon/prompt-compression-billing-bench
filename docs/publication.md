@@ -15,6 +15,11 @@ the audit, including force-added ignored material.
 | Source/configuration | `src/contracts.py`, `src/provenance.py`, `src/measurement.py`, `src/static_run.py`, `src/compare.py` | Local schemas, source snapshots, distinct measurement units, static execution and name-only comparison |
 | Source/configuration | `src/eda.py` | Recompute the published candidate-share chart from reviewed aggregates; no private layout dependency |
 | Source/configuration | `src/eda_report.py`, `tests/test_eda_report.py` | Offline checks of reviewed EDA table cells, samples, denominators, figure bytes/text, limitations and sensitive-pattern regressions |
+| Source/configuration | `src/native_run.py`, `src/native_contract.py`, `src/baseline.py`, `src/native_judge.py`, `ledgers/native.template.toml` | Opt-in native driver, strict unapproved template, proposed stopping calculation and native failure-evidence classification |
+| Source/configuration | `src/harbor_agent.py`, `src/command_trace.py`, `src/task_metrics.py`, `src/live_transport.py`, `src/live_observations.py` | Actual Harbor instrumentation, separate turns/calls/repetitions/units, protected loopback transport and cooperative queue |
+| Source/configuration | `src/prompt_intake.py` | Archive untracked root request attachments privately before CLI/audit inventory; not a public wildcard |
+| Source/configuration | `tests/native_helpers.py`, `tests/test_baseline.py`, `tests/test_native_contract.py`, `tests/test_native_judge.py`, `tests/test_native_run.py`, `tests/test_task_metrics.py`, `tests/test_live_transport.py`, `tests/test_live_observations.py`, `tests/test_harbor_transport.py`, `tests/test_prompt_intake.py` | Synthetic/fake-upstream validation, real SDK serialization without models, malformed/failure/stop/provenance tests and private prompt intake |
+| Implementation documentation | `docs/native-contract.md` | Fixed native design, units, proposed range rule, known judge/transport limits and execution gates; not an experiment results report |
 | Source/configuration | `schemas/frozen-input.schema.json`, `schemas/static-ledger.schema.json`, `schemas/static-result.schema.json` | Frozen input partitions, one selected ledger and typed per-record provenance |
 | Source/configuration | `ledgers/demo.toml`, `ledgers/static.toml` | Synthetic and private historical input profiles; no resource address or credential value |
 | Source/configuration | `tests/test_accounting.py`, `tests/test_evidence.py`, `tests/test_run.py`, `tests/test_protection.py`, `tests/test_static.py`, `tests/test_compare.py`, `tests/test_eda.py` | Synthetic transport/protection/source fixtures and aggregate contracts; optional real-binary test is explicitly selected |
@@ -24,7 +29,7 @@ the audit, including force-added ignored material.
 | Aggregate only | `data/eda/task-candidate-share.csv`, `data/eda/lineage.json` | Five task-level byte/count aggregates for two classification rounds, original table hashes and explicit limitations; no request bodies |
 | Aggregate visualization | `figures/task-candidate-share.svg` | Generated two-round candidate byte shares, denominators and sample caveats; not achieved compression |
 | Reviewed EDA assembly | `docs/eda/README.md`, `docs/eda/manifest.json` | Existing first/second-round tables and explanations, original table ordinals and cell/figure hashes; no raw requests or new experiment results |
-| Reviewed EDA figures | `docs/eda/figures/round1/01-input-size.svg`, `docs/eda/figures/round1/02-input-composition.svg`, `docs/eda/figures/round1/03-compressible-share.svg`, `docs/eda/figures/round1/04-shared-prefix.svg`, `docs/eda/figures/round1/05-corpus-bias.svg`, `docs/eda/figures/round1/06-api-token-calibration.svg` | Byte-identical SVG copies: instruction sizes, composition, candidates, shared prefixes, corpus bias and API/local calibration |
+| Reviewed EDA figures | `docs/eda/figures/round1/01-input-size.svg`, `docs/eda/figures/round1/02-input-composition.svg`, `docs/eda/figures/round1/03-compressible-share.svg`, `docs/eda/figures/round1/04-shared-prefix.svg`, `docs/eda/figures/round1/05-corpus-bias.svg`, `docs/eda/figures/round1/06-api-token-calibration.svg` | Five byte-identical SVG copies and one label-only public derivative: instruction sizes, composition, candidates, shared prefixes, corpus bias and API/local calibration. The shared-prefix measurements and 1,024 reference are unchanged; only the work-environment name is removed |
 | Reviewed EDA figures | `docs/eda/figures/round2/01-task-types.svg`, `docs/eda/figures/round2/02-candidate-share-by-type.svg`, `docs/eda/figures/round2/03-input-size-by-type.svg`, `docs/eda/figures/round2/04-unknown-decomposition.svg` | Byte-identical SVG copies: task classifications, candidates by type, sizes by type and unknown-span decomposition |
 | Historical sanitized measurements | `evidence/local-baseline.json`, `evidence/local-baseline-repeat.json`, `evidence/development-3b-failure.json`, `evidence/development-7b-timeout.json`, `evidence/development-reasoning-timeout.json` | Previously allowlisted local-provider usage, outcomes and artifact hashes, including failures; no prompt/response bodies or deployed endpoints |
 
@@ -39,7 +44,7 @@ Local-provider tokens are not billed cloud tokens.
 | Raw, never automatically public | `runs/` | Source/ledger/input snapshots, original requests, transformed output, recovery stashes, raw tool stderr and detailed static records |
 | Entire imported tree stays private | `local-imports/` | Original code copies, raw executions, internal documents, meetings, fixtures and downloaded executables; do not import its history |
 | Private working material | `_work/` | Migration scan with per-file line numbers, internal inventories/design/kanban, frozen-input preparation, original-source mappings and local history backup |
-| Private request attachments, retained in place | Root `prompt_eda_round2.md`, `prompt_eda_round2 (1).md`, `prompt_design_final.md`, `prompt_repo_first_commit.md` | Only these exact filenames are ignored; the first two are identical request copies. No wildcard approval for future attachments |
+| Private request attachments | `_work/prompts/` and its `manifest.json`; original root names `prompt_eda_round2.md`, `prompt_eda_round2 (1).md`, `prompt_design_final.md`, `prompt_repo_first_commit.md`, `prompt_before_baseline.md` | User requests, not measurement outputs. Intake preserves original/archive paths, SHA-256 and byte count. Exact legacy root ignores remain as defense; no wildcard public approval |
 | Local resource/cache/credentials | `.cache/`, `.venv/`, `.env`, `__pycache__/`, `*.pyc` | Not source or publishable evidence |
 | System metadata | `@eaDir/` directories at any depth, `.DS_Store` | Synology/Finder metadata, ignored while untracked and forbidden if force-added |
 | Private EDA originals | Original EDA scripts, figures and row-level catalogs under `_work/` | Only the exact reviewed copies listed above are graded. Raw sources, classification records and the standalone review HTML stay private; the aggregate renderer does not reproduce all EDA |
@@ -50,6 +55,14 @@ lineage retains the original table hashes without private host paths. Independen
 raw-request classification cannot be reproduced from the aggregate-only release.
 
 ## Audit before commit or release
+
+`run.py` entry and `evidence.py audit-files` automatically archive **untracked
+root** `prompt_*.md` attachments with conservative filenames under ignored
+`_work/prompts/`, with a private inventory. Different contents with the same
+name receive a hash suffix, not an overwrite. Tracked attachments, symlinks,
+hardlinks, unknown filenames and nested files are not silently moved or approved.
+The intake requires Git to exclude the destination and verifies bytes before
+removing the root copy. It runs on command entry, not as a background watcher.
 
 ```bash
 uv run --locked python evidence.py audit-files .

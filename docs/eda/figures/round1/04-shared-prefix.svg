@@ -968,7 +968,7 @@ L 877.83952 300.854145
    </g>
   </g>
   <g id="text_51">
-   <text style="font-size: 12px; font-family: 'DejaVu Sans'" transform="translate(240.945698 16.318125)">Text-only prefix measurements; dashed line = Azure GPT-5.4 reference minimum (1,024)</text>
+   <text style="font-size: 12px; font-family: 'DejaVu Sans'" transform="translate(240.945698 16.318125)">Text-only prefix measurements; dashed line = historical GPT-5.4 service cache reference minimum (1,024)</text>
    <text style="font-size: 12px; font-family: 'DejaVu Sans'" transform="translate(282.86601 29.7555)">These are NOT provider-serialized cache lengths or evidence of a cache hit</text>
   </g>
  </g>

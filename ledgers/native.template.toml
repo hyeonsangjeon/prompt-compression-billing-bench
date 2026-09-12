@@ -1,0 +1,99 @@
+schema_version = 1
+mode = "native_log_truncation"
+conditions = ["none", "squeez"]
+output_dir = "runs"
+raw_retrieval = "not_exposed_to_agent"
+
+[benchmark]
+name = "terminal-bench-2.1"
+revision = "7131e4375048a0e408a8fb404b5f499d726b695b"
+root_env = "TERMINAL_BENCH_ROOT"
+tasks = ["cancel-async-tasks", "log-summary-date-ranges", "multi-source-data-merger", "nginx-request-logging", "openssl-selfsigned-cert"]
+
+[benchmark.images]
+cancel-async-tasks = "alexgshaw/cancel-async-tasks@sha256:84c7fae6b256dcc56a350790e2a9715eefc7dad662a9d8e8a472363aa71ef18d"
+log-summary-date-ranges = "alexgshaw/log-summary-date-ranges@sha256:cbeb6ba905c2fec294f16cd5e16e3ea7f2e04d38ac2484d51a11de262aa7dc51"
+multi-source-data-merger = "alexgshaw/multi-source-data-merger@sha256:8b32782078ff7383a1b4e5d3cecca8ce287e30f50bb4c0e5db009a18064e666e"
+nginx-request-logging = "alexgshaw/nginx-request-logging@sha256:693e64431a0dbf45952e8b91a298d54fd60247e501c6623fb8fa3ebc07fc3d3d"
+openssl-selfsigned-cert = "alexgshaw/openssl-selfsigned-cert@sha256:4c948a4e630af2435ae0a19108fc0814a946ac2fa29a512469e0fc77b38c8c12"
+
+[model]
+provider = "foundry"
+name = "gpt-5.4"
+reported_model = "gpt-5.4-2026-03-05"
+endpoint_env = "FOUNDRY_ENDPOINT"
+temperature = 0
+reasoning_effort = "none"
+max_completion_tokens = 2048
+
+[runner]
+harbor_version = "0.22.0"
+agent_import_path = "src.harbor_agent:ObservedTerminus2"
+concurrency = 8
+max_turns = 60
+agent_timeout_seconds = 900
+verifier_timeout_seconds = 900
+setup_timeout_seconds = 600
+trial_timeout_seconds = 2400
+
+[measurement]
+tokenizer = "o200k_base"
+tiktoken_version = "0.14.0"
+cache_env = "TIKTOKEN_CACHE_DIR"
+table_sha256 = "446a9538cb6c348e3516120d7c08b09f57c36495e2acfffe59a5bf8b0cfb1a2d"
+
+[compressor]
+name = "squeez"
+target = "identified_log_spans"
+
+[compressor.tools.none]
+version = "unavailable"
+options = {}
+
+[compressor.tools.squeez]
+version = "1.48.4"
+binary_env = "SQUEEZ_BINARY"
+sha256 = "ef956365ace3aa5f362847afc000aa008d5b4a26db4ee2c5bcc0d2718d043773"
+
+[compressor.tools.squeez.options]
+invocation = "wrap_cat_input_txt"
+state = "fresh_home_per_span"
+timeout_seconds = 10
+output = "complete_stdout"
+
+[queue]
+state_path_env = "FOUNDRY_QUEUE_STATE"
+rpm = 3000
+tpm = 300000
+limits_checked_at_utc = "2026-09-12T09:34:50.299151+00:00"
+limits_source_reference = "Azure deployment properties.rateLimits and one lightweight eight-request check"
+deployment_isolation_reference = ""
+
+[limits]
+api_cost_usd = 0
+deadline_utc = ""
+max_wall_seconds = 86400
+max_calls_per_trial = 60
+request_timeout_seconds = 300
+max_request_bytes = 8000000
+max_attempts_per_call = 3
+max_retry_wait_seconds = 120
+protocol_token_allowance = 4096
+
+[prices]
+input_per_million_usd = 0
+cached_input_per_million_usd = 0
+output_per_million_usd = 0
+source_reference = ""
+checked_at_utc = ""
+
+[stability]
+rule = "equal_half_support_v1_proposal"
+minimum_repetitions = 10
+maximum_repetitions = 20
+comparison_repetitions = "match_baseline"
+
+[approval]
+execution_approved = false
+rule_accepted = false
+reference = ""

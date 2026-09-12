@@ -483,6 +483,13 @@ def verify(directory: Path, source_commit: str | None = None) -> dict:
 
 
 def main() -> int:
+    from src.prompt_intake import archive_prompts
+
+    archive_prompts(ROOT)
+    if len(sys.argv) > 1 and sys.argv[1] == "native":
+        from src.native_run import main as native_main
+
+        return native_main(sys.argv[2:])
     if len(sys.argv) > 1 and sys.argv[1] == "static":
         from src.static_run import main as static_main
 

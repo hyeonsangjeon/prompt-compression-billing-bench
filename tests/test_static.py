@@ -1,4 +1,5 @@
 import copy
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import chdir, redirect_stderr
 import io
 import json
@@ -164,6 +165,23 @@ class StaticContractTests(unittest.TestCase):
         self.assertTrue((self.directory / "artifacts/span-00001/home/seen").exists())
         self.assertTrue((self.directory / "artifacts/span-00002/home/seen").exists())
         self.assertEqual(compressor.calls, 2)
+
+    def test_binary_adapter_allocates_unique_artifacts_under_concurrency(self):
+        specification = self.stub(
+            "assert sys.argv[1:] == ['wrap', 'cat input.txt']\n"
+            "time.sleep(0.02)\n"
+            "sys.stdout.write(pathlib.Path('input.txt').read_text())\n"
+        )
+        compressor = SqueezCompressor(specification, self.directory / "artifacts")
+        inputs = [f"input {index}" for index in range(8)]
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            outputs = list(executor.map(compressor.compress, inputs))
+        self.assertEqual([output.text for output in outputs], inputs)
+        self.assertEqual(compressor.calls, 8)
+        self.assertEqual(
+            sorted(path.name for path in (self.directory / "artifacts").glob("span-*")),
+            [f"span-{index:05d}" for index in range(1, 9)],
+        )
 
     def test_binary_change_exit_failure_and_invalid_utf8_stop(self):
         for body in ("sys.exit(7)\n", "sys.stdout.buffer.write(b'\\xff')\n"):

@@ -1,0 +1,435 @@
+"""One fail-closed loopback transport for every trial in a native run."""
+
+from collections import deque
+from datetime import datetime, timezone
+import fcntl
+import hmac
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import json
+import math
+import os
+from pathlib import Path
+import re
+import stat
+import threading
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+
+from accounting import now, provider_tokens
+from .live_observations import POLICY, partition
+from .measurement import counts, token_count
+from .protection import FrozenRequestGuard, ProtectionViolation, canonical, digest, parse_request
+
+
+def write_json(path: Path, payload) -> None:
+    with path.open("x", encoding="utf-8") as handle:
+        json.dump(payload, handle, ensure_ascii=False, indent=2, allow_nan=False)
+        handle.write("\n")
+
+
+class DeploymentQueue:
+    def __init__(self, path: Path, deployment: str, rpm: int, tpm: int, *, clock=time.time):
+        if type(rpm) is not int or type(tpm) is not int or rpm < 1 or tpm < 1:
+            raise ValueError("Verified positive deployment RPM and TPM are required")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.is_symlink():
+            raise ValueError("Shared queue must not be a symlink")
+        flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(path, flags, 0o600)
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            os.close(descriptor)
+            raise ValueError("Shared queue must be a regular file")
+        self.file = os.fdopen(descriptor, "r+", encoding="utf-8")
+        try:
+            fcntl.flock(self.file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self.file.seek(0)
+            saved = self.file.read()
+            state = json.loads(saved) if saved else {"deployment": deployment, "reservations": [], "not_before": 0}
+            if state["deployment"] != deployment:
+                raise ValueError("Shared queue belongs to another deployment")
+            reservations = state["reservations"]
+            if not isinstance(reservations, list) or any(
+                not isinstance(row, list) or len(row) != 2
+                or type(row[0]) not in (int, float) or not math.isfinite(row[0])
+                or type(row[1]) is not int or row[1] < 1 for row in reservations
+            ) or reservations != sorted(reservations, key=lambda row: row[0]):
+                raise ValueError("Shared queue reservations are invalid")
+            if type(state["not_before"]) not in (int, float) or not math.isfinite(state["not_before"]):
+                raise ValueError("Shared queue cooldown is invalid")
+            if reservations and reservations[-1][0] > clock() + 1:
+                raise ValueError("Clock moved backwards; shared reservations must not be discarded")
+        except Exception:
+            self.file.close()
+            raise
+        self.deployment, self.rpm, self.tpm, self.clock = deployment, rpm, tpm, clock
+        self.reservations = deque(state["reservations"])
+        self.not_before = state["not_before"]
+        self.lock = threading.Lock()
+
+    def persist(self):
+        self.file.seek(0)
+        json.dump({"deployment": self.deployment, "reservations": list(self.reservations),
+                   "not_before": self.not_before}, self.file)
+        self.file.truncate()
+        self.file.flush()
+        os.fsync(self.file.fileno())
+
+    def reserve(self, estimated_tokens: int, stopped: threading.Event, deadline: float) -> float:
+        if type(estimated_tokens) is not int or estimated_tokens < 1 or estimated_tokens > self.tpm:
+            raise ValueError("Request token reservation exceeds the configured TPM; do not wait forever")
+        started = self.clock()
+        while True:
+            current = self.clock()
+            if stopped.is_set() or current >= deadline:
+                raise ProtectionViolation("Run stopped or deadline reached while waiting")
+            with self.lock:
+                while self.reservations and self.reservations[0][0] <= current - 60:
+                    self.reservations.popleft()
+                limited = len(self.reservations) >= self.rpm or sum(row[1] for row in self.reservations) + estimated_tokens > self.tpm
+                ready = max(self.not_before, self.reservations[0][0] + 60 if limited else current)
+                if ready <= current:
+                    self.reservations.append([current, estimated_tokens])
+                    self.persist()
+                    return current - started
+            if ready >= deadline:
+                raise ValueError("Queue wait would exceed the run deadline")
+            stopped.wait(min(ready - current, 1.0))
+
+    def cooldown(self, seconds: float):
+        if type(seconds) not in (int, float) or not math.isfinite(seconds) or seconds < 0:
+            raise ValueError("Invalid provider cooldown")
+        with self.lock:
+            self.not_before = max(self.not_before, self.clock() + seconds)
+            self.persist()
+
+    def close(self):
+        self.file.close()
+
+
+class FoundrySender:
+    def __init__(self, endpoint: str, timeout: float, bearer, *, deadline: float | None = None):
+        parsed = urllib.parse.urlsplit(endpoint)
+        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
+            raise ValueError("Foundry requires an explicit HTTPS base URL without credentials or query")
+        if not parsed.path.rstrip("/").endswith("/openai/v1"):
+            raise ValueError("Only the inspected Foundry OpenAI v1 base URL is supported")
+        if not parsed.hostname.endswith((".openai.azure.com", ".services.ai.azure.com", ".cognitiveservices.azure.com")):
+            raise ValueError("Credentials may only be sent to an explicit Azure Foundry host")
+        self.endpoint, self.timeout, self.bearer = endpoint.rstrip("/"), timeout, bearer
+        self.deadline = deadline
+
+    def __call__(self, body: bytes) -> tuple[int, bytes, dict]:
+        class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, *arguments, **keywords):
+                raise ValueError("Provider redirects are not allowed")
+
+        timeout = self.timeout if self.deadline is None else min(self.timeout, self.deadline - time.time())
+        if timeout <= 0:
+            raise TimeoutError("Run deadline reached before provider dispatch")
+        request = urllib.request.Request(self.endpoint + "/chat/completions", data=body, headers={
+            "Authorization": "Bearer " + self.bearer(), "Content-Type": "application/json",
+        })
+        opener = urllib.request.build_opener(NoRedirect())
+        try:
+            with opener.open(request, timeout=timeout) as response:
+                return response.status, response.read(), dict(response.headers)
+        except urllib.error.HTTPError as error:
+            return error.code, error.read(), dict(error.headers)
+
+
+class ManagedIdentity:
+    def __init__(self):
+        self.token, self.expires = "", 0
+        self.lock = threading.Lock()
+
+    def __call__(self) -> str:
+        with self.lock:
+            if time.time() >= self.expires - 300:
+                query = urllib.parse.urlencode({"api-version": "2018-02-01", "resource": "https://cognitiveservices.azure.com"})
+                request = urllib.request.Request("http://169.254.169.254/metadata/identity/oauth2/token?" + query,
+                                                 headers={"Metadata": "true"})
+                opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+                with opener.open(request, timeout=15) as response:
+                    token = json.load(response)
+                self.token, self.expires = token["access_token"], int(token["expires_on"])
+        return self.token
+
+
+class LiveRecorder:
+    def __init__(self, directory: Path, ledger: dict, source_commit: str, compressor, encoder, queue, sender,
+                 *, condition="none", evidence_kind="native_measurement"):
+        self.directory, self.ledger, self.source_commit = directory, ledger, source_commit
+        self.compressor, self.encoder, self.queue, self.sender = compressor, encoder, queue, sender
+        self.condition, self.evidence_kind = condition, evidence_kind
+        directory.mkdir(parents=True, exist_ok=False)
+        self.lock = threading.RLock()
+        self.event_lock = threading.Lock()
+        self.stopped = threading.Event()
+        self.failure = None
+        self.trials = {}
+        self.sequence = 0
+        self.budget_used_usd = 0.0
+        self.serialize = canonical
+        self.deadline = min(datetime.fromisoformat(ledger["limits"]["deadline_utc"]).timestamp(),
+                            time.time() + ledger["limits"]["max_wall_seconds"])
+
+    def event(self, payload):
+        with self.event_lock, (self.directory / "events.jsonl").open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps({"at": now(), "kind": self.evidence_kind, "condition": self.condition,
+                                     "source_commit": self.source_commit, **payload},
+                                    ensure_ascii=False, allow_nan=False) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+
+    def register_trial(self, trial_id: str, task: str, repetition: int):
+        with self.lock:
+            self.check()
+            if not re.fullmatch(r"[a-z0-9-]+", trial_id) or trial_id in self.trials:
+                raise ValueError("A new safe trial identifier is required")
+            self.trials[trial_id] = {"task": task, "repetition": repetition, "calls": 0, "assistant_hashes": set(), "closed": False}
+
+    def close_trial(self, trial_id: str):
+        with self.lock:
+            self.trials[trial_id]["closed"] = True
+            self.event({"event": "trial_closed", "trial_id": trial_id})
+
+    def stop(self, reason: str, details=None):
+        with self.lock:
+            self.stopped.set()
+            if self.failure is None:
+                self.failure = {"reason": reason, "details": details or {}}
+                self.event({"event": "run_stopped", **self.failure})
+
+    def check(self):
+        if self.stopped.is_set():
+            raise ProtectionViolation("All subsequent requests are blocked", self.failure)
+        if time.time() >= self.deadline:
+            raise ValueError("Run deadline reached")
+
+    def request_contract(self, payload):
+        required = {"model", "temperature", "reasoning_effort", "max_completion_tokens", "messages"}
+        if not required <= payload.keys() or payload.keys() - required - {"stream"}:
+            raise ProtectionViolation("Unexpected or missing live request fields")
+        expected = self.ledger["model"]
+        for key in ("model", "temperature", "reasoning_effort", "max_completion_tokens"):
+            value = expected["name"] if key == "model" else expected[key]
+            if type(payload[key]) is bool or payload[key] != value:
+                raise ProtectionViolation("Actual model settings differ from the ledger", {"field": key})
+        if payload.get("stream", False) is not False:
+            raise ProtectionViolation("Only nonstreaming completions are supported")
+        if not isinstance(payload["messages"], list) or not payload["messages"]:
+            raise ProtectionViolation("A nonempty live conversation is required")
+        for message in payload["messages"]:
+            if not isinstance(message, dict) or set(message) != {"role", "content"} or message["role"] not in ("user", "assistant", "system") or not isinstance(message["content"], str):
+                raise ProtectionViolation("Unexpected live message structure")
+
+    def complete(self, trial_id: str, source: bytes) -> tuple[int, bytes]:
+        try:
+            self.check()
+            return self._complete(trial_id, source)
+        except Exception as error:
+            self.stop(type(error).__name__, getattr(error, "details", {"message": str(error)}))
+            raise
+
+    def _complete(self, trial_id: str, source: bytes) -> tuple[int, bytes]:
+        limits, prices = self.ledger["limits"], self.ledger["prices"]
+        with self.lock:
+            self.check()
+            trial = self.trials[trial_id]
+            if trial["closed"]:
+                raise ProtectionViolation("A finished trial cannot issue another request")
+            if len(source) > limits["max_request_bytes"] or trial["calls"] >= limits["max_calls_per_trial"]:
+                raise ValueError("Request size or trial call limit reached")
+            self.sequence += 1
+            request_number = self.sequence
+            trial["calls"] += 1
+            task = trial["task"]
+            repetition = trial["repetition"]
+            assistant_hashes = set(trial["assistant_hashes"])
+        self.event({"event": "call_received", "trial_id": trial_id, "request": request_number,
+                    "task": task, "repetition": repetition, "request_sha256": digest(source)})
+        directory = self.directory / f"request-{request_number:05d}"
+        directory.mkdir()
+        (directory / "before.json").write_bytes(source)
+        payload = parse_request(source)
+        self.request_contract(payload)
+        segments = partition(payload, assistant_hashes)
+        write_json(directory / "manifest.json", {"source_sha256": digest(source), "segments": segments,
+                                                "classification_policy": POLICY, "trial_id": trial_id})
+        guard = FrozenRequestGuard(source, digest(source), segments)
+        originals = guard.candidate_texts()
+        compressed = [self.compressor.compress(text) for text in originals]
+        transformed = guard.prepare([result.text for result in compressed])
+        outgoing = self.serialize(transformed)
+        (directory / "after.json").write_bytes(outgoing)
+        proof = guard.verify_serialized(outgoing)
+        if len(outgoing) > limits["max_request_bytes"]:
+            raise ValueError("Transformed request exceeds the size cap")
+        input_measurement = {
+            "kind": "calculated", "before": counts(payload, originals, self.encoder),
+            "after": counts(transformed, [result.text for result in compressed], self.encoder),
+            "candidates": [{"before_sha256": digest(original.encode()), "after_sha256": digest(result.text.encode()),
+                            "before_lines": len(original.splitlines()), "after_lines": len(result.text.splitlines()),
+                            "changed": original != result.text, "tool_reported": result.tool_reported}
+                           for original, result in zip(originals, compressed)],
+        }
+        write_json(directory / "protection.json", proof)
+        write_json(directory / "local-input.json", input_measurement)
+        for candidate_index, (segment, original, result) in enumerate(zip(
+            [segment for segment in segments if segment["candidate"]], originals, compressed
+        )):
+            if original != result.text:
+                self.event({
+                    "event": "candidate_changed", "trial_id": trial_id, "request": request_number,
+                    "candidate_index": candidate_index, "before_sha256": digest(original.encode()),
+                    "after_sha256": digest(result.text.encode()), **segment,
+                    "before_lines": len(original.splitlines()), "after_lines": len(result.text.splitlines()),
+                })
+        output_cap = payload["max_completion_tokens"]
+        input_reservation = len(outgoing) + limits["protocol_token_allowance"]
+        reservation = (input_reservation * prices["input_per_million_usd"] + output_cap * prices["output_per_million_usd"]) / 1_000_000
+        rate_estimate = token_count(outgoing.decode(), self.encoder) + output_cap + limits["protocol_token_allowance"]
+        for attempt in range(1, limits["max_attempts_per_call"] + 1):
+            with self.lock:
+                self.check()
+                if self.budget_used_usd + reservation > limits["api_cost_usd"]:
+                    raise ValueError("Run budget reservation would exceed the ledger ceiling")
+                self.budget_used_usd += reservation
+            try:
+                waited = self.queue.reserve(rate_estimate, self.stopped, self.deadline)
+                guard.verify_serialized(outgoing)
+                self.check()
+            except Exception:
+                with self.lock:
+                    self.budget_used_usd -= reservation
+                raise
+            self.event({"event": "attempt_started", "trial_id": trial_id, "request": request_number,
+                        "attempt": attempt, "request_sha256": digest(outgoing),
+                        "local_input_tokens": input_measurement["after"]["message_content_tokens"],
+                        "queue_wait_seconds": waited, "rate_reservation_tokens": rate_estimate,
+                        "budget_reservation_usd": reservation, "reservation_is_provider_guarantee": False})
+            started = time.monotonic()
+            try:
+                status, raw, headers = self.sender(outgoing)
+            except Exception as error:
+                self.event({"event": "http", "trial_id": trial_id, "request": request_number,
+                            "attempt": attempt, "status": None, "provider_usage": None, "tokens": None,
+                            "calculated_cost_usd": None, "error_type": type(error).__name__,
+                            "elapsed_seconds": time.monotonic() - started, "billing_unknown": True})
+                raise
+            elapsed = time.monotonic() - started
+            (directory / f"response-{attempt:02d}.json").write_bytes(raw)
+            record = {"event": "http", "trial_id": trial_id, "request": request_number, "attempt": attempt,
+                      "status": status, "response_sha256": digest(raw), "elapsed_seconds": elapsed,
+                      "provider_usage": None, "calculated_cost_usd": None,
+                      "invoice_reconciled": False, "source_commit": self.source_commit}
+            if status == 200:
+                try:
+                    response = parse_request(raw)
+                except (ValueError, UnicodeError, TypeError):
+                    self.event({**record, "error_type": "MalformedProviderResponse"})
+                    raise ValueError("Provider response is not unambiguous JSON") from None
+                tokens = provider_tokens(response)
+                if tokens is None:
+                    self.event(record)
+                    raise ValueError("Successful response lacks valid provider usage; reservation retained")
+                choices = response.get("choices")
+                if not isinstance(choices, list) or len(choices) != 1:
+                    self.event({**record, "provider_usage": response.get("usage"), "tokens": tokens})
+                    raise ValueError("Expected one textual assistant response")
+                choice = choices[0]
+                message = choice.get("message") if isinstance(choice, dict) else None
+                content = message.get("content") if isinstance(message, dict) else None
+                if not isinstance(content, str) or message.get("role") != "assistant":
+                    self.event({**record, "provider_usage": response.get("usage"), "tokens": tokens})
+                    raise ValueError("Unexpected nontext assistant output")
+                cached = tokens["cached_input_tokens"]
+                upper_cost = (tokens["input_tokens"] * prices["input_per_million_usd"] + tokens["output_tokens"] * prices["output_per_million_usd"]) / 1_000_000
+                exact_cost = None if cached is None else upper_cost - cached * (prices["input_per_million_usd"] - prices["cached_input_per_million_usd"]) / 1_000_000
+                record.update(provider_usage=response["usage"], provider_reported_model=response.get("model"),
+                              provider_response_id=response.get("id"), tokens=tokens,
+                              provider_fingerprint=response.get("system_fingerprint"),
+                              finish_reason=choices[0].get("finish_reason"), calculated_cost_usd=exact_cost,
+                              uncached_cost_ceiling_usd=upper_cost,
+                              cost_basis="provider_usage_times_ledger_rates_not_invoice",
+                              local_output={"content_utf8_bytes": len(content.encode()),
+                                            "content_tokens": token_count(content, self.encoder), "tokenizer": "o200k_base"})
+                self.event(record)
+                with self.lock:
+                    self.budget_used_usd += (upper_cost if exact_cost is None else exact_cost) - reservation
+                if response["usage"].get("total_tokens", tokens["input_tokens"] + tokens["output_tokens"]) != tokens["input_tokens"] + tokens["output_tokens"]:
+                    raise ValueError("Provider total tokens disagree with input plus output")
+                if tokens["input_tokens"] > input_reservation or tokens["output_tokens"] > output_cap or upper_cost > reservation:
+                    raise ValueError("Provider usage exceeded reservation; stop rather than silently expand it")
+                expected_model = self.ledger["model"]["reported_model"]
+                if response.get("model") != expected_model:
+                    raise ValueError("Provider-reported model revision differs from the ledger")
+                with self.lock:
+                    self.check()
+                    trial["assistant_hashes"].add(digest(content.encode()))
+                return status, raw
+            self.event(record)
+            if status == 429:
+                if attempt < limits["max_attempts_per_call"]:
+                    normalized = {key.lower(): value for key, value in headers.items()}
+                    wait = float(normalized.get("retry-after", "60"))
+                    if not math.isfinite(wait) or not 0 <= wait <= limits["max_retry_wait_seconds"]:
+                        raise ValueError("Retry-After exceeds the predeclared wait limit")
+                    self.queue.cooldown(wait)
+                    continue
+            raise ValueError(f"Provider HTTP {status}; no outer retry budget restart")
+        raise ValueError("HTTP retry budget exhausted")
+
+
+def start_live_proxy(recorder: LiveRecorder, key: str) -> ThreadingHTTPServer:
+    class Handler(BaseHTTPRequestHandler):
+        def setup(self):
+            super().setup()
+            self.connection.settimeout(min(30, recorder.ledger["limits"]["request_timeout_seconds"]))
+
+        def log_message(self, *arguments):
+            return
+
+        def do_POST(self):
+            if not hmac.compare_digest(self.headers.get("Authorization", ""), "Bearer " + key):
+                self.send_error(403)
+                return
+            match = re.fullmatch(r"/([a-z0-9-]+)/v1/chat/completions", self.path)
+            if not match or match[1] not in recorder.trials:
+                self.send_error(404)
+                return
+            try:
+                if len(self.headers.get_all("Content-Length", [])) != 1 or self.headers.get("Transfer-Encoding"):
+                    raise ValueError("Ambiguous request framing")
+                length = int(self.headers.get("Content-Length", "0"))
+                if not 0 < length <= recorder.ledger["limits"]["max_request_bytes"]:
+                    raise ValueError("Invalid request length")
+                source = self.rfile.read(length)
+                if len(source) != length:
+                    raise ValueError("Incomplete request")
+            except Exception as error:
+                with recorder.lock:
+                    recorder.stop(type(error).__name__, getattr(error, "details", {"message": str(error)}))
+                source = b""
+            try:
+                status, body = recorder.complete(match[1], source)
+            except Exception:
+                status, body = 503, b'{"error":{"type":"run_stopped","message":"See private run diagnostics; later requests are blocked"}}'
+            try:
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                self.wfile.flush()
+                if status == 200:
+                    recorder.event({"event": "response_delivered", "trial_id": match[1]})
+            except OSError:
+                recorder.stop("ClientDisconnectedAfterDispatch")
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server.daemon_threads = False
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server

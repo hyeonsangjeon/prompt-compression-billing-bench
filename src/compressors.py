@@ -9,6 +9,7 @@ import re
 import signal
 import subprocess
 import tempfile
+import threading
 from typing import Protocol
 
 from .protection import digest
@@ -73,6 +74,7 @@ class SqueezCompressor:
         self.artifacts = artifacts
         self.artifacts.mkdir(parents=True, exist_ok=False)
         self.calls = 0
+        self.lock = threading.Lock()
         with tempfile.TemporaryDirectory(prefix="version-", dir=artifacts) as temporary:
             stdout, _stderr = self._execute([str(self.binary), "--version"], Path(temporary))
         version = stdout.decode("utf-8").strip()
@@ -119,8 +121,10 @@ class SqueezCompressor:
     def compress(self, text: str) -> CompressionResult:
         if digest(self.binary.read_bytes()) != self.metadata["binary_sha256"]:
             raise CompressorError("The squeez binary changed during the run")
-        self.calls += 1
-        directory = self.artifacts / f"span-{self.calls:05d}"
+        with self.lock:
+            self.calls += 1
+            call = self.calls
+        directory = self.artifacts / f"span-{call:05d}"
         directory.mkdir()
         (directory / "input.txt").write_bytes(text.encode("utf-8"))
         stdout, _stderr = self._execute([str(self.binary), "wrap", "cat input.txt"], directory)

@@ -205,8 +205,8 @@
     {
       "id": "figure-10",
       "path": "figures/round1/04-shared-prefix.svg",
-      "sha256": "da89ae87d02d0361c5dfdd9109e01b4e8b9fe98e4effa432faa87ced32ea3f47",
-      "alt": "공식 지시문 과제 쌍과 실제 Terminal 요청 쌍의 공통 선두 로컬 token ID 길이 분포. 1,024 점선은 Azure GPT-5.4 기준이며 서비스 캐시 접두부 실측이 아니다.",
+      "sha256": "94f9a6f0c510530c676bafffd5f059e81a31345f9454510192a5f6c649a724e4",
+      "alt": "공식 지시문 과제 쌍과 실제 Terminal 요청 쌍의 공통 선두 로컬 token ID 길이 분포. 1,024 점선은 당시 GPT-5.4 서비스의 캐시 최소 길이 참고선이며 서비스 캐시 접두부 실측이 아니다.",
       "caption": "정적 지시문/첫 요청/인접 요청 쌍의 공통 로컬 token ID 길이 누적분포",
       "metadata": [
         [
@@ -222,7 +222,7 @@
           "측정 · 통계 계산"
         ]
       ],
-      "visible_text_sha256": "ce8e37bebc2c5e58ed9a4716618f8fae5359d0d60c54783fe6f59bc31b6bce74"
+      "visible_text_sha256": "6f545a82247d3cb8653efbe4b29a7d7e429ddcd8533971ffb9930925c16a7d40"
     }
   ],
   "tables": [

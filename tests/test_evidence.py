@@ -118,9 +118,8 @@ class PublicationAuditTests(unittest.TestCase):
 
     def test_new_unclassified_files_still_fail(self):
         for relative_path in (
-            "new-report.md", "prompt_eda_round2 (2).md", "nested/prompt_eda_round2.md",
-            "prompt_design_final (1).md", "nested/prompt_design_final.md",
-            "prompt_repo_first_commit (1).md", "nested/prompt_repo_first_commit.md",
+            "new-report.md", "nested/prompt_eda_round2.md",
+            "nested/prompt_design_final.md", "nested/prompt_repo_first_commit.md",
             "@eaDir-extra/notes.md", "loose@SynoResource",
         ):
             with self.subTest(path=relative_path):

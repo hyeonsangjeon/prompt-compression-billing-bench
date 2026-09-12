@@ -834,7 +834,7 @@ API와 로컬의 차이는 API 입력을 분모로 0.24–1.38%다.
 
 ### 1차 · 정적 지시문/첫 요청/인접 요청 쌍의 공통 로컬 token ID 길이 누적분포
 
-![공식 지시문 과제 쌍과 실제 Terminal 요청 쌍의 공통 선두 로컬 token ID 길이 분포. 1,024 점선은 Azure GPT-5.4 기준이며 서비스 캐시 접두부 실측이 아니다.](figures/round1/04-shared-prefix.svg)
+![공식 지시문 과제 쌍과 실제 Terminal 요청 쌍의 공통 선두 로컬 token ID 길이 분포. 1,024 점선은 당시 GPT-5.4 서비스의 캐시 최소 길이 참고선이며 서비스 캐시 접두부 실측이 아니다.](figures/round1/04-shared-prefix.svg)
 
 정적 지시문/첫 요청/인접 요청 쌍의 공통 로컬 token ID 길이 누적분포
 

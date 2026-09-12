@@ -1,0 +1,214 @@
+# Native truncation experiment contract
+
+This is an implementation and pre-execution design contract, **not a native
+experiment result or approval to call a model**. The optional Foundry path is
+separate from the legacy local-model runner and the frozen static demo.
+
+## Fixed comparison and gates
+
+`run.py native` runs the existing five purpose-selected Terminal tasks with
+Harbor 0.22.0 / the instrumented Terminus 2 agent. Both arms use the same pinned
+task images, instructions, native tests, model settings, observation policy,
+transport and metrics. The order is **none baseline, then squeez**; there is no
+delete-all arm. This runner does not run DeepSWE or a substitute benchmark.
+
+The reviewed squeez 1.48.4 profile is `wrap "cat input.txt"`, with a fresh private
+HOME/CWD per candidate. In the audited corpus it retained the **first 30 content
+lines and deleted the suffix**, sometimes also removing a blank line. It is a
+lossy truncation intervention, not a lossless character codec. A universal
+`--full` switch is not part of this contract. Complete stdout, including tool
+metadata and recovery notices, reaches the agent and counts toward local size.
+
+Raw originals are retained privately for auditing, but **no recovery tool is
+exposed to the agent**. A recovery notice is not proof of an available retrieval
+path. The agent can still rerun commands or reread files through its terminal;
+those actions must be counted, not assumed free. Both arms keep Harbor's existing
+10,000-byte middle-elision behavior. Pre-Harbor terminal output is recorded
+separately so that loss by Harbor is not attributed to squeez.
+
+The template at `ledgers/native.template.toml` is deliberately unapproved and
+not runnable. Before execution it needs an explicit rule/execution approval
+reference, current rates with a source/check time, remaining budget, deployment
+coordination reference, and an absolute UTC deadline. The ledger already fixes
+the checked deployment limits at 300,000 TPM and 3,000 RPM and fixes eight
+simultaneous native trial processes. These are operational records, not a request
+for per-call cost approval.
+
+Concurrency is a comparison control, not an experiment arm. The validator rejects
+any value other than eight instead of issuing a warning that could be ignored.
+Changing it requires an explicit contract/code change and a new execution SHA;
+the none baseline and every comparison must use the same complete runner and queue
+section. Each outer process still runs one Harbor trial and one agent at a time.
+
+`--source-commit` is mandatory. The designated full SHA must match a clean HEAD
+and the committed source inventory. Source, ledger and dependency-lock snapshots
+travel with every run; trial and transport records carry the same SHA. The
+benchmark checkout and every copied task file are compared against its pinned
+Git revision. Only the environment image reference and Dockerfile are replaced
+by the ledger's immutable image digest. Native tests/instructions are unchanged.
+Critical installed dependencies are checked against `uv.lock`.
+
+## Transmission boundary
+
+```text
+native runner and source/ledger checks
+  -> Harbor / LiteLLM / OpenAI SDK
+  -> authenticated loopback proxy, separate route for each trial
+  -> capture original JSON and identify source-bound log candidates
+  -> common none/squeez adapter and FrozenRequestGuard
+  -> shared deployment RPM/TPM reservation queue
+  -> verify the actual serialized bytes again, immediately before sending
+  -> Foundry, raw response and usage capture
+  -> native verifier, classified failure evidence and task metrics
+```
+
+The live policy is `echo_bound_terminal_logs_v2`. A candidate must follow an
+assistant response actually received in that trial, match its echoed terminal
+command, and fit a conservative command/output rule. Code reads, mixed code,
+structured JSON/YAML, unknown commands, ambiguous boundaries and unmatched
+output stay protected. A matching hash proves structural preservation, **not
+that the classified log is semantically safe to discard**. The policy does not
+widen itself to reproduce a historical candidate percentage.
+
+Protected changes, unexpected settings or malformed JSON block transmission.
+The run-wide stop latch also blocks queued requests, retries and later tasks.
+The supervisor interrupts the Harbor process group and force-kills it if it
+does not exit. Diagnostics preserve JSON paths, affected segments, first
+differences and expected/actual hashes. Finished trial routes are closed;
+response logging drains before metrics and final artifact hashes are collected.
+With concurrent trials, requests already dispatched before a peer failure cannot
+be recalled; this boundary is retained in the timestamps and transport records.
+
+Docker resource cleanup after a forced interruption is **not validated** by a
+host process-group test. Harbor is configured to delete environments, but an
+operator must check for leftover containers on the execution host. An HTTP
+request already sent cannot be recalled; ambiguous failures retain their budget
+reservation and unknown usage rather than being retried as free calls.
+
+## Units and task metrics
+
+All metrics are collected for **both** arms from the same path.
+
+| Field | Definition and boundary |
+|---|---|
+| `turns` | Recorded Harbor `source=agent` trajectory steps, including repair/confirmation steps when Harbor writes them; not HTTP attempts or unfinished steps |
+| `logical_model_calls` | Requests received by the proxy, not appearances of the same conversation in saved history |
+| `total_model_calls` | Every outgoing provider HTTP attempt, including bounded 429 retries; successful responses and deliveries are separate counts |
+| `delivered_responses_without_separate_agent_step` | Delivery count minus native steps; Harbor can repair an output-length error inside a turn. This gap is recorded, not silently equated to turns |
+| `provider_tokens.input_tokens`, `output_tokens` | Separate provider-reported usage totals; not a reconciled invoice. Missing usage is null with a known subtotal and unknown-attempt count, never an invented zero |
+| `cached_input_tokens` | Observed cache-read usage; missing cache detail is null, not zero. Cache behavior is not controlled |
+| `local_tokens.input_tokens` | `o200k_base` message-content tokens per sent attempt, excluding API role framing; retries count again |
+| `local_tokens.output_tokens` | Visible assistant-content tokens; not hidden reasoning or provider-billed output. Unknown responses leave a subtotal rather than a complete total |
+| `cost` | Usage multiplied by ledger rates, separately from a conservative budget reservation; no invoice reconciliation claim |
+| `same_command_reexecutions` | Sum of occurrences beyond the first for each byte-identical complete command block actually accepted by the terminal wrapper |
+| `same_subcommand_reexecutions` | Additional conservative lexical count for shell units such as `find` inside `ls && find`; not proof of command completion or the same filesystem/cwd |
+| `post_changed_output_*` | Repetition linked by command text and time to an earlier changed output; retained evidence, **not proof that truncation caused the repetition** |
+| `native_outcome` | Unmodified native binary reward plus failure categories, per-test evidence and integrity warnings |
+| `concurrency`, `deployment_limits` | Fixed outer native-trial concurrency plus the ledger RPM/TPM, check time and source; written to both `summary.json` and `execution.json` and revalidated from the saved ledger |
+
+Waits, control keystrokes, undecomposable scripts and uncertain submissions have
+separate fields. Proposed assistant commands that never reach the terminal do
+not count as executed. Lower input tokens alone do not establish savings: output,
+retries, turns and command repetition may increase total cost.
+
+## Proposed baseline calculation
+
+`equal_half_support_v1_proposal` is a **predeclared operational stopping rule**,
+not a statistical test of convergence, equivalence or noninferiority. Accept it
+explicitly in the execution ledger before observing a baseline.
+
+One repetition is all five fixed tasks, each with a valid native reward in
+`{0,1}`. The primary quality unit is **passed tasks per five-task repetition**,
+an integer from 0 through 5. Record the observed minimum/maximum/range, mean,
+sample standard deviation, and per-task pass counts. Use the observed range as
+the primary tolerance; standard deviation is descriptive, not a normality-based
+threshold for this small, heterogeneous binary sample.
+
+- At 10 complete repetitions, compare repetitions 1–5 with 6–10. Stop range
+  collection if suite minima/maxima match and each task has the same observed
+  support (`{0}`, `{1}` or `{0,1}`) in both halves.
+- Otherwise extend to **20 total**, comparing 1–10 with 11–20. If the same
+  checks still fail, stop as inconclusive; do not collect 30 or change tasks.
+- Matching supports do not imply equal frequencies. Half histograms and mean
+  differences remain visible. An all-failing baseline or a full 0–5 range cannot
+  detect useful degradation and is marked inconclusive, even if supports match.
+- Squeez uses the same complete repetition count as the accepted baseline.
+  A suite count below the baseline minimum, or a failure on a previously
+  always-passing task, is below the observed tolerance. Values above the baseline
+  maximum require review rather than automatic attribution to truncation.
+- Within-range observations are not proof of equal quality. Floor tasks cannot
+  show further degradation. Zero actual interventions do not test truncation
+  safety; unchanged short logs cannot establish that throwing away lines is safe.
+
+Invalid/missing judge evidence, incomplete mandatory metrics, protection errors,
+settings/model-revision changes, budget/deadline limits and ambiguous transport
+failures stop the run. They are not native zeros or grounds for replacing tasks.
+Stored decisions and repetitions are reconstructed from per-trial artifacts on
+verification; changing a summary alone cannot change the accepted baseline.
+
+## Judge scope and known gaps
+
+Terminal tasks define their own `tests/test.sh`; the selected five use pytest
+exit status to write the native reward. Retain `result.json`, `reward.txt`,
+`ctrf.json`, test stdout and process/exception evidence. Cross-check test counts,
+duplicates, reward files and pass/fail consistency without loosening thresholds.
+
+Failure categories are `wrong_answer`, `wrong_format`, `timeout`, `tool_error`
+and `other`. They describe observed signatures, not a diagnosis that compression
+caused a failure. Unclassifiable failures preserve the raw evidence and use
+`other`; the agent's answer is not used to regrade a native failure.
+
+The fixed judges are not complete semantic oracles. Known subcheck gaps include
+unchecked user fields/conditional conflict checks in the merger, regex matches
+inside nginx comments and no assertion that a new request appears in its log,
+and acceptance of printed verification text by the certificate-script subcheck.
+These do not demonstrate that an invalid solution passes **all** native tests.
+Keep the original scores and disclose those coverage limits.
+
+The actual DeepSWE wrapper resets test-patch files, applies the hidden patch,
+and runs `/app/test.sh base` and `/app/test.sh new`. It rewards only two zero exit
+codes; setup/patch failures are not model-quality zeros. Its wrapper does not
+guarantee per-test structured failure records or nonzero test counts. A future
+DeepSWE run needs mode-specific logs and framework reports before individual
+causes/coverage can be certified. This five-task runner does not claim to have
+executed DeepSWE, nor count a SWE-bench surrogate as DeepSWE validation.
+
+## Resource and control boundaries
+
+The runner schedules contiguous waves of at most eight native trials, including
+across repetition boundaries. The queue holds an exclusive process lock on a
+persistent, deployment-bound file and uses an internal thread lock for rolling
+RPM/TPM reservations and provider cooldown. Every participating deployment caller
+on that host must use the **same absolute queue path**, not a new file per run.
+The process lock rejects a second uncoordinated runner rather than merging two
+independent in-memory schedulers. It does not control unrelated callers on other
+hosts or direct API clients. Record how deployment isolation/cooperation was
+checked before execution.
+
+Temperature 0 and reasoning effort none are checked on the wire and recorded,
+along with provider-reported model revision/fingerprint. They do **not** prove
+determinism, losslessness, immutable backend state or cache control. Baseline
+repetitions precede comparison to measure observed variability; none-before-squeez
+arm order still permits temporal/backend drift, while requests within an arm may
+overlap under the fixed concurrency. Record timestamps and per-call usage.
+
+## Model-free validation and execution separation
+
+```bash
+uv sync --locked --extra native
+LITELLM_LOCAL_MODEL_COST_MAP=true uv run --locked --extra native python -m unittest discover -s tests -v
+uv run --locked --extra native python run.py native _work/native.toml \
+  --source-commit "$SOURCE_COMMIT" --check
+```
+
+`--check` validates local prerequisites only; it does not start Harbor, contact
+IMDS/Foundry or call any model. It fails on an unapproved/incomplete ledger or a
+dirty/wrong source tree. Actual execution requires the separate `--execute`
+flag; squeez additionally requires `--condition squeez --baseline runs/<id>`.
+Do not run either arm until authorized. The loopback SDK, dummy process and
+synthetic driver tests are software checks, not native quality/billing evidence.
+
+Exit 0 means checks succeeded or the requested measurement completed; exit 2 is
+a preflight/verification error; exit 3 denotes a stopped/inconclusive execution.
+Raw diagnostics and artifacts stay under ignored `runs/`. There is no automatic
+native-results publisher, commit, push or repository visibility change.
