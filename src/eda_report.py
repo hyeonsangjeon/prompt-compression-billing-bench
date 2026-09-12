@@ -14,6 +14,17 @@ from .protection import digest
 
 
 CANDIDATE_CAVEAT = "식별된 후보 범위이지 검증된 상한이 아니다."
+COUNTING_METHOD_SUMMARY = "<summary>이 값들을 어떻게 셌는가</summary>"
+COUNTING_METHOD_FACTS = (
+    "2026-09-09", "2026-09-10", "2026-09-11", "DeepSWE 113/113과제",
+    "Terminal-Bench 2.1 89/89과제", "Terminal 5과제 × 3실행", "성공 HTTP 56요청",
+    "gpt-5.4-2026-03-05", "tiktoken 0.14.0", "o200k_base",
+    "UTF-8 바이트", "로컬 토큰", "청구 토큰",
+)
+REMOVED_WORK_HISTORY = (
+    "<summary>측정 조건</summary>", "NAS 로컬", "Azure VM", "Foundry",
+    "Harbor 0.22.0", "terminus-2", "실행하지 않은 것", "새로 바꾼 것", "그대로 둔 것",
+)
 PRIVATE_PATTERNS = (
     r"(?:_work|local-imports)[/\\]",
     r"/(?:ai-work|home|Users|volume\d+|tmp|private)/|\bfile://|\b[A-Z]:[/\\]",
@@ -104,6 +115,10 @@ def audit_report(root: Path) -> dict:
         raise ValueError("EDA assembly provenance changed")
     if re.search(r"squeez|headroom|13\.79%", markdown, re.IGNORECASE):
         raise ValueError("Tool experiment or withdrawn estimate in EDA")
+    if COUNTING_METHOD_SUMMARY not in markdown or any(value not in markdown for value in COUNTING_METHOD_FACTS):
+        raise ValueError("EDA counting method is incomplete")
+    if any(value in markdown for value in REMOVED_WORK_HISTORY):
+        raise ValueError("Internal work history returned to EDA")
     for caveat in {CANDIDATE_CAVEAT, *manifest["required_caveats"]}:
         if caveat not in markdown:
             raise ValueError("Required EDA limitation is missing")
@@ -113,7 +128,7 @@ def audit_report(root: Path) -> dict:
         raise ValueError("Duplicate EDA anchor")
     sections = dict(zip(identifiers, blocks[2::2]))
     figures, tables = manifest["figures"], manifest["tables"]
-    for prefix, entries, expected in (("figure", figures, 10), ("table", tables, 31)):
+    for prefix, entries, expected in (("figure", figures, 10), ("table", tables, 27)):
         actual = [identifier for identifier in identifiers if identifier.startswith(prefix + "-")]
         if len(entries) != expected or actual != [entry["id"] for entry in entries]:
             raise ValueError(f"EDA {prefix} inventory changed")

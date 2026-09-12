@@ -6,7 +6,16 @@ import tempfile
 import unittest
 
 from evidence import audit_files
-from src.eda_report import CANDIDATE_CAVEAT, audit_report, check_svg, json_digest, scan_public_text
+from src.eda_report import (
+    CANDIDATE_CAVEAT,
+    COUNTING_METHOD_FACTS,
+    COUNTING_METHOD_SUMMARY,
+    REMOVED_WORK_HISTORY,
+    audit_report,
+    check_svg,
+    json_digest,
+    scan_public_text,
+)
 from src.protection import digest
 
 
@@ -25,7 +34,20 @@ class EdaReportTests(unittest.TestCase):
         self.manifest = json.loads((self.report / "manifest.json").read_bytes())
 
     def test_reviewed_assembly(self):
-        self.assertEqual(audit_report(self.root), {"figures": 10, "tables": 31})
+        self.assertEqual(audit_report(self.root), {"figures": 10, "tables": 27})
+
+    def test_counting_method_excludes_internal_work_history(self):
+        self.assertIn(COUNTING_METHOD_SUMMARY, self.markdown)
+        self.assertIn(
+            "분류 판단: 사람이 정한 규칙으로 나눈 결과. 규칙이 달라지면 값도 달라진다. 경계가 애매한 항목이 있다.",
+            self.markdown,
+        )
+        for content in COUNTING_METHOD_FACTS:
+            with self.subTest(required=content):
+                self.assertIn(content, self.markdown)
+        for content in REMOVED_WORK_HISTORY:
+            with self.subTest(content=content):
+                self.assertNotIn(content, self.markdown)
 
     def test_numeric_drift_in_either_direction(self):
         for replacement in ("1,974", "1,976"):
@@ -35,9 +57,11 @@ class EdaReportTests(unittest.TestCase):
                     audit_report(self.root)
 
     def test_sample_denominator_and_kind_are_required(self):
+        metadata = dict(self.manifest["figures"][0]["metadata"])
         for label in ("표본", "분모 · 단위", "성격"):
             with self.subTest(label=label):
-                self.markdown_path.write_text(self.markdown.replace(f"- **{label}:**", "- removed:", 1), encoding="utf-8")
+                original = f"- **{label}:** {metadata[label]}"
+                self.markdown_path.write_text(self.markdown.replace(original, "- removed:", 1), encoding="utf-8")
                 with self.assertRaisesRegex(ValueError, "sample, denominator or kind"):
                     audit_report(self.root)
 
@@ -71,7 +95,9 @@ class EdaReportTests(unittest.TestCase):
             audit_report(self.root)
 
     def test_table_provenance_is_required(self):
-        self.markdown_path.write_text(self.markdown.replace("원문 표: 1차 분석 · 표 1.", ""), encoding="utf-8")
+        entry = self.manifest["tables"][0]
+        provenance = f"원문 표: {entry['source']} · 표 {entry['source_table']}."
+        self.markdown_path.write_text(self.markdown.replace(provenance, ""), encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "provenance"):
             audit_report(self.root)
 
