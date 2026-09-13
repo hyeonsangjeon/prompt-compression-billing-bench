@@ -1,6 +1,6 @@
 schema_version = 1
-mode = "native_log_truncation"
-conditions = ["none", "squeez"]
+mode = "native_candidate_compression"
+conditions = ["none", "squeez", "headroom", "llmlingua2"]
 output_dir = "runs"
 raw_retrieval = "not_exposed_to_agent"
 
@@ -43,7 +43,7 @@ cache_env = "TIKTOKEN_CACHE_DIR"
 table_sha256 = "446a9538cb6c348e3516120d7c08b09f57c36495e2acfffe59a5bf8b0cfb1a2d"
 
 [compressor]
-name = "squeez"
+name = "selected_by_condition"
 target = "identified_log_spans"
 
 [compressor.tools.none]
@@ -60,6 +60,98 @@ invocation = "wrap_cat_input_txt"
 state = "fresh_home_per_span"
 timeout_seconds = 10
 output = "complete_stdout"
+
+[compressor.tools.headroom]
+version = "0.36.5"
+module_env = "HEADROOM_LOSSLESS_MODULE"
+module_sha256 = "a97f1801a610ebcff4201600e3453634d118db57a8a36183bfe1918d98d67d60"
+wheel_sha256 = "56954b76cd10b5312061725e7470575598a4bde3fa7f80f77d82a08a71fceae8"
+
+[compressor.tools.headroom.options]
+profile_revision = 2
+allowed_kind = "paths"
+inverse = "path_unheading"
+selection = "smaller_utf8_exact_inverse_no_fewer_display_lines"
+scope = "restricted_unmodified_helper_not_default_pipeline"
+
+[compressor.tools.llmlingua2]
+version = "0.2.2"
+python_env = "LLMLINGUA_PYTHON"
+python_version = "3.10.12"
+worker_path = "src/llmlingua_worker.py"
+worker_sha256 = "d50966c8e13507204754f1eda37c4e9ace2ac911669139592810a21910892965"
+requirements_path = "requirements/llmlingua2-cpu.txt"
+requirements_sha256 = "ab865e99ec5d846dc87537ca9d35011b93461f48e9cd01b551a2425a5da7816f"
+model_env = "LLMLINGUA_MODEL"
+model_id = "microsoft/llmlingua-2-xlm-roberta-large-meetingbank"
+model_revision = "ebaba9b0e874dadd3003ffcff828e4397e568089"
+tokenizer_cache_env = "TIKTOKEN_CACHE_DIR"
+
+[compressor.tools.llmlingua2.options]
+method = "PromptCompressor.compress_prompt_llmlingua2"
+rate = 0.5
+target_token = -1
+force_tokens = ["\n", "?", ".", ","]
+force_reserve_digit = false
+drop_consecutive = false
+chunk_end_tokens = [".", "\n"]
+device = "cpu"
+torch_dtype = "float32"
+seed = 42
+torch_threads = 8
+torch_interop_threads = 1
+deterministic_algorithms = true
+worker_processes_per_run = 1
+serial_inference = true
+initialize_timeout_seconds = 180
+inference_timeout_seconds = 120
+lock_timeout_seconds = 600
+
+[compressor.tools.llmlingua2.model_files."config.json"]
+bytes = 752
+sha256 = "a3fdcf4e63057797101ecc84412bc654f9adb4e8d4ed3c91c5afb28eda327706"
+
+[compressor.tools.llmlingua2.model_files."model.safetensors"]
+bytes = 2235829648
+sha256 = "a33a153b2493bff6be06af6921e69de9c0d0bb6ff06fe5bbb68670ba8d980ae2"
+
+[compressor.tools.llmlingua2.model_files."special_tokens_map.json"]
+bytes = 280
+sha256 = "06e405a36dfe4b9604f484f6a1e619af1a7f7d09e34a8555eb0b77b66318067f"
+
+[compressor.tools.llmlingua2.model_files."tokenizer.json"]
+bytes = 17082756
+sha256 = "f59925fcb90c92b894cb93e51bb9b4a6105c5c249fe54ce1c704420ac39b81af"
+
+[compressor.tools.llmlingua2.model_files."tokenizer_config.json"]
+bytes = 1147
+sha256 = "f90024142df07163e5e6c5b9a6ad7c8c68b22a9112af11e3db4559a9ff90f737"
+
+[compressor.tools.llmlingua2.tokenizer_cache_files."9b5ad71b2ce5302211f9c61530b329a4922fc6a4"]
+bytes = 1681126
+sha256 = "223921b76ee99bde995b7ff738513eef100fb51d18c93597a113bcffe865b2a7"
+
+[compressor.tools.llmlingua2.tokenizer_cache_files."fb374d419588a4632f3f557e76b4b70aebbca790"]
+bytes = 3613922
+sha256 = "446a9538cb6c348e3516120d7c08b09f57c36495e2acfffe59a5bf8b0cfb1a2d"
+
+[[compressor.tools.llmlingua2.fixtures]]
+name = "path-listing"
+path = "fixtures/llmlingua2/path-listing.txt"
+input_sha256 = "1509c8ab2413d1a8f204073c2b94f36401957808a800527951e2f8a6f2cfa0e4"
+output_sha256 = "5584b5ad36b4a36db45bb35a5659154fdafae5559f67248465b3dff6e5297423"
+
+[[compressor.tools.llmlingua2.fixtures]]
+name = "severity-log"
+path = "fixtures/llmlingua2/severity-log.txt"
+input_sha256 = "e6f48a8035541a288112807cf169480f41e163a041d94af8eba0aff20dd73e30"
+output_sha256 = "e0edacae128c56ec95b20d1e427f115e98067ce31e3ccb19a656e6a7ec53961d"
+
+[[compressor.tools.llmlingua2.fixtures]]
+name = "package-install"
+path = "fixtures/llmlingua2/package-install.txt"
+input_sha256 = "bcb77fccee038963729d58991a2cff44f7f35d705f3f39e88ed8369a9ca0cda5"
+output_sha256 = "d6d647b8efdd766ec081da2376d37526db7effffdba1843e2b6e3a1cb69b458c"
 
 [queue]
 state_path_env = "FOUNDRY_QUEUE_STATE"

@@ -1,4 +1,4 @@
-# Native truncation experiment contract
+# Native candidate-compression experiment contract
 
 This is an implementation and pre-execution design contract, **not a native
 experiment result or approval to call a model**. The optional Foundry path is
@@ -7,10 +7,12 @@ separate from the legacy local-model runner and the frozen static demo.
 ## Fixed comparison and gates
 
 `run.py native` runs the existing five purpose-selected Terminal tasks with
-Harbor 0.22.0 / the instrumented Terminus 2 agent. Both arms use the same pinned
-task images, instructions, native tests, model settings, observation policy,
-transport and metrics. The order is **none baseline, then squeez**; there is no
-delete-all arm. This runner does not run DeepSWE or a substitute benchmark.
+Harbor 0.22.0 / the instrumented Terminus 2 agent. All conditions use the same
+pinned task images, instructions, native tests, model settings, observation
+policy, transport and metrics. The order is **none baseline, then squeez,
+Headroom and LLMLingua-2 comparisons**. Each comparison uses the baseline's
+complete repetition count. There is no delete-all arm. This runner does not run
+DeepSWE or a substitute benchmark.
 
 The reviewed squeez 1.48.4 profile is `wrap "cat input.txt"`, with a fresh private
 HOME/CWD per candidate. In the audited corpus it retained the **first 30 content
@@ -22,9 +24,24 @@ metadata and recovery notices, reaches the agent and counts toward local size.
 Raw originals are retained privately for auditing, but **no recovery tool is
 exposed to the agent**. A recovery notice is not proof of an available retrieval
 path. The agent can still rerun commands or reread files through its terminal;
-those actions must be counted, not assumed free. Both arms keep Harbor's existing
+those actions must be counted, not assumed free. All conditions keep Harbor's existing
 10,000-byte middle-elision behavior. Pre-Harbor terminal output is recorded
 separately so that loss by Harbor is not attributed to squeez.
+
+Headroom 0.36.5 uses only the audited `compact_lossless(text, "paths")` helper.
+It factors repeated directory prefixes, accepts a change only when UTF-8 bytes
+decrease without fewer displayed lines, and checks `path_unheading` against the
+original bytes on every call. This restricted profile is not Headroom's default
+router or a measurement of the whole product.
+
+LLMLingua-2 0.2.2 uses the large MeetingBank checkpoint at the pinned revision
+and `rate=0.5`. It selects source tokens to retain; it is a lossy token-selection
+compressor, not a generated summary. A Python 3.10 worker loads the model once
+per run, remains offline, and serializes inference behind one lock. This avoids
+eight model copies and CPU-thread races. Queue wait, adapter execution and worker
+inference time are recorded separately, so the added latency is not hidden inside
+provider latency. A failed worker close handshake stops the run and is recorded
+rather than accepting a partially closed compressor as complete.
 
 The template at `ledgers/native.template.toml` is deliberately unapproved and
 not runnable. Before execution it needs an explicit rule/execution approval
@@ -55,7 +72,7 @@ native runner and source/ledger checks
   -> Harbor / LiteLLM / OpenAI SDK
   -> authenticated loopback proxy, separate route for each trial
   -> capture original JSON and identify source-bound log candidates
-  -> common none/squeez adapter and FrozenRequestGuard
+  -> common none/squeez/Headroom/LLMLingua-2 adapter and FrozenRequestGuard
   -> shared deployment RPM/TPM reservation queue
   -> verify the actual serialized bytes again, immediately before sending
   -> Foundry, raw response and usage capture
@@ -87,7 +104,7 @@ reservation and unknown usage rather than being retried as free calls.
 
 ## Units and task metrics
 
-All metrics are collected for **both** arms from the same path.
+All metrics are collected for **all four** conditions from the same path.
 
 | Field | Definition and boundary |
 |---|---|
@@ -103,6 +120,7 @@ All metrics are collected for **both** arms from the same path.
 | `same_command_reexecutions` | Sum of occurrences beyond the first for each byte-identical complete command block actually accepted by the terminal wrapper |
 | `same_subcommand_reexecutions` | Additional conservative lexical count for shell units such as `find` inside `ls && find`; not proof of command completion or the same filesystem/cwd |
 | `post_changed_output_*` | Repetition linked by command text and time to an earlier changed output; retained evidence, **not proof that truncation caused the repetition** |
+| `compressor` | Candidate calls, changed occurrences, adapter wall time, serialization wait, adapter execution and LLMLingua worker inference; input/output SHA-256 stays in private transport evidence |
 | `native_outcome` | Unmodified native binary reward plus failure categories, per-test evidence and integrity warnings |
 | `concurrency`, `deployment_limits` | Fixed outer native-trial concurrency plus the ledger RPM/TPM, check time and source; written to both `summary.json` and `execution.json` and revalidated from the saved ledger |
 
@@ -132,12 +150,12 @@ threshold for this small, heterogeneous binary sample.
 - Matching supports do not imply equal frequencies. Half histograms and mean
   differences remain visible. An all-failing baseline or a full 0–5 range cannot
   detect useful degradation and is marked inconclusive, even if supports match.
-- Squeez uses the same complete repetition count as the accepted baseline.
+- Every compressor uses the same complete repetition count as the accepted baseline.
   A suite count below the baseline minimum, or a failure on a previously
   always-passing task, is below the observed tolerance. Values above the baseline
   maximum require review rather than automatic attribution to truncation.
 - Within-range observations are not proof of equal quality. Floor tasks cannot
-  show further degradation. Zero actual interventions do not test truncation
+  show further degradation. Zero actual interventions do not test an adapter's
   safety; unchanged short logs cannot establish that throwing away lines is safe.
 
 Invalid/missing judge evidence, incomplete mandatory metrics, protection errors,
@@ -188,9 +206,41 @@ checked before execution.
 Temperature 0 and reasoning effort none are checked on the wire and recorded,
 along with provider-reported model revision/fingerprint. They do **not** prove
 determinism, losslessness, immutable backend state or cache control. Baseline
-repetitions precede comparison to measure observed variability; none-before-squeez
-arm order still permits temporal/backend drift, while requests within an arm may
+repetitions precede comparison to measure observed variability; baseline-before-tools
+ordering still permits temporal/backend drift, while requests within an arm may
 overlap under the fixed concurrency. Record timestamps and per-call usage.
+
+## Adapter prerequisites and fixed probes
+
+The Headroom adapter loads the exact `lossless_compaction.py` extracted from the
+0.36.5 wheel through `HEADROOM_LOSSLESS_MODULE`. Both the module and wheel hashes
+are fixed in the ledger. The full package dependency tree is not imported by the
+live runner.
+
+LLMLingua uses `LLMLINGUA_PYTHON`, `LLMLINGUA_MODEL` and the existing
+`TIKTOKEN_CACHE_DIR`. `requirements/llmlingua2-cpu.txt`, five model files, two
+tokenizer tables, the worker source and their byte counts or SHA-256 values are
+fixed. Before a native request can be sent, a fresh worker must reproduce three
+checked fixture output hashes for a path listing, severity log and package-install
+output. A mismatch stops the run before provider access. These probes observed
+the same output in two local processes during adapter preparation; they do not
+guarantee byte equality on another CPU or dependency stack.
+
+The earlier static corpus measurement observed a mean **4.13 seconds per candidate
+span** for LLMLingua-2. That is a planning input, not a live result. Using the
+measured 5.6-minute serial five-task pass, fixed concurrency eight and the observed
+static candidate workload gives **46–48 minutes** for the three 10-repetition tool
+conditions, or **53–56 minutes including a 10-repetition baseline**. Turns, candidate
+occurrences, CPU contention and provider waits can change the actual duration.
+
+The eventual result must retain the static risk observations used to select this
+condition: all 107 candidate occurrences kept their line counts, but none of the
+2,375 nonempty source lines remained byte-identical; line boundaries therefore did
+not preserve fields, identifiers or states. Examples lost `[ERROR]` and `[WARNING]`,
+split `1.22.1` into `. 22. 1`, and removed `denied` from
+`policy-rc.d denied execution`. The eight reviewed tools contained no validated
+summarizer that preserves the meaning of arbitrary structured command output;
+they truncated content, factored notation or selected tokens.
 
 ## Model-free validation and execution separation
 
@@ -198,13 +248,15 @@ overlap under the fixed concurrency. Record timestamps and per-call usage.
 uv sync --locked --extra native
 LITELLM_LOCAL_MODEL_COST_MAP=true uv run --locked --extra native python -m unittest discover -s tests -v
 uv run --locked --extra native python run.py native _work/native.toml \
-  --source-commit "$SOURCE_COMMIT" --check
+  --source-commit "$SOURCE_COMMIT" --condition none --check
 ```
 
 `--check` validates local prerequisites only; it does not start Harbor, contact
-IMDS/Foundry or call any model. It fails on an unapproved/incomplete ledger or a
-dirty/wrong source tree. Actual execution requires the separate `--execute`
-flag; squeez additionally requires `--condition squeez --baseline runs/<id>`.
+IMDS/Foundry or call any provider model. A LLMLingua-2 condition check verifies
+local artifacts; actual construction also performs local classifier probes. It
+fails on an unapproved/incomplete ledger or a dirty/wrong source tree. Actual
+execution requires the separate `--execute` flag; every non-`none` condition
+requires `--baseline runs/<id>`.
 Do not run either arm until authorized. The loopback SDK, dummy process and
 synthetic driver tests are software checks, not native quality/billing evidence.
 

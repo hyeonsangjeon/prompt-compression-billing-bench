@@ -1,0 +1,9 @@
+/app:
+total 20
+drwxr-xr-x 1 root root 4096 Sep 13 2025 .
+
+/app/logs:
+total 6132
+-rw-r--r-- 1 root root 39171 Sep 13 2025 2025-07-03_api.log
+-rw-r--r-- 1 root root 19494 Sep 13 2025 2025-07-03_app.log
+-rw-r--r-- 1 root root 16220 Sep 13 2025 2025-07-03_auth.log

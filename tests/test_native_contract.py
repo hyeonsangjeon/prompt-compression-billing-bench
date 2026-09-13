@@ -33,6 +33,14 @@ class NativeContractTests(unittest.TestCase):
             ledger[section][field] = value
             with self.subTest(section=section, field=field), self.assertRaises(ValueError):
                 validate_native_ledger(ledger)
+        changed = deepcopy(original)
+        changed["compressor"]["tools"]["headroom"]["options"]["allowed_kind"] = "log"
+        with self.assertRaises(ValueError):
+            validate_native_ledger(changed)
+        changed = deepcopy(original)
+        changed["compressor"]["tools"]["llmlingua2"]["options"]["rate"] = 0.6
+        with self.assertRaises(ValueError):
+            validate_native_ledger(changed)
         original["limits"]["deadline_utc"] = "2020-01-01T00:00:00+00:00"
         with self.assertRaises(ValueError):
             require_operational_values(original)

@@ -93,6 +93,8 @@ class NativeRunTests(unittest.TestCase):
         self.assertEqual(summary["baseline_decision"]["suite_pass_counts"], [3] * 10)
         self.assertEqual(summary["concurrency"], 8)
         self.assertEqual(summary["deployment_limits"]["rpm"], 3000)
+        self.assertEqual(summary["compressor_metrics"]["trials"], 50)
+        self.assertEqual(summary["compressor_metrics"]["calls"], 0)
         execution = json.loads((directory / "execution.json").read_bytes())
         self.assertEqual(execution["concurrency_unit"], "simultaneous_native_trial_processes")
         self.assertGreater(self.maximum_active_supervisors, 1)
@@ -135,6 +137,18 @@ class NativeRunTests(unittest.TestCase):
         self.assertTrue(all(not trial["metrics"]["measurement_complete"] for trial in summary["trials"]))
         self.assertTrue(all(trial["native_outcome"]["native_reward"] is None for trial in summary["trials"]))
         self.assertEqual(summary["repetitions"], [])
+
+    def test_compressor_close_failure_stops_and_records_the_run(self):
+        def fail_close():
+            raise RuntimeError("synthetic close failure")
+
+        compressor = SimpleNamespace(metadata={"name": "synthetic"}, close=fail_close)
+        with patch("src.native_run.make_compressor", return_value=compressor):
+            directory, _provenance = self.run_fixture()
+        summary = json.loads((directory / "summary.json").read_bytes())
+        self.assertEqual(summary["status"], "stopped")
+        self.assertEqual(summary["compressor_close_error"]["type"], "RuntimeError")
+        self.assertEqual(summary["stop_reason"]["reason"], "CompressorCloseError")
 
     def test_cli_is_no_call_by_default_and_unapproved_execute_fails(self):
         with patch("src.native_run.preflight", return_value={"provenance": {"source_commit": "a" * 40}}), patch("src.native_run.execute_native") as execute, patch("sys.stdout", new_callable=io.StringIO):

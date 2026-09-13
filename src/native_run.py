@@ -17,16 +17,16 @@ import tomllib
 
 from accounting import now
 from .baseline import baseline_summary, compare_quality
-from .compressors import make_compressor
+from .compressors import check_compressor_artifacts, make_compressor
 from .contracts import safe_child, save_json
 from .live_observations import POLICY
 from .live_transport import DeploymentQueue, FoundrySender, LiveRecorder, ManagedIdentity, start_live_proxy
 from .measurement import load_encoder
-from .native_contract import TASKS, load_native_ledger, require_operational_values
+from .native_contract import CONDITIONS, TASKS, load_native_ledger, require_operational_values
 from .native_judge import collect_native_outcome
 from .protection import digest
 from .provenance import ROOT, capture, git, verify_snapshot
-from .task_metrics import collect_trial_metrics
+from .task_metrics import aggregate_run_compressor_metrics, collect_trial_metrics
 
 
 def runtime_environment(proxy_key: str) -> dict:
@@ -167,8 +167,10 @@ def runtime_versions() -> dict:
     return versions
 
 
-def preflight(ledger: dict, ledger_path: Path, source_commit: str) -> dict:
+def preflight(ledger: dict, ledger_path: Path, source_commit: str, condition: str = "none") -> dict:
     deadline = require_operational_values(ledger)
+    if condition not in ledger["conditions"]:
+        raise ValueError("Condition is not part of the fixed native design")
     provenance, snapshots = capture(ledger_path, source_commit)
     versions = runtime_versions()
     from harbor.models.job.config import JobConfig
@@ -183,9 +185,7 @@ def preflight(ledger: dict, ledger_path: Path, source_commit: str) -> dict:
         raise ValueError("Use the same absolute queue file for every deployment caller")
     if Path(queue_value).resolve().is_relative_to(ROOT / "runs"):
         raise ValueError("A per-run queue cannot coordinate the deployment")
-    binary = os.environ.get(ledger["compressor"]["tools"]["squeez"]["binary_env"], "")
-    if not binary or digest(Path(binary).read_bytes()) != ledger["compressor"]["tools"]["squeez"]["sha256"]:
-        raise ValueError("Both arms require the reviewed squeez binary to be available")
+    check_compressor_artifacts(ledger["compressor"], condition)
     return {"provenance": provenance, "snapshots": snapshots, "encoder": encoder, "tasks": tasks,
             "benchmark_root": str(benchmark_root), "sender": sender, "queue_path": Path(queue_value).resolve(),
             "runtime_versions": versions}
@@ -193,7 +193,7 @@ def preflight(ledger: dict, ledger_path: Path, source_commit: str) -> dict:
 
 def verify_native_run(directory: Path) -> dict:
     summary = json.loads((directory / "summary.json").read_bytes())
-    if summary.get("kind") != "native_measurement" or summary.get("mode") != "native_log_truncation":
+    if summary.get("kind") != "native_measurement" or summary.get("mode") != "native_candidate_compression":
         raise ValueError("Synthetic or static records cannot serve as a native baseline")
     source = verify_snapshot(directory)
     if source["source_commit"] != summary["source_commit"] or source["ledger_sha256"] != summary["ledger_sha256"]:
@@ -221,7 +221,7 @@ def verify_native_run(directory: Path) -> dict:
             raise ValueError(f"Native artifact changed: {name}")
     if {name for name in files if re.fullmatch(r"trials/[^/]+/trial.json", name)} != {trial["record_path"] for trial in summary["trials"]}:
         raise ValueError("Summary must include every recorded native trial")
-    if summary["condition"] not in ("none", "squeez") or summary["status"] not in ("complete", "inconclusive", "stopped"):
+    if summary["condition"] not in CONDITIONS or summary["status"] not in ("complete", "inconclusive", "stopped"):
         raise ValueError("Unexpected native condition or completion state")
     repetitions, rewards, incomplete_repetition = [], {}, False
     for index, trial in enumerate(summary["trials"]):
@@ -266,7 +266,9 @@ def verify_native_run(directory: Path) -> dict:
         informative = decision["status"] == "observed_range_stabilized" and decision["comparison_informative"]
         if (summary["status"] == "complete") != informative:
             raise ValueError("Uninformative baseline cannot be labeled complete")
-    if summary["condition"] == "squeez" and summary["status"] == "complete":
+    if summary.get("compressor_metrics") != aggregate_run_compressor_metrics(summary["trials"]):
+        raise ValueError("Run compressor metrics differ from the trial records")
+    if summary["condition"] != "none" and summary["status"] == "complete":
         reference_bytes = (directory / "baseline-summary.json").read_bytes()
         if digest(reference_bytes) != summary["baseline"]["summary_sha256"]:
             raise ValueError("Verified baseline snapshot changed")
@@ -374,10 +376,10 @@ def run_repetition_block(directory: Path, ledger: dict, recorder, server, key: s
 
 def execute_native(ledger_path: Path, ledger: dict, source_commit: str, condition: str,
                    baseline_path: Path | None = None) -> Path:
-    if condition not in ledger["conditions"] or (condition == "squeez") != (baseline_path is not None):
-        raise ValueError("Run none first; squeez requires its verified native baseline")
+    if condition not in ledger["conditions"] or (condition != "none") != (baseline_path is not None):
+        raise ValueError("Run none first; every compression condition requires its verified native baseline")
     baseline = baseline_for_comparison(baseline_path, ledger, source_commit) if baseline_path else None
-    setup = preflight(ledger, ledger_path, source_commit)
+    setup = preflight(ledger, ledger_path, source_commit, condition)
     deployment = digest((setup["sender"].endpoint + "/" + ledger["model"]["name"]).encode())
     if baseline:
         original_execution = json.loads((baseline_path / "execution.json").read_bytes())
@@ -406,8 +408,9 @@ def execute_native(ledger_path: Path, ledger: dict, source_commit: str, conditio
         },
         "raw_retrieval": ledger["raw_retrieval"], "baseline": None if baseline is None else {
             "run_id": baseline["run_id"], "summary_sha256": digest((baseline_path / "summary.json").read_bytes())},
+        "compressor_metrics": aggregate_run_compressor_metrics([]),
     }
-    queue = recorder = server = None
+    queue = recorder = server = compressor = None
     try:
         queue = DeploymentQueue(setup["queue_path"], deployment, ledger["queue"]["rpm"], ledger["queue"]["tpm"])
         compressor_specification = {**ledger["compressor"], "name": condition}
@@ -470,12 +473,23 @@ def execute_native(ledger_path: Path, ledger: dict, source_commit: str, conditio
         if server is not None:
             server.shutdown()
             server.server_close()
+        if compressor is not None:
+            try:
+                compressor.close()
+            except BaseException as error:
+                record = {"type": type(error).__name__, "message": str(error)}
+                summary["status"] = "stopped"
+                summary.setdefault("error", record)
+                summary["compressor_close_error"] = record
+                if recorder is not None:
+                    recorder.stop("CompressorCloseError", record)
         if recorder is not None:
             with recorder.lock:
                 summary["stop_reason"] = recorder.failure
                 summary["budget_used_or_reserved_usd"] = recorder.budget_used_usd
         if queue is not None:
             queue.close()
+        summary["compressor_metrics"] = aggregate_run_compressor_metrics(summary["trials"])
         summary["finished_at"] = now()
         artifacts = {path.relative_to(directory).as_posix(): digest(path.read_bytes())
                      for path in sorted(directory.rglob("*")) if path.is_file() and not path.is_symlink()}
@@ -489,7 +503,7 @@ def main(arguments=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("ledger", nargs="?", type=Path, default=ROOT / "ledgers/native.template.toml")
     parser.add_argument("--source-commit", required=True)
-    parser.add_argument("--condition", choices=("none", "squeez"), default="none")
+    parser.add_argument("--condition", choices=CONDITIONS, default="none")
     parser.add_argument("--baseline", type=Path)
     parser.add_argument("--execute", action="store_true", help="Explicitly opt in only after baseline approval")
     parser.add_argument("--check", action="store_true", help="Validate local inputs without starting Harbor or calling a model")
@@ -499,7 +513,7 @@ def main(arguments=None) -> int:
         if args.execute and args.check:
             raise ValueError("Choose either validation or execution")
         if not args.execute:
-            checked = preflight(ledger, args.ledger.resolve(), args.source_commit)
+            checked = preflight(ledger, args.ledger.resolve(), args.source_commit, args.condition)
             print(json.dumps({"status": "local_preflight_passed", "model_calls": 0,
                               "source_commit": checked["provenance"]["source_commit"]}))
             return 0

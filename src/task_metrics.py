@@ -3,6 +3,7 @@
 from collections import Counter
 from datetime import datetime
 import json
+import math
 from pathlib import Path
 
 from .command_trace import shell_units, submission_kind
@@ -123,6 +124,25 @@ def trial_metrics(events: list[dict], trace: list[dict] | None, trajectory: dict
     if turns is not None and turns > delivered:
         issues.append("native_turns_exceed_delivered_responses")
     changed = [event for event in selected if event.get("event") == "candidate_changed"]
+    compressions = [event for event in selected if event.get("event") == "compressor_completed"]
+    compression_failures = [event for event in selected if event.get("event") == "compressor_failed"]
+    compression_keys = [(event["request"], event["candidate_index"]) for event in compressions]
+    if len(compression_keys) != len(set(compression_keys)):
+        raise ValueError("Compressor calls would be double-counted")
+    if compression_failures:
+        issues.append("compressor_calls_failed")
+    for event in compression_failures:
+        if type(event.get("compressor_wall_seconds")) not in (int, float) or not math.isfinite(event["compressor_wall_seconds"]) or event["compressor_wall_seconds"] < 0:
+            raise ValueError("Failed compressor timing is invalid")
+    if process_complete and len(changed) != sum(event["changed"] for event in compressions):
+        issues.append("changed_candidate_events_incomplete")
+    for event in compressions:
+        for name in ("compressor_wall_seconds", "serialization_wait_seconds", "adapter_execution_seconds"):
+            if type(event.get(name)) not in (int, float) or not math.isfinite(event[name]) or event[name] < 0:
+                raise ValueError("Compressor timing is invalid")
+        worker = event.get("worker_inference_seconds")
+        if worker is not None and (type(worker) not in (int, float) or not math.isfinite(worker) or worker < 0):
+            raise ValueError("Worker inference timing is invalid")
     commands = command_metrics(trace, changed) if trace is not None else None
     if commands is None:
         issues.append("terminal_submission_trace_missing")
@@ -158,12 +178,55 @@ def trial_metrics(events: list[dict], trace: list[dict] | None, trajectory: dict
             "output_scope": "visible_assistant_content_not_hidden_reasoning",
         },
         "commands": commands, "changed_candidate_occurrences": len(changed),
+        "compressor": {
+            "kind": "measured_from_live_adapter_events", "unit": "seconds",
+            "calls": len(compressions) + len(compression_failures), "completed_calls": len(compressions),
+            "failed_calls": len(compression_failures),
+            "changed_occurrences": sum(event["changed"] for event in compressions),
+            "wall_seconds": sum(event["compressor_wall_seconds"] for event in compressions + compression_failures),
+            "completed_wall_seconds": sum(event["compressor_wall_seconds"] for event in compressions),
+            "serialization_wait_seconds": sum(event["serialization_wait_seconds"] for event in compressions),
+            "adapter_execution_seconds": sum(event["adapter_execution_seconds"] for event in compressions),
+            "worker_inference_seconds": (
+                sum(event["worker_inference_seconds"] for event in compressions)
+                if compressions and all(event["worker_inference_seconds"] is not None for event in compressions)
+                else None
+            ),
+            "known_worker_inference_seconds": sum(
+                event["worker_inference_seconds"] for event in compressions
+                if event["worker_inference_seconds"] is not None
+            ),
+            "worker_inference_calls": sum(event["worker_inference_seconds"] is not None for event in compressions),
+        },
         "cost": {"kind": "provider_usage_times_ledger_rates_not_invoice", "unit": "USD",
                  "calculated_cost_usd": sum(costs) if len(costs) == len(attempts) else None,
                  "known_cost_subtotal_usd": sum(costs), "unknown_cost_attempts": len(attempts) - len(costs),
                  "invoice_reconciled": False},
         "truncation_causality": "not_established", "integrity_issues": issues,
         "measurement_complete": process_complete and not issues,
+    }
+
+
+def aggregate_run_compressor_metrics(trials: list[dict]) -> dict:
+    rows = [trial["metrics"]["compressor"] for trial in trials]
+    calls = sum(row["calls"] for row in rows)
+    worker_calls = sum(row["worker_inference_calls"] for row in rows)
+    return {
+        "kind": "calculated_from_trial_compressor_metrics", "unit": "seconds",
+        "trials": len(rows), "calls": calls,
+        "completed_calls": sum(row["completed_calls"] for row in rows),
+        "failed_calls": sum(row["failed_calls"] for row in rows),
+        "changed_occurrences": sum(row["changed_occurrences"] for row in rows),
+        "wall_seconds": sum(row["wall_seconds"] for row in rows),
+        "completed_wall_seconds": sum(row["completed_wall_seconds"] for row in rows),
+        "serialization_wait_seconds": sum(row["serialization_wait_seconds"] for row in rows),
+        "adapter_execution_seconds": sum(row["adapter_execution_seconds"] for row in rows),
+        "worker_inference_seconds": (
+            sum(row["known_worker_inference_seconds"] for row in rows)
+            if calls and worker_calls == calls else None
+        ),
+        "known_worker_inference_seconds": sum(row["known_worker_inference_seconds"] for row in rows),
+        "worker_inference_calls": worker_calls,
     }
 
 

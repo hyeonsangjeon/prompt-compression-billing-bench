@@ -29,10 +29,10 @@ That runner needs `uv sync --locked --extra native`; it is not a third compresso
 
 ## Compressor selection
 
-`compress(text) -> CompressionResult(text, tool_reported)` is the common boundary
-in `src/compressors.py`. The registry contains only `none` and `squeez`. Unsupported
-names fail before a run; the other six tools get no success-shaped placeholders.
-Add them with their real installation, state, output and protection contracts when needed.
+`compress(text) -> CompressionResult(text, tool_reported, telemetry)` is the common
+boundary in `src/compressors.py`. The static ledger schema permits only `none` and
+`squeez`; native-only adapters cannot be selected by a static ledger. Unsupported
+static names fail before a run and get no success-shaped placeholders.
 A history-aware API may require more context than a stateless text adapter; that
 must be designed explicitly rather than concealed behind an empty implementation.
 

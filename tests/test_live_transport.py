@@ -48,6 +48,24 @@ class LiveTransportTests(unittest.TestCase):
         self.assertEqual(response["tokens"]["cached_input_tokens"], 0)
         self.assertTrue(self.queue.calls)
 
+    def test_candidate_compression_records_hashes_and_timing_before_dispatch(self):
+        assistant = json.dumps({"commands": [{"keystrokes": "ls -la /logs\n", "duration": 1}]})
+        self.recorder.sender = lambda body: (self.sent.append(body), (200, response_fixture(assistant), {}))[1]
+        self.recorder.complete("trial-one", canonical(request_fixture()))
+        content = "root@123456789abc:/app# ls -la /logs\na.log\nb.log\nroot@123456789abc:/app# "
+        payload = request_fixture()
+        payload["messages"] = [{"role": "assistant", "content": assistant}, {"role": "user", "content": content}]
+        self.recorder.complete("trial-one", canonical(payload))
+        event = next(
+            row for row in read_events(self.root / "transport/events.jsonl")
+            if row["event"] == "compressor_completed"
+        )
+        self.assertEqual(event["before_sha256"], event["after_sha256"])
+        self.assertFalse(event["changed"])
+        self.assertGreaterEqual(event["compressor_wall_seconds"], event["adapter_execution_seconds"])
+        local = json.loads((self.root / "transport/request-00002/local-input.json").read_text())
+        self.assertEqual(local["candidates"][0]["compression"]["before_sha256"], event["before_sha256"])
+
     def test_protected_mutation_blocks_this_and_all_later_trials(self):
         def corrupt(payload):
             payload = deepcopy(payload)

@@ -1,0 +1,4 @@
+2025-07-03 09:24:57 [ERROR] Unhandled exception: FileNotFoundError
+2025-07-03 01:56:02 [WARNING] Disk space low: 1924 remaining
+2025-07-03 03:10:36 [WARNING] Failed login attempt for user: eve. Retrying...
+2025-07-03 22:05:28 [INFO] User login successful for user: bob

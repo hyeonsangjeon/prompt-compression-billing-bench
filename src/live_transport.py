@@ -29,6 +29,24 @@ def write_json(path: Path, payload) -> None:
         handle.write("\n")
 
 
+def compressor_timing(result, wall_seconds: float) -> dict:
+    telemetry = result.telemetry or {}
+    expected = {"serialization_wait_seconds", "adapter_execution_seconds", "worker_inference_seconds"}
+    if set(telemetry) != expected:
+        raise ProtectionViolation("Compressor timing fields differ from the live contract")
+    values = {"compressor_wall_seconds": wall_seconds, **telemetry}
+    for name, value in values.items():
+        if value is None and name == "worker_inference_seconds":
+            continue
+        if type(value) not in (int, float) or not math.isfinite(value) or value < 0:
+            raise ProtectionViolation("Compressor returned invalid timing", {"field": name})
+    if telemetry["serialization_wait_seconds"] + telemetry["adapter_execution_seconds"] > wall_seconds + 0.01:
+        raise ProtectionViolation("Compressor sub-timings exceed observed wall time")
+    if telemetry["worker_inference_seconds"] is not None and telemetry["worker_inference_seconds"] > telemetry["adapter_execution_seconds"] + 0.01:
+        raise ProtectionViolation("Worker inference exceeds adapter execution time")
+    return values
+
+
 class DeploymentQueue:
     def __init__(self, path: Path, deployment: str, rpm: int, tpm: int, *, clock=time.time):
         if type(rpm) is not int or type(tpm) is not int or rpm < 1 or tpm < 1:
@@ -260,7 +278,33 @@ class LiveRecorder:
                                                 "classification_policy": POLICY, "trial_id": trial_id})
         guard = FrozenRequestGuard(source, digest(source), segments)
         originals = guard.candidate_texts()
-        compressed = [self.compressor.compress(text) for text in originals]
+        candidate_segments = [segment for segment in segments if segment["candidate"]]
+        compressed = []
+        compression_records = []
+        for candidate_index, (segment, original) in enumerate(zip(candidate_segments, originals, strict=True)):
+            started = time.monotonic()
+            try:
+                result = self.compressor.compress(original)
+                timing = compressor_timing(result, time.monotonic() - started)
+            except Exception as error:
+                self.event({
+                    "event": "compressor_failed", "trial_id": trial_id, "request": request_number,
+                    "candidate_index": candidate_index, "before_sha256": digest(original.encode()),
+                    "compressor_wall_seconds": time.monotonic() - started,
+                    "error_type": type(error).__name__, **segment,
+                })
+                raise
+            record = {
+                "event": "compressor_completed", "trial_id": trial_id, "request": request_number,
+                "candidate_index": candidate_index, "before_sha256": digest(original.encode()),
+                "after_sha256": digest(result.text.encode()), "changed": original != result.text,
+                **timing,
+            }
+            self.event(record)
+            compression_records.append({key: value for key, value in record.items() if key not in {
+                "event", "trial_id", "request", "candidate_index"
+            }})
+            compressed.append(result)
         transformed = guard.prepare([result.text for result in compressed])
         outgoing = self.serialize(transformed)
         (directory / "after.json").write_bytes(outgoing)
@@ -272,13 +316,14 @@ class LiveRecorder:
             "after": counts(transformed, [result.text for result in compressed], self.encoder),
             "candidates": [{"before_sha256": digest(original.encode()), "after_sha256": digest(result.text.encode()),
                             "before_lines": len(original.splitlines()), "after_lines": len(result.text.splitlines()),
-                            "changed": original != result.text, "tool_reported": result.tool_reported}
-                           for original, result in zip(originals, compressed)],
+                            "changed": original != result.text, "tool_reported": result.tool_reported,
+                            "compression": compression}
+                           for original, result, compression in zip(originals, compressed, compression_records, strict=True)],
         }
         write_json(directory / "protection.json", proof)
         write_json(directory / "local-input.json", input_measurement)
         for candidate_index, (segment, original, result) in enumerate(zip(
-            [segment for segment in segments if segment["candidate"]], originals, compressed
+            candidate_segments, originals, compressed
         )):
             if original != result.text:
                 self.event({

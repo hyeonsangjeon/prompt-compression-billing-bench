@@ -7,7 +7,7 @@ import unittest
 
 from src.command_trace import CommandTrace, shell_parts, shell_units, submission_kind
 from src.protection import digest
-from src.task_metrics import collect_trial_metrics, command_metrics, read_events, trial_metrics
+from src.task_metrics import aggregate_run_compressor_metrics, collect_trial_metrics, command_metrics, read_events, trial_metrics
 
 
 def submission(identifier, command, second, status="accepted_by_terminal"):
@@ -48,6 +48,9 @@ class TaskMetricTests(unittest.TestCase):
     def test_calls_turns_provider_and_local_units_are_separate(self):
         events = [
             {"event": "call_received", "request": 1},
+            {"event": "compressor_completed", "request": 1, "candidate_index": 0, "changed": False,
+             "compressor_wall_seconds": 0.3, "serialization_wait_seconds": 0.1,
+             "adapter_execution_seconds": 0.2, "worker_inference_seconds": 0.15},
             {"event": "attempt_started", "request": 1, "attempt": 1, "local_input_tokens": 12},
             {"event": "http", "request": 1, "attempt": 1, "status": 200,
              "tokens": {"input_tokens": 20, "output_tokens": 5, "cached_input_tokens": 3},
@@ -61,6 +64,8 @@ class TaskMetricTests(unittest.TestCase):
         self.assertEqual((metrics["turns"], metrics["total_model_calls"]), (1, 1))
         self.assertEqual((metrics["provider_tokens"]["input_tokens"], metrics["provider_tokens"]["output_tokens"]), (20, 5))
         self.assertEqual((metrics["local_tokens"]["input_tokens"], metrics["local_tokens"]["output_tokens"]), (12, 4))
+        self.assertEqual(metrics["compressor"]["calls"], 1)
+        self.assertEqual(metrics["compressor"]["worker_inference_seconds"], 0.15)
         self.assertFalse(metrics["provider_tokens"]["cache_controlled"])
         internal_repair = events + [{**event, "request": 2} for event in events]
         metrics = trial_metrics(internal_repair, [], trajectory, "trial-one", process_complete=True)
@@ -76,6 +81,19 @@ class TaskMetricTests(unittest.TestCase):
         self.assertIsNone(metrics["provider_tokens"]["input_tokens"])
         self.assertEqual(metrics["provider_tokens"]["reported_subtotal"]["input_tokens"], 20)
         self.assertFalse(metrics["measurement_complete"])
+
+    def test_run_compressor_totals_are_calculated_from_trials(self):
+        first = {"metrics": {"compressor": {
+            "calls": 2, "completed_calls": 2, "failed_calls": 0, "changed_occurrences": 1,
+            "wall_seconds": 3.0, "completed_wall_seconds": 3.0,
+            "serialization_wait_seconds": 1.0, "adapter_execution_seconds": 2.0,
+            "worker_inference_seconds": 1.5, "known_worker_inference_seconds": 1.5,
+            "worker_inference_calls": 2,
+        }}}
+        second = deepcopy(first)
+        totals = aggregate_run_compressor_metrics([first, second])
+        self.assertEqual((totals["trials"], totals["calls"], totals["changed_occurrences"]), (2, 4, 2))
+        self.assertEqual(totals["worker_inference_seconds"], 3.0)
 
     def test_missing_and_corrupt_artifacts_are_recorded_not_silently_dropped(self):
         with tempfile.TemporaryDirectory() as temporary:
