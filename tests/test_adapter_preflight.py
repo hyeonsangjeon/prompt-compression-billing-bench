@@ -16,6 +16,12 @@ class AdapterPreflightTests(unittest.TestCase):
         self.assertEqual(record["completed_compressor_calls"], 8)
         self.assertEqual(record["external_model_calls"], 0)
         self.assertTrue(record["protected_mutation_blocked_before_sender"])
+        self.assertEqual(set(record["protected_byte_exact"]), {
+            "system_instruction", "task_instruction", "assistant_history", "file_read_code",
+        })
+        self.assertTrue(all(record["protected_byte_exact"].values()))
+        self.assertTrue(record["protected_not_sent_to_compressor"])
+        self.assertIn("LiveRecorder.complete", record["adapter_path"])
         self.assertGreater(len(candidate_content()), 5000)
 
 

@@ -65,6 +65,8 @@ class NativeContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {
             "FOUNDRY_ENDPOINT": "https://synthetic.openai.azure.com/openai/v1",
             "FOUNDRY_QUEUE_STATE": str(Path(temporary) / "deployment-queue.json"),
+            "NATIVE_BLOB_ACCOUNT_URL": "https://synthetic.blob.core.windows.net",
+            "NATIVE_BLOB_SPOOL_ROOT": str(Path(temporary) / "blob-spool"),
         }), patch("src.native_run.capture", return_value=({"source_commit": "a" * 40}, {})), \
              patch("src.native_run.runtime_versions", return_value={}), \
              patch("src.native_run.load_encoder", return_value=object()), \

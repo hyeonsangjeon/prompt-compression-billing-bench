@@ -1,6 +1,6 @@
 import unittest
 
-from src.baseline import baseline_summary, compare_quality
+from src.baseline import baseline_summary, compare_quality, interim_baseline_gate
 from src.native_contract import TASKS
 
 
@@ -22,6 +22,17 @@ class BaselineTests(unittest.TestCase):
         changed = self.rows(5, 3) + self.rows(5, 2)
         self.assertEqual(baseline_summary(changed, list(TASKS))["status"], "extend_to_total_20")
         self.assertEqual(baseline_summary(changed + self.rows(10, 1), list(TASKS))["status"], "stop_inconclusive")
+
+    def test_five_repetition_gate_is_operational_not_stability_evidence(self):
+        continued = interim_baseline_gate(self.rows(5, 3), list(TASKS))
+        self.assertEqual(continued["decision"], "continue_to_10")
+        self.assertFalse(continued["stability_proven"])
+        changed = self.rows(5, 3)
+        changed[1] = self.rows(1, 1)[0]
+        stopped = interim_baseline_gate(changed, list(TASKS))
+        self.assertEqual(stopped["range_width"], 2)
+        self.assertEqual(stopped["decision"], "stop_for_design_audit")
+        self.assertFalse(stopped["threshold_empirically_calibrated"])
 
     def test_task_swaps_cannot_hide_behind_equal_suite_counts(self):
         rows = self.rows(10)

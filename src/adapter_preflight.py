@@ -17,12 +17,17 @@ from .live_transport import LiveRecorder
 from .measurement import load_encoder
 from .native_contract import CONDITIONS, load_native_ledger
 from .protection import ProtectionViolation, canonical, digest
+from .protection import parse_request
 from .provenance import capture
 from .task_metrics import read_events
 
 
 COMMAND = "ls /logs"
 ASSISTANT = json.dumps({"commands": [{"keystrokes": COMMAND + "\n", "duration": 0.1}]})
+SYSTEM_INSTRUCTION = "Protected system instruction for the model-free adapter preflight."
+TASK_INSTRUCTION = "Protected task instruction: inspect the public synthetic workspace."
+FILE_READ_PREFIX = "src/example.py:\n```python\ndef preserved_identifier():\n    return 'byte-exact'\n```\n"
+FILE_READ_SUFFIX = "\nProtected file-read suffix: do not alter code, identifiers, or status text.\n"
 
 
 class ImmediateQueue:
@@ -37,11 +42,13 @@ class SyntheticSender:
     def __init__(self, model: str):
         self.model = model
         self.calls = 0
+        self.bodies = []
         self.lock = threading.Lock()
 
     def __call__(self, body: bytes) -> tuple[int, bytes, dict]:
         with self.lock:
             self.calls += 1
+            self.bodies.append(body)
         response = {
             "id": "software-preflight-not-provider-response",
             "object": "chat.completion",
@@ -69,7 +76,7 @@ def candidate_content() -> str:
     if len(rows) <= 5000:
         raise AssertionError("The fixed preflight candidate must exercise the LLMLingua input cap")
     prompt = "root@123456789abc:/app# "
-    return f"{prompt}{COMMAND}\n{rows}{prompt}"
+    return f"{FILE_READ_PREFIX}{prompt}{COMMAND}\n{rows}{prompt}{FILE_READ_SUFFIX}"
 
 
 def run_condition(root: Path, ledger: dict, condition: str, source_commit: str, encoder) -> dict:
@@ -95,6 +102,8 @@ def run_condition(root: Path, ledger: dict, condition: str, source_commit: str, 
             recorder.complete(trial_id, request(local_ledger, [{"role": "user", "content": "Protected preflight instruction"}]))
 
         payload = request(local_ledger, [
+            {"role": "system", "content": SYSTEM_INSTRUCTION},
+            {"role": "user", "content": TASK_INSTRUCTION},
             {"role": "assistant", "content": ASSISTANT},
             {"role": "user", "content": candidate_content()},
         ])
@@ -110,6 +119,43 @@ def run_condition(root: Path, ledger: dict, condition: str, source_commit: str, 
         concurrent_wall_seconds = time.monotonic() - started
         if any(status != 200 for status, _body in responses):
             raise ValueError(f"{condition} did not complete eight guarded synthetic requests")
+        outgoing = [parse_request(body) for body in sender.bodies[-8:]]
+        protected_checks = {
+            "system_instruction": all(row["messages"][0] == {
+                "role": "system", "content": SYSTEM_INSTRUCTION,
+            } for row in outgoing),
+            "task_instruction": all(row["messages"][1] == {
+                "role": "user", "content": TASK_INSTRUCTION,
+            } for row in outgoing),
+            "assistant_history": all(row["messages"][2] == {
+                "role": "assistant", "content": ASSISTANT,
+            } for row in outgoing),
+            "file_read_code": all(
+                row["messages"][3]["content"].startswith(FILE_READ_PREFIX)
+                and row["messages"][3]["content"].endswith(FILE_READ_SUFFIX)
+                for row in outgoing
+            ),
+        }
+        if not all(protected_checks.values()):
+            raise ValueError(f"{condition} changed a byte-exact protected preflight category")
+        protected_exclusion = []
+        for request_number in range(9, 17):
+            manifest = json.loads((directory / f"transport/request-{request_number:05d}/manifest.json").read_bytes())
+            segments = manifest["segments"]
+            excluded = all(
+                not segment["candidate"] for segment in segments
+                if segment["message_index"] in (0, 1, 2)
+            ) and all(
+                not segment["candidate"]
+                for segment in segments
+                if segment["message_index"] == 3 and (
+                    segment["char_start"] < len(FILE_READ_PREFIX)
+                    or segment["char_end"] > len(candidate_content()) - len(FILE_READ_SUFFIX)
+                )
+            )
+            protected_exclusion.append(excluded)
+        if not all(protected_exclusion):
+            raise ValueError(f"{condition} exposed protected preflight text to the compressor")
 
         events = read_events(directory / "transport/events.jsonl")
         completions = [event for event in events if event.get("event") == "compressor_completed"]
@@ -155,6 +201,9 @@ def run_condition(root: Path, ledger: dict, condition: str, source_commit: str, 
                 if event["worker_inference_seconds"] is not None
             ),
             "worker_ids": worker_ids, "overflow_calls": overflow_calls,
+            "adapter_path": "LiveRecorder.complete_then_FrozenRequestGuard_then_sender",
+            "protected_byte_exact": protected_checks,
+            "protected_not_sent_to_compressor": all(protected_exclusion),
             "protected_mutation_blocked_before_sender": True,
             "events_sha256": digest((directory / "transport/events.jsonl").read_bytes()),
         }

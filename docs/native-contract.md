@@ -70,6 +70,15 @@ Changing it requires an explicit contract/code change and a new execution SHA;
 the none baseline and every comparison must use the same complete runner and queue
 section. Each outer process still runs one Harbor trial and one agent at a time.
 
+The baseline has a separate continuation gate after its first five complete
+repetitions. If the range of passed-task counts is at most one, collection
+continues to 10 without claiming stability. A range greater than one stops the
+run for judge, runtime and design review instead of automatically spending the
+20-repetition allowance. One point is one of five tasks; the threshold is a
+predeclared judgmental operating limit, not an empirically calibrated confidence
+bound. Earlier unchanged-call variability motivated having a gate but did not
+numerically derive this threshold.
+
 `--source-commit` is mandatory. The designated full SHA must match a clean HEAD
 and the committed source inventory. Source, ledger and dependency-lock snapshots
 travel with every run; trial and transport records carry the same SHA. The
@@ -109,6 +118,24 @@ response logging drains before metrics and final artifact hashes are collected.
 With concurrent trials, requests already dispatched before a peer failure cannot
 be recalled; this boundary is retained in the timestamps and transport records.
 
+Each complete five-task repetition is also copied to a local managed-disk spool
+through an atomic directory rename. Its tar payload contains the completed trial,
+judge, request/response, source and adapter evidence available at that boundary.
+A single background uploader uses the VM's system-assigned Managed Identity,
+uploads the payload first and publishes `manifest.json` last. The manifest binds
+the payload path, byte count and SHA-256 to the run, source commit, ledger and
+repetition. Account URLs and spool roots come from `NATIVE_BLOB_ACCOUNT_URL` and
+`NATIVE_BLOB_SPOOL_ROOT`; credentials and tokens are never written to the ledger
+or result.
+
+A Blob failure does not stop benchmark workers. The immutable local payload stays
+in the spool while bounded retries record attempt times and a sanitized error
+category. A preserved failed spool can be resumed with the same destination and
+lineage checks. At run shutdown, unfinished uploads are a hard gate: the native
+measurement becomes `retrieval_pending`, not complete. Reading every remote
+manifest and payload checksum from the collection host remains an external VM
+shutdown gate; the agent has no access to this result-recovery path.
+
 Docker resource cleanup after a forced interruption is **not validated** by a
 host process-group test. Harbor is configured to delete environments, but an
 operator must check for leftover containers on the execution host. An HTTP
@@ -139,6 +166,7 @@ All metrics are collected for **all four** conditions from the same path.
 | `timing.model_seconds` | Provider-reported `engine_ttlt_ms`, converted to seconds; otherwise null with a known subtotal |
 | `native_outcome` | Unmodified native binary reward plus failure categories, per-test evidence and integrity warnings |
 | `concurrency`, `deployment_limits` | Fixed outer native-trial concurrency plus the ledger RPM/TPM, check time and source; written to both `summary.json` and `execution.json` and revalidated from the saved ledger |
+| `retrieval` | Per-repetition local payload size/SHA, Blob names, attempts, sanitized failure category and ETags; payload-before-manifest ordering is recorded, while collection-host read verification remains an external shutdown gate |
 
 Waits, control keystrokes, undecomposable scripts and uncertain submissions have
 separate fields. Proposed assistant commands that never reach the terminal do
@@ -158,6 +186,9 @@ sample standard deviation, and per-task pass counts. Use the observed range as
 the primary tolerance; standard deviation is descriptive, not a normality-based
 threshold for this small, heterogeneous binary sample.
 
+- At five complete repetitions, stop for design and runtime audit if the suite
+  range is greater than one. A range of zero or one only permits continued
+  collection; it is not stability evidence and does not replace the checks below.
 - At 10 complete repetitions, compare repetitions 1–5 with 6–10. Stop range
   collection if suite minima/maxima match and each task has the same observed
   support (`{0}`, `{1}` or `{0,1}`) in both halves.
@@ -281,15 +312,19 @@ IMDS/Foundry or call any provider model. The baseline check verifies artifacts
 for all four conditions, not only the selected condition. The separate adapter
 preflight sends eight synthetic candidates per condition through the common
 recorder and protection guard, uses only an in-process synthetic response, and
-constructs all eight LLMLingua workers. It records software timings but is not a
-native quality or provider-latency measurement. Both checks fail on a dirty or
-wrong source tree; native execution also requires an approved, operational
-ledger and the separate `--execute` flag. Every non-`none` condition requires
-`--baseline runs/<id>`.
+constructs all eight LLMLingua workers. It verifies byte-exact system/task
+instructions, file-read code and assistant history for every condition, then
+injects a protected mutation and confirms that neither it nor later requests
+reach the synthetic sender. It records software timings but is not a native
+quality or provider-latency measurement. Both checks fail on a dirty or wrong
+source tree; native execution also requires an approved, operational ledger and
+the separate `--execute` flag. Every non-`none` condition requires `--baseline
+runs/<id>`.
 Do not run either arm until authorized. The loopback SDK, dummy process and
 synthetic driver tests are software checks, not native quality/billing evidence.
 
 Exit 0 means checks succeeded or the requested measurement completed; exit 2 is
-a preflight/verification error; exit 3 denotes a stopped/inconclusive execution.
+a preflight/verification error; exit 3 denotes a stopped, inconclusive or
+retrieval-pending execution.
 Raw diagnostics and artifacts stay under ignored `runs/`. There is no automatic
 native-results publisher, commit, push or repository visibility change.

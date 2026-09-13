@@ -5,6 +5,32 @@ import statistics
 
 
 RULE = "equal_half_support_v1_proposal"
+INTERIM_REPETITIONS = 5
+INTERIM_MAX_RANGE_WIDTH = 1
+
+
+def interim_baseline_gate(repetitions: list[dict[str, int]], tasks: list[str]) -> dict:
+    if len(repetitions) != INTERIM_REPETITIONS:
+        raise ValueError("The interim baseline gate requires exactly five complete repetitions")
+    summary = baseline_summary(repetitions, tasks)
+    continue_run = summary["range_width"] <= INTERIM_MAX_RANGE_WIDTH
+    return {
+        "kind": "predeclared_operational_decision",
+        "rule": "five_repetition_suite_range_gate_v1",
+        "rule_status": "accepted_in_execution_ledger",
+        "unit": summary["unit"],
+        "repetitions": INTERIM_REPETITIONS,
+        "native_trials": INTERIM_REPETITIONS * len(tasks),
+        "suite_pass_counts": summary["suite_pass_counts"],
+        "range_min": summary["range_min"],
+        "range_max": summary["range_max"],
+        "range_width": summary["range_width"],
+        "maximum_range_width_to_continue": INTERIM_MAX_RANGE_WIDTH,
+        "decision": "continue_to_10" if continue_run else "stop_for_design_audit",
+        "stability_proven": False,
+        "threshold_kind": "predeclared_judgmental_operational_threshold",
+        "threshold_empirically_calibrated": False,
+    }
 
 
 def baseline_summary(repetitions: list[dict[str, int]], tasks: list[str]) -> dict:

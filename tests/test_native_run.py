@@ -34,7 +34,7 @@ class NativeRunTests(unittest.TestCase):
         self.maximum_active_supervisors = 0
         self.activity_lock = threading.Lock()
 
-    def run_fixture(self, *, evidence_kind="synthetic_validation", broken=False):
+    def run_fixture(self, *, evidence_kind="synthetic_validation", broken=False, pass_counts=None):
         """Mock all execution dependencies; temporary native-shaped records are never evidence."""
         def sender(body):
             self.sent.append(body)
@@ -44,10 +44,44 @@ class NativeRunTests(unittest.TestCase):
         files = {"task.toml": b'[environment]\ndocker_image = "synthetic:unused"\n', "instruction.md": b"Synthetic fixture",
                  "tests/test.sh": b"synthetic, never executed", "tests/test_outputs.py": b"synthetic, never imported"}
         provenance = {"source_commit": "a" * 40, "ledger_sha256": digest(self.ledger_bytes)}
+        retrieval_client = SimpleNamespace(
+            account_url="https://synthetic.blob.core.windows.net", container="runs", timeout_seconds=1,
+        )
         setup = {"provenance": provenance, "snapshots": {"ledger.toml": self.ledger_bytes}, "encoder": FixtureEncoder(),
                  "tasks": {task: deepcopy(files) for task in TASKS}, "benchmark_root": str(self.root / "benchmark"),
                  "sender": sender, "queue_path": self.root / "shared-queue.json", "runtime_versions": {"kind": "synthetic"},
+                 "retrieval": {"client": retrieval_client, "container": "runs", "prefix": "runs"},
                  "evidence_kind": evidence_kind}
+
+        class SyntheticRetrieval:
+            def __init__(self):
+                self.items = []
+
+            def stage_run_snapshot(self, directory, repetition, trials):
+                self.items.append({
+                    "kind": "native_repetition_snapshot", "item_id": f"repetition-{repetition:03d}",
+                    "metadata": {"repetition": repetition}, "payload": {
+                        "name": "payload.tar", "bytes": 1, "sha256": "b" * 64,
+                        "blob": f"runs/synthetic/repetition-{repetition:03d}/payload.tar",
+                    }, "manifest_blob": f"runs/synthetic/repetition-{repetition:03d}/manifest.json",
+                    "manifest_uploaded_last": True, "upload_state": "uploaded", "attempts": 1,
+                    "first_attempt_at": "synthetic", "last_attempt_at": "synthetic",
+                    "last_error_category": None, "uploaded_at": "synthetic",
+                    "payload_etag": "synthetic", "manifest_etag": "synthetic",
+                })
+
+            def finish(self, wait_seconds):
+                return {
+                    "schema_version": 1, "kind": "native_blob_retrieval",
+                    "account_url_sha256": "c" * 64, "container": "runs", "prefix": "runs",
+                    "run_id": next(iter((self.root if hasattr(self, "root") else [])), None),
+                    "source_commit": "a" * 40, "ledger_sha256": provenance["ledger_sha256"],
+                    "condition": "none", "upload_state": "uploaded" if self.items else "no_complete_repetitions",
+                    "items": self.items, "nas_read_verification": "pending_external",
+                    "credentials_recorded": False,
+                }
+
+        synthetic_retrieval = SyntheticRetrieval()
 
         def synthetic_supervisor(command, log, recorder, timeout, environment):
             self.supervised.append(command)
@@ -63,7 +97,9 @@ class NativeRunTests(unittest.TestCase):
                 recorder.complete(trial_id, canonical(request_fixture()))
                 recorder.event({"event": "response_delivered", "trial_id": trial_id})
                 task = recorder.trials[trial_id]["task"]
-                reward = int(task not in TASKS[:2])
+                repetition = int(trial_id[1:3])
+                passed = (pass_counts or [3] * 20)[repetition - 1]
+                reward = int(TASKS.index(task) >= len(TASKS) - passed)
                 native = log.parents[2] / "jobs" / trial_id / "synthetic-trial"
                 (native / "verifier").mkdir(parents=True)
                 (native / "agent/command-trace").mkdir(parents=True)
@@ -79,7 +115,23 @@ class NativeRunTests(unittest.TestCase):
                 with self.activity_lock:
                     self.active_supervisors -= 1
 
-        with patch("src.native_run.ROOT", self.root), patch("src.native_run.preflight", return_value=setup), patch("src.native_run.supervise", synthetic_supervisor):
+        def make_retrieval(_settings, run_id, source_commit, ledger_sha256, condition):
+            synthetic_retrieval.root = [run_id]
+            synthetic_retrieval.condition = condition
+            return synthetic_retrieval
+
+        original_finish = synthetic_retrieval.finish
+
+        def finish(wait_seconds):
+            result = original_finish(wait_seconds)
+            result["run_id"] = synthetic_retrieval.root[0]
+            result["condition"] = synthetic_retrieval.condition
+            return result
+
+        synthetic_retrieval.finish = finish
+        with patch("src.native_run.ROOT", self.root), patch("src.native_run.preflight", return_value=setup), \
+             patch("src.native_run.supervise", synthetic_supervisor), \
+             patch("src.native_run.make_blob_spool", side_effect=make_retrieval):
             directory = execute_native(self.ledger_path, self.ledger, "a" * 40, "none")
         return directory, provenance
 
@@ -104,6 +156,9 @@ class NativeRunTests(unittest.TestCase):
         self.assertLessEqual(self.maximum_active_supervisors, 8)
         self.assertTrue(all(trial["metrics"]["measurement_complete"] for trial in summary["trials"]))
         self.assertEqual(summary["trials"][0]["native_outcome"]["primary_failure"], "wrong_answer")
+        self.assertEqual(summary["interim_decision"]["decision"], "continue_to_10")
+        self.assertEqual(summary["retrieval"]["upload_state"], "uploaded")
+        self.assertEqual(len(summary["retrieval"]["items"]), 10)
         self.assertTrue(all(trial["metrics"]["total_model_calls"] == 1 for trial in summary["trials"]))
         with self.assertRaisesRegex(ValueError, "Synthetic"):
             verify_native_run(directory)
@@ -140,6 +195,17 @@ class NativeRunTests(unittest.TestCase):
         self.assertTrue(all(not trial["metrics"]["measurement_complete"] for trial in summary["trials"]))
         self.assertTrue(all(trial["native_outcome"]["native_reward"] is None for trial in summary["trials"]))
         self.assertEqual(summary["repetitions"], [])
+
+    def test_large_first_five_range_stops_before_sixth_repetition(self):
+        directory, _provenance = self.run_fixture(pass_counts=[1, 3, 1, 3, 1])
+        summary = json.loads((directory / "summary.json").read_bytes())
+        self.assertEqual(summary["status"], "stopped")
+        self.assertEqual(len(summary["trials"]), 25)
+        self.assertEqual(summary["interim_decision"]["range_width"], 2)
+        self.assertEqual(summary["interim_decision"]["decision"], "stop_for_design_audit")
+        self.assertNotIn("baseline_decision", summary)
+        self.assertEqual(summary["stop_reason"]["reason"], "InterimBaselineVariability")
+        self.assertEqual(len(summary["retrieval"]["items"]), 5)
 
     def test_compressor_close_failure_stops_and_records_the_run(self):
         def fail_close():

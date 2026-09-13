@@ -54,14 +54,14 @@ PUBLIC_FILES = {
     "docs/eda/figures/round2/03-input-size-by-type.svg", "docs/eda/figures/round2/04-unknown-decomposition.svg",
     "src/baseline.py", "src/command_trace.py", "src/harbor_agent.py", "src/live_observations.py",
     "src/live_transport.py", "src/native_contract.py", "src/native_judge.py", "src/native_run.py",
-    "src/llmlingua_worker.py", "src/adapter_preflight.py", "src/prompt_intake.py", "src/task_metrics.py",
+    "src/llmlingua_worker.py", "src/adapter_preflight.py", "src/blob_retrieval.py", "src/prompt_intake.py", "src/task_metrics.py",
     "requirements/llmlingua2-cpu.txt", "fixtures/llmlingua2/path-listing.txt",
     "fixtures/llmlingua2/severity-log.txt", "fixtures/llmlingua2/package-install.txt",
     "ledgers/native.template.toml", "docs/native-contract.md",
     "tests/native_helpers.py", "tests/test_baseline.py", "tests/test_live_observations.py",
     "tests/test_live_transport.py", "tests/test_native_judge.py", "tests/test_prompt_intake.py",
     "tests/test_task_metrics.py", "tests/test_native_contract.py", "tests/test_native_run.py",
-    "tests/test_native_compressors.py", "tests/test_adapter_preflight.py", "tests/test_harbor_transport.py",
+    "tests/test_native_compressors.py", "tests/test_adapter_preflight.py", "tests/test_blob_retrieval.py", "tests/test_harbor_transport.py",
 }
 
 TIMING_ROWS = (

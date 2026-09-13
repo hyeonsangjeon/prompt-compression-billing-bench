@@ -71,7 +71,7 @@ version. Binary distribution is an [open readiness item](STATUS.md).
 - Separate `tool_reported`, `measured_local` and `measured_billed` fields. No API calls means billing is **not measured**, not a measured zero.
 - A reproducible aggregate EDA chart; raw historical requests are not distributed.
 - An optional [local-model native runner](docs/local-native.md), not yet connected to the compressor pipeline.
-- An opt-in [Harbor/Foundry candidate-compression runner](docs/native-contract.md) for none, squeez, a Headroom paths-only profile and LLMLingua-2, with a shared protected transport, per-task workload metrics and a proposed baseline rule. Its template cannot execute without approval and operational values; no native comparison result is claimed.
+- An opt-in [Harbor/Foundry candidate-compression runner](docs/native-contract.md) for none, squeez, a Headroom paths-only profile and LLMLingua-2, with a shared protected transport, per-task workload metrics, a five-repetition continuation gate and local-first Blob result retrieval. Its template cannot execute without approval and operational values; no native comparison result is claimed.
 
 ## Protection
 

@@ -6,7 +6,7 @@ from pathlib import Path
 import re
 import tomllib
 
-from .baseline import RULE
+from .baseline import INTERIM_MAX_RANGE_WIDTH, INTERIM_REPETITIONS, RULE
 
 
 TASKS = ("cancel-async-tasks", "log-summary-date-ranges", "multi-source-data-merger",
@@ -45,9 +45,10 @@ FIELDS = {
     "measurement": {"tokenizer", "tiktoken_version", "cache_env", "table_sha256"},
     "compressor": {"name", "target", "tools"},
     "queue": {"state_path_env", "rpm", "tpm", "limits_checked_at_utc", "limits_source_reference", "deployment_isolation_reference"},
+    "retrieval": {"account_url_env", "spool_root_env", "container", "prefix", "upload_timeout_seconds", "maximum_attempts", "initial_backoff_seconds", "maximum_backoff_seconds", "final_flush_seconds"},
     "limits": {"api_cost_usd", "deadline_utc", "max_wall_seconds", "max_calls_per_trial", "request_timeout_seconds", "max_request_bytes", "max_attempts_per_call", "max_retry_wait_seconds", "protocol_token_allowance"},
     "prices": {"input_per_million_usd", "cached_input_per_million_usd", "output_per_million_usd", "source_reference", "checked_at_utc"},
-    "stability": {"rule", "minimum_repetitions", "maximum_repetitions", "comparison_repetitions"},
+    "stability": {"rule", "interim_repetitions", "interim_max_range_width", "minimum_repetitions", "maximum_repetitions", "comparison_repetitions"},
     "approval": {"execution_approved", "rule_accepted", "reference"},
 }
 
@@ -93,7 +94,11 @@ def validate_native_ledger(ledger: dict) -> None:
         raise ValueError("Use the pinned, instrumented Terminus 2 adapter")
     if runner["concurrency"] != FIXED_CONCURRENCY:
         raise ValueError("Native trial concurrency is fixed at eight for every comparison arm")
-    for value in (benchmark["root_env"], model["endpoint_env"], ledger["queue"]["state_path_env"], ledger["measurement"]["cache_env"]):
+    for value in (
+        benchmark["root_env"], model["endpoint_env"], ledger["queue"]["state_path_env"],
+        ledger["measurement"]["cache_env"], ledger["retrieval"]["account_url_env"],
+        ledger["retrieval"]["spool_root_env"],
+    ):
         if not isinstance(value, str) or not re.fullmatch(r"[A-Z][A-Z0-9_]*", value):
             raise ValueError("Store environment variable names, not credentials")
     for section, fields in {
@@ -118,7 +123,20 @@ def validate_native_ledger(ledger: dict) -> None:
         raise ValueError("Deployment limits need a past timezone-aware check and source")
     if ledger["prices"]["cached_input_per_million_usd"] > ledger["prices"]["input_per_million_usd"]:
         raise ValueError("Cached input rate exceeds the full input rate")
-    if ledger["stability"] != {"rule": RULE, "minimum_repetitions": 10, "maximum_repetitions": 20, "comparison_repetitions": "match_baseline"}:
+    retrieval = ledger["retrieval"]
+    if retrieval != {
+        "account_url_env": "NATIVE_BLOB_ACCOUNT_URL", "spool_root_env": "NATIVE_BLOB_SPOOL_ROOT",
+        "container": "runs", "prefix": "runs", "upload_timeout_seconds": 300,
+        "maximum_attempts": 30, "initial_backoff_seconds": 2,
+        "maximum_backoff_seconds": 60, "final_flush_seconds": 600,
+    }:
+        raise ValueError("Keep the managed-identity Blob spool and bounded retry contract")
+    if ledger["stability"] != {
+        "rule": RULE, "interim_repetitions": INTERIM_REPETITIONS,
+        "interim_max_range_width": INTERIM_MAX_RANGE_WIDTH,
+        "minimum_repetitions": 10, "maximum_repetitions": 20,
+        "comparison_repetitions": "match_baseline",
+    }:
         raise ValueError("Baseline stopping and comparison rules must be fixed before collection")
     if any(type(ledger["approval"][field]) is not bool for field in ("execution_approved", "rule_accepted")):
         raise ValueError("Approval fields must be explicit booleans")

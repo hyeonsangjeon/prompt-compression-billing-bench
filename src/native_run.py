@@ -16,7 +16,8 @@ import time
 import tomllib
 
 from accounting import now
-from .baseline import baseline_summary, compare_quality
+from .baseline import baseline_summary, compare_quality, interim_baseline_gate
+from .blob_retrieval import make_blob_spool, retrieval_settings
 from .compressors import check_compressor_artifacts, make_compressor
 from .contracts import safe_child, save_json
 from .live_observations import POLICY
@@ -178,6 +179,7 @@ def preflight(ledger: dict, ledger_path: Path, source_commit: str, condition: st
     JobConfig.model_validate(harbor_config(ledger, ROOT / "placeholder", ROOT / "runs", "check", "http://127.0.0.1:1/check/v1"))
     encoder = load_encoder(ledger["measurement"])
     benchmark_root, tasks = benchmark_sources(ledger)
+    retrieval = retrieval_settings(ledger, ROOT)
     endpoint = os.environ.get(ledger["model"]["endpoint_env"], "")
     sender = FoundrySender(endpoint, ledger["limits"]["request_timeout_seconds"], ManagedIdentity(), deadline=deadline)
     queue_value = os.environ.get(ledger["queue"]["state_path_env"])
@@ -189,7 +191,7 @@ def preflight(ledger: dict, ledger_path: Path, source_commit: str, condition: st
         check_compressor_artifacts(ledger["compressor"], compressor_name)
     return {"provenance": provenance, "snapshots": snapshots, "encoder": encoder, "tasks": tasks,
             "benchmark_root": str(benchmark_root), "sender": sender, "queue_path": Path(queue_value).resolve(),
-            "runtime_versions": versions}
+            "runtime_versions": versions, "retrieval": retrieval}
 
 
 def verify_native_run(directory: Path) -> dict:
@@ -222,7 +224,9 @@ def verify_native_run(directory: Path) -> dict:
             raise ValueError(f"Native artifact changed: {name}")
     if {name for name in files if re.fullmatch(r"trials/[^/]+/trial.json", name)} != {trial["record_path"] for trial in summary["trials"]}:
         raise ValueError("Summary must include every recorded native trial")
-    if summary["condition"] not in CONDITIONS or summary["status"] not in ("complete", "inconclusive", "stopped"):
+    if summary["condition"] not in CONDITIONS or summary["status"] not in (
+        "complete", "inconclusive", "stopped", "retrieval_pending"
+    ):
         raise ValueError("Unexpected native condition or completion state")
     repetitions, rewards, incomplete_repetition = [], {}, False
     for index, trial in enumerate(summary["trials"]):
@@ -255,7 +259,36 @@ def verify_native_run(directory: Path) -> dict:
         raise ValueError("An invalid trial must stop the run, not become a zero")
     if summary["repetitions"] != repetitions:
         raise ValueError("Native repetitions differ from the individual trial rewards")
-    if summary["condition"] == "none" and summary["status"] in ("complete", "inconclusive"):
+    retrieval = json.loads((directory / "retrieval.json").read_bytes())
+    if summary.get("retrieval") != retrieval:
+        raise ValueError("Native retrieval summary differs from its record")
+    if (
+        retrieval.get("kind") != "native_blob_retrieval"
+        or retrieval.get("run_id") != summary["run_id"]
+        or retrieval.get("source_commit") != summary["source_commit"]
+        or retrieval.get("ledger_sha256") != summary["ledger_sha256"]
+        or retrieval.get("condition") != summary["condition"]
+        or retrieval.get("credentials_recorded") is not False
+    ):
+        raise ValueError("Native retrieval lineage or credential boundary differs")
+    expected_items = [f"repetition-{index:03d}" for index in range(1, len(repetitions) + 1)]
+    if [item.get("item_id") for item in retrieval.get("items", [])] != expected_items:
+        raise ValueError("Native retrieval items differ from complete repetitions")
+    if summary["status"] in ("complete", "inconclusive") and retrieval.get("upload_state") != "uploaded":
+        raise ValueError("A complete native run requires every repetition manifest in Blob")
+    if summary["status"] == "retrieval_pending" and retrieval.get("upload_state") != "retrieval_pending":
+        raise ValueError("Retrieval-pending status needs an unfinished Blob upload")
+    measurement_status = summary.get("completion_status_before_retrieval", summary["status"])
+    if summary["status"] == "retrieval_pending" and measurement_status not in ("complete", "inconclusive"):
+        raise ValueError("Retrieval-pending run lacks its pre-retrieval measurement status")
+    interim = interim_baseline_gate(repetitions[:5], list(TASKS)) if len(repetitions) >= 5 else None
+    if summary["condition"] == "none" and summary.get("interim_decision") != interim:
+        raise ValueError("The five-repetition baseline gate differs from native rewards")
+    if summary["condition"] == "none" and len(repetitions) == 5:
+        gate_stop = (summary.get("stop_reason") or {}).get("reason") == "InterimBaselineVariability"
+        if summary["status"] != "stopped" or gate_stop != (interim["decision"] == "stop_for_design_audit"):
+            raise ValueError("A five-repetition baseline stop differs from the predeclared gate or later failure")
+    elif summary["condition"] == "none" and summary["status"] in ("complete", "inconclusive", "retrieval_pending"):
         if len(repetitions) not in (10, 20) or rewards:
             raise ValueError("A completed baseline requires complete repetitions")
         if len(repetitions) == 20 and baseline_summary(repetitions[:10], list(TASKS))["status"] == "observed_range_stabilized":
@@ -265,13 +298,13 @@ def verify_native_run(directory: Path) -> dict:
         if summary.get("baseline_decision") != json.loads(json.dumps(decision)):
             raise ValueError("Baseline stopping decision differs from the native rewards")
         informative = decision["status"] == "observed_range_stabilized" and decision["comparison_informative"]
-        if (summary["status"] == "complete") != informative:
+        if (measurement_status == "complete") != informative:
             raise ValueError("Uninformative baseline cannot be labeled complete")
     if summary.get("compressor_metrics") != aggregate_run_compressor_metrics(summary["trials"]):
         raise ValueError("Run compressor metrics differ from the trial records")
     if summary.get("timing_metrics") != aggregate_run_timing_metrics(summary["trials"]):
         raise ValueError("Run phase timings differ from the trial records")
-    if summary["condition"] != "none" and summary["status"] == "complete":
+    if summary["condition"] != "none" and measurement_status == "complete":
         reference_bytes = (directory / "baseline-summary.json").read_bytes()
         if digest(reference_bytes) != summary["baseline"]["summary_sha256"]:
             raise ValueError("Verified baseline snapshot changed")
@@ -289,7 +322,10 @@ def verify_native_run(directory: Path) -> dict:
 def baseline_for_comparison(directory: Path, ledger: dict, source_commit: str) -> dict:
     summary = verify_native_run(directory)
     original_ledger = load_native_ledger(directory / "ledger.toml")
-    for key in ("benchmark", "model", "runner", "measurement", "compressor", "stability", "raw_retrieval", "queue"):
+    for key in (
+        "benchmark", "model", "runner", "measurement", "compressor", "stability",
+        "raw_retrieval", "queue", "retrieval",
+    ):
         if original_ledger[key] != ledger[key]:
             raise ValueError(f"Comparison differs from baseline {key}")
     for key in ("max_calls_per_trial", "request_timeout_seconds", "max_request_bytes", "max_attempts_per_call", "max_retry_wait_seconds", "protocol_token_allowance"):
@@ -341,9 +377,10 @@ def trial_is_complete(trial: dict) -> bool:
 
 
 def run_trial_plans(directory: Path, ledger: dict, recorder, server, key: str,
-                    plans: list[tuple[str, int]]) -> list[dict]:
+                    plans: list[tuple[str, int]], on_repetition=None) -> list[dict]:
     concurrency = ledger["runner"]["concurrency"]
     completed = []
+    reported = 0
     for offset in range(0, len(plans), concurrency):
         recorder.check()
         wave = plans[offset:offset + concurrency]
@@ -354,6 +391,18 @@ def run_trial_plans(directory: Path, ledger: dict, recorder, server, key: str,
                        for task, repetition in wave]
             trials = [future.result() for future in futures]
         completed.extend(trials)
+        while len(completed) - reported >= len(TASKS):
+            group = completed[reported:reported + len(TASKS)]
+            expected_repetition = plans[reported][1]
+            if any(not trial_is_complete(trial) for trial in group):
+                break
+            if [trial["task"] for trial in group] != list(TASKS) or any(
+                trial["repetition"] != expected_repetition for trial in group
+            ):
+                raise ValueError("Completed repetition differs from the fixed task plan")
+            if on_repetition is not None:
+                on_repetition(expected_repetition, group)
+            reported += len(TASKS)
         if any(not trial_is_complete(trial) for trial in trials):
             recorder.stop("NativeOutcomeOrMandatoryMetricsIncomplete", {
                 "trial_ids": [trial["trial_id"] for trial in trials if not trial_is_complete(trial)]})
@@ -362,9 +411,9 @@ def run_trial_plans(directory: Path, ledger: dict, recorder, server, key: str,
 
 
 def run_repetition_block(directory: Path, ledger: dict, recorder, server, key: str,
-                         first: int, last: int) -> tuple[list[dict], list[dict], bool]:
+                         first: int, last: int, on_repetition=None) -> tuple[list[dict], list[dict], bool]:
     plans = [(task, repetition) for repetition in range(first, last + 1) for task in TASKS]
-    trials = run_trial_plans(directory, ledger, recorder, server, key, plans)
+    trials = run_trial_plans(directory, ledger, recorder, server, key, plans, on_repetition)
     expected = (last - first + 1) * len(TASKS)
     repetitions = []
     for offset in range(0, len(trials), len(TASKS)):
@@ -414,7 +463,7 @@ def execute_native(ledger_path: Path, ledger: dict, source_commit: str, conditio
         "compressor_metrics": aggregate_run_compressor_metrics([]),
         "timing_metrics": aggregate_run_timing_metrics([]),
     }
-    queue = recorder = server = compressor = None
+    queue = recorder = server = compressor = retrieval = None
     try:
         queue = DeploymentQueue(setup["queue_path"], deployment, ledger["queue"]["rpm"], ledger["queue"]["tpm"])
         compressor_specification = {**ledger["compressor"], "name": condition}
@@ -439,33 +488,69 @@ def execute_native(ledger_path: Path, ledger: dict, source_commit: str, conditio
             "queue_scope": "cooperating_callers_on_one_host_using_this_exclusive_queue",
             "external_callers_independently_verified": False,
             "deployment_isolation_reference": ledger["queue"]["deployment_isolation_reference"],
+            "retrieval": {
+                "account_url_sha256": digest(setup["retrieval"]["client"].account_url.encode()),
+                "container": setup["retrieval"]["container"], "prefix": setup["retrieval"]["prefix"],
+                "account_url_env": ledger["retrieval"]["account_url_env"],
+                "spool_root_env": ledger["retrieval"]["spool_root_env"],
+                "credentials": "system_assigned_managed_identity_not_recorded",
+                "nas_read_verification": "external_shutdown_gate",
+            },
             "effective_deadline_utc_epoch": recorder.deadline, "benchmark_root": setup["benchmark_root"],
             "runtime_versions": setup["runtime_versions"], "python": sys.version,
         })
+        retrieval = make_blob_spool(
+            setup["retrieval"], run_id, source_commit, setup["provenance"]["ledger_sha256"], condition
+        )
+
+        def stage_repetition(repetition, repetition_trials):
+            retrieval.stage_run_snapshot(directory, repetition, repetition_trials)
+
         minimum = ledger["stability"]["minimum_repetitions"]
         maximum = len(baseline["repetitions"]) if baseline else ledger["stability"]["maximum_repetitions"]
+        first_block_end = ledger["stability"]["interim_repetitions"] if baseline is None else maximum
         trials, repetitions, complete = run_repetition_block(
-            directory, ledger, recorder, server, key, 1, minimum if baseline is None else maximum)
+            directory, ledger, recorder, server, key, 1, first_block_end, stage_repetition)
         summary["trials"].extend(trials)
         summary["repetitions"].extend(repetitions)
         if not complete:
             raise ValueError("Native outcome or required metrics are incomplete; no task replacement")
         if condition == "none":
-            decision = baseline_summary(summary["repetitions"], list(TASKS))
-            if decision["status"] == "extend_to_total_20":
+            interim = interim_baseline_gate(summary["repetitions"], list(TASKS))
+            summary["interim_decision"] = interim
+            if interim["decision"] == "stop_for_design_audit":
+                summary["status"] = "stopped"
+                recorder.stop("InterimBaselineVariability", interim)
+            else:
                 trials, repetitions, complete = run_repetition_block(
-                    directory, ledger, recorder, server, key, minimum + 1, maximum)
+                    directory, ledger, recorder, server, key, first_block_end + 1, minimum,
+                    stage_repetition,
+                )
                 summary["trials"].extend(trials)
                 summary["repetitions"].extend(repetitions)
                 if not complete:
                     raise ValueError("Native outcome or required metrics are incomplete; no task replacement")
                 decision = baseline_summary(summary["repetitions"], list(TASKS))
-            decision["rule_status"] = "accepted_in_execution_ledger"
-            summary["baseline_decision"] = decision
-        summary["status"] = "complete"
-        if condition == "none" and (summary["baseline_decision"]["status"] != "observed_range_stabilized" or not summary["baseline_decision"]["comparison_informative"]):
+                if decision["status"] == "extend_to_total_20":
+                    trials, repetitions, complete = run_repetition_block(
+                        directory, ledger, recorder, server, key, minimum + 1, maximum,
+                        stage_repetition,
+                    )
+                    summary["trials"].extend(trials)
+                    summary["repetitions"].extend(repetitions)
+                    if not complete:
+                        raise ValueError("Native outcome or required metrics are incomplete; no task replacement")
+                    decision = baseline_summary(summary["repetitions"], list(TASKS))
+                decision["rule_status"] = "accepted_in_execution_ledger"
+                summary["baseline_decision"] = decision
+        if summary["status"] != "stopped":
+            summary["status"] = "complete"
+        if condition == "none" and summary["status"] == "complete" and (
+            summary["baseline_decision"]["status"] != "observed_range_stabilized"
+            or not summary["baseline_decision"]["comparison_informative"]
+        ):
             summary["status"] = "inconclusive"
-        if baseline:
+        if baseline and summary["status"] == "complete":
             changed = sum(trial["metrics"]["changed_candidate_occurrences"] for trial in summary["trials"])
             summary["quality_comparison"] = compare_quality(baseline["repetitions"], summary["repetitions"], list(TASKS), changed)
             summary["quality_comparison"]["rule_status"] = "accepted_in_execution_ledger"
@@ -493,6 +578,38 @@ def execute_native(ledger_path: Path, ledger: dict, source_commit: str, conditio
                 summary["budget_used_or_reserved_usd"] = recorder.budget_used_usd
         if queue is not None:
             queue.close()
+        if retrieval is not None:
+            wait_seconds = ledger["retrieval"]["final_flush_seconds"]
+            if recorder is not None:
+                wait_seconds = min(wait_seconds, max(0, recorder.deadline - time.time()))
+            try:
+                retrieval_record = retrieval.finish(wait_seconds)
+            except BaseException as error:
+                retrieval_record = {
+                    "schema_version": 1, "kind": "native_blob_retrieval",
+                    "run_id": run_id, "source_commit": source_commit,
+                    "ledger_sha256": setup["provenance"]["ledger_sha256"],
+                    "condition": condition, "upload_state": "retrieval_pending", "items": [],
+                    "nas_read_verification": "pending_external", "credentials_recorded": False,
+                    "finalization_error_type": type(error).__name__,
+                }
+            save_json(directory / "retrieval.json", retrieval_record)
+            summary["retrieval"] = retrieval_record
+            if retrieval_record["upload_state"] == "retrieval_pending" and summary["status"] in (
+                "complete", "inconclusive"
+            ):
+                summary["completion_status_before_retrieval"] = summary["status"]
+                summary["status"] = "retrieval_pending"
+        else:
+            retrieval_record = {
+                "schema_version": 1, "kind": "native_blob_retrieval", "run_id": run_id,
+                "source_commit": source_commit, "ledger_sha256": setup["provenance"]["ledger_sha256"],
+                "condition": condition, "upload_state": "retrieval_pending", "items": [],
+                "nas_read_verification": "pending_external", "credentials_recorded": False,
+                "finalization_error_type": "RetrievalNotInitialized",
+            }
+            save_json(directory / "retrieval.json", retrieval_record)
+            summary["retrieval"] = retrieval_record
         summary["compressor_metrics"] = aggregate_run_compressor_metrics(summary["trials"])
         summary["timing_metrics"] = aggregate_run_timing_metrics(summary["trials"])
         summary["finished_at"] = now()

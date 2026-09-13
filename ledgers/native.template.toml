@@ -163,6 +163,17 @@ limits_checked_at_utc = "2026-09-12T09:34:50.299151+00:00"
 limits_source_reference = "Azure deployment properties.rateLimits and one lightweight eight-request check"
 deployment_isolation_reference = ""
 
+[retrieval]
+account_url_env = "NATIVE_BLOB_ACCOUNT_URL"
+spool_root_env = "NATIVE_BLOB_SPOOL_ROOT"
+container = "runs"
+prefix = "runs"
+upload_timeout_seconds = 300
+maximum_attempts = 30
+initial_backoff_seconds = 2
+maximum_backoff_seconds = 60
+final_flush_seconds = 600
+
 [limits]
 api_cost_usd = 0
 deadline_utc = ""
@@ -183,6 +194,8 @@ checked_at_utc = ""
 
 [stability]
 rule = "equal_half_support_v1_proposal"
+interim_repetitions = 5
+interim_max_range_width = 1
 minimum_repetitions = 10
 maximum_repetitions = 20
 comparison_repetitions = "match_baseline"
