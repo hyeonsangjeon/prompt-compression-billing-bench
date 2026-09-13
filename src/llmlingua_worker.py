@@ -82,6 +82,15 @@ def install_offline_guard() -> None:
     sys.addaudithook(reject)
 
 
+def bind_local_model_identity(compressor, local_path: Path, model_id: str) -> str:
+    if compressor.model_name != str(local_path):
+        raise ValueError("LLMLingua loaded an unexpected local model path")
+    if "xlm-roberta-large" not in model_id:
+        raise ValueError("Pinned LLMLingua model ID does not identify the supported tokenizer family")
+    compressor.model_name = model_id
+    return compressor.model_name
+
+
 def initialize(payload: dict):
     if set(payload) != {"operation", "model_path", "specification"} or payload["operation"] != "initialize":
         raise ValueError("First worker message must be an exact initialization request")
@@ -126,6 +135,9 @@ def initialize(payload: dict):
         device_map="cpu",
         model_config={"local_files_only": True, "torch_dtype": torch.float32},
     )
+    token_boundary_model_name = bind_local_model_identity(
+        compressor, Path(payload["model_path"]), specification["model_id"]
+    )
     load_seconds = time.perf_counter() - started
     if compressor.model.training:
         raise ValueError("Pinned token classifier did not load in eval mode")
@@ -136,6 +148,7 @@ def initialize(payload: dict):
         "torch_threads": torch.get_num_threads(),
         "torch_interop_threads": torch.get_num_interop_threads(),
         "deterministic_algorithms": torch.are_deterministic_algorithms_enabled(),
+        "token_boundary_model_name": token_boundary_model_name,
     }
     emit({
         "operation": "initialized", "ok": True, "runtime": runtime, "model_files": verified_model,

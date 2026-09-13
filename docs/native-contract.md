@@ -42,6 +42,11 @@ the three fixed fixtures; a ledger mismatch or cross-worker output mismatch stop
 the run. Pool wait, adapter execution and worker inference time are recorded
 separately. Every worker must complete its close handshake.
 
+The checkpoint loads from a verified local directory while the upstream 0.2.2
+token-boundary branch reads its `model_name` string. After loading, the worker
+binds that discriminator to the pinned public model ID instead of depending on
+the VM directory name. The runtime record verifies the same ID.
+
 LLMLingua receives at most the first 5,000 characters of a candidate in one
 inference call. It does not split or summarize the remainder in additional calls;
 the suffix is discarded. The private artifact retains that exact suffix, while

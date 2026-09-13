@@ -438,7 +438,8 @@ class LLMLingua2Compressor:
         if response["tokenizer_cache_files"] != expected_cache:
             raise CompressorError("LLMLingua tokenizer cache differs from the ledger")
         runtime = response["runtime"]
-        if runtime.get("python") != self.specification["python_version"]:
+        if (runtime.get("python") != self.specification["python_version"]
+                or runtime.get("token_boundary_model_name") != self.specification["model_id"]):
             raise CompressorError("LLMLingua runtime differs from the ledger")
         for key in ("load_seconds",):
             if type(response[key]) not in (int, float) or not math.isfinite(response[key]) or response[key] < 0:

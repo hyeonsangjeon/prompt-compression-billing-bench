@@ -8,11 +8,13 @@ import sys
 import tempfile
 import threading
 import time
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 from native_helpers import ledger_fixture
 from src.compressors import CompressorError, HeadroomPathsCompressor, LLMLingua2Compressor
+from src.llmlingua_worker import bind_local_model_identity
 from src.protection import digest
 
 
@@ -76,7 +78,8 @@ class LLMLinguaAdapterTests(unittest.TestCase):
             "def emit(value): print(json.dumps(value), flush=True)\n"
             "initial = receive(); spec = initial['specification']\n"
             "files = lambda rows: [{'name': n, 'bytes': r['bytes'], 'sha256': r['sha256']} for n, r in rows.items()]\n"
-            "emit({'operation':'initialized','ok':True,'runtime':{'python':spec['python_version']},"
+            "emit({'operation':'initialized','ok':True,'runtime':{'python':spec['python_version'],"
+            "'token_boundary_model_name':spec['model_id']},"
             "'model_files':files(spec['model_files']),'tokenizer_cache_files':files(spec['tokenizer_cache_files']),"
             "'model_id':spec['model_id'],'model_revision':spec['model_revision'],'profile':spec['profile'],'load_seconds':0.01})\n"
             "while True:\n"
@@ -115,6 +118,15 @@ class LLMLinguaAdapterTests(unittest.TestCase):
             "LLMLINGUA_MODEL": str(self.model),
             "TIKTOKEN_CACHE_DIR": str(self.cache),
         }
+
+    def test_local_model_path_is_bound_to_the_pinned_tokenizer_family(self):
+        local_path = self.root / "model-with-arbitrary-directory-name"
+        compressor = SimpleNamespace(model_name=str(local_path))
+        model_id = "microsoft/llmlingua-2-xlm-roberta-large-meetingbank"
+        self.assertEqual(bind_local_model_identity(compressor, local_path, model_id), model_id)
+        self.assertEqual(compressor.model_name, model_id)
+        with self.assertRaises(ValueError):
+            bind_local_model_identity(SimpleNamespace(model_name="wrong"), local_path, model_id)
 
     def test_eight_workers_run_in_parallel_and_identify_each_worker(self):
         with patch.dict(os.environ, self.environment):
