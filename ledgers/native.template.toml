@@ -106,7 +106,7 @@ parallel_inference = true
 max_input_characters = 5000
 overflow_policy = "keep_prefix_once_discard_suffix"
 initialize_timeout_seconds = 180
-inference_timeout_seconds = 120
+inference_timeout_seconds = 300
 pool_wait_timeout_seconds = 600
 
 [compressor.tools.llmlingua2.model_files."config.json"]

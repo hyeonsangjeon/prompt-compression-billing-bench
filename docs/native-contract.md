@@ -40,7 +40,8 @@ compressor, not a generated summary. Eight offline Python 3.10 workers load one
 model copy each and accept at most one request per worker. All eight workers run
 the three fixed fixtures; a ledger mismatch or cross-worker output mismatch stops
 the run. Pool wait, adapter execution and worker inference time are recorded
-separately. Every worker must complete its close handshake.
+separately. A worker response has a fixed 300-second ceiling, and every worker
+must complete its close handshake.
 
 The checkpoint loads from a verified local directory while the upstream 0.2.2
 token-boundary branch reads its `model_name` string. After loading, the worker

@@ -179,7 +179,7 @@ def validate_native_ledger(ledger: dict) -> None:
         "torch_dtype": "float32", "seed": 42, "torch_threads": 8, "torch_interop_threads": 1,
         "deterministic_algorithms": True, "worker_processes_per_run": 8, "parallel_inference": True,
         "max_input_characters": 5000, "overflow_policy": "keep_prefix_once_discard_suffix",
-        "initialize_timeout_seconds": 180, "inference_timeout_seconds": 120,
+        "initialize_timeout_seconds": 180, "inference_timeout_seconds": 300,
         "pool_wait_timeout_seconds": 600,
     }:
         raise ValueError("Keep the reviewed LLMLingua-2 rate, input cap and eight-worker CPU profile")

@@ -142,7 +142,7 @@ def run_condition(root: Path, ledger: dict, condition: str, source_commit: str, 
             raise ValueError(f"{condition} did not block a protected mutation")
         if sender.calls != calls_before_violation or not recorder.stopped.is_set():
             raise ValueError(f"{condition} protection failure reached the synthetic sender")
-        return {
+        record = {
             "condition": condition, "kind": "software_preflight_not_native_measurement",
             "external_model_calls": 0, "concurrent_candidate_requests": 8,
             "concurrent_wall_seconds": concurrent_wall_seconds,
@@ -158,8 +158,17 @@ def run_condition(root: Path, ledger: dict, condition: str, source_commit: str, 
             "protected_mutation_blocked_before_sender": True,
             "events_sha256": digest((directory / "transport/events.jsonl").read_bytes()),
         }
-    finally:
+    except BaseException as primary_error:
+        try:
+            compressor.close()
+        except BaseException as close_error:
+            raise RuntimeError(
+                f"{condition} failed before close: {primary_error}; close also failed: {close_error}"
+            ) from primary_error
+        raise
+    else:
         compressor.close()
+        return record
 
 
 def run(ledger_path: Path, source_commit: str, output: Path) -> dict:
