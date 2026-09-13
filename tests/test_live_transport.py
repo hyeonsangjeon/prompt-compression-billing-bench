@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 from native_helpers import FixtureEncoder, ImmediateQueue, ledger_fixture, request_fixture, response_fixture
 from src.compressors import NoOpCompressor
-from src.live_transport import DeploymentQueue, FoundrySender, LiveRecorder, start_live_proxy
+from src.live_transport import DeploymentQueue, FoundrySender, LiveRecorder, provider_timing, start_live_proxy
 from src.protection import FrozenRequestGuard, ProtectionViolation, canonical
 from src.task_metrics import read_events
 
@@ -46,6 +46,9 @@ class LiveTransportTests(unittest.TestCase):
         self.assertEqual(response["tokens"]["input_tokens"], 10)
         self.assertEqual(response["tokens"]["output_tokens"], 5)
         self.assertEqual(response["tokens"]["cached_input_tokens"], 0)
+        self.assertIsNone(response["transport_seconds"])
+        self.assertIsNone(response["model_seconds"])
+        self.assertGreaterEqual(response["client_http_seconds"], 0)
         self.assertTrue(self.queue.calls)
 
     def test_candidate_compression_records_hashes_and_timing_before_dispatch(self):
@@ -63,8 +66,24 @@ class LiveTransportTests(unittest.TestCase):
         self.assertEqual(event["before_sha256"], event["after_sha256"])
         self.assertFalse(event["changed"])
         self.assertGreaterEqual(event["compressor_wall_seconds"], event["adapter_execution_seconds"])
+        self.assertEqual(event["audit"]["source"], event["audit"]["worker_input"])
+        self.assertEqual(event["audit"]["worker_id"], None)
         local = json.loads((self.root / "transport/request-00002/local-input.json").read_text())
         self.assertEqual(local["candidates"][0]["compression"]["before_sha256"], event["before_sha256"])
+
+    def test_provider_checkpoint_separates_model_and_transport_without_inventing_missing_values(self):
+        response = {"usage": {"latency_checkpoint": {
+            "engine_ttlt_ms": 500, "service_ttlt_ms": 800, "pre_inference_ms": 100,
+        }}}
+        timing = provider_timing(response, 1.25)
+        self.assertEqual(timing["model_seconds"], 0.5)
+        self.assertAlmostEqual(timing["transport_seconds"], 0.45)
+        self.assertEqual(timing["provider_service_seconds"], 0.8)
+        self.assertEqual(timing["pre_inference_seconds"], 0.1)
+        self.assertEqual(timing["timing_status"], "complete")
+        missing = provider_timing({"usage": {}}, 1.25)
+        self.assertIsNone(missing["model_seconds"])
+        self.assertIsNone(missing["transport_seconds"])
 
     def test_protected_mutation_blocks_this_and_all_later_trials(self):
         def corrupt(payload):

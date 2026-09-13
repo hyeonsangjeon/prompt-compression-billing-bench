@@ -101,11 +101,13 @@ seed = 42
 torch_threads = 8
 torch_interop_threads = 1
 deterministic_algorithms = true
-worker_processes_per_run = 1
-serial_inference = true
+worker_processes_per_run = 8
+parallel_inference = true
+max_input_characters = 5000
+overflow_policy = "keep_prefix_once_discard_suffix"
 initialize_timeout_seconds = 180
 inference_timeout_seconds = 120
-lock_timeout_seconds = 600
+pool_wait_timeout_seconds = 600
 
 [compressor.tools.llmlingua2.model_files."config.json"]
 bytes = 752

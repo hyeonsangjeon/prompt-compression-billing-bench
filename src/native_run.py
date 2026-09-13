@@ -26,7 +26,7 @@ from .native_contract import CONDITIONS, TASKS, load_native_ledger, require_oper
 from .native_judge import collect_native_outcome
 from .protection import digest
 from .provenance import ROOT, capture, git, verify_snapshot
-from .task_metrics import aggregate_run_compressor_metrics, collect_trial_metrics
+from .task_metrics import aggregate_run_compressor_metrics, aggregate_run_timing_metrics, collect_trial_metrics
 
 
 def runtime_environment(proxy_key: str) -> dict:
@@ -185,7 +185,8 @@ def preflight(ledger: dict, ledger_path: Path, source_commit: str, condition: st
         raise ValueError("Use the same absolute queue file for every deployment caller")
     if Path(queue_value).resolve().is_relative_to(ROOT / "runs"):
         raise ValueError("A per-run queue cannot coordinate the deployment")
-    check_compressor_artifacts(ledger["compressor"], condition)
+    for compressor_name in CONDITIONS:
+        check_compressor_artifacts(ledger["compressor"], compressor_name)
     return {"provenance": provenance, "snapshots": snapshots, "encoder": encoder, "tasks": tasks,
             "benchmark_root": str(benchmark_root), "sender": sender, "queue_path": Path(queue_value).resolve(),
             "runtime_versions": versions}
@@ -268,6 +269,8 @@ def verify_native_run(directory: Path) -> dict:
             raise ValueError("Uninformative baseline cannot be labeled complete")
     if summary.get("compressor_metrics") != aggregate_run_compressor_metrics(summary["trials"]):
         raise ValueError("Run compressor metrics differ from the trial records")
+    if summary.get("timing_metrics") != aggregate_run_timing_metrics(summary["trials"]):
+        raise ValueError("Run phase timings differ from the trial records")
     if summary["condition"] != "none" and summary["status"] == "complete":
         reference_bytes = (directory / "baseline-summary.json").read_bytes()
         if digest(reference_bytes) != summary["baseline"]["summary_sha256"]:
@@ -409,6 +412,7 @@ def execute_native(ledger_path: Path, ledger: dict, source_commit: str, conditio
         "raw_retrieval": ledger["raw_retrieval"], "baseline": None if baseline is None else {
             "run_id": baseline["run_id"], "summary_sha256": digest((baseline_path / "summary.json").read_bytes())},
         "compressor_metrics": aggregate_run_compressor_metrics([]),
+        "timing_metrics": aggregate_run_timing_metrics([]),
     }
     queue = recorder = server = compressor = None
     try:
@@ -490,6 +494,7 @@ def execute_native(ledger_path: Path, ledger: dict, source_commit: str, conditio
         if queue is not None:
             queue.close()
         summary["compressor_metrics"] = aggregate_run_compressor_metrics(summary["trials"])
+        summary["timing_metrics"] = aggregate_run_timing_metrics(summary["trials"])
         summary["finished_at"] = now()
         artifacts = {path.relative_to(directory).as_posix(): digest(path.read_bytes())
                      for path in sorted(directory.rglob("*")) if path.is_file() and not path.is_symlink()}

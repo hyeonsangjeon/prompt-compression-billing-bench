@@ -177,10 +177,12 @@ def validate_native_ledger(ledger: dict) -> None:
         "force_tokens": ["\n", "?", ".", ","], "force_reserve_digit": False,
         "drop_consecutive": False, "chunk_end_tokens": [".", "\n"], "device": "cpu",
         "torch_dtype": "float32", "seed": 42, "torch_threads": 8, "torch_interop_threads": 1,
-        "deterministic_algorithms": True, "worker_processes_per_run": 1, "serial_inference": True,
-        "initialize_timeout_seconds": 180, "inference_timeout_seconds": 120, "lock_timeout_seconds": 600,
+        "deterministic_algorithms": True, "worker_processes_per_run": 8, "parallel_inference": True,
+        "max_input_characters": 5000, "overflow_policy": "keep_prefix_once_discard_suffix",
+        "initialize_timeout_seconds": 180, "inference_timeout_seconds": 120,
+        "pool_wait_timeout_seconds": 600,
     }:
-        raise ValueError("Keep the reviewed LLMLingua-2 rate, preservation tokens and serialized CPU profile")
+        raise ValueError("Keep the reviewed LLMLingua-2 rate, input cap and eight-worker CPU profile")
 
 
 def require_operational_values(ledger: dict) -> float:

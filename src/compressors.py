@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 import hashlib
 import importlib.util
@@ -9,6 +10,7 @@ import json
 import math
 import os
 from pathlib import Path
+from queue import Empty, Queue
 import re
 import select
 import signal
@@ -30,6 +32,7 @@ class CompressionResult:
     text: str
     tool_reported: dict
     telemetry: dict = field(default_factory=dict)
+    audit: dict = field(default_factory=dict)
 
 
 class Compressor(Protocol):
@@ -59,6 +62,32 @@ def report(headers: list[str], name: str) -> dict:
     }
 
 
+def text_measurement(text: str) -> dict:
+    encoded = text.encode("utf-8")
+    return {
+        "sha256": digest(encoded), "characters": len(text),
+        "utf8_bytes": len(encoded), "lines": len(text.splitlines()),
+    }
+
+
+def compression_audit(source: str, adapter_input: str, output: str, *,
+                      discarded_suffix: str = "", worker_id: int | None = None,
+                      overflow_policy: str = "none",
+                      discarded_suffix_artifact: str | None = None) -> dict:
+    return {
+        "kind": "measured_adapter_text_boundaries",
+        "line_count_definition": "Python_str.splitlines",
+        "overflow_policy": overflow_policy,
+        "overflow_applied": bool(discarded_suffix),
+        "discarded_suffix_artifact": discarded_suffix_artifact,
+        "worker_id": worker_id,
+        "source": text_measurement(source),
+        "worker_input": text_measurement(adapter_input),
+        "output": text_measurement(output),
+        "discarded_suffix": text_measurement(discarded_suffix),
+    }
+
+
 class NoOpCompressor:
     def __init__(self, specification: dict, artifacts: Path):
         self.metadata = {"name": "none", "version": "unavailable", "binary_sha256": None, "options": specification["options"]}
@@ -69,6 +98,7 @@ class NoOpCompressor:
             tool_reported=report([], "none"),
             telemetry={"serialization_wait_seconds": 0.0, "adapter_execution_seconds": 0.0,
                        "worker_inference_seconds": None},
+            audit=compression_audit(text, text, text),
         )
 
     def close(self) -> None:
@@ -155,6 +185,7 @@ class SqueezCompressor:
             tool_reported=report(headers, "squeez"),
             telemetry={"serialization_wait_seconds": 0.0, "adapter_execution_seconds": elapsed,
                        "worker_inference_seconds": None},
+            audit=compression_audit(text, text, transformed),
         )
 
     def close(self) -> None:
@@ -256,6 +287,7 @@ class HeadroomPathsCompressor:
             tool_reported=observation,
             telemetry={"serialization_wait_seconds": 0.0, "adapter_execution_seconds": elapsed,
                        "worker_inference_seconds": None},
+            audit=compression_audit(text, text, candidate),
         )
 
     def close(self) -> None:
@@ -287,12 +319,64 @@ class LLMLingua2Compressor:
         self.options = specification["options"]
         self.artifacts = artifacts
         self.artifacts.mkdir(parents=True, exist_ok=False)
-        home = self.artifacts / "home"
-        home.mkdir()
+        (self.artifacts / "preflight").mkdir()
         self.calls = 0
         self.calls_lock = threading.Lock()
-        self.inference_lock = threading.Lock()
-        self.stderr_handle = (self.artifacts / "worker-stderr.txt").open("xb")
+        self.state_lock = threading.Lock()
+        self.closed = False
+        self.worker_count = self.options["worker_processes_per_run"]
+        self.worker_pool: Queue = Queue(maxsize=self.worker_count)
+        self.workers = []
+        self.worker_specification = {
+            "python_version": specification["python_version"],
+            "requirements_path": str(self.requirements_path),
+            "requirements_sha256": specification["requirements_sha256"],
+            "model_id": specification["model_id"], "model_revision": specification["model_revision"],
+            "model_files": specification["model_files"],
+            "tokenizer_cache_path": str(self.tokenizer_cache),
+            "tokenizer_cache_files": specification["tokenizer_cache_files"],
+            "profile": {key: self.options[key] for key in (
+                "method", "rate", "target_token", "force_tokens", "force_reserve_digit", "drop_consecutive",
+                "chunk_end_tokens", "device", "torch_dtype", "seed", "torch_threads",
+                "torch_interop_threads", "deterministic_algorithms",
+            )},
+        }
+        try:
+            self.workers = [self._spawn_worker(identifier) for identifier in range(1, self.worker_count + 1)]
+            with ThreadPoolExecutor(max_workers=self.worker_count, thread_name_prefix="llmlingua-init") as executor:
+                initialized = list(executor.map(self._initialize_worker, self.workers))
+            self._validate_probe_agreement(initialized)
+            for worker in self.workers:
+                self.worker_pool.put_nowait(worker)
+            first = initialized[0]["initialized"]
+            probes = [probe for record in initialized for probe in record["probes"]]
+            self.metadata = {
+                "name": "llmlingua2", "version": specification["version"], "binary_sha256": None,
+                "worker_sha256": specification["worker_sha256"],
+                "requirements_sha256": specification["requirements_sha256"],
+                "model_id": specification["model_id"], "model_revision": specification["model_revision"],
+                "model_files": first["model_files"], "tokenizer_cache_files": first["tokenizer_cache_files"],
+                "options": self.options,
+                "worker_pool": {
+                    "size": self.worker_count, "parallel_inference": self.options["parallel_inference"],
+                    "runtime_by_worker": [
+                        {"worker_id": record["worker_id"], "runtime": record["initialized"]["runtime"],
+                         "model_load_seconds": record["initialized"]["load_seconds"]}
+                        for record in initialized
+                    ],
+                },
+                "determinism_probes": probes,
+            }
+        except BaseException:
+            self._dispose_workers()
+            raise
+
+    def _spawn_worker(self, identifier: int) -> dict:
+        directory = self.artifacts / f"worker-{identifier:02d}"
+        directory.mkdir()
+        home = directory / "home"
+        home.mkdir()
+        stderr_handle = (directory / "stderr.txt").open("xb")
         environment = {
             "PATH": "/usr/bin:/bin", "HOME": str(home), "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8",
             "TMPDIR": str(home), "HF_HOME": str(home / "huggingface"), "HF_HUB_OFFLINE": "1",
@@ -301,69 +385,42 @@ class LLMLingua2Compressor:
             "OMP_NUM_THREADS": str(self.options["torch_threads"]),
             "MKL_NUM_THREADS": str(self.options["torch_threads"]),
         }
-        self.process = subprocess.Popen(
-            [str(self.python), "-I", "-u", str(self.worker_path)], cwd=self.artifacts, env=environment,
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.stderr_handle,
-            text=True, encoding="utf-8", start_new_session=True,
-        )
         try:
-            worker_specification = {
-                "python_version": specification["python_version"],
-                "requirements_path": str(self.requirements_path),
-                "requirements_sha256": specification["requirements_sha256"],
-                "model_id": specification["model_id"], "model_revision": specification["model_revision"],
-                "model_files": specification["model_files"],
-                "tokenizer_cache_path": str(self.tokenizer_cache),
-                "tokenizer_cache_files": specification["tokenizer_cache_files"],
-                "profile": {key: self.options[key] for key in (
-                    "method", "rate", "target_token", "force_tokens", "force_reserve_digit", "drop_consecutive",
-                    "chunk_end_tokens", "device", "torch_dtype", "seed", "torch_threads",
-                    "torch_interop_threads", "deterministic_algorithms",
-                )},
-            }
-            self._send({"operation": "initialize", "model_path": str(self.model),
-                        "specification": worker_specification})
-            initialized = self._receive(self.options["initialize_timeout_seconds"])
-            if initialized.get("operation") != "initialized" or initialized.get("ok") is not True:
-                raise CompressorError("LLMLingua worker initialization failed; inspect worker-stderr.txt")
-            self._validate_initialized(initialized, worker_specification)
-            probes = self._probe_fixtures()
-            self.metadata = {
-                "name": "llmlingua2", "version": specification["version"], "binary_sha256": None,
-                "worker_sha256": specification["worker_sha256"],
-                "requirements_sha256": specification["requirements_sha256"],
-                "model_id": specification["model_id"], "model_revision": specification["model_revision"],
-                "model_files": initialized["model_files"], "runtime": initialized["runtime"],
-                "tokenizer_cache_files": initialized["tokenizer_cache_files"],
-                "options": self.options, "model_load_seconds": initialized["load_seconds"],
-                "determinism_probes": probes,
-            }
+            process = subprocess.Popen(
+                [str(self.python), "-I", "-u", str(self.worker_path)], cwd=directory, env=environment,
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr_handle,
+                text=True, encoding="utf-8", start_new_session=True,
+            )
         except BaseException:
-            self._terminate()
-            self._close_pipes()
-            self.stderr_handle.close()
+            stderr_handle.close()
             raise
+        return {"id": identifier, "directory": directory, "process": process, "stderr": stderr_handle}
 
-    def _send(self, payload: dict) -> None:
-        if self.process.poll() is not None or self.process.stdin is None:
-            raise CompressorError("LLMLingua worker exited; inspect worker-stderr.txt")
-        self.process.stdin.write(json.dumps(payload, ensure_ascii=False, allow_nan=False) + "\n")
-        self.process.stdin.flush()
+    def _send(self, worker: dict, payload: dict) -> None:
+        process = worker["process"]
+        if process.poll() is not None or process.stdin is None:
+            raise CompressorError(f"LLMLingua worker {worker['id']} exited; inspect its stderr.txt")
+        process.stdin.write(json.dumps(payload, ensure_ascii=False, allow_nan=False) + "\n")
+        process.stdin.flush()
 
-    def _receive(self, timeout: float) -> dict:
-        if self.process.stdout is None:
-            raise CompressorError("LLMLingua worker stdout is unavailable")
-        readable, _, _ = select.select([self.process.stdout], [], [], timeout)
+    def _receive(self, worker: dict, timeout: float) -> dict:
+        process = worker["process"]
+        if process.stdout is None:
+            raise CompressorError(f"LLMLingua worker {worker['id']} stdout is unavailable")
+        readable, _, _ = select.select([process.stdout], [], [], timeout)
         if not readable:
-            raise CompressorError("LLMLingua worker timed out")
-        line = self.process.stdout.readline()
+            raise CompressorError(f"LLMLingua worker {worker['id']} timed out")
+        line = process.stdout.readline()
         if not line:
-            raise CompressorError("LLMLingua worker exited; inspect worker-stderr.txt")
-        response = json.loads(line)
+            raise CompressorError(f"LLMLingua worker {worker['id']} exited; inspect its stderr.txt")
+        try:
+            response = json.loads(line)
+        except json.JSONDecodeError:
+            raise CompressorError(f"LLMLingua worker {worker['id']} returned invalid JSON") from None
         if not isinstance(response, dict):
-            raise CompressorError("LLMLingua worker returned a non-object")
+            raise CompressorError(f"LLMLingua worker {worker['id']} returned a non-object")
         if response.get("ok") is False:
-            raise CompressorError("LLMLingua worker failed; inspect worker-stderr.txt")
+            raise CompressorError(f"LLMLingua worker {worker['id']} failed; inspect its stderr.txt")
         return response
 
     def _validate_initialized(self, response: dict, expected: dict) -> None:
@@ -387,9 +444,9 @@ class LLMLingua2Compressor:
             if type(response[key]) not in (int, float) or not math.isfinite(response[key]) or response[key] < 0:
                 raise CompressorError("LLMLingua worker returned invalid timing")
 
-    def _exchange(self, identifier, text: str, timeout: float) -> dict:
-        self._send({"operation": "compress", "id": identifier, "text": text})
-        response = self._receive(timeout)
+    def _exchange(self, worker: dict, identifier, text: str, timeout: float) -> dict:
+        self._send(worker, {"operation": "compress", "id": identifier, "text": text})
+        response = self._receive(worker, timeout)
         required = {"operation", "ok", "id", "text", "inference_seconds", "tool_reported"}
         if set(response) != required or response["operation"] != "compressed" or response["id"] != identifier:
             raise CompressorError("LLMLingua worker response lineage differs")
@@ -400,54 +457,90 @@ class LLMLingua2Compressor:
             raise CompressorError("LLMLingua worker returned invalid inference time")
         return response
 
-    def _probe_fixtures(self) -> list[dict]:
-        directory = self.artifacts / "preflight"
+    def _initialize_worker(self, worker: dict) -> dict:
+        self._send(worker, {"operation": "initialize", "model_path": str(self.model),
+                            "specification": self.worker_specification})
+        initialized = self._receive(worker, self.options["initialize_timeout_seconds"])
+        if initialized.get("operation") != "initialized" or initialized.get("ok") is not True:
+            raise CompressorError(f"LLMLingua worker {worker['id']} initialization failed")
+        self._validate_initialized(initialized, self.worker_specification)
+        return {"worker_id": worker["id"], "initialized": initialized,
+                "probes": self._probe_fixtures(worker)}
+
+    def _probe_fixtures(self, worker: dict) -> list[dict]:
+        directory = self.artifacts / "preflight" / f"worker-{worker['id']:02d}"
         directory.mkdir()
         probes = []
         for fixture, path in self.fixtures:
             text = path.read_text(encoding="utf-8")
             started = time.monotonic()
-            response = self._exchange("fixture-" + fixture["name"], text,
+            response = self._exchange(worker, f"fixture-{worker['id']:02d}-{fixture['name']}", text,
                                       self.options["inference_timeout_seconds"])
             wall = time.monotonic() - started
             output_sha256 = digest(response["text"].encode("utf-8"))
-            if output_sha256 != fixture["output_sha256"]:
-                raise CompressorError(f"LLMLingua determinism fixture changed: {fixture['name']}")
             target = directory / fixture["name"]
             target.mkdir()
             (target / "input.txt").write_text(text, encoding="utf-8")
             (target / "output.txt").write_text(response["text"], encoding="utf-8")
-            record = {"name": fixture["name"], "input_sha256": fixture["input_sha256"],
+            record = {"worker_id": worker["id"], "name": fixture["name"],
+                      "input_sha256": fixture["input_sha256"],
                       "output_sha256": output_sha256, "wall_seconds": wall,
                       "worker_inference_seconds": response["inference_seconds"]}
             write_json(target / "observation.json", record)
             probes.append(record)
         return probes
 
+    def _validate_probe_agreement(self, initialized: list[dict]) -> None:
+        for fixture, _path in self.fixtures:
+            outputs = {
+                probe["output_sha256"]
+                for record in initialized for probe in record["probes"]
+                if probe["name"] == fixture["name"]
+            }
+            if len(outputs) != 1:
+                raise CompressorError(f"LLMLingua cross-worker fixture output differs: {fixture['name']}")
+            if outputs != {fixture["output_sha256"]}:
+                raise CompressorError(f"LLMLingua determinism fixture changed: {fixture['name']}")
+
     def compress(self, text: str) -> CompressionResult:
+        with self.state_lock:
+            if self.closed:
+                raise CompressorError("LLMLingua worker pool is closed")
         with self.calls_lock:
             self.calls += 1
             call = self.calls
         directory = self.artifacts / f"span-{call:05d}"
         directory.mkdir()
         (directory / "input.txt").write_text(text, encoding="utf-8")
+        maximum = self.options["max_input_characters"]
+        worker_input, discarded_suffix = text[:maximum], text[maximum:]
+        (directory / "worker-input.txt").write_text(worker_input, encoding="utf-8")
+        discarded_suffix_artifact = None
+        if discarded_suffix:
+            discarded_suffix_artifact = f"span-{call:05d}/discarded-suffix.txt"
+            (directory / "discarded-suffix.txt").write_text(discarded_suffix, encoding="utf-8")
         wait_started = time.monotonic()
-        if not self.inference_lock.acquire(timeout=self.options["lock_timeout_seconds"]):
-            raise CompressorError("LLMLingua serialization wait exceeded its fixed limit")
+        try:
+            worker = self.worker_pool.get(timeout=self.options["pool_wait_timeout_seconds"])
+        except Empty:
+            raise CompressorError("LLMLingua worker-pool wait exceeded its fixed limit") from None
         wait_seconds = time.monotonic() - wait_started
         try:
             execution_started = time.monotonic()
-            response = self._exchange(call, text, self.options["inference_timeout_seconds"])
+            response = self._exchange(worker, call, worker_input, self.options["inference_timeout_seconds"])
             execution_seconds = time.monotonic() - execution_started
         finally:
-            self.inference_lock.release()
+            self.worker_pool.put(worker)
         transformed = response["text"]
         (directory / "output.txt").write_text(transformed, encoding="utf-8")
+        audit = compression_audit(
+            text, worker_input, transformed, discarded_suffix=discarded_suffix,
+            worker_id=worker["id"], overflow_policy=self.options["overflow_policy"],
+            discarded_suffix_artifact=discarded_suffix_artifact,
+        )
         observation = {
-            "input_sha256": digest(text.encode("utf-8")),
-            "output_sha256": digest(transformed.encode("utf-8")),
             "serialization_wait_seconds": wait_seconds, "adapter_execution_seconds": execution_seconds,
-            "worker_inference_seconds": response["inference_seconds"],
+            "worker_inference_seconds": response["inference_seconds"], **audit,
         }
         write_json(directory / "observation.json", observation)
         return CompressionResult(
@@ -456,50 +549,90 @@ class LLMLingua2Compressor:
             telemetry={key: observation[key] for key in (
                 "serialization_wait_seconds", "adapter_execution_seconds", "worker_inference_seconds"
             )},
+            audit=audit,
         )
 
-    def _terminate(self) -> None:
-        if self.process.poll() is not None:
+    def _terminate(self, worker: dict) -> None:
+        process = worker["process"]
+        if process.poll() is not None:
             return
         try:
-            os.killpg(self.process.pid, signal.SIGTERM)
-            self.process.wait(timeout=5)
+            os.killpg(process.pid, signal.SIGTERM)
+            process.wait(timeout=5)
         except (ProcessLookupError, subprocess.TimeoutExpired):
             try:
-                os.killpg(self.process.pid, signal.SIGKILL)
+                os.killpg(process.pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
-            self.process.wait(timeout=5)
+            process.wait(timeout=5)
 
-    def _close_pipes(self) -> None:
-        if self.process.stdin is not None and not self.process.stdin.closed:
-            self.process.stdin.close()
-        if self.process.stdout is not None and not self.process.stdout.closed:
-            self.process.stdout.close()
+    def _close_pipes(self, worker: dict) -> None:
+        process = worker["process"]
+        if process.stdin is not None and not process.stdin.closed:
+            process.stdin.close()
+        if process.stdout is not None and not process.stdout.closed:
+            process.stdout.close()
+
+    def _dispose_workers(self) -> None:
+        for worker in self.workers:
+            self._terminate(worker)
+            self._close_pipes(worker)
+            if not worker["stderr"].closed:
+                worker["stderr"].close()
+
+    def _close_worker(self, worker: dict) -> None:
+        process = worker["process"]
+        try:
+            if process.poll() is not None:
+                raise CompressorError(f"LLMLingua worker {worker['id']} exited before the close handshake")
+            self._send(worker, {"operation": "close"})
+            response = self._receive(worker, 10)
+            if response != {"operation": "closed", "ok": True}:
+                raise CompressorError(f"LLMLingua worker {worker['id']} did not close cleanly")
+            process.wait(timeout=10)
+            if process.returncode != 0:
+                raise CompressorError(f"LLMLingua worker {worker['id']} exited unsuccessfully")
+        except (CompressorError, subprocess.TimeoutExpired) as error:
+            self._terminate(worker)
+            raise CompressorError(
+                f"LLMLingua worker {worker['id']} did not close cleanly; inspect its stderr.txt"
+            ) from error
+        finally:
+            self._close_pipes(worker)
+            if not worker["stderr"].closed:
+                worker["stderr"].close()
 
     def close(self) -> None:
-        close_error = None
-        if self.process.poll() is None:
-            try:
-                with self.inference_lock:
-                    self._send({"operation": "close"})
-                    response = self._receive(10)
-                    if response != {"operation": "closed", "ok": True}:
-                        raise CompressorError("LLMLingua worker did not close cleanly")
-                self.process.wait(timeout=10)
-                if self.process.returncode != 0:
-                    raise CompressorError("LLMLingua worker exited unsuccessfully after the close handshake")
-            except (CompressorError, subprocess.TimeoutExpired) as error:
-                close_error = CompressorError("LLMLingua worker did not close cleanly; inspect worker-stderr.txt")
-                close_error.__cause__ = error
-                self._terminate()
-        else:
-            close_error = CompressorError("LLMLingua worker exited before the close handshake; inspect worker-stderr.txt")
-        self._close_pipes()
-        if not self.stderr_handle.closed:
-            self.stderr_handle.close()
-        if close_error is not None:
-            raise close_error
+        with self.state_lock:
+            if self.closed:
+                return
+            self.closed = True
+        available = []
+        deadline = time.monotonic() + self.options["pool_wait_timeout_seconds"]
+        try:
+            for _ in range(self.worker_count):
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise CompressorError("LLMLingua workers did not return to the pool before close")
+                try:
+                    available.append(self.worker_pool.get(timeout=remaining))
+                except Empty:
+                    raise CompressorError("LLMLingua workers did not return to the pool before close") from None
+            errors = []
+            with ThreadPoolExecutor(max_workers=self.worker_count, thread_name_prefix="llmlingua-close") as executor:
+                futures = [executor.submit(self._close_worker, worker) for worker in available]
+                for future in futures:
+                    try:
+                        future.result()
+                    except CompressorError as error:
+                        errors.append(error)
+            if errors:
+                raise CompressorError(
+                    f"{len(errors)} LLMLingua worker(s) did not close cleanly"
+                ) from errors[0]
+        except BaseException:
+            self._dispose_workers()
+            raise
 
 
 def check_compressor_artifacts(configuration: dict, name: str) -> None:

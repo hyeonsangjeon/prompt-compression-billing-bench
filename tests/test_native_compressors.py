@@ -6,6 +6,8 @@ from pathlib import Path
 import platform
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from unittest.mock import patch
 
@@ -114,22 +116,79 @@ class LLMLinguaAdapterTests(unittest.TestCase):
             "TIKTOKEN_CACHE_DIR": str(self.cache),
         }
 
-    def test_one_worker_serializes_inference_and_records_wait(self):
+    def test_eight_workers_run_in_parallel_and_identify_each_worker(self):
         with patch.dict(os.environ, self.environment):
             compressor = LLMLingua2Compressor(self.specification, self.root / "artifacts")
-            with ThreadPoolExecutor(max_workers=2) as executor:
-                results = list(executor.map(compressor.compress, ["first", "second"]))
+            barrier = threading.Barrier(8)
+
+            def compress(source):
+                barrier.wait(timeout=2)
+                return compressor.compress(source)
+
+            started = time.monotonic()
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                results = list(executor.map(compress, [f"input-{index}" for index in range(8)]))
+            elapsed = time.monotonic() - started
             compressor.close()
-        self.assertEqual([result.text for result in results], ["FIRST", "SECOND"])
-        self.assertEqual(compressor.calls, 2)
-        self.assertGreater(sum(result.telemetry["serialization_wait_seconds"] for result in results), 0.01)
-        self.assertEqual([result.telemetry["worker_inference_seconds"] for result in results], [0.02, 0.02])
-        self.assertEqual(len(compressor.metadata["determinism_probes"]), 1)
+        self.assertEqual([result.text for result in results], [f"INPUT-{index}" for index in range(8)])
+        self.assertEqual(compressor.calls, 8)
+        self.assertLess(elapsed, 0.2)
+        self.assertEqual({result.audit["worker_id"] for result in results}, set(range(1, 9)))
+        self.assertEqual([result.telemetry["worker_inference_seconds"] for result in results], [0.02] * 8)
+        self.assertEqual(len(compressor.metadata["determinism_probes"]), 8)
+        self.assertEqual(compressor.metadata["worker_pool"]["size"], 8)
+
+    def test_ninth_call_records_worker_pool_wait(self):
+        with patch.dict(os.environ, self.environment):
+            compressor = LLMLingua2Compressor(self.specification, self.root / "wait-artifacts")
+            barrier = threading.Barrier(9)
+
+            def compress(source):
+                barrier.wait(timeout=2)
+                return compressor.compress(source)
+
+            with ThreadPoolExecutor(max_workers=9) as executor:
+                results = list(executor.map(compress, [f"input-{index}" for index in range(9)]))
+            compressor.close()
+        self.assertGreater(max(result.telemetry["serialization_wait_seconds"] for result in results), 0.01)
+
+    def test_input_over_5000_characters_is_compressed_once_and_suffix_is_audited(self):
+        source = "a" * 5000 + "discarded"
+        with patch.dict(os.environ, self.environment):
+            compressor = LLMLingua2Compressor(self.specification, self.root / "cap-artifacts")
+            result = compressor.compress(source)
+            compressor.close()
+        self.assertEqual(result.text, "A" * 5000)
+        self.assertEqual(result.audit["source"]["characters"], 5009)
+        self.assertEqual(result.audit["worker_input"]["characters"], 5000)
+        self.assertEqual(result.audit["discarded_suffix"]["characters"], 9)
+        self.assertTrue(result.audit["overflow_applied"])
+        self.assertEqual((self.root / "cap-artifacts/span-00001/discarded-suffix.txt").read_text(), "discarded")
+
+    def test_input_at_cap_has_no_discarded_suffix_artifact(self):
+        with patch.dict(os.environ, self.environment):
+            compressor = LLMLingua2Compressor(self.specification, self.root / "exact-cap-artifacts")
+            result = compressor.compress("a" * 5000)
+            compressor.close()
+        self.assertFalse(result.audit["overflow_applied"])
+        self.assertIsNone(result.audit["discarded_suffix_artifact"])
+        self.assertFalse((self.root / "exact-cap-artifacts/span-00001/discarded-suffix.txt").exists())
 
     def test_fixture_mismatch_stops_before_live_compression(self):
         self.specification["fixtures"][0]["output_sha256"] = hashlib.sha256(b"different").hexdigest()
         with patch.dict(os.environ, self.environment), self.assertRaisesRegex(CompressorError, "fixture changed"):
             LLMLingua2Compressor(self.specification, self.root / "failed")
+
+    def test_cross_worker_fixture_mismatch_stops_initialization(self):
+        source = self.worker.read_text(encoding="utf-8").replace(
+            "text = request['text'] if str(request['id']).startswith('fixture-') else request['text'].upper()",
+            "text = request['text'] if str(request['id']).startswith('fixture-') else request['text'].upper()\n"
+            "    if str(request['id']).startswith('fixture-08-'): text += 'different'",
+        )
+        self.worker.write_text(source, encoding="utf-8")
+        self.specification["worker_sha256"] = digest(self.worker.read_bytes())
+        with patch.dict(os.environ, self.environment), self.assertRaisesRegex(CompressorError, "cross-worker"):
+            LLMLingua2Compressor(self.specification, self.root / "cross-worker-failure")
 
     def test_close_handshake_failure_is_not_silently_accepted(self):
         source = self.worker.read_text(encoding="utf-8").replace(

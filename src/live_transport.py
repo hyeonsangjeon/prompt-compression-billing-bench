@@ -47,6 +47,110 @@ def compressor_timing(result, wall_seconds: float) -> dict:
     return values
 
 
+def compression_audit(result, source: str, condition: str) -> dict:
+    audit = result.audit or {}
+    required = {
+        "kind", "line_count_definition", "overflow_policy", "overflow_applied",
+        "discarded_suffix_artifact", "worker_id", "source", "worker_input", "output",
+        "discarded_suffix",
+    }
+    if set(audit) != required or audit["kind"] != "measured_adapter_text_boundaries":
+        raise ProtectionViolation("Compressor text-boundary audit differs from the live contract")
+    if audit["line_count_definition"] != "Python_str.splitlines":
+        raise ProtectionViolation("Compressor line-count definition differs from the live contract")
+    for name in ("source", "worker_input", "output", "discarded_suffix"):
+        record = audit[name]
+        if not isinstance(record, dict) or set(record) != {"sha256", "characters", "utf8_bytes", "lines"}:
+            raise ProtectionViolation("Compressor text measurement differs from the live contract", {"field": name})
+        if not re.fullmatch(r"[0-9a-f]{64}", record["sha256"]):
+            raise ProtectionViolation("Compressor text measurement has an invalid SHA-256", {"field": name})
+        if any(type(record[field]) is not int or record[field] < 0 for field in ("characters", "utf8_bytes", "lines")):
+            raise ProtectionViolation("Compressor text measurement has an invalid count", {"field": name})
+    source_bytes, output_bytes = source.encode(), result.text.encode()
+    expected_source = {"sha256": digest(source_bytes), "characters": len(source),
+                       "utf8_bytes": len(source_bytes), "lines": len(source.splitlines())}
+    expected_output = {"sha256": digest(output_bytes), "characters": len(result.text),
+                       "utf8_bytes": len(output_bytes), "lines": len(result.text.splitlines())}
+    if audit["source"] != expected_source or audit["output"] != expected_output:
+        raise ProtectionViolation("Compressor audit does not match its actual input or output")
+    worker_input, discarded = audit["worker_input"], audit["discarded_suffix"]
+    if source and worker_input["characters"] + discarded["characters"] != len(source):
+        raise ProtectionViolation("Compressor character boundary accounting is incomplete")
+    if worker_input["utf8_bytes"] + discarded["utf8_bytes"] != len(source_bytes):
+        raise ProtectionViolation("Compressor byte boundary accounting is incomplete")
+    if audit["overflow_applied"] != bool(discarded["characters"]):
+        raise ProtectionViolation("Compressor overflow flag differs from the discarded suffix")
+    if audit["overflow_applied"] and not (
+        isinstance(audit["discarded_suffix_artifact"], str)
+        and re.fullmatch(r"span-\d{5}/discarded-suffix\.txt", audit["discarded_suffix_artifact"])
+    ):
+        raise ProtectionViolation("Discarded compressor input needs a private source artifact")
+    if not audit["overflow_applied"] and worker_input != expected_source:
+        raise ProtectionViolation("An uncapped compressor must account for its complete source input")
+    worker_id = audit["worker_id"]
+    if worker_id is not None and (type(worker_id) is not int or worker_id < 1):
+        raise ProtectionViolation("Compressor worker identifier is invalid")
+    if condition == "llmlingua2":
+        expected_worker_text, expected_discarded_text = source[:5000], source[5000:]
+        expected_worker = {
+            "sha256": digest(expected_worker_text.encode()), "characters": len(expected_worker_text),
+            "utf8_bytes": len(expected_worker_text.encode()), "lines": len(expected_worker_text.splitlines()),
+        }
+        expected_discarded = {
+            "sha256": digest(expected_discarded_text.encode()), "characters": len(expected_discarded_text),
+            "utf8_bytes": len(expected_discarded_text.encode()), "lines": len(expected_discarded_text.splitlines()),
+        }
+        if (audit["overflow_policy"] != "keep_prefix_once_discard_suffix"
+                or worker_id not in range(1, 9) or worker_input != expected_worker
+                or discarded != expected_discarded
+                or bool(audit["discarded_suffix_artifact"]) != bool(expected_discarded_text)):
+            raise ProtectionViolation("LLMLingua input-cap audit differs from the fixed intervention")
+    elif (audit["overflow_policy"] != "none" or worker_id is not None
+          or discarded["characters"] or audit["discarded_suffix_artifact"] is not None):
+        raise ProtectionViolation("A non-LLMLingua adapter reported an unexpected input cap or worker")
+    return audit
+
+
+def provider_timing(response: dict | None, client_http_seconds: float) -> dict:
+    timing = {
+        "client_http_seconds": client_http_seconds,
+        "transport_seconds": None,
+        "model_seconds": None,
+        "provider_service_seconds": None,
+        "pre_inference_seconds": None,
+        "transport_basis": "client_http_minus_provider_service_ttlt",
+        "model_basis": "provider_usage_latency_checkpoint_engine_ttlt",
+        "timing_status": "provider_checkpoint_unavailable",
+    }
+    usage = response.get("usage") if isinstance(response, dict) else None
+    checkpoint = usage.get("latency_checkpoint") if isinstance(usage, dict) else None
+    if not isinstance(checkpoint, dict):
+        return timing
+
+    def seconds(name: str) -> float | None:
+        value = checkpoint.get(name)
+        if type(value) not in (int, float) or not math.isfinite(value) or value < 0:
+            return None
+        return value / 1000
+
+    model = seconds("engine_ttlt_ms")
+    service = seconds("service_ttlt_ms")
+    pre_inference = seconds("pre_inference_ms")
+    transport = None if service is None or service > client_http_seconds else client_http_seconds - service
+    timing.update(
+        transport_seconds=transport,
+        model_seconds=model,
+        provider_service_seconds=service,
+        pre_inference_seconds=pre_inference,
+        timing_status=(
+            "complete" if None not in (transport, model, service, pre_inference)
+            else "provider_service_exceeds_client_http" if service is not None and service > client_http_seconds
+            else "provider_checkpoint_incomplete"
+        ),
+    )
+    return timing
+
+
 class DeploymentQueue:
     def __init__(self, path: Path, deployment: str, rpm: int, tpm: int, *, clock=time.time):
         if type(rpm) is not int or type(tpm) is not int or rpm < 1 or tpm < 1:
@@ -286,6 +390,7 @@ class LiveRecorder:
             try:
                 result = self.compressor.compress(original)
                 timing = compressor_timing(result, time.monotonic() - started)
+                audit = compression_audit(result, original, self.condition)
             except Exception as error:
                 self.event({
                     "event": "compressor_failed", "trial_id": trial_id, "request": request_number,
@@ -298,7 +403,7 @@ class LiveRecorder:
                 "event": "compressor_completed", "trial_id": trial_id, "request": request_number,
                 "candidate_index": candidate_index, "before_sha256": digest(original.encode()),
                 "after_sha256": digest(result.text.encode()), "changed": original != result.text,
-                **timing,
+                "worker_id": audit["worker_id"], "audit": audit, **timing,
             }
             self.event(record)
             compression_records.append({key: value for key, value in record.items() if key not in {
@@ -359,17 +464,20 @@ class LiveRecorder:
             try:
                 status, raw, headers = self.sender(outgoing)
             except Exception as error:
+                elapsed = time.monotonic() - started
                 self.event({"event": "http", "trial_id": trial_id, "request": request_number,
                             "attempt": attempt, "status": None, "provider_usage": None, "tokens": None,
                             "calculated_cost_usd": None, "error_type": type(error).__name__,
-                            "elapsed_seconds": time.monotonic() - started, "billing_unknown": True})
+                            "elapsed_seconds": elapsed, **provider_timing(None, elapsed),
+                            "billing_unknown": True})
                 raise
             elapsed = time.monotonic() - started
             (directory / f"response-{attempt:02d}.json").write_bytes(raw)
             record = {"event": "http", "trial_id": trial_id, "request": request_number, "attempt": attempt,
                       "status": status, "response_sha256": digest(raw), "elapsed_seconds": elapsed,
                       "provider_usage": None, "calculated_cost_usd": None,
-                      "invoice_reconciled": False, "source_commit": self.source_commit}
+                      "invoice_reconciled": False, "source_commit": self.source_commit,
+                      **provider_timing(None, elapsed)}
             if status == 200:
                 try:
                     response = parse_request(raw)
@@ -377,6 +485,7 @@ class LiveRecorder:
                     self.event({**record, "error_type": "MalformedProviderResponse"})
                     raise ValueError("Provider response is not unambiguous JSON") from None
                 tokens = provider_tokens(response)
+                record.update(provider_timing(response, elapsed))
                 if tokens is None:
                     self.event(record)
                     raise ValueError("Successful response lacks valid provider usage; reservation retained")

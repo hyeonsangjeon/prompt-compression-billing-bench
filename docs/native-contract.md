@@ -36,12 +36,19 @@ router or a measurement of the whole product.
 
 LLMLingua-2 0.2.2 uses the large MeetingBank checkpoint at the pinned revision
 and `rate=0.5`. It selects source tokens to retain; it is a lossy token-selection
-compressor, not a generated summary. A Python 3.10 worker loads the model once
-per run, remains offline, and serializes inference behind one lock. This avoids
-eight model copies and CPU-thread races. Queue wait, adapter execution and worker
-inference time are recorded separately, so the added latency is not hidden inside
-provider latency. A failed worker close handshake stops the run and is recorded
-rather than accepting a partially closed compressor as complete.
+compressor, not a generated summary. Eight offline Python 3.10 workers load one
+model copy each and accept at most one request per worker. All eight workers run
+the three fixed fixtures; a ledger mismatch or cross-worker output mismatch stops
+the run. Pool wait, adapter execution and worker inference time are recorded
+separately. Every worker must complete its close handshake.
+
+LLMLingua receives at most the first 5,000 characters of a candidate in one
+inference call. It does not split or summarize the remainder in additional calls;
+the suffix is discarded. The private artifact retains that exact suffix, while
+the event records source, worker-input, output and discarded-suffix SHA-256 plus
+character, UTF-8 byte and line counts. This is an explicit lossy adapter policy,
+not behavior supplied by LLMLingua. The same policy is applied to every
+LLMLingua arm and cannot be changed through a runtime option.
 
 The template at `ledgers/native.template.toml` is deliberately unapproved and
 not runnable. Before execution it needs an explicit rule/execution approval
@@ -120,7 +127,10 @@ All metrics are collected for **all four** conditions from the same path.
 | `same_command_reexecutions` | Sum of occurrences beyond the first for each byte-identical complete command block actually accepted by the terminal wrapper |
 | `same_subcommand_reexecutions` | Additional conservative lexical count for shell units such as `find` inside `ls && find`; not proof of command completion or the same filesystem/cwd |
 | `post_changed_output_*` | Repetition linked by command text and time to an earlier changed output; retained evidence, **not proof that truncation caused the repetition** |
-| `compressor` | Candidate calls, changed occurrences, adapter wall time, serialization wait, adapter execution and LLMLingua worker inference; input/output SHA-256 stays in private transport evidence |
+| `compressor` | Candidate calls, changed occurrences, adapter wall time, worker-pool wait, adapter execution and LLMLingua worker inference; source/worker-input/output/discarded-suffix hashes and sizes stay in private transport evidence |
+| `timing.compress_seconds` | Sum of measured compressor wall time, including worker-pool wait; concurrent calls can make the sum exceed run wall time |
+| `timing.transport_seconds` | Client HTTP wall time minus provider-reported service TTLT when both are available; otherwise null with a known subtotal |
+| `timing.model_seconds` | Provider-reported `engine_ttlt_ms`, converted to seconds; otherwise null with a known subtotal |
 | `native_outcome` | Unmodified native binary reward plus failure categories, per-test evidence and integrity warnings |
 | `concurrency`, `deployment_limits` | Fixed outer native-trial concurrency plus the ledger RPM/TPM, check time and source; written to both `summary.json` and `execution.json` and revalidated from the saved ledger |
 
@@ -220,18 +230,25 @@ live runner.
 LLMLingua uses `LLMLINGUA_PYTHON`, `LLMLINGUA_MODEL` and the existing
 `TIKTOKEN_CACHE_DIR`. `requirements/llmlingua2-cpu.txt`, five model files, two
 tokenizer tables, the worker source and their byte counts or SHA-256 values are
-fixed. Before a native request can be sent, a fresh worker must reproduce three
-checked fixture output hashes for a path listing, severity log and package-install
-output. A mismatch stops the run before provider access. These probes observed
-the same output in two local processes during adapter preparation; they do not
-guarantee byte equality on another CPU or dependency stack.
+fixed. Before a native request can be sent, all eight fresh workers must reproduce
+three checked fixture output hashes for a path listing, severity log and
+package-install output. Cross-worker disagreement also stops before provider
+access. The probes do not guarantee byte equality on another CPU or dependency
+stack; they test it on the execution host instead of assuming it.
+
+The frozen 107-occurrence development corpus contains **10**, not 12, candidates
+over the 5,000-character adapter limit. All 10 belong to
+`log-summary-date-ranges`; they represent three unique inputs repeated across
+historical requests. This recount corrects the planning note without changing
+the live cap. The discarded suffixes contain later file-listing rows, and two
+occurrences also contain all 10 later `find` paths.
 
 The earlier static corpus measurement observed a mean **4.13 seconds per candidate
-span** for LLMLingua-2. That is a planning input, not a live result. Using the
-measured 5.6-minute serial five-task pass, fixed concurrency eight and the observed
-static candidate workload gives **46–48 minutes** for the three 10-repetition tool
-conditions, or **53–56 minutes including a 10-repetition baseline**. Turns, candidate
-occurrences, CPU contention and provider waits can change the actual duration.
+span** for LLMLingua-2 on an eight-vCPU host with one active compressor. That is
+a planning input, not an intrinsic tool speed or an eight-worker live result.
+The retained plan is **46–48 minutes** for the three 10-repetition tool conditions,
+or **53–56 minutes including a 10-repetition baseline**. Turns, candidate
+occurrences, eight-worker CPU contention and provider waits can change it.
 
 The eventual result must retain the static risk observations used to select this
 condition: all 107 candidate occurrences kept their line counts, but none of the
@@ -249,14 +266,20 @@ uv sync --locked --extra native
 LITELLM_LOCAL_MODEL_COST_MAP=true uv run --locked --extra native python -m unittest discover -s tests -v
 uv run --locked --extra native python run.py native _work/native.toml \
   --source-commit "$SOURCE_COMMIT" --condition none --check
+uv run --locked --extra native python -m src.adapter_preflight _work/native.toml \
+  --source-commit "$SOURCE_COMMIT" --output _work/adapter-preflight/$SOURCE_COMMIT
 ```
 
 `--check` validates local prerequisites only; it does not start Harbor, contact
-IMDS/Foundry or call any provider model. A LLMLingua-2 condition check verifies
-local artifacts; actual construction also performs local classifier probes. It
-fails on an unapproved/incomplete ledger or a dirty/wrong source tree. Actual
-execution requires the separate `--execute` flag; every non-`none` condition
-requires `--baseline runs/<id>`.
+IMDS/Foundry or call any provider model. The baseline check verifies artifacts
+for all four conditions, not only the selected condition. The separate adapter
+preflight sends eight synthetic candidates per condition through the common
+recorder and protection guard, uses only an in-process synthetic response, and
+constructs all eight LLMLingua workers. It records software timings but is not a
+native quality or provider-latency measurement. Both checks fail on a dirty or
+wrong source tree; native execution also requires an approved, operational
+ledger and the separate `--execute` flag. Every non-`none` condition requires
+`--baseline runs/<id>`.
 Do not run either arm until authorized. The loopback SDK, dummy process and
 synthetic driver tests are software checks, not native quality/billing evidence.
 

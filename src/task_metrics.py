@@ -88,6 +88,37 @@ def command_metrics(trace: list[dict], changes: list[dict]) -> dict:
     }
 
 
+def phase_metrics(responses: list[dict], compressions: list[dict], compression_failures: list[dict]) -> dict:
+    for event in responses:
+        client = event.get("client_http_seconds")
+        if type(client) not in (int, float) or not math.isfinite(client) or client < 0:
+            raise ValueError("Client HTTP timing is invalid")
+        for name in ("transport_seconds", "model_seconds", "provider_service_seconds", "pre_inference_seconds"):
+            value = event.get(name)
+            if value is not None and (type(value) not in (int, float) or not math.isfinite(value) or value < 0):
+                raise ValueError("Provider phase timing is invalid")
+
+    def total(name: str) -> tuple[float | None, float, int]:
+        known = [event[name] for event in responses if event.get(name) is not None]
+        return (sum(known) if responses and len(known) == len(responses) else None, sum(known), len(known))
+
+    result = {
+        "kind": "measured_and_calculated_phase_seconds",
+        "unit": "seconds",
+        "provider_http_attempts": len(responses),
+        "compress_seconds": sum(event["compressor_wall_seconds"] for event in compressions + compression_failures),
+        "client_http_seconds": sum(event["client_http_seconds"] for event in responses),
+        "transport_basis": "client_http_minus_provider_service_ttlt",
+        "model_basis": "provider_usage_latency_checkpoint_engine_ttlt",
+    }
+    for name in ("transport_seconds", "model_seconds", "provider_service_seconds", "pre_inference_seconds"):
+        complete, subtotal, calls = total(name)
+        result[name] = complete
+        result["known_" + name] = subtotal
+        result["known_" + name.removesuffix("_seconds") + "_calls"] = calls
+    return result
+
+
 def trial_metrics(events: list[dict], trace: list[dict] | None, trajectory: dict | None,
                   trial_id: str, *, process_complete: bool) -> dict:
     selected = [event for event in events if event.get("trial_id") == trial_id]
@@ -178,6 +209,7 @@ def trial_metrics(events: list[dict], trace: list[dict] | None, trajectory: dict
             "output_scope": "visible_assistant_content_not_hidden_reasoning",
         },
         "commands": commands, "changed_candidate_occurrences": len(changed),
+        "timing": phase_metrics(responses, compressions, compression_failures),
         "compressor": {
             "kind": "measured_from_live_adapter_events", "unit": "seconds",
             "calls": len(compressions) + len(compression_failures), "completed_calls": len(compressions),
@@ -228,6 +260,27 @@ def aggregate_run_compressor_metrics(trials: list[dict]) -> dict:
         "known_worker_inference_seconds": sum(row["known_worker_inference_seconds"] for row in rows),
         "worker_inference_calls": worker_calls,
     }
+
+
+def aggregate_run_timing_metrics(trials: list[dict]) -> dict:
+    rows = [trial["metrics"]["timing"] for trial in trials]
+    attempts = sum(row["provider_http_attempts"] for row in rows)
+    result = {
+        "kind": "calculated_from_trial_phase_metrics", "unit": "seconds",
+        "trials": len(rows), "provider_http_attempts": attempts,
+        "compress_seconds": sum(row["compress_seconds"] for row in rows),
+        "client_http_seconds": sum(row["client_http_seconds"] for row in rows),
+        "transport_basis": "client_http_minus_provider_service_ttlt",
+        "model_basis": "provider_usage_latency_checkpoint_engine_ttlt",
+    }
+    for name in ("transport_seconds", "model_seconds", "provider_service_seconds", "pre_inference_seconds"):
+        call_field = "known_" + name.removesuffix("_seconds") + "_calls"
+        known_field = "known_" + name
+        known_calls = sum(row[call_field] for row in rows)
+        result[name] = sum(row[known_field] for row in rows) if attempts and known_calls == attempts else None
+        result[known_field] = sum(row[known_field] for row in rows)
+        result[call_field] = known_calls
+    return result
 
 
 def read_events(path: Path) -> list[dict]:
