@@ -28,6 +28,7 @@ from .native_judge import collect_native_outcome
 from .protection import digest
 from .provenance import ROOT, capture, git, verify_snapshot
 from .task_metrics import aggregate_run_compressor_metrics, aggregate_run_timing_metrics, collect_trial_metrics
+from .verifier_revisions import apply_verifier_revision
 
 
 def runtime_environment(proxy_key: str) -> dict:
@@ -70,7 +71,7 @@ def benchmark_sources(ledger: dict) -> tuple[Path, dict[str, dict[str, bytes]]]:
     return root, tasks
 
 
-def prepare_task(files: dict[str, bytes], target: Path, image: str) -> dict:
+def prepare_task(task: str, files: dict[str, bytes], target: Path, image: str, verifier_specs: dict) -> dict:
     before = tomllib.loads(files["task.toml"].decode())
     text, count = re.subn(r'(?m)^docker_image\s*=\s*"[^"\n]+"\s*$', f'docker_image = "{image}"', files["task.toml"].decode())
     after = tomllib.loads(text)
@@ -78,7 +79,14 @@ def prepare_task(files: dict[str, bytes], target: Path, image: str) -> dict:
     expected["environment"]["docker_image"] = image
     if count != 1 or after != expected:
         raise ValueError("Task image pinning would change another task setting")
-    effective = {**files, "task.toml": text.encode(), "environment/Dockerfile": f"FROM {image}\n".encode()}
+    effective, verifier_revision = apply_verifier_revision(task, files, verifier_specs)
+    effective.update({"task.toml": text.encode(), "environment/Dockerfile": f"FROM {image}\n".encode()})
+    modified_files = sorted(name for name in effective if effective[name] != files.get(name))
+    expected_modified = {"task.toml", "environment/Dockerfile"}
+    if verifier_revision["modified"]:
+        expected_modified.add(verifier_revision["source_path"])
+    if set(modified_files) != expected_modified:
+        raise ValueError("Task preparation changed a file outside the approved image and verifier revisions")
     target.mkdir(parents=True, exist_ok=False)
     for name, content in effective.items():
         path = safe_child(target, name)
@@ -87,7 +95,11 @@ def prepare_task(files: dict[str, bytes], target: Path, image: str) -> dict:
     return {
         "source_files": {name: digest(content) for name, content in files.items()},
         "effective_files": {name: digest(content) for name, content in effective.items()},
-        "only_environment_image_is_overridden": True, "native_judge_modified": False,
+        "only_environment_image_is_overridden": not verifier_revision["modified"],
+        "only_approved_files_modified": True,
+        "approved_modified_files": modified_files,
+        "native_judge_modified": verifier_revision["modified"],
+        "verifier_revision": verifier_revision,
         "pinned_image": image,
     }
 
@@ -212,6 +224,8 @@ def verify_native_run(directory: Path) -> dict:
         raise ValueError("Native result concurrency or deployment limits differ from the ledger")
     if execution.get("concurrency") != ledger["runner"]["concurrency"] or execution.get("deployment_limits") != deployment_limits:
         raise ValueError("Native execution metadata concurrency or limits differ from the ledger")
+    if summary.get("verifier_revisions") != ledger["benchmark"]["verifiers"] or execution.get("verifier_revisions") != ledger["benchmark"]["verifiers"]:
+        raise ValueError("Native result verifier revisions differ from the ledger")
     manifest_path = directory / "artifacts.json"
     if digest(manifest_path.read_bytes()) != summary["artifact_manifest_sha256"]:
         raise ValueError("Native artifact manifest changed")
@@ -460,6 +474,7 @@ def execute_native(ledger_path: Path, ledger: dict, source_commit: str, conditio
         },
         "raw_retrieval": ledger["raw_retrieval"], "baseline": None if baseline is None else {
             "run_id": baseline["run_id"], "summary_sha256": digest((baseline_path / "summary.json").read_bytes())},
+        "verifier_revisions": ledger["benchmark"]["verifiers"],
         "compressor_metrics": aggregate_run_compressor_metrics([]),
         "timing_metrics": aggregate_run_timing_metrics([]),
     }
@@ -473,12 +488,16 @@ def execute_native(ledger_path: Path, ledger: dict, source_commit: str, conditio
         setup["sender"].deadline = recorder.deadline
         key = secrets.token_urlsafe(32)
         server = start_live_proxy(recorder, key)
-        task_sources = {task: prepare_task(files, directory / "tasks" / task, ledger["benchmark"]["images"][task])
+        task_sources = {task: prepare_task(
+            task, files, directory / "tasks" / task, ledger["benchmark"]["images"][task],
+            ledger["benchmark"]["verifiers"],
+        )
                         for task, files in setup["tasks"].items()}
         save_json(directory / "task-sources.json", task_sources)
         save_json(directory / "execution.json", {
             "source_commit": source_commit, "condition": condition, "compressor": compressor.metadata,
             "classification_policy": POLICY, "task_order": list(TASKS),
+            "verifier_revisions": ledger["benchmark"]["verifiers"],
             "concurrency": ledger["runner"]["concurrency"],
             "concurrency_unit": "simultaneous_native_trial_processes",
             "harbor_concurrency_per_process": 1, "agent_concurrency_per_trial": 1,

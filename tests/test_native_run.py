@@ -131,6 +131,7 @@ class NativeRunTests(unittest.TestCase):
         synthetic_retrieval.finish = finish
         with patch("src.native_run.ROOT", self.root), patch("src.native_run.preflight", return_value=setup), \
              patch("src.native_run.supervise", synthetic_supervisor), \
+             patch("src.native_run.apply_verifier_revision", side_effect=lambda _task, source, _specs: (deepcopy(source), {"revision": "synthetic", "modified": False})), \
              patch("src.native_run.make_blob_spool", side_effect=make_retrieval):
             directory = execute_native(self.ledger_path, self.ledger, "a" * 40, "none")
         return directory, provenance

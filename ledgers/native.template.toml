@@ -17,6 +17,12 @@ multi-source-data-merger = "alexgshaw/multi-source-data-merger@sha256:8b32782078
 nginx-request-logging = "alexgshaw/nginx-request-logging@sha256:693e64431a0dbf45952e8b91a298d54fd60247e501c6623fb8fa3ebc07fc3d3d"
 openssl-selfsigned-cert = "alexgshaw/openssl-selfsigned-cert@sha256:4c948a4e630af2435ae0a19108fc0814a946ac2fa29a512469e0fc77b38c8c12"
 
+[benchmark.verifiers.nginx-request-logging]
+revision = "nginx-request-logging-verifier-v2"
+source_path = "tests/test_outputs.py"
+source_sha256 = "045cc716c14efde3b0dcff5fc7c85ec5d18bfc6ce66f8b40a418fa2a3a4acda0"
+effective_sha256 = "20812107bc3bfc541728a2d10e3da0552e907d949e1347a03d33aa26954f8902"
+
 [model]
 provider = "foundry"
 name = "gpt-5.4"

@@ -43,6 +43,10 @@ class NativeContractTests(unittest.TestCase):
         changed["compressor"]["tools"]["llmlingua2"]["options"]["rate"] = 0.6
         with self.assertRaises(ValueError):
             validate_native_ledger(changed)
+        changed = deepcopy(original)
+        changed["benchmark"]["verifiers"]["nginx-request-logging"]["effective_sha256"] = "0" * 64
+        with self.assertRaises(ValueError):
+            validate_native_ledger(changed)
         original["limits"]["deadline_utc"] = "2020-01-01T00:00:00+00:00"
         with self.assertRaises(ValueError):
             require_operational_values(original)

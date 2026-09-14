@@ -9,7 +9,7 @@ separate from the legacy local-model runner and the frozen static demo.
 `run.py native` runs the existing five purpose-selected Terminal tasks with
 Harbor 0.22.0 / the instrumented Terminus 2 agent. All conditions use the same
 pinned task images, instructions, native tests, model settings, observation
-policy, transport and metrics. The order is **none baseline, then squeez,
+policy, transport and metrics, including the same approved verifier revision. The order is **none baseline, then squeez,
 Headroom and LLMLingua-2 comparisons**. Each comparison uses the baseline's
 complete repetition count. There is no delete-all arm. This runner does not run
 DeepSWE or a substitute benchmark.
@@ -83,8 +83,16 @@ numerically derive this threshold.
 and the committed source inventory. Source, ledger and dependency-lock snapshots
 travel with every run; trial and transport records carry the same SHA. The
 benchmark checkout and every copied task file are compared against its pinned
-Git revision. Only the environment image reference and Dockerfile are replaced
-by the ledger's immutable image digest. Native tests/instructions are unchanged.
+Git revision. The environment image reference and Dockerfile are replaced by
+the ledger's immutable image digest. The nginx verifier alone also receives the
+hash-bound `nginx-request-logging-verifier-v2` revision: source SHA-256
+`045cc716c14efde3b0dcff5fc7c85ec5d18bfc6ce66f8b40a418fa2a3a4acda0`
+must produce effective SHA-256
+`20812107bc3bfc541728a2d10e3da0552e907d949e1347a03d33aa26954f8902`.
+It accepts the equivalent `$name` and `${name}` Nginx variable forms; all other
+native test text and instructions remain unchanged. Any source or effective-hash
+mismatch stops preparation. The ledger, task-source record, summary and execution
+record retain the revision. Native tests for all other tasks are unchanged.
 Critical installed dependencies are checked against `uv.lock`.
 
 ## Transmission boundary
@@ -228,7 +236,9 @@ unchecked user fields/conditional conflict checks in the merger, regex matches
 inside nginx comments and no assertion that a new request appears in its log,
 and acceptance of printed verification text by the certificate-script subcheck.
 These do not demonstrate that an invalid solution passes **all** native tests.
-Keep the original scores and disclose those coverage limits.
+The nginx variable-syntax correction does not close these other coverage gaps.
+Keep scores from the original and revised verifier revisions separate and disclose
+the applicable revision.
 
 The actual DeepSWE wrapper resets test-patch files, applies the hidden patch,
 and runs `/app/test.sh base` and `/app/test.sh new`. It rewards only two zero exit

@@ -7,6 +7,7 @@ import re
 import tomllib
 
 from .baseline import INTERIM_MAX_RANGE_WIDTH, INTERIM_REPETITIONS, RULE
+from .verifier_revisions import VERIFIER_SPECS
 
 
 TASKS = ("cancel-async-tasks", "log-summary-date-ranges", "multi-source-data-merger",
@@ -39,7 +40,7 @@ LLMLINGUA_FIXTURES = [
      "output_sha256": "d6d647b8efdd766ec081da2376d37526db7effffdba1843e2b6e3a1cb69b458c"},
 ]
 FIELDS = {
-    "benchmark": {"name", "revision", "root_env", "tasks", "images"},
+    "benchmark": {"name", "revision", "root_env", "tasks", "images", "verifiers"},
     "model": {"provider", "name", "reported_model", "endpoint_env", "temperature", "reasoning_effort", "max_completion_tokens"},
     "runner": {"harbor_version", "agent_import_path", "concurrency", "max_turns", "agent_timeout_seconds", "verifier_timeout_seconds", "setup_timeout_seconds", "trial_timeout_seconds"},
     "measurement": {"tokenizer", "tiktoken_version", "cache_env", "table_sha256"},
@@ -86,6 +87,8 @@ def validate_native_ledger(ledger: dict) -> None:
         for image in benchmark["images"].values()
     ):
         raise ValueError("Every task image needs an immutable digest")
+    if benchmark["verifiers"] != VERIFIER_SPECS:
+        raise ValueError("Keep the approved hash-bound benchmark verifier revisions")
     if model["provider"] != "foundry" or model["name"] != "gpt-5.4" or not re.fullmatch(r"gpt-5\.4-\d{4}-\d{2}-\d{2}", model["reported_model"]):
         raise ValueError("Pin the requested gpt-5.4 provider-reported snapshot")
     if type(model["temperature"]) not in (float, int) or model["temperature"] != 0 or model["reasoning_effort"] != "none":
