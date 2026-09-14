@@ -70,7 +70,7 @@ PUBLIC_FILES = {
     "tests/test_live_transport.py", "tests/test_native_judge.py", "tests/test_prompt_intake.py",
     "tests/test_task_metrics.py", "tests/test_native_contract.py", "tests/test_native_run.py",
     "tests/test_native_compressors.py", "tests/test_adapter_preflight.py", "tests/test_blob_retrieval.py", "tests/test_harbor_transport.py",
-    "tests/test_verifier_revisions.py",
+    "tests/native_test_harbor_preflight.py", "tests/test_verifier_revisions.py",
 }
 
 TIMING_ROWS = (

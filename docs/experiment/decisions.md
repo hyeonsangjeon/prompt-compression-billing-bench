@@ -6,8 +6,8 @@
 
 | 번호 | 승인할 것 | 제안 | 근거 문서 | 상태 |
 | --- | --- | --- | --- | --- |
-| N1 | 평가 적격 기준 B 세부 | 최대 20회·총 18/20·유형별 3과제는 선택. 전후반 차이 H1≤1과 실패 규칙 F1 추천 | [선별 규약](screening-protocol.md#평가-적격-기준-b--세부-승인-대기) | H0/H1/H2와 F1 승인 필요·허용폭은 임의값 |
-| N2 | 성공 기준 | S1 10%p·15%, S2 15%p·10%, S3 5%p·15% | [평가 규약](evaluation-protocol.md#성공-기준-후보) | 승인 필요·숫자는 임의의 설계값 |
+| N1 | 평가 적격 기준 B 세부 | 최대 20회·총 18/20은 선택. 전후반 H0/H1/H2 gate 또는 D1 진단 지표, 실패 규칙 F1과 유형별 선정 수는 미정 | [선별 규약](screening-protocol.md#평가-적격-기준-b--세부-승인-대기) | H1 추천 보류·허용폭은 임의값·15과제는 일정 시나리오 |
+| N2 | 성공 기준과 표본 설계 | S1 10%p·15%, S2 15%p·10%, S3 5%p·15%. 283·488·1,129는 trial-level 민감도 계산 | [평가 규약](evaluation-protocol.md#성공-기준-후보) | 기준 승인 필요·숫자는 임의값·군집과 이질성을 반영한 최종 표본 수 미정 |
 | N3 | 평가 행렬 | `none`과 세 압축기를 한 위치에서 비교. 현재 LLMLingua-2 profile은 앞 5,000자 token 선택과 뒤쪽 삭제가 함께 있음 | [평가 규약](evaluation-protocol.md#비교-행렬-제안-m1) | profile 범위 승인 필요 |
 | N4 | nginx verifier revision | 원본·수정본 SHA를 고정한 `nginx-request-logging-verifier-v2`; 원문·동등 문법 통과, 오답 실패 fixture 3/3 | [선별 규약](screening-protocol.md#revision과-fixture) | 구현·모델 호출 없는 fixture 완료, 선별 사용 승인 필요 |
 
