@@ -13,9 +13,23 @@
 | attempt | trial ID와 증가하는 attempt number | 같은 attempt 레코드의 재업로드는 한 번만 수집 |
 | provider request | provider request ID와 로컬 request hash | 같은 응답 레코드를 비용에 두 번 넣지 않음 |
 
-실제 retry가 새 provider 요청을 만들면 새 attempt 또는 request ID로 기록하고 실제 사용량·비용에 한 번 포함한다. retry는 품질 분모의 새 trial이 아니다.
+실제 retry가 새 provider 요청을 만들면 새 attempt 또는 request ID로 기록하고 실제 사용량·비용에 한 번 포함한다. retry는 품질 분모의 새 trial이 아니다. F1-R1을 유발한 실패 attempt에는 provider 요청이 없어야 한다.
 
 trial ID는 `run ID`, 정규화 task ID, repetition과 condition을 길이 구분자로 연결한 값의 SHA-256으로 만든다. attempt ID는 trial ID와 1부터 증가하는 attempt number로 만든다. 문자열을 단순 이어 붙이지 않으며, 같은 randomization manifest에서 같은 trial tuple은 언제 다시 계산해도 같은 ID가 나와야 한다.
+
+## F1-R1 준비 retry 계약
+
+F1-R1은 첫 provider dispatch 전에 발생한 `image_error` 또는 `setup_error`에만 적용한다. 첫 attempt와 동일한 준비 작업을 동일한 immutable artifact와 hash로 정확히 1회 다시 시도한다. artifact에는 task tree, instruction, image digest, verifier source·dependency, agent·runner·adapter commit과 요청 설정이 포함된다.
+
+- retry는 같은 trial ID와 새 attempt ID를 사용한다.
+- 실패한 container와 workspace는 폐기하고 fresh container·fresh workspace를 만든다.
+- 첫 attempt의 filesystem layer, process, service, cache 또는 임시 파일을 retry에 연결하지 않는다.
+- artifact나 hash가 달라지면 retry하지 않고 run을 멈춰 새 revision 승인을 요청한다.
+- 두 번째 attempt가 유효하면 품질 분모에는 trial 결과를 한 번만 넣고 두 attempt의 시간·비용은 모두 원장에 넣는다.
+- 두 번째 준비 attempt가 실패하면 추가 retry 없이 해당 과제를 부적격으로 둔다.
+- `wrong_answer`·`wrong_format`을 포함한 품질 실패와 provider dispatch 뒤 오류에는 F1-R1을 적용하지 않는다.
+
+정확히 1회라는 한도는 통계적으로 도출한 값이 아니라 일시적 준비 장애 한 번을 허용하기 위한 임의의 운영 규칙이다. retry attempt는 원래 attempt와 `artifact_manifest_hash`가 같고 `container_instance_id`와 `workspace_instance_id`가 달라야 한다. 이 불변식을 model-free contract test로 확인하기 전에는 선별을 시작하지 않는다.
 
 ## pause·resume·retry 상태
 
@@ -24,13 +38,13 @@ trial ID는 `run ID`, 정규화 task ID, repetition과 condition을 길이 구�
 | `planned` | manifest에 있고 아직 시작하지 않음 | 품질 결과 없음·비용 0 |
 | `running` | attempt를 만들고 실행 자원을 할당함 | 발생한 provider 요청은 비용 원장에 기록 |
 | `paused` | 새 attempt를 시작하지 않고 현재 상태를 고정함 | 완료 trial을 되돌리지 않음 |
-| `retried` | 실패 attempt 뒤 같은 trial ID로 다음 attempt를 허용함 | 품질 분모는 하나·모든 실제 요청 비용은 한 번씩 포함 |
+| `retried` | F1-R1 허용 범위의 준비 실패 뒤 같은 trial ID로 두 번째 attempt를 시작함 | 품질 분모는 하나·두 attempt의 실제 시간·비용을 각각 한 번 포함 |
 | `completed` | verifier 결과와 필수 증거가 모두 확정됨 | 품질 분모에 한 번 포함 |
 | `failed` | 재시도 한도 또는 증거 gate를 통과하지 못함 | 성공 trial로 바꾸지 않고 실패 유형과 발생 비용 기록 |
 | `cancelled_by_futility` | 기준 B에서 세 번째 유효 품질 실패가 확정된 뒤 아직 시작하지 않은 계획 trial | 품질 분모와 비용은 0. 계획 최대 반복과 취소 사유는 유지 |
 | `superseded` | 실행 전에 승인된 새 manifest가 기존 계획을 대체함 | 주분석 분모에서 제외하되 이미 든 비용은 지우지 않음 |
 
-허용 전이는 manifest revision에 고정한다. `completed`에서 `running`으로 돌아갈 수 없고, resume는 `planned` 또는 `paused`만 시작한다. retry는 새 trial을 만들지 않는다. `cancelled_by_futility`는 다시 시작하지 않으며, 조기 종료 전에 시작한 trial은 완료·증거·비용을 보존한다. 수집기는 trial ID, attempt ID와 provider request ID에 unique constraint를 두고 같은 Blob을 다시 읽어도 합계가 늘지 않아야 한다.
+허용 전이는 manifest revision에 고정한다. `completed`에서 `running`으로 돌아갈 수 없고, resume는 `planned` 또는 `paused`만 시작한다. retry는 새 trial을 만들지 않으며 attempt number 2를 넘길 수 없다. `cancelled_by_futility`는 다시 시작하지 않으며, 조기 종료 전에 시작한 trial은 완료·증거·비용을 보존한다. 수집기는 trial ID, attempt ID와 provider request ID에 unique constraint를 두고 같은 Blob을 다시 읽어도 합계가 늘지 않아야 한다.
 
 ## 필수 재현 묶음
 
@@ -80,7 +94,7 @@ verifier 결함을 발견하면 실행 중 즉시 고치지 않는다. 영향 �
 
 ## randomization manifest
 
-manifest에는 seed, 생성 알고리즘 revision, inventory hash, task·유형·반복·조건, block ID, 계획 순서와 trial ID를 넣는다. 평가 block은 task×반복이며 네 조건을 한 번씩 포함한다. 선별 manifest에는 과제당 최대 20개 trial과 조기 종료 전이 규칙을 모두 넣고, 실제로 시작하지 않은 trial도 `cancelled_by_futility` 상태로 남긴다.
+manifest에는 seed, 생성 알고리즘 revision, inventory hash, task·유형·반복·조건, block ID, 계획 순서, trial ID와 F1-R1 revision을 넣는다. 평가 block은 task×반복이며 네 조건을 한 번씩 포함한다. 선별 manifest에는 과제당 최대 20개 trial과 조기 종료 전이 규칙을 모두 넣고, 실제로 시작하지 않은 trial도 `cancelled_by_futility` 상태로 남긴다. 각 attempt에는 artifact manifest hash, container instance ID, workspace instance ID와 provider dispatch 시각 또는 미발생 상태를 기록한다.
 
 manifest는 첫 trial 전에 비공개 Blob과 로컬에 함께 고정한다. pause·resume·retry는 같은 manifest를 사용한다. 계획에 없던 trial을 실행하면 별도 protocol deviation으로 기록하고 주분석 분모에 자동 편입하지 않는다.
 
