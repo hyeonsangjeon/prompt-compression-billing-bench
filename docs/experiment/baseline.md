@@ -49,7 +49,9 @@
 | `nginx-request-logging` | 18 | 20 | 2건 `wrong_answer` | 측정·분류 판단 |
 | `openssl-selfsigned-cert` | 20 | 20 | 없음 | 측정 |
 
-100/100 trial의 native 판정 증거가 유효했다. 실패 37건은 모두 `native_assertion_failed` 서명을 근거로 `wrong_answer`로 분류했다. 이는 실패 형태의 분류이며 원인 진단이 아니다. 추가 압축이 없었으므로 이 실패를 압축에 귀속할 수 없다.
+100/100 trial의 native 판정 증거가 유효했다. 실행 당시 자동 분류기는 실패 37건을 모두 `native_assertion_failed` 서명에 따라 `wrong_answer`로 기록했다. 이 값은 실패 형태의 자동 분류이며 실제 답이 틀렸다는 원인 진단이 아니다. 추가 압축이 없었으므로 이 실패를 압축에 귀속할 수 없다.
+
+**2026-09-14 UTC 분류 설명 정정 제안:** 이후 정적 대조에서 nginx의 `wrong_answer` 2건은 동등한 문법을 원본 verifier가 거부한 거짓 실패로 확인됐다. 따라서 “실제 오답 37건”이라고 쓰지 않는다. 원장에는 실행 당시 자동 분류 37건을 유지하되, 원인 대조 상태는 nginx verifier 거짓 실패 2건과 원인이 독립 검증되지 않은 자동 분류 35건으로 구분한다. 이는 분류 설명의 정정 제안이며 원측정의 통과 수를 바꾸지 않는다.
 
 이 표는 실행 당시 원본 verifier의 측정값이다. 이후 정적 대조에서 nginx 실패 2건이 동등한 `${http_user_agent}` 문법을 원본 verifier가 거부한 거짓 실패로 확인됐다. 수정본의 변수 검사에 대한 계산값은 nginx 20/20, 전체 65/100이다. 이는 보존 trace와 당시 verifier 결과에 근거한 정적 반사실 계산이며 실제 workspace replay가 아니다. 새 실행이나 원본 측정값으로 바꾸지 않는다. 근거와 고정 SHA는 [선별 규약](screening-protocol.md#기존-기준선에-미치는-영향)에 기록한다.
 

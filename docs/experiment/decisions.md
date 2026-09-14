@@ -6,10 +6,11 @@
 
 | 번호 | 승인할 것 | 제안 | 근거 문서 | 상태 |
 | --- | --- | --- | --- | --- |
-| N1 | 평가 적격 기준 B 세부 | 최대 20회·총 18/20은 선택. 전후반 H0/H1/H2 gate 또는 D1 진단 지표, 실패 규칙 F1과 유형별 선정 수는 미정 | [선별 규약](screening-protocol.md#평가-적격-기준-b--세부-승인-대기) | H1 추천 보류·허용폭은 임의값·15과제는 일정 시나리오 |
-| N2 | 성공 기준과 표본 설계 | S1 10%p·15%, S2 15%p·10%, S3 5%p·15%. 283·488·1,129는 trial-level 민감도 계산 | [평가 규약](evaluation-protocol.md#성공-기준-후보) | 기준 승인 필요·숫자는 임의값·군집과 이질성을 반영한 최종 표본 수 미정 |
+| N1 | 평가 적격 기준 B 세부 | 최대 20회·총 18/20은 선택. B-2 gate 또는 D1 진단 지표, F1-R0·F1-R1, 민감도 분석의 판정 불가 규칙은 미정 | [선별 규약](screening-protocol.md#평가-적격-기준-b--세부-승인-대기) | B-2는 정확히 18/20인 과제에서 실패 위치를 균등한 조합으로 셀 때 90/190을 제외해 추천 보류 |
+| N2 | 성공 기준과 표본 설계 | S1 10%p·15%, S2 15%p·10%, S3 5%p·15%. 283·488·1,129는 trial-level 민감도 계산 | [평가 규약](evaluation-protocol.md#성공-기준-후보) | 기준 승인 필요·숫자는 임의값·군집과 이질성을 반영한 최종 `K`·`R` 미정 |
 | N3 | 평가 행렬 | `none`과 세 압축기를 한 위치에서 비교. 현재 LLMLingua-2 profile은 앞 5,000자 token 선택과 뒤쪽 삭제가 함께 있음 | [평가 규약](evaluation-protocol.md#비교-행렬-제안-m1) | profile 범위 승인 필요 |
-| N4 | nginx verifier revision | 원본·수정본 SHA를 고정한 `nginx-request-logging-verifier-v2`; 원문·동등 문법 통과, 오답 실패 fixture 3/3 | [선별 규약](screening-protocol.md#revision과-fixture) | 구현·모델 호출 없는 fixture 완료, 선별 사용 승인 필요 |
+| N4 | nginx verifier revision | 원본·수정본 SHA를 고정한 기존 `nginx-request-logging-verifier-v2`; 원문·동등 문법 통과, 오답 실패 fixture 3/3 | [선별 규약](screening-protocol.md#revision과-fixture) | 2026-09-14 UTC 기존 diff·두 SHA·test module 6/6 재검증, 해당 바이트 범위 조건부 승인 |
+| N5 | 최종 과제 수 | 평가 적격 과제 전부 또는 사전 층화·hash 표본 | [평가 규약](evaluation-protocol.md#최종-과제-수-선택지) | 12·15과제 상한 없음·선별 결과 전에 규칙 승인 필요 |
 
 DeepSWE, 보호 우회 감사, 구조화 출력·파일 읽기 위치 확대는 이 행렬에 섞지 않는다. [재현 계약](reproducibility-contract.md)의 구현과 모델 호출 없는 검사를 마치기 전에는 승인된 기준이 있어도 실행하지 않는다.
 
@@ -70,6 +71,7 @@ O1이 먼저다. 현재 runner는 판정 불가 기준선에서 압축 비교로
 | 2026-09-14 | 선별 기준 B의 최대 20회와 18/20을 선택 | 같은 통과율이어도 9/10으로 환산하지 않고 증거량 20회를 유지 | 일부 확정·전후반 허용폭과 실패 규칙 승인 대기 |
 | 2026-09-14 | nginx 동등 변수 문법을 허용하는 verifier revision을 준비 | 원본 SHA와 수정본 SHA를 고정하고 정답·동등 문법·오답 fixture 3건을 모델 호출 없이 검증 | 구현 완료·선별 사용 승인 대기 |
 | 2026-09-14 | 일정 적합 판단을 잠정으로 제한 | 기존 5과제 시간의 전체 89과제 투영이며, 조기 종료·승인 대기·전체 setup 꼬리를 측정하지 않음 | 확정·해석 범위 |
+| 2026-09-14 | 기존 nginx verifier v2를 바이트 범위로 조건부 승인 | 고정 원본 source SHA와 effective SHA 일치, 원문·동등 문법·오답 fixture를 포함한 test module 6/6 재검증 | 조건부 승인·선별 실행 승인은 아님 |
 
 ## 문서와 Project의 역할
 
