@@ -71,6 +71,14 @@ Processing triggers for libc-bin (2.36-9+deb12u10) ...
 
 공통 접두어를 한 번만 표시하고 파일 항목은 남긴다. 이 결과는 Headroom 전체 제품이 아니라 `compact_lossless(text, "paths")`만 허용한 제한 프로필의 측정이다.
 
+### 측정 범위와 제품 기능의 구분
+
+**성격:** 공개 소스 확인·분류 판단. 이 저장소에서 아래 설정을 적용한 정적 측정과 native 실행은 모두 0회다.
+
+우리가 확인한 Headroom `0.36.5` paths-only 설정 범위에서는 압축할 메시지나 툴 결과를 종류별로 나누는 위치 제어가 관측되지 않았다. 이 판단을 Headroom 제품 전체로 일반화할 수는 없다.
+
+Headroom `0.37.0`의 [`coding` 프로필](https://github.com/headroomlabs-ai/headroom/blob/v0.37.0/headroom/agent_savings.py)은 툴 검색, turn 간 중복 제거, 무손실 처리 뒤 손실 압축, 파일 읽기 보호, 분석 문맥 보호와 AST 기반 코드 압축을 설정한다. [`DEFAULT_EXCLUDE_TOOLS`](https://github.com/headroomlabs-ai/headroom/blob/v0.37.0/headroom/config.py)는 `Read`, `Glob`, `Grep`, `Write`, `Edit`, 웹 검색·가져오기, 원문 회수와 `view` 계열 툴을 제외한다. 같은 소스의 `DEFAULT_VERBATIM_EXCLUDE_TOOLS`는 웹 검색·가져오기, 원문 회수와 `view` 계열 툴을 바이트 그대로 두도록 별도로 지정한다. 파일 읽기 보호는 bash 계열 읽기 명령도 식별하고, 분석 문맥 보호는 최근 사용자 요청에 분석·리뷰·감사·보안·버그·디버그·수정·오류 등의 의도가 있으면 코드 압축을 건너뛴다. AST 기반 경로는 tree-sitter로 코드를 파싱해 구조를 남기고 함수 본문을 줄인다. 해당 설정이 이 저장소의 56개 저장 요청에서 만드는 크기·보존·품질 변화는 아직 측정하지 않았다.
+
 ## LLMLingua-2 표본
 
 **표본·분모:** 후보 107출현·27고유 입력 전부 변경. 원문에서 비어 있지 않은 2,375줄 중 byte 단위로 그대로 남은 줄은 0개다. **성격:** 측정·token 선택 분류.
@@ -98,3 +106,5 @@ LLMLingua-2 측정은 GPU 없는 Linux kernel `3.10.102`, 8 CPU, 31 GiB RAM에�
 ## 도구 검토 범위
 
 **분류 판단:** 검토한 8개 도구 가운데 임의의 로그·명령 출력을 받아 필요한 뜻을 보존하고, 손실 정도를 조절할 수 있으며, 현재 조건에서 재현 가능한 요약 경로는 확인되지 않았다. 일부 제품에는 별도의 규칙 요약이나 생성 모델 요약 경로가 있지만, 1차에 고정한 세 프로필은 각각 버리기, 묶기, token 선택이다.
+
+이 분류 판단은 요약 경로에 한정한다. 툴 단위 제외나 파일 읽기 보호 같은 위치 제어 기능이 없다는 뜻은 아니다.
