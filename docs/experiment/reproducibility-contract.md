@@ -94,9 +94,9 @@ verifier 결함을 발견하면 실행 중 즉시 고치지 않는다. 영향 �
 
 ## randomization manifest
 
-manifest에는 seed, 생성 알고리즘 revision, inventory hash, task·유형·반복·조건, block ID, 계획 순서, trial ID와 F1-R1 revision을 넣는다. 평가 block은 task×반복이며 네 조건을 한 번씩 포함한다. 선별 manifest에는 과제당 최대 20개 trial과 조기 종료 전이 규칙을 모두 넣고, 실제로 시작하지 않은 trial도 `cancelled_by_futility` 상태로 남긴다. 각 attempt에는 artifact manifest hash, container instance ID, workspace instance ID와 provider dispatch 시각 또는 미발생 상태를 기록한다.
+manifest에는 seed, 생성 알고리즘 revision, inventory hash, task·유형·반복·조건, block ID, 계획 순서, trial ID와 F1-R1 revision을 넣는다. 분석 계획 manifest에는 승인한 S 기준, 비용 추론 또는 기술통계 전용 경로, 비용 추론이면 사전 기대 절감 범위, `rho_quality`·`rho_cost` 범위, P1 또는 P2, P2의 계획값, `R(K, rho)` 식 revision과 승인 시각을 넣는다. 평가 block은 task×반복이며 네 조건을 한 번씩 포함한다. 선별 manifest에는 과제당 최대 20개 trial과 조기 종료 전이 규칙을 모두 넣고, 실제로 시작하지 않은 trial도 `cancelled_by_futility` 상태로 남긴다. 각 attempt에는 artifact manifest hash, container instance ID, workspace instance ID와 provider dispatch 시각 또는 미발생 상태를 기록한다.
 
-manifest는 첫 trial 전에 비공개 Blob과 로컬에 함께 고정한다. pause·resume·retry는 같은 manifest를 사용한다. 계획에 없던 trial을 실행하면 별도 protocol deviation으로 기록하고 주분석 분모에 자동 편입하지 않는다.
+randomization manifest와 분석 계획 manifest는 첫 선별 trial 전에 비공개 Blob과 로컬에 함께 고정한다. pause·resume·retry는 같은 manifest를 사용한다. 계획에 없던 trial을 실행하면 별도 protocol deviation으로 기록하고 주분석 분모에 자동 편입하지 않는다. 선별 뒤 분석 계획에서 바꾸는 값은 실제 평가 적격 과제 수 `K`와 그 값으로 계산한 `R`뿐이며, 평가 뒤 관측한 두 상관은 민감도 분석에만 사용한다.
 
 ## workspace replay gate
 
