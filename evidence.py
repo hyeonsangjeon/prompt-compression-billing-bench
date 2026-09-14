@@ -45,6 +45,8 @@ PUBLIC_FILES = {
     "examples/static/manifest.json", "examples/static/requests/0000.json",
     "data/eda/task-candidate-share.csv", "data/eda/lineage.json", "figures/task-candidate-share.svg",
     "docs/local-native.md", "docs/static-contract.md", "docs/publication.md",
+    "docs/experiment/README.md", "docs/experiment/protocol.md", "docs/experiment/baseline.md",
+    "docs/experiment/compressors.md", "docs/experiment/decisions.md",
     "tests/test_protection.py", "tests/test_static.py", "tests/test_eda.py", "tests/test_compare.py",
     "src/eda_report.py", "tests/test_eda_report.py", "docs/eda/README.md", "docs/eda/manifest.json",
     "docs/eda/figures/round1/01-input-size.svg", "docs/eda/figures/round1/02-input-composition.svg",

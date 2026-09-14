@@ -27,6 +27,11 @@ The [two-round EDA review (Korean)](docs/eda/README.md) collects the existing
 benchmark/input figures and tables with sample counts, denominators and measurement
 labels. Its ten figures use relative paths; tool-behavior experiments are separate.
 
+The [experiment record (Korean)](docs/experiment/README.md) separates the fixed
+protocol, the measured none baseline, static compressor measurements and open
+decisions. The none baseline completed 20 repetitions but stopped inconclusive
+under its predeclared rule. No native compressor comparison has run.
+
 Static token reductions do not establish native quality, prompt-cache behavior,
 recovery overhead or cost savings. Setting temperature to zero or reasoning effort
 to none does not make a model deterministic or undo the native harness's existing
@@ -71,7 +76,7 @@ version. Binary distribution is an [open readiness item](STATUS.md).
 - Separate `tool_reported`, `measured_local` and `measured_billed` fields. No API calls means billing is **not measured**, not a measured zero.
 - A reproducible aggregate EDA chart; raw historical requests are not distributed.
 - An optional [local-model native runner](docs/local-native.md), not yet connected to the compressor pipeline.
-- An opt-in [Harbor/Foundry candidate-compression runner](docs/native-contract.md) for none, squeez, a Headroom paths-only profile and LLMLingua-2, with a shared protected transport, per-task workload metrics, a five-repetition continuation gate and local-first Blob result retrieval. Its template cannot execute without approval and operational values; no native comparison result is claimed.
+- An opt-in [Harbor/Foundry candidate-compression runner](docs/native-contract.md) for none, squeez, a Headroom paths-only profile and LLMLingua-2, with a shared protected transport, per-task workload metrics, a five-repetition continuation gate and local-first Blob result retrieval. A none baseline is measured; native compressor comparisons remain unexecuted.
 
 ## Protection
 
@@ -105,14 +110,16 @@ an expanding result is recorded as an expansion rather than hidden.
 
 The real accountless Ollama path remains available separately, but its historical
 cached runs exceeded five minutes. The synthetic demo is not a substitute for that gap.
-The new native connection is tested with synthetic responses only; a real cloud
-comparison and execution-host resource cleanup have not been validated.
+The native path has one real none baseline with verified result retrieval and
+host deallocation. A compressor comparison and deployment-wide caller isolation
+have not been validated.
 
 | Need | Read |
 |---|---|
 | Exact execution, provenance, adapter and measurement contracts | [Static contract](docs/static-contract.md) |
 | Accountless native execution and historical evidence | [Local native runner](docs/local-native.md) |
 | Opt-in Foundry path, workload metrics and proposed baseline rule | [Native contract](docs/native-contract.md) |
+| Current protocol, baseline, static compressors and open decisions | [Experiment record](docs/experiment/README.md) |
 | Unsupported paths and readiness gaps | [Status](STATUS.md) |
 | What may be shared and what stays private | [Publication grades](docs/publication.md) |
 
