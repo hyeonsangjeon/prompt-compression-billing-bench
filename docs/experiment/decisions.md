@@ -94,3 +94,11 @@ Terminal-Bench 2.1 원본 verifier는 Nginx에서 동등한 `$http_user_agent`�
 ## 이전 실험과의 관계
 
 기존 목적 선정 5과제 기준선은 100개 native `trial`에서 판정 불가로 끝났다. 최종 workspace 재생 계약도 충족하지 않아 새 선별 자료로 재사용하지 않는다. [기존 1차 실험 규약](protocol.md)과 [기준선 기록](baseline.md)은 당시 실행의 원본 판단으로 유지한다.
+
+## provider 호출 상한 종료 처리
+
+**관측:** 정식 선별의 `gpt2-codegolf`는 네 번째 provider 요청이 HTTP 400 `content_filter`로 거부되어 첫 채점 전에 끝났다. 정식 분모에서 제외한 새 단일 과제 진단에서는 provider 요청 60건이 모두 HTTP 200이었고, 그중 2건은 `finish_reason=length`였다. Terminus 2는 출력 길이 제한 뒤 보정 호출을 사용했고, 60회 상한 다음 호출이 로컬에서 차단되자 verifier를 실행하지 않았다. 두 실행의 요청 내용과 작업 이력이 달라 HTTP 400의 재현 여부를 같은 입력 비교로 말할 수 없다.
+
+**처리:** 과제당 provider 호출 상한 60회, `max_turns=60`, 시간과 비용 상한은 바꾸지 않는다. 60회에 닿으면 새 provider 호출 없이 agent 실행을 끝내고 현재 workspace를 verifier로 채점한다. 저장·복원·재채점과 원격 hash 확인이 끝난 결과만 품질 분모에 넣는다. 수정 전 두 `gpt2-codegolf` 실행은 기술 진단으로 남기며 사후 품질 결과로 바꾸지 않는다.
+
+**한계:** 이 처리는 Terminus 2가 호출 상한에 닿았을 때 verifier가 생략되는 실행 경로를 고친다. 터미널에서 오래 실행 중인 명령을 모델이 중단하지 못한 원인이나 HTTP 400 정책 거부를 고치지 않는다. 실제 단일 과제 전체 경로 검증은 수정 source commit에서 별도로 수행한다.

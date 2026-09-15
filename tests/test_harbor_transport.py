@@ -5,7 +5,7 @@ from pathlib import Path
 import socket
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from native_helpers import FixtureEncoder, ImmediateQueue, ledger_fixture, response_fixture
 from src.compressors import NoOpCompressor
@@ -15,6 +15,28 @@ from src.task_metrics import read_events
 
 @unittest.skipUnless(importlib.util.find_spec("harbor"), "Install the locked native extra for Harbor integration")
 class HarborTransportTests(unittest.IsolatedAsyncioTestCase):
+    async def test_call_limit_ends_agent_loop_without_hiding_other_errors(self):
+        from harbor.agents.terminus_2.terminus_2 import Terminus2
+        from src.harbor_agent import ObservedTerminus2
+
+        agent = object.__new__(ObservedTerminus2)
+        agent.logger = Mock()
+        with patch.object(
+            Terminus2,
+            "_run_agent_loop",
+            new=AsyncMock(side_effect=RuntimeError("trial_call_limit_reached")),
+        ):
+            self.assertIsNone(await agent._run_agent_loop())
+        agent.logger.warning.assert_called_once()
+
+        with patch.object(
+            Terminus2,
+            "_run_agent_loop",
+            new=AsyncMock(side_effect=RuntimeError("different failure")),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "different failure"):
+                await agent._run_agent_loop()
+
     async def test_actual_harbor_sdk_serialization_reaches_only_fake_upstream(self):
         """Real SDK to loopback; non-loopback socket connections are forbidden."""
         temporary = tempfile.TemporaryDirectory()

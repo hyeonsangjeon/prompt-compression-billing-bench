@@ -290,6 +290,10 @@ def _classify_attempt(attempt: dict, process: dict, recorder: LiveRecorder, tran
     dispatched = provider["http_attempts"] > 0
     with recorder.lock:
         request_failure = recorder.trials[attempt_id]["failure"]
+    call_limit_reached = (
+        request_failure is not None
+        and request_failure.get("reason") == "TrialCallLimitReached"
+    )
     outcome = collect_native_outcome(job, process=process, transport_failure=None)
     completed_process = not process["timed_out"] and not process["stopped_by_guard"] and process["returncode"] == 0
     metrics = collect_trial_metrics(job, transport, attempt_id, process_complete=completed_process)
@@ -308,7 +312,7 @@ def _classify_attempt(attempt: dict, process: dict, recorder: LiveRecorder, tran
         result = "timeout"
     elif native_timeout:
         result = "timeout"
-    elif request_failure is not None:
+    elif request_failure is not None and not call_limit_reached:
         reason = request_failure["reason"]
         result = "network_error" if reason in {
             "TimeoutError", "ConnectionError", "OSError", "ClientDisconnectedAfterDispatch",
@@ -366,6 +370,7 @@ def _classify_attempt(attempt: dict, process: dict, recorder: LiveRecorder, tran
         },
         "verifier_test_ids": test_ids,
         "request_failure": request_failure,
+        "provider_call_limit_reached": call_limit_reached,
     }
 
 

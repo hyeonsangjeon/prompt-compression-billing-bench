@@ -11,7 +11,14 @@ from unittest.mock import patch
 
 from native_helpers import FixtureEncoder, ImmediateQueue, ledger_fixture, request_fixture, response_fixture
 from src.compressors import NoOpCompressor
-from src.live_transport import DeploymentQueue, FoundrySender, LiveRecorder, TrialRequestBlocked, provider_timing, start_live_proxy
+from src.live_transport import (
+    DeploymentQueue,
+    FoundrySender,
+    LiveRecorder,
+    TrialRequestBlocked,
+    provider_timing,
+    start_live_proxy,
+)
 from src.protection import FrozenRequestGuard, ProtectionViolation, canonical
 from src.task_metrics import read_events
 
@@ -280,6 +287,26 @@ class LiveTransportTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "budget"):
             self.recorder.complete("trial-one", canonical(request_fixture()))
         self.assertEqual(self.sent, [])
+
+    def test_trial_call_limit_has_a_distinct_local_response(self):
+        self.ledger["limits"]["max_calls_per_trial"] = 1
+        self.recorder.request_error_scope = "trial"
+        server = start_live_proxy(self.recorder, "synthetic-key")
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{server.server_port}/trial-one/v1/chat/completions",
+            data=canonical(request_fixture()),
+            headers={"Authorization": "Bearer synthetic-key", "Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(request, timeout=3) as response:
+            self.assertEqual(response.status, 200)
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(request, timeout=3)
+        self.assertEqual(error.exception.code, 409)
+        self.assertEqual(json.load(error.exception)["error"]["type"], "trial_call_limit_reached")
+        self.assertEqual(self.recorder.trials["trial-one"]["failure"]["reason"], "TrialCallLimitReached")
+        self.assertEqual(len(self.sent), 1)
 
 
 class QueueTests(unittest.TestCase):

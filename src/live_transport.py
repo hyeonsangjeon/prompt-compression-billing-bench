@@ -158,6 +158,13 @@ class TrialRequestBlocked(RuntimeError):
         self.failure = failure
 
 
+class TrialCallLimitReached(RuntimeError):
+    pass
+
+
+TRIAL_CALL_LIMIT_ERROR = "trial_call_limit_reached"
+
+
 class DeploymentQueue:
     def __init__(self, path: Path, deployment: str, rpm: int, tpm: int, *, clock=time.time):
         if type(rpm) is not int or type(tpm) is not int or rpm < 1 or tpm < 1:
@@ -412,8 +419,10 @@ class LiveRecorder:
                 raise ProtectionViolation("A finished trial cannot issue another request")
             if trial["failure"] is not None:
                 raise TrialRequestBlocked(trial_id, trial["failure"])
-            if len(source) > limits["max_request_bytes"] or trial["calls"] >= limits["max_calls_per_trial"]:
-                raise ValueError("Request size or trial call limit reached")
+            if len(source) > limits["max_request_bytes"]:
+                raise ValueError("Request size limit reached")
+            if trial["calls"] >= limits["max_calls_per_trial"]:
+                raise TrialCallLimitReached("Provider call limit reached")
             self.sequence += 1
             request_number = self.sequence
             trial["calls"] += 1
@@ -620,7 +629,20 @@ def start_live_proxy(recorder: LiveRecorder, key: str) -> ThreadingHTTPServer:
             try:
                 status, body = recorder.complete(match[1], source)
             except Exception:
-                status, body = 503, b'{"error":{"type":"run_stopped","message":"See private run diagnostics; later requests are blocked"}}'
+                with recorder.lock:
+                    trial = recorder.trials.get(match[1])
+                    failure = None if trial is None else trial.get("failure")
+                if failure is not None and failure.get("reason") == "TrialCallLimitReached":
+                    status = 409
+                    body = json.dumps({
+                        "error": {
+                            "type": TRIAL_CALL_LIMIT_ERROR,
+                            "code": TRIAL_CALL_LIMIT_ERROR,
+                            "message": TRIAL_CALL_LIMIT_ERROR,
+                        },
+                    }, separators=(",", ":")).encode()
+                else:
+                    status, body = 503, b'{"error":{"type":"run_stopped","message":"See private run diagnostics; later requests are blocked"}}'
             try:
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")

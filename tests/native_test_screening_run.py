@@ -129,6 +129,18 @@ class ScreeningRunTests(unittest.TestCase):
         disconnected = self.classify(quality_outcome(), events=dispatched)
         self.assertEqual(disconnected["result"], "network_error")
 
+        self.recorder.trials[self.attempt_id]["failure"] = {
+            "reason": "TrialCallLimitReached", "details": {"message": "synthetic"},
+        }
+        call_limited = self.classify(quality_outcome(reward=0, valid=True), events=dispatched)
+        self.assertEqual(call_limited["result"], "wrong_answer")
+        self.assertTrue(call_limited["provider_call_limit_reached"])
+
+        self.recorder.trials[self.attempt_id]["failure"] = {
+            "reason": "ClientDisconnectedAfterDispatch",
+            "details": {"error_type": "OSError", "message": "synthetic"},
+        }
+
         timed_out = quality_outcome(
             reward=0,
             valid=True,
