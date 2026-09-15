@@ -12,6 +12,7 @@ from src.screening_contract import load_screening_ledger
 from src.screening_run import (
     _attempt_intervals,
     _classify_attempt,
+    _reported_task_id,
     main,
     screening_harbor_config,
 )
@@ -86,6 +87,15 @@ class ScreeningRunTests(unittest.TestCase):
             "src.replay_environment:PreservingDockerEnvironment",
         )
         self.assertNotIn("type", config["environment"])
+
+    def test_install_preflight_maps_harbor_source_prefix_to_inventory_task(self):
+        expected = {"alpha-task", "beta-task"}
+        self.assertEqual(_reported_task_id("alpha-task", expected), "alpha-task")
+        self.assertEqual(_reported_task_id("terminal-bench/beta-task", expected), "beta-task")
+        with self.assertRaisesRegex(ValueError, "unambiguous inventory task"):
+            _reported_task_id("terminal-bench/unknown-task", expected)
+        with self.assertRaisesRegex(ValueError, "unambiguous inventory task"):
+            _reported_task_id("source/nested/task", {"task", "nested/task"})
 
     def test_classification_keeps_quality_and_technical_failures_separate(self):
         passed = self.classify(quality_outcome(reward=1, valid=True))

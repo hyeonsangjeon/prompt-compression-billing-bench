@@ -826,6 +826,15 @@ def execute_screening(ledger_path: Path, source_commit: str, *, resume_directory
     return directory
 
 
+def _reported_task_id(reported: str, expected: set[str]) -> str:
+    if not isinstance(reported, str) or not reported:
+        raise ValueError("Harbor install preflight omitted the task name")
+    matches = [task_id for task_id in expected if reported == task_id or reported.endswith("/" + task_id)]
+    if len(matches) != 1:
+        raise ValueError(f"Harbor install preflight task name is not an unambiguous inventory task: {reported}")
+    return matches[0]
+
+
 def run_install_preflight(ledger_path: Path, source_commit: str, output: Path) -> dict:
     setup = screening_preflight(ledger_path, source_commit)
     output = output.resolve()
@@ -848,16 +857,21 @@ def run_install_preflight(ledger_path: Path, source_commit: str, output: Path) -
         stderr=subprocess.STDOUT,
         timeout=setup["ledger"]["limits"]["max_wall_seconds"],
     )
+    expected = {task["task_id"] for task in setup["inventory"]["tasks"] if task["exclusion"] is None}
     results = {}
     for path in sorted((output / "jobs" / "install-preflight").glob("*/result.json")):
         result = json.loads(path.read_bytes())
-        results[result["task_name"]] = {
+        reported_task_name = result["task_name"]
+        task_id = _reported_task_id(reported_task_name, expected)
+        if task_id in results:
+            raise ValueError(f"Harbor install preflight recorded a duplicate task: {task_id}")
+        results[task_id] = {
             "result_path": path.relative_to(output).as_posix(),
+            "reported_task_name": reported_task_name,
             "exception_type": (result.get("exception_info") or {}).get("exception_type"),
             "environment_setup": result.get("environment_setup"),
             "agent_setup": result.get("agent_setup"),
         }
-    expected = {task["task_id"] for task in setup["inventory"]["tasks"] if task["exclusion"] is None}
     failures = sorted(task for task in expected if task not in results or results[task]["exception_type"])
     record = {
         "schema_version": 1,
