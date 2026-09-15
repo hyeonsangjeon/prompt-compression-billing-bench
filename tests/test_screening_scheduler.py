@@ -101,6 +101,39 @@ class ScreeningSchedulerTests(unittest.TestCase):
         task = self.state.connection.execute("SELECT state,reason FROM tasks WHERE task_id=?", (trial["task_id"],)).fetchone()
         self.assertEqual(tuple(task), ("ineligible", "setup_error"))
 
+    def test_vm_deallocation_preserves_first_attempt_and_schedules_one_fresh_attempt(self):
+        trial = self.state.claim(1)[0]
+        self.state.mark_attempt_runtime(
+            trial["attempt_id"], process_id=101, artifact_manifest_hash="a" * 64,
+            container_instance_id="container-1", workspace_instance_id="workspace-1",
+        )
+        self.state.pause_interrupted()
+        self.state.retry_paused_after_infrastructure_interruption(
+            trial["attempt_id"], provider_dispatched=True, evidence_sha256="e" * 64,
+            cost_usd=0.25, reason="vm_deallocated",
+        )
+        first = self.state.connection.execute(
+            "SELECT state,error_category,cost_usd FROM attempts WHERE attempt_id=?",
+            (trial["attempt_id"],),
+        ).fetchone()
+        self.assertEqual(tuple(first), ("completed", "infrastructure_interruption", 0.25))
+        task = self.state.connection.execute(
+            "SELECT state,valid_results,passes,quality_failures FROM tasks WHERE task_id=?",
+            (trial["task_id"],),
+        ).fetchone()
+        self.assertEqual(tuple(task), ("eligible_for_screening", 0, 0, 0))
+        retried = self.state.claim(1)[0]
+        self.assertEqual((retried["trial_id"], retried["attempt_number"]), (trial["trial_id"], 2))
+        self.state.mark_attempt_runtime(
+            retried["attempt_id"], process_id=102, artifact_manifest_hash="a" * 64,
+            container_instance_id="container-2", workspace_instance_id="workspace-2",
+        )
+        with self.assertRaisesRegex(ValueError, "paused first attempt"):
+            self.state.retry_paused_after_infrastructure_interruption(
+                trial["attempt_id"], provider_dispatched=True, evidence_sha256="f" * 64,
+                cost_usd=0.25, reason="vm_deallocated",
+            )
+
     def test_provider_request_and_attempt_ids_are_unique(self):
         trial = self.state.claim(1)[0]
         self.state.mark_provider_dispatch(trial["attempt_id"], "provider-request-1", 0.25,

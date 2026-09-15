@@ -339,6 +339,58 @@ class ScreeningState:
             cost_usd=cost_usd, verifier_test_ids=verifier_test_ids, allowed_state="paused",
         )
 
+    def retry_paused_after_infrastructure_interruption(
+        self,
+        attempt_id: str,
+        *,
+        provider_dispatched: bool,
+        evidence_sha256: str,
+        cost_usd: float | None,
+        reason: str,
+    ) -> None:
+        if reason != "vm_deallocated":
+            raise ValueError("Only a recorded VM deallocation may use infrastructure recovery")
+        if not re.fullmatch(r"[0-9a-f]{64}", evidence_sha256):
+            raise ValueError("Attempt evidence hash is invalid")
+        with self.transaction():
+            attempt = self.connection.execute(
+                "SELECT * FROM attempts WHERE attempt_id=?", (attempt_id,)
+            ).fetchone()
+            if attempt is None or attempt["state"] != "paused" or attempt["attempt_number"] != 1:
+                raise ValueError("Infrastructure recovery requires one paused first attempt")
+            trial = self.connection.execute(
+                "SELECT * FROM trials WHERE trial_id=?", (attempt["trial_id"],)
+            ).fetchone()
+            if trial is None or trial["state"] != "paused":
+                raise ValueError("Infrastructure recovery trial is not paused")
+            if self.connection.execute(
+                "SELECT COUNT(*) FROM attempts WHERE trial_id=? AND attempt_number>1",
+                (attempt["trial_id"],),
+            ).fetchone()[0]:
+                raise ValueError("Infrastructure recovery cannot schedule another retry")
+            if not all((
+                attempt["artifact_manifest_hash"],
+                attempt["container_instance_id"],
+                attempt["workspace_instance_id"],
+            )):
+                raise ValueError("Interrupted attempt runtime identity is incomplete")
+            finished_at = utc_now()
+            self.connection.execute(
+                """UPDATE attempts SET state='completed',provider_dispatched=?,
+                          error_category='infrastructure_interruption',finished_at=?,
+                          evidence_sha256=?,cost_usd=? WHERE attempt_id=?""",
+                (int(provider_dispatched), finished_at, evidence_sha256, cost_usd, attempt_id),
+            )
+            self.connection.execute(
+                "UPDATE trials SET state='retry_pending' WHERE trial_id=?", (trial["trial_id"],)
+            )
+            self._event(
+                "infrastructure_interruption_retry_pending",
+                trial_id=trial["trial_id"],
+                attempt_id=attempt_id,
+                details={"reason": reason, "provider_dispatched": provider_dispatched},
+            )
+
     def _complete_attempt(self, attempt_id: str, result: str, *, provider_dispatched: bool,
                           evidence_sha256: str, cost_usd: float | None,
                           artifact_manifest_hash: str | None = None, container_instance_id: str | None = None,
