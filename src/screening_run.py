@@ -18,7 +18,7 @@ import sys
 import time
 
 from accounting import now
-from .blob_retrieval import make_blob_spool, resume_blob_spool, retrieval_settings
+from .blob_retrieval import atomic_json, make_blob_spool, resume_blob_spool, retrieval_settings
 from .compressors import NoOpCompressor
 from .contracts import safe_child, save_json
 from .live_observations import POLICY
@@ -581,7 +581,7 @@ def _stage_checkpoint(directory: Path, state: ScreeningState, summary: dict, spo
         },
     )
     summary["latest_checkpoint"] = staged
-    save_json(directory / "summary.json", summary)
+    atomic_json(directory / "summary.json", summary)
     return staged
 
 
@@ -821,7 +821,7 @@ def execute_screening(ledger_path: Path, source_commit: str, *, resume_directory
         summary["retrieval"] = retrieval
         if retrieval["upload_state"] != "uploaded" and summary["status"] == "complete":
             summary["status"] = "retrieval_pending"
-        save_json(directory / "summary.json", summary)
+        atomic_json(directory / "summary.json", summary)
         state.close()
     return directory
 

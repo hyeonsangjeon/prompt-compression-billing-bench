@@ -13,6 +13,7 @@ from src.screening_run import (
     _attempt_intervals,
     _classify_attempt,
     _reported_task_id,
+    _stage_checkpoint,
     main,
     screening_harbor_config,
 )
@@ -150,6 +151,35 @@ class ScreeningRunTests(unittest.TestCase):
         }
         with self.assertRaisesRegex(ValueError, "finishes before"):
             _attempt_intervals([reversed_time])
+
+    def test_repeated_checkpoints_replace_the_mutable_run_summary_atomically(self):
+        class State:
+            def backup(self, target):
+                target.write_bytes(b"state")
+
+            def summary(self):
+                return {"completed_attempts": 0}
+
+        class Spool:
+            def __init__(self):
+                self.items = []
+
+            def report(self):
+                return {"items": list(self.items)}
+
+            def stage_directory(self, source, item_id, *, kind, metadata):
+                self.items.append({"item_id": item_id})
+                return {"item_id": item_id, "metadata": metadata}
+
+        summary = {"status": "running"}
+        spool = Spool()
+        _stage_checkpoint(self.root, State(), summary, spool)
+        _stage_checkpoint(self.root, State(), summary, spool)
+        written = json.loads((self.root / "summary.json").read_bytes())
+        self.assertEqual(written["checkpoint_sequence"], 2)
+        self.assertEqual([item["item_id"] for item in spool.items], [
+            "run-state-000001", "run-state-000002",
+        ])
 
     def test_cli_routes_resume_without_treating_it_as_a_new_run(self):
         ledger = self.root / "ledger.toml"

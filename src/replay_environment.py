@@ -39,19 +39,27 @@ def parse_docker_diff(output: str) -> list[dict]:
 def changed_leaf_paths(records: list[dict]) -> list[dict]:
     changed = [record for record in records if record["change"] in ("A", "C")]
     paths = [PurePosixPath(record["path"]) for record in changed]
+    changed_paths = set(paths)
+    paths_with_changed_descendants = {
+        parent
+        for path in paths
+        for parent in path.parents
+        if parent in changed_paths
+    }
     return [
         record
         for record, path in zip(changed, paths, strict=True)
-        if not any(path != other and path in other.parents for other in paths)
+        if path not in paths_with_changed_descendants
     ]
 
 
 def deleted_root_paths(records: list[dict]) -> list[str]:
     deleted = [PurePosixPath(record["path"]) for record in records if record["change"] == "D"]
+    deleted_paths = set(deleted)
     return [
         path.as_posix()
         for path in deleted
-        if not any(path != other and other in path.parents for other in deleted)
+        if not any(parent in deleted_paths for parent in path.parents)
     ]
 
 

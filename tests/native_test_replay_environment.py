@@ -46,6 +46,15 @@ class ReplayEnvironmentTests(unittest.IsolatedAsyncioTestCase):
             {"change": "A", "path": "/tmp/empty"},
         ])
 
+    def test_changed_paths_handle_observed_large_diff_without_pairwise_comparison(self):
+        records = [{"change": "C", "path": "/usr"}] + [
+            {"change": "A", "path": f"/usr/lib/package-{index}/output"}
+            for index in range(13_108)
+        ]
+        selected = changed_leaf_paths(records)
+        self.assertEqual(len(selected), 13_108)
+        self.assertNotIn(records[0], selected)
+
     def test_deleted_paths_copy_only_outer_roots(self):
         records = parse_docker_diff("D /app/old\nD /app/old/child\nD /tmp/other\n")
         self.assertEqual(deleted_root_paths(records), ["/app/old", "/tmp/other"])
