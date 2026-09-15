@@ -44,6 +44,6 @@ jobs:
         run: uv sync --locked --extra native
       - name: Exercise actual Harbor code with synthetic responses only
         run: |
-          for test_file in test_harbor_transport.py native_test_harbor_preflight.py test_native_contract.py test_native_compressors.py test_task_metrics.py test_native_run.py; do
+          for test_file in test_harbor_transport.py native_test_harbor_preflight.py native_test_replay_environment.py native_test_screening_run.py test_native_contract.py test_native_compressors.py test_task_metrics.py test_native_run.py; do
             uv run --locked --extra native python -m unittest discover -s tests -p "$test_file" -v
           done

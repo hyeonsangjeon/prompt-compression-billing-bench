@@ -151,6 +151,13 @@ def provider_timing(response: dict | None, client_http_seconds: float) -> dict:
     return timing
 
 
+class TrialRequestBlocked(RuntimeError):
+    def __init__(self, trial_id: str, failure: dict):
+        super().__init__(f"Trial {trial_id} cannot issue another request")
+        self.trial_id = trial_id
+        self.failure = failure
+
+
 class DeploymentQueue:
     def __init__(self, path: Path, deployment: str, rpm: int, tpm: int, *, clock=time.time):
         if type(rpm) is not int or type(tpm) is not int or rpm < 1 or tpm < 1:
@@ -281,10 +288,13 @@ class ManagedIdentity:
 
 class LiveRecorder:
     def __init__(self, directory: Path, ledger: dict, source_commit: str, compressor, encoder, queue, sender,
-                 *, condition="none", evidence_kind="native_measurement"):
+                 *, condition="none", evidence_kind="native_measurement", request_error_scope="run"):
         self.directory, self.ledger, self.source_commit = directory, ledger, source_commit
         self.compressor, self.encoder, self.queue, self.sender = compressor, encoder, queue, sender
         self.condition, self.evidence_kind = condition, evidence_kind
+        if request_error_scope not in ("run", "trial"):
+            raise ValueError("Request error scope must be run or trial")
+        self.request_error_scope = request_error_scope
         directory.mkdir(parents=True, exist_ok=False)
         self.lock = threading.RLock()
         self.event_lock = threading.Lock()
@@ -310,7 +320,10 @@ class LiveRecorder:
             self.check()
             if not re.fullmatch(r"[a-z0-9-]+", trial_id) or trial_id in self.trials:
                 raise ValueError("A new safe trial identifier is required")
-            self.trials[trial_id] = {"task": task, "repetition": repetition, "calls": 0, "assistant_hashes": set(), "closed": False}
+            self.trials[trial_id] = {
+                "task": task, "repetition": repetition, "calls": 0,
+                "assistant_hashes": set(), "closed": False, "failure": None,
+            }
 
     def close_trial(self, trial_id: str):
         with self.lock:
@@ -352,7 +365,25 @@ class LiveRecorder:
             self.check()
             return self._complete(trial_id, source)
         except Exception as error:
-            self.stop(type(error).__name__, getattr(error, "details", {"message": str(error)}))
+            details = getattr(error, "details", {"message": str(error)})
+            run_wide = self.request_error_scope == "run" or isinstance(error, ProtectionViolation) or str(error) in {
+                "Run deadline reached",
+                "Run budget reservation would exceed the ledger ceiling",
+                "Provider total tokens disagree with input plus output",
+                "Provider usage exceeded reservation; stop rather than silently expand it",
+                "Provider-reported model revision differs from the ledger",
+            }
+            if run_wide:
+                self.stop(type(error).__name__, details)
+            else:
+                with self.lock:
+                    trial = self.trials.get(trial_id)
+                    if trial is not None and trial["failure"] is None:
+                        trial["failure"] = {"reason": type(error).__name__, "details": details}
+                        self.event({
+                            "event": "trial_request_failed", "trial_id": trial_id,
+                            **trial["failure"],
+                        })
             raise
 
     def _complete(self, trial_id: str, source: bytes) -> tuple[int, bytes]:
@@ -362,6 +393,8 @@ class LiveRecorder:
             trial = self.trials[trial_id]
             if trial["closed"]:
                 raise ProtectionViolation("A finished trial cannot issue another request")
+            if trial["failure"] is not None:
+                raise TrialRequestBlocked(trial_id, trial["failure"])
             if len(source) > limits["max_request_bytes"] or trial["calls"] >= limits["max_calls_per_trial"]:
                 raise ValueError("Request size or trial call limit reached")
             self.sequence += 1

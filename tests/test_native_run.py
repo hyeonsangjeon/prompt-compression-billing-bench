@@ -252,6 +252,25 @@ class NativeRunTests(unittest.TestCase):
             self.assertTrue(result["stopped_by_guard"] if mode == "guard" else result["timed_out"])
             self.assertLess(result["elapsed_seconds"], 5)
 
+    def test_supervisor_stops_child_when_runtime_identity_recording_fails(self):
+        stopped = threading.Event()
+        recorder = SimpleNamespace(
+            stopped=stopped,
+            deadline=time.time() + 5,
+            check=lambda: None,
+            stop=lambda _reason: stopped.set(),
+        )
+        with self.assertRaisesRegex(RuntimeError, "synthetic state failure"):
+            supervise(
+                [sys.executable, "-c", "import time; time.sleep(60)"],
+                self.root / "callback-failure.log",
+                recorder,
+                5,
+                runtime_environment("synthetic"),
+                on_start=lambda _process_id: (_ for _ in ()).throw(RuntimeError("synthetic state failure")),
+            )
+        self.assertTrue(stopped.is_set())
+
 
 if __name__ == "__main__":
     unittest.main()

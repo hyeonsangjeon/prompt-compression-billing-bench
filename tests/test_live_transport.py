@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 from native_helpers import FixtureEncoder, ImmediateQueue, ledger_fixture, request_fixture, response_fixture
 from src.compressors import NoOpCompressor
-from src.live_transport import DeploymentQueue, FoundrySender, LiveRecorder, provider_timing, start_live_proxy
+from src.live_transport import DeploymentQueue, FoundrySender, LiveRecorder, TrialRequestBlocked, provider_timing, start_live_proxy
 from src.protection import FrozenRequestGuard, ProtectionViolation, canonical
 from src.task_metrics import read_events
 
@@ -203,6 +203,30 @@ class LiveTransportTests(unittest.TestCase):
         response = next(event for event in read_events(self.root / "transport/events.jsonl") if event["event"] == "http")
         self.assertIsNone(response["status"])
         self.assertTrue(response["billing_unknown"])
+        self.assertTrue(self.recorder.stopped.is_set())
+
+    def test_trial_scoped_network_failure_does_not_stop_other_screening_trial(self):
+        recorder = LiveRecorder(
+            self.root / "screening-transport", self.ledger, "a" * 40,
+            NoOpCompressor({"options": {}}, self.root), FixtureEncoder(), self.queue,
+            lambda _body: (_ for _ in ()).throw(TimeoutError("synthetic network timeout")),
+            evidence_kind="synthetic_validation", request_error_scope="trial",
+        )
+        recorder.register_trial("trial-one", "task-one", 1)
+        recorder.register_trial("trial-two", "task-two", 1)
+        with self.assertRaises(TimeoutError):
+            recorder.complete("trial-one", canonical(request_fixture()))
+        self.assertFalse(recorder.stopped.is_set())
+        with self.assertRaises(TrialRequestBlocked):
+            recorder.complete("trial-one", canonical(request_fixture()))
+        recorder.sender = lambda _body: (200, response_fixture(), {})
+        self.assertEqual(recorder.complete("trial-two", canonical(request_fixture()))[0], 200)
+
+    def test_trial_scope_keeps_protection_failure_run_wide(self):
+        self.recorder.request_error_scope = "trial"
+        self.recorder.serialize = lambda payload: canonical({**payload, "temperature": 1})
+        with self.assertRaises(ProtectionViolation):
+            self.recorder.complete("trial-one", canonical(request_fixture()))
         self.assertTrue(self.recorder.stopped.is_set())
 
     def test_loopback_proxy_uses_the_same_guarded_recorder(self):

@@ -1,199 +1,128 @@
 # Terminal-Bench 2.1 평가 과제 선별 규약
 
-**상태:** 실행 전 설계안이다. 선별 실행은 0회다. 평가 적격은 과제당 20개 유효 결과 중 18회 이상 통과로 판정한다. 시간 순서와 실패 category·test ID는 D1 진단 지표로만 기록하고, 준비 단계에는 F1-R1을 적용한다. nginx verifier v2는 2026-09-14 UTC에 기존 diff·source SHA·effective SHA·fixture 범위로만 조건부 승인됐다. 여기서 `평가 적격`은 정해진 평가에 넣을 조건을 충족했다는 뜻이며, 작은 반복 표본으로 과제나 모델의 진짜 안정성을 증명했다는 뜻이 아니다.
+**상태:** 2026-09-15 UTC 기준 사전등록 문서다. 모델을 호출한 선별 실행은 아직 0회다. 아래 진행 조건을 모두 확인한 뒤 추가 압축 없는 조건으로 선별을 시작한다.
 
-기존 [1차 실험 규약](protocol.md)은 목적 선정 5과제 기록으로 그대로 둔다. 이 문서는 전체 모집단에서 새 평가 과제를 고르는 후속 설계다.
+## 선별이 답할 질문
 
-## 선별 모집단
+Terminal-Bench 2.1 고정 revision의 89과제 중 어떤 과제가 압축 비교에 들어갈 최소 품질 증거를 갖추는지 정한다. 평가 적격은 과제당 최대 20개의 유효한 품질 결과 중 18회 이상 통과한 경우다. 이 표현은 작은 표본으로 과제나 모델의 안정성을 증명했다는 뜻이 아니다.
 
-| 항목 | 고정값 | 성격 |
+선별이 끝나면 통과한 정확한 과제 ID 집합만 평가 모집단으로 쓴다. 선별에서 탈락한 과제와 다른 유사 과제로 결론을 넓히지 않는다. 18/20 선별은 쉬운 과제와 높은 통과율 쪽으로 치우칠 수 있으므로, 이 선택 편향을 평가 결론의 한계로 남긴다.
+
+## 모집단과 고정 조건
+
+| 항목 | 값 | 상태 |
 | --- | --- | --- |
-| 벤치마크 | Terminal-Bench 2.1 | 설계 판단 |
-| revision | `7131e4375048a0e408a8fb404b5f499d726b695b` | 고정 조건 |
-| 모집단 | 공식 영어 과제 89/89개 | 고정 분모 |
-| 선별 조건 | 추가 압축 없는 `none` | 설계 판단 |
-| 제외 범위 | DeepSWE, 보호 우회 감사 | 설계 판단 |
+| 벤치마크 | Terminal-Bench 2.1, 89과제 | 고정 |
+| revision | `7131e4375048a0e408a8fb404b5f499d726b695b` | 고정 |
+| 선별 조건 | 추가 압축 없는 `none` | 고정 |
+| 모델 | `gpt-5.4`; 제공자가 돌려준 revision을 요청마다 기록 | 고정·실행 시 확인 |
+| 요청 설정 | temperature `0`, reasoning effort `none`, 최대 출력 2,048 token | 설정 기록이며 결정론 보장은 아님 |
+| 실행기 | Harbor `0.22.0`, 계측한 Terminus 2 | 고정 |
+| 병렬도 | 8 | 고정 |
+| 배포 한도 | 300,000 TPM, 3,000 RPM | 실행 전 재확인 |
+| 반복 | 과제당 최대 20개 유효한 품질 결과 | 고정 |
+| 채점 | 벤치마크 verifier와 승인된 nginx 수정본 | hash 고정 |
+| 로컬 token 계산 | tiktoken `0.14.0`, `o200k_base` | 청구 token과 별도 기록 |
 
-과제 유형은 [벤치마크 EDA](../eda/README.md#table-5)의 주된 산출물 기준 분류를 고정해 사용한다. 이는 저자 메타데이터가 아니라 분류 판단이다.
+DeepSWE와 보호 우회 검사는 이 선별 행렬에 넣지 않는다. 선별 결과를 평가의 동시 대조군으로 재사용하지 않는다. 평가는 각 과제와 반복 실행 안에서 `none`을 세 압축 조건과 다시 실행한다.
 
-| 주 유형 | 모집단 과제 수 | 분모 | 성격 |
-| --- | ---: | ---: | --- |
-| 기능 요청 | 31 | 89과제 | 분류 판단·집계 |
-| 버그 수정·디버깅 | 5 | 89과제 | 분류 판단·집계 |
-| 코드 리뷰 | 0 | 89과제 | 분류 판단·집계 |
-| 리팩터링 | 6 | 89과제 | 분류 판단·집계 |
-| 테스트 작성 | 0 | 89과제 | 분류 판단·집계 |
-| 환경 설정·빌드 | 16 | 89과제 | 분류 판단·집계 |
-| 그 밖에 | 31 | 89과제 | 분류 판단·집계 |
+## 결과를 보기 전에 고정하는 목록
 
-코드 리뷰와 테스트 작성은 모집단에 단독 과제가 없다. 다른 유형을 코드 리뷰로 바꾸거나 DeepSWE 과제를 넣어 빈 유형을 채우지 않는다.
+89과제의 다음 항목을 실행 전에 한 목록으로 만들고 SHA-256을 원장에 기록한다.
 
-## 결과를 보기 전 inventory 고정
+- 과제 ID와 유형 분류
+- instruction, task 설정, verifier와 직접 의존성 파일의 SHA-256
+- 컨테이너 이미지의 `linux/amd64` digest
+- 적용한 verifier revision과 수정 전후 SHA-256
+- 실행 가능 여부와 제외 사유
 
-89과제의 실행 가능성을 확인하기 전에 다음 필드를 과제 ID 순으로 정렬한 inventory를 만든다.
+실행할 수 없는 과제가 있으면 모델 결과를 보기 전에 제외 사유를 기록하고 목록 hash를 다시 고정한다. 결과를 본 뒤 과제를 바꾸거나 같은 유형의 다른 과제로 대체하지 않는다.
 
-```
-benchmark revision
-task ID
-task tree SHA-256
-instruction SHA-256
-task.toml SHA-256
-container image reference와 image SHA
-verifier source tree SHA-256
-verifier command와 dependency lock SHA-256
-주 유형과 분류표 revision
-```
+## 평가 적격 판정
 
-inventory hash는 위 레코드를 키 이름 순서가 고정된 공백 없는 UTF-8 JSON으로 직렬화한 뒤 계산한 SHA-256이다. 배열은 task ID 오름차순으로 고정한다. 구현이 생기기 전에는 임의의 hash를 문서에 채우지 않는다.
+| 항목 | 규칙 |
+| --- | --- |
+| 유효 결과 | provider 호출, agent 실행, verifier, 계측과 보존 증거가 모두 완전한 품질 결과 |
+| 통과 | native reward `1`과 구조화된 test 결과가 서로 맞음 |
+| 품질 실패 | `wrong_answer` 또는 `wrong_format`; 둘 다 실패 1건 |
+| 평가 적격 | 유효 결과 20개 중 18회 이상 통과 |
+| 조기 종료 | 세 번째 유효한 품질 실패가 확정되면 새 실행 예약을 중단 |
+| 실패 위치·종류·test ID | 진단용으로 기록하며 자동 탈락 조건으로 쓰지 않음 |
 
-`task tree SHA-256`은 `.git`과 실행 중 생성된 파일을 제외한 상대 경로, 파일 종류, mode, 크기와 파일 SHA-256을 상대 경로 오름차순으로 기록한 manifest의 SHA-256이다. symlink는 링크 대상 문자열을 hash 입력으로 삼는다. verifier 의존성 lock이 없는 과제는 `tests/test.sh`의 정확한 명령과 직접 pin을 별도 manifest로 남기고, 전이 의존성을 고정하지 못했다는 사실을 실행 가능성 판정에 기록한다.
+18/20이면 전반 10회와 후반 10회의 최소 통과 수가 자동으로 각각 8회가 된다. 따라서 절반마다 8회 이상이라는 조건을 추가하지 않는다. 대신 전반·후반 통과 수, 차이, 실패 순서, 최장 연속 실패와 누적 통과율을 기록한다. 이 값은 시간 변화 진단에만 쓰며 과제를 빼는 데 쓰지 않는다.
 
-실행 불가능한 과제가 있으면 모델 응답을 보기 전에 과제 ID, 제외 사유, 확인 시각, 확인 코드 revision을 inventory에 기록한다. 허용하는 사유는 고정 image를 가져오거나 시작할 수 없음, 필수 task 파일 누락, 고정 verifier 의존성을 준비할 수 없음, verifier를 원형 그대로 호출할 수 없음이다. 낮은 통과율, 긴 실행 시간, 불리한 결과는 사전 제외 사유가 아니다.
+정확히 18/20인 과제에서 두 실패 위치가 20개 자리에 균등하다고 가정하면, 두 실패가 같은 절반에 있는 비율은 `2×C(10,2)÷C(20,2)=90/190=47.37%`다. 실패가 같은 절반에 있다는 이유로 제외하면 같은 통과 횟수의 과제를 위치만으로 다르게 고를 수 있다. 47.37%는 조합 계산이며 실제 시간 변화의 측정값이 아니다.
 
-제외 전 89과제, 제외 과제, 실행 가능한 과제를 각각 분모로 남긴다. 제외가 생기면 제외 전 inventory hash와 실행 대상 inventory hash를 둘 다 보존한다.
+## 실패 분류와 한 번의 준비 재시도
 
-## 선별 실행의 고정 조건
+`trial`은 한 과제의 한 반복 실행이고, `attempt`는 그 안에서 실제로 시작한 실행이다. 재시도는 provider 호출 전에 같은 준비 작업이 실패한 경우에만 정확히 한 번 허용한다.
 
-| 항목 | 값 | 성격 |
-| --- | --- | --- |
-| 모델 | `gpt-5.4`, 제공자 보고 revision을 trial마다 기록 | 고정 조건·실행 시 확인 |
-| 생성 설정 | temperature `0`, reasoning effort `none`, 최대 completion 2,048 token | 고정 설정·결정론 보장 아님 |
-| 실행기 | Harbor `0.22.0`, instrumented Terminus 2 `2.0.0` | 고정 조건 |
-| 동시성 | native trial 8개 | 비교 통제 |
-| 채점 | 승인된 verifier revision | 승인 전 조건 |
-| 반복 | 과제당 최대 20개 유효 결과. 세 번째 품질 실패에서 새 trial 예약 중단 | 확정된 설계 판단 |
-| 증거 | [재현 계약](reproducibility-contract.md)의 필수 묶음 | 실행 전 차단 조건 |
+| 분류 | 품질 분모 | 재시도 | 과제 처리 |
+| --- | --- | --- | --- |
+| `image_error` | 제외 | 같은 artifact로 1회 | 두 번째 실패면 부적격 |
+| `setup_error` | 제외 | 같은 artifact로 1회 | 두 번째 실패면 부적격 |
+| `provider_error`·`network_error` | 제외 | transport 내부의 제한된 재시도만 | 소진되면 부적격 |
+| `timeout` | 제외 | 없음 | 부적격·느린 과제 제외 가능성 기록 |
+| `verifier_crash` | 제외 | 없음 | 부적격 |
+| `evidence_missing`·`replay_mismatch` | 제외 | 없음 | 부적격·실행 중단 검토 |
+| `wrong_answer`·`wrong_format` | 포함 | 없음 | 품질 실패 |
+| `pass` | 포함 | 없음 | 통과 |
 
-선별의 `none` 결과는 과제를 고르는 자료다. 평가는 시간대와 조건을 맞춘 `none`을 각 task×반복 블록 안에서 다시 실행한다. 선별 결과를 평가의 동시 대조군으로 재사용하지 않는다.
+준비 재시도는 첫 실행과 같은 immutable artifact와 hash를 사용한다. 실패한 컨테이너나 workspace를 재사용하지 않고 새 컨테이너와 새 workspace에서 새 `attempt` ID로 시작한다. artifact나 설정을 바꿔야 하면 재시도가 아니라 새 revision이므로 실행을 멈춘다.
 
-## 평가 적격 기준 B — 확정된 선별 규칙
+provider 호출이 한 번도 없으면 verifier가 우연히 통과해도 유효한 품질 결과로 세지 않는다. 첫 실행과 재시도의 시간, 비용, 오류, artifact hash는 모두 원장에 남긴다. 품질 결과는 `trial`당 한 번만 분모에 넣고, 실제로 시작한 모든 `attempt`의 비용은 포함한다.
 
-| 항목 | 기준 B | 상태·성격 |
-| --- | --- | --- |
-| 유효 결과 | 과제당 20개 | 확정. 준비 retry attempt는 별도이며 유효 결과로 중복 집계하지 않음 |
-| 총 통과 | 18/20 이상 | 확정. 9/10으로 환산하지 않음 |
-| 시간 순서 | D1 진단 지표 | 확정. 전후반 차이와 실패 위치로 자동 탈락시키지 않음 |
-| 품질 실패 | `wrong_answer`·`wrong_format` | 확정. 둘 다 품질 실패 1건이며 category·test ID는 기록만 함 |
-| 준비 retry | F1-R1 | 확정. 첫 provider 호출 전 동일 준비 작업만 fresh 환경에서 정확히 1회 |
-| 최종 과제 수 | 평가 적격 과제 `K`개 전부 | 확정. 일정 gate를 넘으면 일부를 자동 선정하지 않고 중단·승인 요청 |
+같은 과제는 동시에 두 번 실행하지 않는다. 세 번째 품질 실패 전에 이미 시작한 실행이 있다면 끝까지 보존하고 실제 결과를 기록하되, 확정된 부적격 판정을 되돌리지 않는다. 시작하지 않은 계획은 `cancelled_by_futility`로 남겨 품질 분모와 비용에서 제외한다.
 
-18/20이면 전후반은 최악에도 10/10과 8/10이다. 따라서 “각 절반 8/10 이상”은 총 통과 조건과 중복되어 시간에 따른 쏠림을 따로 제한하지 못한다.
+## 판정기 확인
 
-### D1 시간 진단과 B-2 배제
+모든 verifier에 대해 정답, 명백한 오답, 형식 오류와 기술 오류를 모델 호출 없이 구분하는 검사를 먼저 수행한다. 보존한 동일 상태에서 verifier를 한 번 더 실행해 test별 결과, exit code와 reward가 같아야 유효한 품질 결과로 인정한다.
 
-B-2는 1–10회와 11–20회의 통과 횟수 차이를 1 이하로 요구하던 보수적 임의 후보다. 총 18/20인 과제에서 10/10·8/10을 제외하므로 채택하지 않는다. D1은 전후반 차이와 실패 위치를 기록하되 평가 적격 gate에 사용하지 않는다.
+### nginx-request-logging 수정본
 
-정확히 18/20인 과제에서 두 실패의 위치가 20개 trial에 균등하게 배치된다고 가정하면, B-2가 제외하는 같은 절반 배치는 `2×C(10,2)÷C(20,2)=90/190=47.37%`다. 19/20과 20/20은 B-2 때문에 제외되지 않는다. 전체 탈락 비중은 정확히 18/20인 과제 수에 따라 달라지므로 선별 전에는 계산할 수 없다. 47.37%는 관측값이 아니라 실패 위치의 조합 계산이며 실제 시간 변화가 있었는지 보여주지 않는다.
+과제 명세는 사용자 에이전트 변수를 로그에 넣으라고 요구하지만 `$http_user_agent` 표기만 요구하지 않는다. Nginx `1.22.1`은 `$http_user_agent`와 `${http_user_agent}`를 같은 변수로 해석한다. 원본 verifier는 문자열 `$http_user_agent`만 찾아 동등한 중괄호 문법을 거짓 실패로 분류했다.
 
-B-2는 작은 실패 수에서 우연한 위치와 시간 변화를 구분하지 못하고, 실패 위치만으로 같은 통과 횟수의 과제를 다르게 거른다. D1로 바꾸면 이런 선택 편향은 피하지만 선별 자료로 시간 안정성을 증명할 수는 없다. 다음 값은 과제별 진단으로 남긴다.
+수정본 `nginx-request-logging-verifier-v2`는 네 필수 변수를 `$name`과 `${name}`으로 인식하고 다른 검사와 임계값은 바꾸지 않는다.
 
-- 전반부·후반부 통과 횟수와 차이
-- 실패 trial 번호와 최장 연속 실패 길이
-- trial 순서의 pass/fail 열과 누적 통과율
-- 실패 category와 verifier test ID
-- 모델 revision, verifier revision·effective SHA, 실행 소스와 비교 통제 설정
-
-모델 revision, verifier revision·effective SHA, 실행 소스, 모델 요청 설정이나 병렬도가 실행 중 바뀌면 시간 진단값과 관계없이 hard stop한다. 변경 전후 trial을 한 선별 분모로 합치지 않는다.
-
-평가는 각 task×반복 block에 contemporaneous `none`을 넣고 조건 순서를 block 안에서 무작위화한다. 기본 분석은 18/20을 충족한 평가 적격 과제 `K`개를 모두 사용한다. 평가에서도 전후반 조건 차이, 실패 순서, category와 test ID를 진단 표로 제시하지만, 과제를 제외하거나 성공 문턱을 바꾸는 데 쓰지 않는다. 진단과 주분석의 방향이 다르면 둘을 함께 보고하고 일반화 한계로 남기며, 사후에 분모를 바꾸지 않는다.
-
-### 실패 기록과 준비 retry F1-R1
-
-`trial`은 실행 manifest에 미리 적은 task×반복 한 건이고, `attempt`는 그 trial을 실행하거나 재시도한 한 번의 시도다. 품질 분모에는 완전한 증거와 유효한 verifier 결과가 있는 trial을 최대 한 번 넣는다. 모든 attempt와 발생 비용은 품질 분모와 별도로 원장에 남긴다.
-
-`품질 실패`는 Harbor process와 verifier가 timeout·예외 없이 끝났고, binary reward와 구조화 test 결과가 일치하며, 필수 증거가 완전한 trial에서 reward가 0인 경우다. `wrong_answer`와 `wrong_format`은 모두 품질 실패 1건으로 계산하며 재시도하지 않는다. category는 실행 소스에 고정한 분류기 revision이 pytest trace의 활성 예외 줄과 test ID로 계산하며 사람이 결과를 보고 바꾸지 않는다. JSON·CSV·YAML parse 오류, 명시한 출력 모양 assertion과 필수 산출물 누락만 `wrong_format`이고, 그 규칙에 걸리지 않은 assertion 실패는 `wrong_answer`다. category와 test ID는 원인 진단용이며 평가 적격 gate가 아니다.
-
-| 결과 분류 | 객관적 기준 | 품질 분모 | 재시도 규칙 | 과제 처리 |
-| --- | --- | --- | --- | --- |
-| `pass` | 정상 종료, reward 1, 구조화 test 전부 통과, 필수 증거 일치 | 통과 1 trial | 없음 | 계속 선별 |
-| `wrong_answer`·`wrong_format` | 정상 종료, reward 0, 구조화 test 실패와 reward 일치, 필수 증거 완전 | 품질 실패 1 trial | 없음 | 둘을 같은 품질 실패로 계산. 최대 2회 허용, 3회째 부적격 |
-| `image_error` | 첫 provider dispatch 전에 고정 image를 digest로 가져오거나 시작하지 못함 | 넣지 않음 | F1-R1로 정확히 1회 | 복구 실패 시 부적격 |
-| `setup_error` | 첫 provider dispatch 전에 task 환경이나 agent 준비 실패 | 넣지 않음 | F1-R1로 정확히 1회 | 복구 실패 시 부적격 |
-| `provider_error` | provider가 오류 응답을 반환하고 유효한 모델 결과가 없음 | 넣지 않음 | 기존 bounded transport retry만 허용, outer trial retry 없음 | retry 소진 시 부적격 |
-| `network_error` | dispatch 수락 여부나 usage가 불명인 연결 실패 | 넣지 않음 | 중복 호출 위험 때문에 자동 retry 없음 | 부적격, 비용·불명 상태 보존 |
-| `timeout` | agent·task·verifier의 승인된 deadline 초과 | 넣지 않음 | 자동 retry 없음 | 부적격. 느린 과제를 빼는 편향 기록 |
-| `verifier_crash` | 정상적인 test 실패가 아니라 verifier 예외·중단 또는 완전한 구조화 결과 부재 | 넣지 않음 | 모델 재실행 없음. 같은 workspace의 verifier-only replay는 진단에만 사용 | 부적격 |
-| `evidence_missing` | 필수 trace·assistant 출력·workspace·stdout·stderr·exit code·usage·hash 중 하나가 없거나 서로 불일치 | 넣지 않음 | 자동 retry 없음 | 부적격, 증거 gate hard stop 후보 |
-| `replay_mismatch` | 같은 보존 workspace와 같은 verifier source·명령·의존성으로 판정이 재현되지 않음 | 넣지 않음 | 자동 retry 없음 | 부적격, verifier 범위 조사 전 hard stop 후보 |
-
-F1-R1은 첫 provider dispatch 전에 발생한 `image_error` 또는 `setup_error`에만 적용한다. 첫 attempt와 동일한 준비 작업을 동일한 immutable artifact와 hash로 정확히 1회 다시 시도한다. retry는 같은 trial ID 아래 새 attempt ID를 쓰며, 실패한 container나 workspace를 재사용하지 않고 fresh container·fresh workspace에서 시작한다. artifact, 설정 또는 hash를 바꿔야 하면 retry가 아니라 새 revision이므로 실행을 멈추고 승인을 받는다.
-
-두 번째 attempt가 유효하면 그 trial 결과만 품질 분모에 한 번 넣는다. 준비가 다시 실패하거나 provider dispatch 뒤 오류가 나면 추가 outer retry를 하지 않고 해당 과제를 부적격으로 둔다. 첫 attempt와 retry attempt의 시간·비용·오류·artifact hash는 모두 원장에 남긴다. 정확히 1회라는 한도는 통계적으로 도출한 값이 아니라 일시적 준비 장애 한 번을 허용하기 위한 임의의 운영 규칙이다.
-
-품질 실패의 category와 test ID가 서로 달라도 18/20을 충족하면 평가 적격이다. 여러 방식으로 실패하는 과제를 미리 제외하면 압축에 더 취약한 과제를 제거해 압축이 실제보다 안전해 보일 수 있기 때문이다. category와 test ID는 선별과 평가에서 원인을 설명하는 진단 지표로만 사용한다.
-
-provider의 명시적 retry 가능 응답은 현재 transport 계약의 bounded retry 안에서만 처리하며 F1-R1 attempt로 세지 않는다. F1-R1은 provider dispatch 뒤의 outer trial retry를 허용하지 않는다. dispatch 수락 여부가 불명인 network 오류, timeout, verifier crash, 증거 누락과 replay 불일치는 outer trial retry로 덮지 않는다. 허용한 준비 retry로 복구하지 못한 기술 오류는 품질 실패나 통과로 바꾸거나 분모에서 조용히 빼지 않는다.
-
-### 세 번째 실패에서 조기 종료하는 규칙
-
-세 번째 **유효한 품질 실패**가 확정되면 18/20이 불가능하므로 그 과제의 새 trial을 예약하지 않는다. D1에서는 실패 위치·category·test ID만으로 중단하지 않는다. 18/20의 증거량을 적은 반복의 같은 통과율로 대체하지 않으며, 조기 종료 과제는 평가 부적격으로만 판정한다.
-
-- 같은 과제는 한 번에 한 trial만 실행하도록 계획한다. 전체 동시성 8은 서로 다른 과제로 채워 세 번째 실패 뒤의 초과 실행을 만들지 않는 것이 원칙이다.
-- 조기 종료 신호 전에 이미 시작한 같은 과제 trial이 있으면 취소하지 않고 끝까지 보존한다. 유효한 품질 결과면 실제 관측 분모에 포함하지만, 이미 확정된 부적격 판정을 되돌리지는 않는다.
-- 시작하지 않은 계획 trial은 `cancelled_by_futility`로 남기고 품질 분모와 비용에 넣지 않는다. 시작한 trial과 모든 retry의 실제 비용은 결과와 관계없이 비용 원장에 한 번 포함한다.
-- 기술 오류로 유효한 품질 결과가 없는 attempt는 품질 분모에 넣지 않고 attempt·비용 원장에는 남긴다. F1-R1로 복구하지 못하면 그 과제는 즉시 부적격이며 다른 과제로 바꾸지 않는다.
-- 보고에는 `계획 최대 20회`, `실제 완료 trial`, `유효 품질 분모`, `통과`, `품질 실패`, `기술 오류`, `조기 종료 뒤 완료된 trial`을 따로 쓴다. `17/n`을 `17/20`이나 `9/10`으로 바꾸지 않는다.
-
-이 조기 종료 규칙은 일정 계산에서 절감으로 가정하지 않는다. scheduler 구현과 상태 전이 검사는 아직 없으며, 구현·모의 검증·승인을 마치기 전에는 실행하지 않는다.
-
-선별이 끝나면 평가 적격 과제 수를 `K`로 둔다. 선별 전에 `K`를 추정하지 않는다. 유형별 과제 수는 모집단 구성을 설명하는 진단값으로 남기며, 특정 유형의 수를 맞추려고 과제를 더하거나 빼지 않는다.
-
-전체 `K`개를 평가했을 때의 P90 실행 시간과 검증·보고 여유가 마감 전에 들어오면 전부 평가한다. 들어오지 않으면 통과율·실패 위치·유형·비용·hash 순서로 일부를 자동 선정하지 않고 중단해 승인을 요청한다. 15과제는 일정 산식의 예시일 뿐, 예상 적격 과제 수나 최종 표본 수의 상한이 아니다. 18/20 선별은 쉬운 과제와 ceiling에 치우쳐 압축 피해를 작게 볼 수 있으며, 선별된 과제에만 결과를 일반화한다.
-
-## nginx verifier 정적 대조
-
-**확인 결과:** `${http_user_agent}`는 잘못된 Nginx 구현이 아니라 `$http_user_agent`와 같은 변수를 가리키는 중괄호 문법이다. 현재 verifier가 동등한 문법을 거부한다.
-
-- 과제 [instruction](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/nginx-request-logging/instruction.md)은 사용자 에이전트 변수를 로그에 넣고 큰따옴표로 감싸라고 요구한다. 중괄호 표기를 금지하지 않는다.
-- Nginx `1.22.1`의 [`log_format` 변수 파서](https://github.com/nginx/nginx/blob/release-1.22.1/src/http/modules/ngx_http_log_module.c#L1609-L1687)는 `$` 다음의 `{`를 열고 `}`까지를 변수 이름으로 읽는다. `$http_user_agent`와 `${http_user_agent}`는 같은 `http_user_agent` 변수로 compile된다. **성격:** 공개 소스 정적 확인.
-- 과제 [verifier](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/nginx-request-logging/tests/test_outputs.py#L106-L116)는 nginx.conf 문자열에 정확히 `$http_user_agent`가 들어 있는지만 검사한다. `${http_user_agent}`에는 그 부분 문자열이 없으므로 실패한다. **성격:** 공개 소스 정적 확인.
-- 기존 `none` 20회 가운데 최종 명령 trace가 `${http_user_agent}`를 nginx.conf에 남긴 2회는 `test_nginx_config_settings`만 실패했다. 같은 2회에서 `nginx -t`와 동적 로그 형식 검사는 통과했다. **표본·분모:** 해당 구현 2회/전체 20회. **성격:** 비공개 원본에서 집계한 측정·정적 원인 대조.
-
-로그 형식 test는 마지막 큰따옴표 문자열이 실제 요청의 user-agent 값과 같은지까지 비교하지 않는다. 따라서 이 발견은 verifier의 거짓 실패 경로를 확인하지만, 그 test가 모든 잘못된 로그 구현을 잡는다는 뜻은 아니다.
-
-### revision과 fixture
-
-수정본 `nginx-request-logging-verifier-v2`는 네 필수 Nginx 변수를 `$name`과 `${name}` 두 문법으로 인식한다. 그 밖의 test와 임계값은 바꾸지 않는다.
-
-| 항목 | 값 | 성격 |
+| 항목 | 값 | 증거 상태 |
 | --- | --- | --- |
 | 원본 `tests/test_outputs.py` SHA-256 | `045cc716c14efde3b0dcff5fc7c85ec5d18bfc6ce66f8b40a418fa2a3a4acda0` | 고정 원본 |
-| 수정본 `tests/test_outputs.py` SHA-256 | `20812107bc3bfc541728a2d10e3da0552e907d949e1347a03d33aa26954f8902` | 고정 revision |
-| `$http_user_agent` fixture | 통과 | 모델 호출 없는 fixture 1건 |
-| `${http_user_agent}` fixture | 통과 | 모델 호출 없는 fixture 1건 |
-| 명백한 오답 `$http_referer` fixture | 실패 | 모델 호출 없는 fixture 1건 |
-| 고정 원본을 포함한 test module | 6/6 통과 | 2026-09-14 UTC 정적 재검증 |
+| 수정본 SHA-256 | `20812107bc3bfc541728a2d10e3da0552e907d949e1347a03d33aa26954f8902` | 고정 수정본 |
+| `$http_user_agent` 검증용 입력 | 통과 | 모델 호출 없는 1건 |
+| `${http_user_agent}` 검증용 입력 | 통과 | 모델 호출 없는 1건 |
+| 오답 `$http_referer` 검증용 입력 | 실패 | 모델 호출 없는 1건 |
+| 수정 모듈 검사 | 6/6 통과 | 2026-09-14 UTC 정적 확인 |
 
-세 fixture 3/3은 정적 설정 문자열에서 수정한 변수 검사가 의도대로 작동한다는 확인이다. 고정한 Terminal-Bench 2.1 원본 파일의 SHA가 source SHA와 같고, 기존 diff를 적용한 결과가 effective SHA와 같음을 함께 재검증했다. Nginx container 전체를 다시 실행한 결과는 아니다. 조건부 승인은 이 기존 바이트와 세 fixture에만 적용하며, runner는 원본 SHA나 수정 뒤 SHA가 다르면 실행 전에 중단하고 원장·결과에 revision과 두 SHA를 기록한다.
+기존 기준선 20회에서 nginx 실패 2회는 `${http_user_agent}`를 사용했고 이 문자열 검사만 실패했다. 보존 trace와 당시 verifier 결과로 수정본 판정을 계산하면 nginx는 20/20이지만, 이는 실제 workspace 재생이 아닌 정적 반사실 계산이다. 원본 측정 18/20을 덮어쓰지 않는다.
 
-### 기존 기준선에 미치는 영향
+## 시간과 중단 조건
 
-기존 `none` 20회의 기록된 nginx 결과 18/20은 그대로 보존한다. 실패한 8·9회는 `${http_user_agent}`를 사용했고, 두 trial 모두 `test_nginx_config_settings`만 실패했으며 `nginx -t`와 나머지 동적 검사는 통과했다. 수정본의 변수 검사에 대한 계산값은 nginx 20/20, 전체 65/100이다. 이는 보존 trace와 당시 verifier 결과에 근거한 **정적 반사실 계산**이며 실제 workspace replay가 아니다. 원본 verifier의 측정값 18/20과 전체 63/100을 수정하거나 새 실행으로 부르지 않는다.
+과거 100개 native `trial`에서 관측한 개별 실행 시간은 P50 76.145초, P90 93.559초였다. 실제 구간과 `개별 시간 합계÷8`의 비율 1.4345를 사용하면, 조기 종료와 준비 재시도가 없는 1,780개 계획 실행은 P50 입력 기반 6.7662시간, P90 입력 기반 8.3136시간으로 투영된다. 이는 5과제 원자료를 89과제로 옮긴 계산이지 전체 선별 시간의 관측 P50·P90이나 상한이 아니다.
 
-이 정적 반사실 계산에서 회차별 통과 과제 수 범위는 3–4, 폭 1이 된다. 그러나 `log-summary-date-ranges`의 전후반 관측값 집합이 여전히 달라 기존 기준선의 `stop_inconclusive` 결론은 바뀌지 않는다. 새 verifier revision은 새 선별에만 쓰며, 승인 전에는 실행하지 않는다.
+준비 재시도 시간, 89개 이미지의 최초 준비, 처음 보는 과제의 긴 setup, 승인 대기와 최종 Blob 검증은 이 투영에 없다. 준비 재시도의 P50·P90은 아직 측정하지 않아 최악 시간을 숫자로 채우지 않는다. 조기 종료로 줄어드는 시간도 미리 가정하지 않는다.
 
-## 선별 시간 계산 — 잠정
+최종 마감은 `2026-09-17 21:00 KST`다. 실행 종료 목표는 `2026-09-17 09:00 KST`이며, 그 뒤 12시간은 Blob 무결성 확인, 분석과 보고를 위한 임의의 운영 여유다. 이 12시간은 한 번만 더하며 측정에서 얻은 분위수가 아니다.
 
-시간의 입력은 기존 목적 선정 5과제×20회, 100 native trial의 추가 압축 없는 실행이다. trial 벽시계 P50은 76.145초, P90은 93.559초였다. 100 trial의 실제 관측 구간 1,405.368초를 `trial 시간 합계÷병렬도 8`로 나눈 1.4345를 준비·wave 공백 보정값으로 사용했다. **성격:** 과거 측정에서 만든 일정 계산이며, 전체 89과제의 측정이 아니다.
+다음 경우 선별을 중단하고 원인과 가장 작은 수정안을 기록한다.
 
-| 경로 | 기본 trial·추가 attempt | 계산 P50 | 계산 P90 | 성격 |
-| --- | ---: | ---: | ---: | --- |
-| retry 0회 | 1,780 trial·0 attempt | 6.77시간 | 8.31시간 | 계산·조기 종료 없는 기본 투영 |
-| 준비 retry 최대 증가분 | 1,780 attempt | `ceil(1,780÷8)×Tprep50` | `ceil(1,780÷8)×Tprep90` | 계산식·준비 실패 attempt 시간 미측정 |
-| 최악값 | 1,780 trial·1,780 attempt | `6.7662시간 + ceil(1,780÷8)×Tprep50` | `8.3136시간 + ceil(1,780÷8)×Tprep90` | 조기 종료 없음·모든 첫 attempt가 F1-R1 사용 |
+- 고정한 source commit, 목록 hash, 이미지 digest 또는 verifier SHA가 다름
+- provider가 보고한 모델 revision이 원장과 다름
+- 병렬도나 배포 한도를 유지할 수 없음
+- 필수 증거 또는 같은 상태의 verifier 재실행이 불완전함
+- provider 비용이 미확정이거나 비용 상한을 넘을 수 있음
+- 로컬 증거를 Blob에서 hash로 확인하지 못함
+- 실행 종료 목표를 지킬 수 없음
 
-retry 0회는 `ceil(trial 수÷8) × trial 분위수 × 1.4345`로 계산했다. native trial 시간에는 Harbor process 안의 agent 실행과 내장 verifier가 포함된다. `Tprep50`과 `Tprep90`은 동시성 8에서 provider 호출 전에 실패한 준비 attempt의 벽시계 P50·P90이다. 이 값은 아직 측정하지 않았으므로 준비 retry 최대 증가분과 최악값을 숫자로 쓰지 않는다. 최대 retry 수 1,780은 모든 계획 trial의 첫 attempt가 준비 단계에서 실패하고 두 번째 attempt를 정확히 한 번 시작하는 경계값이다.
+통과율, 품질 허용폭, 비용 절감 문턱이나 반복 공식을 일정에 맞춰 낮추지 않는다.
 
-전체 89개 image의 최초 pull, 처음 보는 과제의 setup 꼬리, Blob 최종 검증·replay, 승인 대기와 scheduler 구현 시간은 retry 0회에 포함하지 않는다. 조기 종료의 절감도 가정하지 않았다.
+## 선별 시작 진행 조건
 
-P50·P90의 원자료가 전체 89과제가 아니라 목적 선정 5과제이므로 이 값은 미래 완료시간의 측정 분위수나 상한이 아니다. 전체 모집단의 실행 시간 범위를 확인하기 전까지 일정 적합 판단은 잠정으로만 쓴다.
+- 격리된 Python 환경에서 Harbor `0.22.0` import와 고정 의존성 검사가 통과한다.
+- tokenizer 표를 고정한 전체 로컬 검사와 native 전용 검사가 통과한다.
+- 89과제 목록과 이미지 digest가 hash로 고정된다.
+- 89과제 install-only 검사와 실제 Docker 상태 보존·복원 검사가 통과한다.
+- Blob 쓰기와 검증 읽기, 비용 결측, 로컬 보존과 재개 경로가 검증된다.
+- 실행 원장에 source commit, 비용 상한, 가격 시점, 배포 한도와 위임된 실행 권한이 기록된다.
+- 입력 묶음이 Blob에 올라가 원격 SHA-256 확인을 마친 뒤에만 첫 provider 호출을 허용한다.
 
-## 선별 시작 전 차단 조건
-
-- D1 진단값과 F1-R1 attempt·분모 규칙을 스케줄러와 결과 schema에 구현하고 모델 호출 없이 검사한다.
-- S1·S2·S3 중 하나, 비용 추론 또는 기술통계 전용 경로, `rho_quality`·`rho_cost`의 범위, P1 또는 P2 계획 규칙과 `R(K, rho)` 계산식을 선별 결과를 보기 전에 승인한다. 비용 추론을 유지하면 전체 gate의 사전 기대 절감 범위도 이때 승인한다.
-- 평가 적격 `K`개 전부의 P90과 검증·보고 여유가 마감에 들어오는지 판정하는 일정 gate를 구현한다.
-- 조건부 승인된 `nginx-request-logging-verifier-v2`의 기존 revision과 두 SHA가 실행 preflight에서 다시 일치한다.
-- 89과제 inventory와 제외 사유가 결과 전에 고정된다.
-- 실행 manifest, block seed, 고유 trial ID와 [재현 계약](reproducibility-contract.md)이 구현돼 있다.
-- Blob 원격 hash 확인 전 로컬 증거를 삭제하지 않는 종료 gate가 연결돼 있다.
+이 조건을 모두 충족했다는 기록과 시작한 작업의 PID·로그·결과 위치를 남긴다.

@@ -1,153 +1,128 @@
 # 선별·평가 재현 계약
 
-**상태:** 실행 전 계약이다. 스케줄러와 replay fixture는 아직 구현하지 않았고 모의 검증도 실행하지 않았다. 이 계약을 충족하지 않은 run은 선별이나 압축 비교의 증거로 채택하지 않는다.
+**상태:** 실행 전 계약이다. 구현과 로컬 검사는 진행 중이며 모델을 호출한 선별·평가는 아직 0회다. 이 계약의 필수 증거가 빠진 실행은 품질 분모에 넣지 않는다.
 
-## 증거 단위
+## 기록 단위
 
-`run`은 한 inventory, 실행 소스, 원장, randomization manifest를 공유하는 묶음이다. `trial`은 한 task·반복·조건의 평가 단위다. `attempt`는 trial 안의 실제 실행 또는 retry이며, provider 요청은 attempt 안에서 고유 request ID를 가진다.
+`run`은 한 과제 목록, 실행 source commit, 원장과 실행 manifest를 공유하는 묶음이다. `trial`은 한 과제·반복·조건의 논리적 평가 단위다. `attempt`는 `trial` 안에서 실제로 시작한 실행이며, provider 요청은 `attempt` 안에서 고유한 요청 위치와 provider request ID를 가진다.
 
-| 단위 | 필수 식별자 | 중복 방지 규칙 |
-| --- | --- | --- |
-| run | run ID, source commit, ledger hash, inventory hash, randomization manifest hash | 같은 manifest hash의 재수집은 새 run으로 세지 않음 |
-| trial | run ID, task ID, repetition, condition으로 만든 고유 trial ID | 완료 trial은 resume 뒤 다시 분모에 넣지 않음 |
-| attempt | trial ID와 증가하는 attempt number | 같은 attempt 레코드의 재업로드는 한 번만 수집 |
-| provider request | provider request ID와 로컬 request hash | 같은 응답 레코드를 비용에 두 번 넣지 않음 |
+계획 `trial` 수와 실제 `attempt` 수를 섞지 않는다. 준비 재시도는 `attempt`를 하나 늘리지만 품질 분모와 계획 `trial`을 늘리지 않는다. provider transport 내부 재시도도 별도 HTTP attempt로 기록하며 논리 요청 수와 구분한다.
 
-실제 retry가 새 provider 요청을 만들면 새 attempt 또는 request ID로 기록하고 실제 사용량·비용에 한 번 포함한다. retry는 품질 분모의 새 trial이 아니다. F1-R1을 유발한 실패 attempt에는 provider 요청이 없어야 한다.
+## 실행 전에 고정하는 항목
 
-trial ID는 `run ID`, 정규화 task ID, repetition과 condition을 길이 구분자로 연결한 값의 SHA-256으로 만든다. attempt ID는 trial ID와 1부터 증가하는 attempt number로 만든다. 문자열을 단순 이어 붙이지 않으며, 같은 randomization manifest에서 같은 trial tuple은 언제 다시 계산해도 같은 ID가 나와야 한다.
+- 실행 source commit 전체 SHA
+- 원장 원문과 SHA-256
+- 정규화한 과제 목록과 SHA-256
+- 모델 이름·provider 보고 revision·요청 설정
+- agent, runner, task와 컨테이너 이미지 SHA
+- verifier source, 명령, 직접 의존성과 revision SHA
+- 압축기 이름, 버전, 프로필, 적용 위치와 artifact SHA
+- 조건 순서 seed, 생성 방법, 모든 `trial` ID와 계획 순서
+- 가격표의 통화, 단위, 적용 시각과 원본 hash
+- 종료 시각, 비용 상한, 병렬도와 배포 TPM·RPM
 
-## F1-R1 준비 retry 계약
+source commit은 실행 전에 커밋된 깨끗한 worktree와 같아야 한다. 실행 중 소스나 원장이 달라지면 중단한다.
 
-F1-R1은 첫 provider dispatch 전에 발생한 `image_error` 또는 `setup_error`에만 적용한다. 첫 attempt와 동일한 준비 작업을 동일한 immutable artifact와 hash로 정확히 1회 다시 시도한다. artifact에는 task tree, instruction, image digest, verifier source·dependency, agent·runner·adapter commit과 요청 설정이 포함된다.
+## `trial`과 요청 증거
 
-- retry는 같은 trial ID와 새 attempt ID를 사용한다.
-- 실패한 container와 workspace는 폐기하고 fresh container·fresh workspace를 만든다.
-- 첫 attempt의 filesystem layer, process, service, cache 또는 임시 파일을 retry에 연결하지 않는다.
-- artifact나 hash가 달라지면 retry하지 않고 run을 멈춰 새 revision 승인을 요청한다.
-- 두 번째 attempt가 유효하면 품질 분모에는 trial 결과를 한 번만 넣고 두 attempt의 시간·비용은 모두 원장에 넣는다.
-- 두 번째 준비 attempt가 실패하면 추가 retry 없이 해당 과제를 부적격으로 둔다.
-- `wrong_answer`·`wrong_format`을 포함한 품질 실패와 provider dispatch 뒤 오류에는 F1-R1을 적용하지 않는다.
+각 `trial`과 `attempt`에 다음을 남긴다.
 
-정확히 1회라는 한도는 통계적으로 도출한 값이 아니라 일시적 준비 장애 한 번을 허용하기 위한 임의의 운영 규칙이다. retry attempt는 원래 attempt와 `artifact_manifest_hash`가 같고 `container_instance_id`와 `workspace_instance_id`가 달라야 한다. 이 불변식을 model-free contract test로 확인하기 전에는 선별을 시작하지 않는다.
-
-## pause·resume·retry 상태
-
-| 상태 | 들어가는 조건 | 분모·비용 규칙 |
-| --- | --- | --- |
-| `planned` | manifest에 있고 아직 시작하지 않음 | 품질 결과 없음·비용 0 |
-| `running` | attempt를 만들고 실행 자원을 할당함 | 발생한 provider 요청은 비용 원장에 기록 |
-| `paused` | 새 attempt를 시작하지 않고 현재 상태를 고정함 | 완료 trial을 되돌리지 않음 |
-| `retried` | F1-R1 허용 범위의 준비 실패 뒤 같은 trial ID로 두 번째 attempt를 시작함 | 품질 분모는 하나·두 attempt의 실제 시간·비용을 각각 한 번 포함 |
-| `completed` | verifier 결과와 필수 증거가 모두 확정됨 | 품질 분모에 한 번 포함 |
-| `failed` | 재시도 한도 또는 증거 gate를 통과하지 못함 | 성공 trial로 바꾸지 않고 실패 유형과 발생 비용 기록 |
-| `cancelled_by_futility` | 기준 B에서 세 번째 유효 품질 실패가 확정된 뒤 아직 시작하지 않은 계획 trial | 품질 분모와 비용은 0. 계획 최대 반복과 취소 사유는 유지 |
-| `superseded` | 실행 전에 승인된 새 manifest가 기존 계획을 대체함 | 주분석 분모에서 제외하되 이미 든 비용은 지우지 않음 |
-
-허용 전이는 manifest revision에 고정한다. `completed`에서 `running`으로 돌아갈 수 없고, resume는 `planned` 또는 `paused`만 시작한다. retry는 새 trial을 만들지 않으며 attempt number 2를 넘길 수 없다. `cancelled_by_futility`는 다시 시작하지 않으며, 조기 종료 전에 시작한 trial은 완료·증거·비용을 보존한다. 수집기는 trial ID, attempt ID와 provider request ID에 unique constraint를 두고 같은 Blob을 다시 읽어도 합계가 늘지 않아야 한다.
-
-## 필수 재현 묶음
-
-### 입력과 요청
-
-- 정규화 전 입력 hash와 정규화 입력
-- 정규화 규칙 revision과 정규화 입력 SHA-256
-- 전체 message role·순서·content hash
-- 모델 이름과 제공자 보고 revision
-- temperature, reasoning effort, completion 한도와 전송한 전체 요청 설정
-- provider request ID, 응답 ID, HTTP 상태와 retry 연결
-
-정규화는 줄바꿈을 LF로 바꾸고, JSON 객체 키를 정렬하며, 의미 있는 문자열 공백과 배열 순서는 바꾸지 않는다. 원문과 정규화 입력을 모두 비공개 묶음에 남기고 각각 hash를 기록한다.
-
-### 실행 소스와 환경
-
-- agent, runner와 adapter의 전체 Git commit SHA
-- task revision, task tree SHA-256과 instruction hash
-- container image reference와 content digest
-- Harbor, Terminus, Python과 주요 runtime 버전
-- VM kernel, vCPU 수, 병렬도, 실행 시점 TPM·RPM
-- compressor 이름·버전·profile·target·artifact hash
-
-`main`의 최신 상태가 아니라 trial에 기록한 source commit과 image digest가 원본이다. 실행 중 checkout, 원장 또는 verifier를 바꾸지 않는다.
-
-### 행동과 결과
-
+- 과제 ID, 반복 번호, 조건과 계획·실제 시작 순서
+- `trial` ID, `attempt` ID와 재시도 번호
+- immutable artifact manifest hash
+- 새 컨테이너와 새 workspace의 실행 식별자
+- 시작·종료 시각, process ID, exit code와 timeout 상태
+- provider request ID, HTTP attempt, 상태와 request·response SHA-256
 - 전체 tool trace와 assistant 출력
-- 각 provider 요청·응답의 원문과 usage
-- stdout, stderr, exit code, 시작·종료·경과 시간
-- turn 수, 논리 호출 수, 실제 HTTP 호출 수와 같은 명령 재실행
-- 압축 전후 hash, 보호 구간 hash와 압축 시간 세부 항목
-- 최종 workspace 재생 묶음과 파일 manifest
+- provider 입력·cache 입력·출력 token, 로컬 token과 비용 계산값
+- 명령별 stdout·stderr·exit code·시간과 같은 명령 재실행 횟수
+- 과제당 turn 수와 총 모델 호출 수
+- verifier stdout·stderr·exit code, test별 결과와 native reward
+- 최종 workspace와 verifier가 읽은 컨테이너 상태의 재생 묶음
+- Blob payload와 manifest의 크기·SHA-256·업로드와 검증 읽기 상태
 
-공개 문서에는 원문 trace나 assistant 출력을 싣지 않는다. 집계에 사용한 private 원본은 삭제하지 않는다.
+필수 값이 없으면 `null`이나 결측 상태로 남긴다. 누락값을 0이나 통과로 바꾸지 않는다.
 
-### verifier
+## 준비 재시도
 
-- verifier source tree와 SHA-256
-- 원본 verifier 파일 SHA-256, 승인된 revision ID와 유효 verifier 파일 SHA-256
-- 실행 명령, 환경 변수 이름과 dependency lock/hash
-- stdout, stderr, exit code와 구조화 test 결과
-- verifier가 실제로 읽은 workspace manifest
-- 승인된 verifier revision과 변경 사유
+provider 호출 전에 이미지 또는 환경 준비가 실패한 경우에만 동일한 artifact로 정확히 한 번 다시 시도한다.
 
-verifier 결함을 발견하면 실행 중 즉시 고치지 않는다. 영향 범위를 보고하고 새 revision을 승인받은 뒤 새 run으로 시작한다. 서로 다른 verifier revision의 pass-rate를 한 분모에 합치지 않는다.
+- 같은 `trial` ID 아래 새 `attempt` ID를 사용한다.
+- 첫 실행과 같은 immutable artifact와 hash를 사용한다.
+- 실패한 컨테이너와 workspace를 재사용하지 않는다.
+- 품질 실패, provider 호출 뒤 오류, timeout, verifier 오류와 증거 누락은 다시 시도하지 않는다.
+- 두 `attempt`의 시간, 비용과 오류는 모두 남긴다.
+- 두 번째 `attempt`가 유효하면 품질 결과는 `trial` 분모에 한 번만 넣는다.
 
-## randomization manifest
+artifact나 설정을 바꾸는 복구는 재시도가 아니라 새 revision이다. 현재 실행을 중단하고 새 source commit과 manifest로 시작한다.
 
-manifest에는 seed, 생성 알고리즘 revision, inventory hash, task·유형·반복·조건, block ID, 계획 순서, trial ID와 F1-R1 revision을 넣는다. 분석 계획 manifest에는 승인한 S 기준, 비용 추론 또는 기술통계 전용 경로, 비용 추론이면 사전 기대 절감 범위, `rho_quality`·`rho_cost` 범위, P1 또는 P2, P2의 계획값, `R(K, rho)` 식 revision과 승인 시각을 넣는다. 평가 block은 task×반복이며 네 조건을 한 번씩 포함한다. 선별 manifest에는 과제당 최대 20개 trial과 조기 종료 전이 규칙을 모두 넣고, 실제로 시작하지 않은 trial도 `cancelled_by_futility` 상태로 남긴다. 각 attempt에는 artifact manifest hash, container instance ID, workspace instance ID와 provider dispatch 시각 또는 미발생 상태를 기록한다.
+## 중단·재개와 중복 방지
 
-randomization manifest와 분석 계획 manifest는 첫 선별 trial 전에 비공개 Blob과 로컬에 함께 고정한다. pause·resume·retry는 같은 manifest를 사용한다. 계획에 없던 trial을 실행하면 별도 protocol deviation으로 기록하고 주분석 분모에 자동 편입하지 않는다. 선별 뒤 분석 계획에서 바꾸는 값은 실제 평가 적격 과제 수 `K`와 그 값으로 계산한 `R`뿐이며, 평가 뒤 관측한 두 상관은 민감도 분석에만 사용한다.
+상태 데이터베이스는 `(task, repetition, condition)`의 `trial`을 하나만 허용하고 `(trial, attempt number)`와 `(attempt, logical request, HTTP attempt)`를 고유하게 만든다.
 
-## workspace replay gate
+중단 시 실행 중이던 `attempt`는 자동으로 다시 실행하지 않고 `paused`로 둔다. 보존 증거로 provider 호출 여부, 결과와 비용을 정적으로 확정한 뒤에만 상태를 해소한다. 같은 `trial`을 새 ID로 다시 예약해 분모나 비용에 중복 집계하지 않는다.
 
-각 trial은 verifier가 읽은 최종 workspace와 task container의 verifier-visible 상태를 보존한다. archive manifest에는 상대 경로, 파일 종류, mode, uid·gid, symlink 대상, 크기와 SHA-256을 넣는다. 과제가 workspace 밖의 시스템 설정이나 상태 디렉터리를 바꾸면 고정 base image에 적용할 writable-layer diff도 묶음에 넣는다. 원격 공개 문서에는 비공개 절대 경로나 원문을 싣지 않는다.
+세 번째 품질 실패 뒤 시작하지 않은 계획은 `cancelled_by_futility`로 보존한다. 실제로 시작한 `attempt`는 결과와 무관하게 비용에 포함한다.
 
-socket, process, service, container와 network 상태처럼 파일 archive만으로 복원되지 않는 상태는 상태 캡처와 재시작 절차를 따로 둔다. verifier가 그 상태를 읽는데 재생할 방법이 없으면 fixture 통과로 간주하지 않는다.
+## 최종 workspace와 verifier 재실행
 
-모의 검증은 다음이 모두 같을 때만 통과한다.
+verifier 실행 직전 다음 상태를 보존한다.
 
-```
-workspace manifest hash
-verifier source·명령·의존성 hash
-구조화 test별 pass/fail
-verifier exit code와 최종 reward
-```
+- workspace와 마운트 파일의 상대 경로, 종류, mode, uid·gid, symlink 대상, 크기와 SHA-256
+- 컨테이너 이미지 SHA, writable layer의 변경·삭제 경로와 내용 hash
+- verifier가 읽는 서비스·process·container 상태와 로그
+- 민감한 환경 변수 값과 호스트 경로를 원문 대신 SHA-256으로 바꾼 inspect 기록
 
-같은 fixture의 반복 판정이 달라지면 판정기 비결정성으로 분류한다. workspace가 달라 재생할 수 없으면 모델 변동과 판정기 변동을 가를 수 없으므로 해당 trial은 원인 진단용 재현 증거가 불완전하다.
+보존한 상태를 같은 이미지와 verifier revision에 복원한 뒤 모델 호출 없이 verifier를 한 번 더 실행한다. workspace 상태 hash, verifier source·명령·의존성 hash, test별 pass/fail, exit code와 reward가 모두 같아야 재생 검사가 통과한다.
 
-기존 목적 선정 5과제×20회 기준선은 최종 workspace와 container rootfs를 보존하지 않아 이 replay gate를 충족하지 않는다. 그 측정은 기존 범위에서 유지하되 새 선별의 적격 판정 자료로 재사용하지 않는다.
+같은 상태에서 판정이 달라지면 verifier 변동으로 분류한다. 상태 복원이 불완전하면 모델 실행 변동과 verifier 변동을 구분할 수 없으므로 유효한 품질 결과로 세지 않는다.
 
-## Blob 보존과 종료 gate
+기존 목적 선정 5과제의 20회 기준선은 최종 workspace와 컨테이너 상태를 이 계약대로 보존하지 않았다. 그 측정은 기존 범위에서 유지하지만 새 선별 자료로 재사용하지 않는다.
 
-trial 증거는 먼저 실행 VM의 local spool에 원자적으로 확정한다. payload를 올린 뒤 manifest를 마지막에 올린다. Blob 쓰기 실패는 완료된 로컬 증거를 지우지 않으며 background retry 대상으로 남긴다.
+## Blob 보존과 회수
 
-run 종료에는 다음 순서가 필요하다.
+각 결과는 먼저 실행 VM의 로컬 spool에 원자적으로 확정한다. payload를 먼저 올리고 manifest를 마지막에 올린다. 각 객체를 다시 읽어 크기와 SHA-256을 확인하기 전에는 업로드 완료로 표시하지 않는다.
 
-1. Blob 객체별 크기와 SHA-256을 원격 manifest와 대조한다.
-2. 별도 수집 호스트가 manifest와 payload를 내려받아 같은 hash를 확인한다.
-3. 누락 trial, 중복 trial·attempt·request ID와 비용 합계를 검사한다.
-4. 승인된 표본의 replay fixture가 같은 판정을 내는지 확인한다.
-5. 그 뒤에만 VM spool 정리와 deallocate를 허용한다.
+Blob 연산은 payload 쓰기, manifest 쓰기, payload 검증 읽기와 manifest 검증 읽기의 시작·성공 횟수를 따로 기록한다. 시작했지만 성공 응답을 확인하지 못한 연산은 비용 미확정으로 남긴다. 재시도로 성공해도 앞선 미확정 연산을 0으로 바꾸지 않는다.
 
-Blob의 ETag만으로 내용 hash 확인을 대신하지 않는다. 원격 hash 확인 전에는 로컬 증거를 삭제하지 않는다. 업로드가 끝나지 않으면 run은 `retrieval_pending` 또는 `incomplete`이며 성공으로 바꾸지 않는다.
+네트워크나 Blob 오류가 나면 모델 실행을 즉시 버리지 않는다. 로컬 payload를 보존하고 제한된 background 재시도를 수행한다. 최종 flush 뒤에도 확인되지 않으면 상태는 `retrieval_pending`이며 완료로 바꾸지 않는다.
+
+종료 순서는 다음과 같다.
+
+1. 모든 payload와 manifest를 Blob에서 다시 읽어 SHA-256을 확인한다.
+2. 별도 수집 환경에서 실제 크기의 결과를 내려받아 같은 hash를 확인한다.
+3. 누락·중복 `trial`, `attempt`, 요청 ID와 비용 합계를 검사한다.
+4. 필요한 verifier 재생 검사가 같은 판정을 내는지 확인한다.
+5. 그 뒤에만 로컬 spool 정리와 VM deallocate를 허용한다.
+
+Blob ETag를 내용 hash 대신 쓰지 않는다. 원격 hash 확인 전에는 로컬 증거를 삭제하지 않는다.
+
+## 비용 기록
+
+provider, VM, Blob 쓰기, Blob 검증 읽기와 network 비용을 구성요소별로 기록한다. 같은 통화와 가격 시점을 네 조건에 적용한다.
+
+VM 비용은 실제 활성 구간을 동시에 실행 중인 `attempt`끼리 나눈다. 각 worker에 VM 전체 단가를 반복해서 곱하지 않으며 배분 합계가 VM 활성 구간 총액과 맞아야 한다.
+
+비용이 확정되지 않은 구성요소가 하나라도 있으면 직접 귀속 총비용은 결측으로 둔다. 확인된 소계와 결측 구성요소 수는 함께 남긴다. 실제 지출 0과 계측 누락을 같은 값으로 기록하지 않는다.
+
+공유 idle, 승인 대기, 일회성 준비와 Blob 장기 보관 비용은 별도 항목이다. 평가 주 비용에는 넣지 않지만 전체 운영비 설명에서 빠뜨리지 않는다.
+
+## 분석 재현
+
+평가 배열은 `반복 × 과제 × 네 조건` 순서를 고정한다. 같은 반복 실행의 `none`과 세 압축 조건을 함께 재표집해 짝 구조와 공유 `none` 상관을 보존한다.
+
+주 분석과 길이 2의 시간 상관 민감도 분석에 서로 다른 용도별 seed를 쓴다. base seed `20260915`, numpy `PCG64`, percentile bootstrap 50,000회, 분위수 계산법 `linear`와 배치 크기를 manifest에 기록한다. 합성 자료 검증은 독립 seed `2026091501`을 쓴다.
+
+분석 코드, 입력 배열, 결과와 manifest에는 실행 source commit을 기록한다. 평가 뒤 관측한 상관이나 분산으로 주 분석의 반복 수, 문턱 또는 신뢰구간을 바꾸지 않는다.
 
 ## 공개와 비공개 경계
 
 | 비공개 Blob 원본 | 공개 문서에 허용 |
 | --- | --- |
-| 계정·테넌트·구독·리소스 식별자 | 공개 benchmark·task·도구·모델 이름과 공개 revision |
-| endpoint, 비공개 host와 내부 절대 경로 | 상대 문서 링크와 비식별 실행 환경 |
-| provider request·response ID 원문 | request 수, 상태 분포와 hash 대조 결과 |
-| 전체 prompt, tool trace, assistant 출력 | 집계 token·호출·시간·실패 유형 |
-| 최종 workspace 원문과 replay archive | workspace hash와 replay 판정 일치 여부 |
+| 계정·테넌트·구독·리소스 식별자 | 공개 벤치마크·과제·도구·모델 이름과 공개 revision |
+| endpoint, 비공개 host와 절대 경로 | 공개 저장소 상대 경로와 비식별 실행 환경 |
+| provider request·response ID 원문 | 요청 수, 상태 분포와 hash 대조 결과 |
+| 전체 prompt, tool trace와 assistant 출력 | 집계 token·호출·시간·실패 분류 |
+| 최종 workspace 원문과 재생 archive | workspace hash와 재생 판정 일치 여부 |
 
-환경·도구·버전·날짜·표본·분모·모델·병렬도는 재현 조건이므로 공개 집계에서 지우지 않는다. 식별자와 비공개 위치를 재현 조건과 섞지 않는다.
-
-## 구현 전 차단 조건
-
-- 현재 runner의 목적 선정 5과제 고정 목록을 전체 inventory 입력으로 바꾸는 구현이 없다.
-- task×반복 block randomization과 idempotent resume 집계가 없다.
-- 최종 workspace replay archive와 같은 판정 확인 경로가 없다.
-- 새 세 문서는 설계이며 이 항목들이 구현됐다는 증거가 아니다.
-
-따라서 [선별 규약](screening-protocol.md)과 [평가 규약](evaluation-protocol.md)의 승인만으로 실행을 시작하지 않는다. 구현, model-free 검사와 별도 실행 승인이 필요하다.
+환경, 도구, 버전, 날짜, 표본, 분모, 모델, 병렬도와 가격 시점은 수치를 해석하는 조건이므로 공개 집계에서 지우지 않는다. 식별자와 비공개 위치를 재현 조건과 섞지 않는다.

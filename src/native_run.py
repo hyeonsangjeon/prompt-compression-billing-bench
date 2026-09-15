@@ -142,7 +142,7 @@ def terminate_group(process, grace_seconds: float = 2) -> None:
     process.wait(timeout=5)
 
 
-def supervise(command: list[str], log: Path, recorder, timeout: float, environment: dict) -> dict:
+def supervise(command: list[str], log: Path, recorder, timeout: float, environment: dict, on_start=None) -> dict:
     recorder.check()
     started, started_at = time.monotonic(), now()
     timed_out = stopped = False
@@ -150,6 +150,8 @@ def supervise(command: list[str], log: Path, recorder, timeout: float, environme
         process = subprocess.Popen(command, stdout=output, stderr=subprocess.STDOUT,
                                    env=environment, cwd=ROOT, start_new_session=True, stdin=subprocess.DEVNULL)
         try:
+            if on_start is not None:
+                on_start(process.pid)
             while process.poll() is None:
                 stopped = recorder.stopped.is_set()
                 timed_out = time.monotonic() - started >= timeout or time.time() >= recorder.deadline

@@ -168,6 +168,40 @@ class AzureBlobClient:
     def put_bytes(self, blob: str, payload: bytes) -> dict:
         return self._put(blob, payload, len(payload), digest(payload), "application/json")
 
+    def verify_blob(self, blob: str, expected_bytes: int, expected_sha256: str) -> dict:
+        if type(expected_bytes) is not int or expected_bytes < 0 or not re.fullmatch(r"[0-9a-f]{64}", expected_sha256):
+            raise ValueError("Expected Blob identity is invalid")
+        connection = http.client.HTTPSConnection(self.hostname, self.port, timeout=self.timeout_seconds)
+        headers = {
+            "Authorization": "Bearer " + self.token(),
+            "x-ms-date": format_datetime(datetime.now(timezone.utc), usegmt=True),
+            "x-ms-version": "2023-11-03",
+        }
+        checksum = hashlib.sha256()
+        total = 0
+        try:
+            connection.request("GET", self._path(blob), headers=headers)
+            response = connection.getresponse()
+            if response.status != 200:
+                response.read(65536)
+                raise BlobUploadError(response.status, f"remote_verify_http_{response.status}")
+            while True:
+                block = response.read(1024 * 1024)
+                if not block:
+                    break
+                checksum.update(block)
+                total += len(block)
+            actual_sha256 = checksum.hexdigest()
+            if total != expected_bytes or actual_sha256 != expected_sha256:
+                raise ValueError("Remote Blob content differs from the uploaded payload")
+            return {
+                "bytes": total,
+                "sha256": actual_sha256,
+                "request_id": response.getheader("x-ms-request-id"),
+            }
+        finally:
+            connection.close()
+
 
 def _add_bytes(archive: tarfile.TarFile, name: str, content: bytes) -> None:
     info = tarfile.TarInfo(name)
@@ -255,6 +289,16 @@ class BlobSpool:
             "upload_state": "pending", "attempts": 0, "first_attempt_at": None,
             "last_attempt_at": None, "last_error_category": None,
             "uploaded_at": None, "payload_etag": None, "manifest_etag": None,
+            "remote_verified_at": None, "payload_verify_request_id": None,
+            "manifest_verify_request_id": None,
+            "manifest_bytes": None,
+            "operations": {
+                name: {"started": 0, "succeeded": 0}
+                for name in (
+                    "payload_write", "manifest_write",
+                    "payload_verify_read", "manifest_verify_read",
+                )
+            },
         }
 
     def _finish_stage(self, temporary: Path, target: Path, state: dict) -> dict:
@@ -292,6 +336,50 @@ class BlobSpool:
             with payload.open("rb") as handle:
                 os.fsync(handle.fileno())
             state = self._initial_state(item_id, payload, kind, metadata)
+            return self._finish_stage(temporary, target, state)
+        except BaseException:
+            shutil.rmtree(temporary, ignore_errors=True)
+            raise
+
+    def stage_directory(self, source: Path, item_id: str, *, kind: str, metadata: dict) -> dict:
+        if source.is_symlink():
+            raise ValueError("Only a regular result directory can be staged")
+        source = source.resolve(strict=True)
+        if not source.is_dir():
+            raise ValueError("Only a regular result directory can be staged")
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,63}", item_id):
+            raise ValueError("Retrieval item identifier is invalid")
+        target = self.directory / item_id
+        if target.exists() or item_id in self.items:
+            raise ValueError("Retrieval item already exists")
+        temporary = self.directory / f".{item_id}.{secrets.token_hex(8)}.tmp"
+        temporary.mkdir(mode=0o700)
+        try:
+            payload = temporary / "payload.tar"
+            files = list(_files(source))
+            inventory = {
+                path.relative_to(source).as_posix(): {
+                    "bytes": path.stat().st_size,
+                    "sha256": file_digest(path),
+                }
+                for path in files
+            }
+            with tarfile.open(payload, "w", format=tarfile.PAX_FORMAT, dereference=False) as archive:
+                _add_bytes(archive, "retrieval-tree.json", json.dumps(
+                    {"kind": kind, "files": inventory}, ensure_ascii=False,
+                    sort_keys=True, separators=(",", ":"), allow_nan=False,
+                ).encode())
+                for path in files:
+                    archive.add(path, arcname=path.relative_to(source).as_posix(), recursive=False)
+            with payload.open("rb") as handle:
+                os.fsync(handle.fileno())
+            state = self._initial_state(item_id, payload, kind, {
+                **metadata,
+                "source_file_count": len(inventory),
+                "source_tree_sha256": digest(json.dumps(
+                    inventory, sort_keys=True, separators=(",", ":"), allow_nan=False
+                ).encode()),
+            })
             return self._finish_stage(temporary, target, state)
         except BaseException:
             shutil.rmtree(temporary, ignore_errors=True)
@@ -373,6 +461,15 @@ class BlobSpool:
         with self.changed:
             self.changed.notify_all()
 
+    def _blob_operation(self, directory: Path, state: dict, name: str, operation):
+        record = state["operations"][name]
+        record["started"] += 1
+        self._write_state(directory, state)
+        result = operation()
+        record["succeeded"] += 1
+        self._write_state(directory, state)
+        return result
+
     def _upload(self, directory: Path) -> None:
         state_path = directory / "state.json"
         state = json.loads(state_path.read_bytes())
@@ -390,8 +487,11 @@ class BlobSpool:
                 payload = directory / state["payload"]["name"]
                 if payload.stat().st_size != state["payload"]["bytes"] or file_digest(payload) != state["payload"]["sha256"]:
                     raise ValueError("Spool payload changed after atomic staging")
-                payload_result = self.client.put_file(
-                    state["payload"]["blob"], payload, state["payload"]["sha256"]
+                payload_result = self._blob_operation(
+                    directory, state, "payload_write",
+                    lambda: self.client.put_file(
+                        state["payload"]["blob"], payload, state["payload"]["sha256"]
+                    ),
                 )
                 completed_at = now()
                 manifest = {
@@ -406,10 +506,30 @@ class BlobSpool:
                 manifest_bytes = json.dumps(
                     manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False
                 ).encode()
-                manifest_result = self.client.put_bytes(state["manifest_blob"], manifest_bytes)
+                state["manifest_bytes"] = len(manifest_bytes)
+                self._write_state(directory, state)
+                manifest_result = self._blob_operation(
+                    directory, state, "manifest_write",
+                    lambda: self.client.put_bytes(state["manifest_blob"], manifest_bytes),
+                )
+                payload_verification = self._blob_operation(
+                    directory, state, "payload_verify_read",
+                    lambda: self.client.verify_blob(
+                        state["payload"]["blob"], state["payload"]["bytes"], state["payload"]["sha256"]
+                    ),
+                )
+                manifest_verification = self._blob_operation(
+                    directory, state, "manifest_verify_read",
+                    lambda: self.client.verify_blob(
+                        state["manifest_blob"], len(manifest_bytes), digest(manifest_bytes)
+                    ),
+                )
                 state.update(
                     upload_state="uploaded", uploaded_at=completed_at,
                     payload_etag=payload_result["etag"], manifest_etag=manifest_result["etag"],
+                    remote_verified_at=now(),
+                    payload_verify_request_id=payload_verification.get("request_id"),
+                    manifest_verify_request_id=manifest_verification.get("request_id"),
                     last_error_category=None,
                 )
                 self._write_state(directory, state)
@@ -443,6 +563,8 @@ class BlobSpool:
             "kind", "item_id", "metadata", "destination", "payload", "manifest_blob", "manifest_uploaded_last",
             "upload_state", "attempts", "first_attempt_at", "last_attempt_at",
             "last_error_category", "uploaded_at", "payload_etag", "manifest_etag",
+            "remote_verified_at", "payload_verify_request_id", "manifest_verify_request_id",
+            "manifest_bytes", "operations",
         )}
 
     def report(self) -> dict:
@@ -457,16 +579,39 @@ class BlobSpool:
             "container": self.client.container, "prefix": self.prefix,
             "run_id": self.run_id, "source_commit": self.source_commit,
             "ledger_sha256": self.ledger_sha256, "condition": self.condition,
-            "upload_state": "no_complete_repetitions" if not records else "uploaded" if all(
-                record["upload_state"] == "uploaded" for record in records
+            "upload_state": "no_complete_items" if not records else "uploaded" if all(
+                record["upload_state"] == "uploaded" and record["remote_verified_at"] for record in records
             ) else "retrieval_pending",
             "items": records, "nas_read_verification": "pending_external",
             "credentials_recorded": False,
         }
 
+    def wait_for_upload(self, item_ids: list[str], wait_seconds: float) -> dict:
+        if not item_ids or len(set(item_ids)) != len(item_ids):
+            raise ValueError("Blob wait needs unique item identifiers")
+        if type(wait_seconds) not in (int, float) or not math.isfinite(wait_seconds) or wait_seconds < 0:
+            raise ValueError("Blob wait must be finite and nonnegative")
+        with self.changed:
+            deadline = time.monotonic() + wait_seconds
+            while True:
+                report = self.report()
+                indexed = {record["item_id"]: record for record in report["items"]}
+                if set(item_ids) - set(indexed):
+                    raise ValueError("Blob wait item has not been staged")
+                selected = [indexed[item_id] for item_id in item_ids]
+                if all(record["upload_state"] == "uploaded" and record["remote_verified_at"] for record in selected):
+                    return {"status": "uploaded", "items": selected}
+                if any(record["upload_state"] == "failed" for record in selected):
+                    return {"status": "retrieval_pending", "items": selected}
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return {"status": "retrieval_pending", "items": selected}
+                self.changed.wait(min(remaining, 0.5))
+
     @classmethod
     def resume(cls, directory: Path, client, *, prefix: str, maximum_attempts: int,
-               initial_backoff_seconds: float, maximum_backoff_seconds: float):
+               initial_backoff_seconds: float, maximum_backoff_seconds: float,
+               accepting: bool = False):
         if not directory.is_absolute() or directory.is_symlink() or not directory.is_dir():
             raise ValueError("Resume requires an existing absolute non-symlink spool directory")
         state_paths = sorted(directory.glob("*/state.json"))
@@ -503,7 +648,7 @@ class BlobSpool:
         self.lock = threading.RLock()
         self.changed = threading.Condition(self.lock)
         self.stop_event = threading.Event()
-        self.accepting = False
+        self.accepting = accepting
         for path, state in zip(state_paths, states, strict=True):
             if state["upload_state"] != "uploaded":
                 state["upload_state"] = "pending"
@@ -528,10 +673,9 @@ class BlobSpool:
                 if remaining <= 0:
                     break
                 self.changed.wait(min(remaining, 0.5))
-        report = self.report()
         self.stop_event.set()
         self.worker.join(timeout=min(self.client.timeout_seconds + 1, max(wait_seconds, 1)))
-        return report
+        return self.report()
 
 
 def retrieval_settings(ledger: dict, root: Path) -> dict:
@@ -564,10 +708,11 @@ def make_blob_spool(settings: dict, run_id: str, source_commit: str,
     )
 
 
-def resume_blob_spool(settings: dict, directory: Path) -> BlobSpool:
+def resume_blob_spool(settings: dict, directory: Path, *, accepting: bool = False) -> BlobSpool:
     return BlobSpool.resume(
         directory, settings["client"], prefix=settings["prefix"],
         maximum_attempts=settings["maximum_attempts"],
         initial_backoff_seconds=settings["initial_backoff_seconds"],
         maximum_backoff_seconds=settings["maximum_backoff_seconds"],
+        accepting=accepting,
     )

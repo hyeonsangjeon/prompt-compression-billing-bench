@@ -49,6 +49,8 @@ PUBLIC_FILES = {
     "docs/experiment/compressors.md", "docs/experiment/decisions.md",
     "docs/experiment/screening-protocol.md", "docs/experiment/evaluation-protocol.md",
     "docs/experiment/reproducibility-contract.md",
+    "data/experiment/coverage-validation-v1.json",
+    "data/experiment/terminal-bench-2.1-task-types.json", "ledgers/screening.template.toml",
     "tests/test_protection.py", "tests/test_static.py", "tests/test_eda.py", "tests/test_compare.py",
     "src/eda_report.py", "tests/test_eda_report.py", "docs/eda/README.md", "docs/eda/manifest.json",
     "docs/eda/figures/round1/01-input-size.svg", "docs/eda/figures/round1/02-input-composition.svg",
@@ -71,6 +73,13 @@ PUBLIC_FILES = {
     "tests/test_task_metrics.py", "tests/test_native_contract.py", "tests/test_native_run.py",
     "tests/test_native_compressors.py", "tests/test_adapter_preflight.py", "tests/test_blob_retrieval.py", "tests/test_harbor_transport.py",
     "tests/native_test_harbor_preflight.py", "tests/test_verifier_revisions.py",
+    "src/evaluation_coverage.py", "src/evaluation_statistics.py", "src/replay_environment.py",
+    "src/screening_contract.py", "src/screening_cost.py", "src/screening_inventory.py",
+    "src/screening_run.py", "src/screening_scheduler.py",
+    "tests/native_test_replay_environment.py", "tests/native_test_screening_run.py",
+    "tests/test_evaluation_coverage.py", "tests/test_evaluation_statistics.py",
+    "tests/test_screening_contract.py", "tests/test_screening_cost.py",
+    "tests/test_screening_inventory.py", "tests/test_screening_scheduler.py",
 }
 
 TIMING_ROWS = (

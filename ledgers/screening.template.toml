@@ -1,0 +1,114 @@
+schema_version = 1
+mode = "terminal_bench_screening"
+output_dir = "runs"
+raw_retrieval = "not_exposed_to_agent"
+
+[benchmark]
+name = "terminal-bench-2.1"
+revision = "7131e4375048a0e408a8fb404b5f499d726b695b"
+root_env = "TERMINAL_BENCH_ROOT"
+inventory_env = "SCREENING_INVENTORY"
+inventory_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+task_count = 89
+
+[benchmark.verifiers.nginx-request-logging]
+revision = "nginx-request-logging-verifier-v2"
+source_path = "tests/test_outputs.py"
+source_sha256 = "045cc716c14efde3b0dcff5fc7c85ec5d18bfc6ce66f8b40a418fa2a3a4acda0"
+effective_sha256 = "20812107bc3bfc541728a2d10e3da0552e907d949e1347a03d33aa26954f8902"
+
+[model]
+provider = "foundry"
+name = "gpt-5.4"
+reported_model = "gpt-5.4-2026-03-05"
+endpoint_env = "FOUNDRY_ENDPOINT"
+temperature = 0
+reasoning_effort = "none"
+max_completion_tokens = 2048
+
+[runner]
+harbor_version = "0.22.0"
+agent_import_path = "src.harbor_agent:ObservedTerminus2"
+environment_import_path = "src.replay_environment:PreservingDockerEnvironment"
+concurrency = 8
+max_turns = 60
+agent_timeout_seconds = 900
+verifier_timeout_seconds = 900
+setup_timeout_seconds = 600
+trial_timeout_seconds = 2400
+
+[measurement]
+tokenizer = "o200k_base"
+tiktoken_version = "0.14.0"
+cache_env = "TIKTOKEN_CACHE_DIR"
+table_sha256 = "446a9538cb6c348e3516120d7c08b09f57c36495e2acfffe59a5bf8b0cfb1a2d"
+
+[queue]
+state_path_env = "FOUNDRY_QUEUE_STATE"
+rpm = 3000
+tpm = 300000
+limits_checked_at_utc = "2026-09-15T00:00:00+00:00"
+limits_source_reference = "Azure deployment properties.rateLimits"
+deployment_isolation_reference = ""
+
+[retrieval]
+account_url_env = "NATIVE_BLOB_ACCOUNT_URL"
+spool_root_env = "NATIVE_BLOB_SPOOL_ROOT"
+container = "runs"
+prefix = "screening"
+upload_timeout_seconds = 300
+maximum_attempts = 30
+initial_backoff_seconds = 2
+maximum_backoff_seconds = 60
+final_flush_seconds = 600
+
+[limits]
+api_cost_usd = 0
+deadline_utc = "2026-09-17T00:00:00+00:00"
+max_wall_seconds = 161928
+max_calls_per_trial = 60
+request_timeout_seconds = 300
+max_request_bytes = 8000000
+max_attempts_per_call = 3
+max_retry_wait_seconds = 120
+protocol_token_allowance = 4096
+
+[prices]
+input_per_million_usd = 2.5
+cached_input_per_million_usd = 0.25
+output_per_million_usd = 15
+source_reference = "Azure Retail Prices API, Azure OpenAI GPT5 Global meters, USD per 1M tokens"
+checked_at_utc = "2026-09-15T00:00:00+00:00"
+
+[screening]
+condition = "none"
+maximum_repetitions_per_task = 20
+valid_results_required = 20
+passes_required = 18
+stop_after_quality_failures = 3
+preparation_retry_maximum = 1
+randomization_seed = 20260915
+
+[replay]
+required = true
+bundle_revision = 1
+require_complete_capture = true
+
+[cost]
+currency = "USD"
+vm_hourly_usd = 0.403
+vm_meter_reference = "Azure Retail Prices API, Linux Standard_D8s_v6 consumption meter"
+vm_price_checked_at_utc = "2026-09-15T00:00:00+00:00"
+allocation = "equal_share_of_each_active_time_segment"
+blob_and_network_contract = "same-region VM and hot LRS Blob operations; application-recorded operation starts without responses remain unknown"
+blob_write_per_10000_operations_usd = 0.05
+blob_read_per_10000_operations_usd = 0.004
+same_region_network_per_gb_usd = 0
+blob_network_meter_reference = "Azure Retail Prices API, Hot LRS Write Operations and Hot Read Operations; same-region transfer has no separate egress meter"
+blob_network_price_checked_at_utc = "2026-09-15T00:00:00+00:00"
+near_zero_usd = 0.00000025
+
+[approval]
+preregistered = false
+execution_authorized = false
+reference = ""

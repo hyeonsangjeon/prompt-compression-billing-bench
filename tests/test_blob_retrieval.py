@@ -34,6 +34,27 @@ class FakeBlobClient:
     def put_bytes(self, name, payload):
         return self._store(name, payload)
 
+    def verify_blob(self, name, expected_bytes, expected_sha256):
+        from hashlib import sha256
+        payload = self.blobs[name]
+        if (len(payload), sha256(payload).hexdigest()) != (expected_bytes, expected_sha256):
+            raise ValueError("Synthetic remote verification failed")
+        self.calls.append(name + "#verify")
+        return {"bytes": len(payload), "sha256": expected_sha256, "request_id": "synthetic-verify"}
+
+
+class BlockingBlobClient(FakeBlobClient):
+    def __init__(self):
+        super().__init__()
+        self.entered = threading.Event()
+        self.release = threading.Event()
+
+    def put_file(self, name, path, sha256):
+        self.entered.set()
+        if not self.release.wait(2):
+            raise TimeoutError("synthetic release timeout")
+        return super().put_file(name, path, sha256)
+
 
 def make_spool(root, client, *, attempts=5, initial=0):
     return BlobSpool(
@@ -44,6 +65,21 @@ def make_spool(root, client, *, attempts=5, initial=0):
 
 
 class BlobRetrievalTests(unittest.TestCase):
+    def test_finish_reports_state_after_the_uploader_thread_stops(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            payload = root / "result.tar"
+            payload.write_bytes(b"result")
+            client = BlockingBlobClient()
+            spool = make_spool(root / "spool", client)
+            spool.stage_file(payload, "adapter-preflight", kind="software_preflight", metadata={})
+            self.assertTrue(client.entered.wait(1))
+            timer = threading.Timer(0.05, client.release.set)
+            timer.start()
+            self.addCleanup(timer.cancel)
+            report = spool.finish(0)
+        self.assertEqual(report["upload_state"], "uploaded")
+
     def test_real_sized_payload_retries_and_uploads_manifest_last(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -53,13 +89,16 @@ class BlobRetrievalTests(unittest.TestCase):
             client = FakeBlobClient(failures=2)
             spool = make_spool(root / "spool", client)
             spool.stage_file(payload, "adapter-preflight", kind="software_preflight", metadata={"model_calls": 0})
+            waited = spool.wait_for_upload(["adapter-preflight"], 3)
             report = spool.finish(3)
         self.assertEqual(report["upload_state"], "uploaded")
+        self.assertEqual(waited["status"], "uploaded")
         self.assertEqual(report["items"][0]["attempts"], 3)
         self.assertEqual(report["items"][0]["payload"]["bytes"], payload_size)
-        self.assertTrue(client.calls[-1].endswith("/manifest.json"))
-        manifest = json.loads(client.blobs[client.calls[-1]])
+        manifest_name = next(name for name in reversed(client.calls) if name.endswith("/manifest.json"))
+        manifest = json.loads(client.blobs[manifest_name])
         self.assertTrue(manifest["manifest_uploaded_last"])
+        self.assertIsNotNone(report["items"][0]["remote_verified_at"])
 
     def test_failed_upload_keeps_atomic_local_payload_and_error_classification(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -96,7 +135,7 @@ class BlobRetrievalTests(unittest.TestCase):
         self.assertEqual(failed["upload_state"], "retrieval_pending")
         self.assertEqual(recovered["upload_state"], "uploaded")
         self.assertEqual(recovered["items"][0]["attempts"], 2)
-        self.assertTrue(resumed_client.calls[-1].endswith("/manifest.json"))
+        self.assertTrue(any(name.endswith("/manifest.json") for name in resumed_client.calls))
 
     def test_native_snapshot_contains_actual_trial_and_transport_artifacts(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -129,6 +168,27 @@ class BlobRetrievalTests(unittest.TestCase):
         self.assertIn("trials/r01-task-5/trial.json", names)
         self.assertIn("jobs/r01-task-5/result.json", names)
         self.assertIn("transport/request-00001/before.json", names)
+
+    def test_screening_attempt_directory_is_staged_with_tree_hash(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "attempt"
+            (source / "nested").mkdir(parents=True)
+            (source / "attempt.json").write_text('{"status":"complete"}\n')
+            (source / "nested/evidence.txt").write_text("evidence\n")
+            client = FakeBlobClient()
+            spool = make_spool(root / "spool", client)
+            staged = spool.stage_directory(
+                source, "attempt-0001", kind="screening_attempt",
+                metadata={"trial_id": "trial-1", "attempt_id": "attempt-1"},
+            )
+            report = spool.finish(2)
+            archive_bytes = client.blobs[staged["payload"]["blob"]]
+        self.assertEqual(report["upload_state"], "uploaded")
+        self.assertEqual(report["items"][0]["metadata"]["source_file_count"], 2)
+        with tarfile.open(fileobj=io.BytesIO(archive_bytes), mode="r:") as archive:
+            names = set(archive.getnames())
+        self.assertEqual(names, {"retrieval-tree.json", "attempt.json", "nested/evidence.txt"})
 
     def test_blob_account_url_cannot_carry_credentials_or_arbitrary_hosts(self):
         for value in (

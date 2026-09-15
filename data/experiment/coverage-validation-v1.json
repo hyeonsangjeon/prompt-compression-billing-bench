@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "kind": "evaluation_coverage_validation",
+  "status": "preregistered_before_screening_results",
+  "quality_pair_target": 1412,
+  "quality_allowance": 0.05,
+  "cost_reduction_threshold": 0.1,
+  "conditions": [
+    "none",
+    "squeez",
+    "headroom",
+    "llmlingua2"
+  ],
+  "simulation_count_per_scenario": 2000,
+  "bootstrap_replications": 50000,
+  "bootstrap_batch_size": 256,
+  "resampling_methods": [
+    "complete_repeat_round",
+    "circular_moving_block_length_2"
+  ],
+  "base_seed": 20260915,
+  "independent_validation_seed": 2026091501,
+  "near_zero_cost": 2.5e-7,
+  "scenarios": [
+    {
+      "id": "quality_boundary",
+      "none_pass_probability": 0.8,
+      "quality_difference": -0.05,
+      "cost_reduction": 0.2,
+      "quality_difference_variances": [0.1, 0.32, 0.4],
+      "time_copy_probability": 0.0,
+      "cost_tail": {
+        "lognormal_sigma": 0.5,
+        "rare_multiplier_probability": 0.02,
+        "rare_multiplier": 10.0
+      }
+    },
+    {
+      "id": "cost_boundary",
+      "none_pass_probability": 0.8,
+      "quality_difference": 0.0,
+      "cost_reduction": 0.1,
+      "quality_difference_variances": [0.1, 0.32, 0.4],
+      "time_copy_probability": 0.025,
+      "cost_tail": {
+        "lognormal_sigma": 0.5,
+        "rare_multiplier_probability": 0.02,
+        "rare_multiplier": 10.0
+      }
+    },
+    {
+      "id": "both_boundaries",
+      "none_pass_probability": 0.8,
+      "quality_difference": -0.05,
+      "cost_reduction": 0.1,
+      "quality_difference_variances": [0.1, 0.32, 0.4],
+      "time_copy_probability": 0.05,
+      "cost_tail": {
+        "lognormal_sigma": 0.5,
+        "rare_multiplier_probability": 0.02,
+        "rare_multiplier": 10.0
+      }
+    }
+  ],
+  "manifest_sha256": "0efd3096ae470b66a8626abd05797e16ca18917c0ef204f0a13726c348efbb19"
+}
