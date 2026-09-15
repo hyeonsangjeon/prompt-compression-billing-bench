@@ -1283,7 +1283,7 @@ def _prepare_continuation(
     execution["continuation_sha256"] = payload["continuation_sha256"]
     execution["prior_run_id"] = prior_manifest["run_id"]
     execution["provider_budget_record_sha256"] = provider_budget["record_sha256"]
-    save_json(execution_path, execution)
+    atomic_json(execution_path, execution)
     return payload
 
 
