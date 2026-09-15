@@ -312,6 +312,7 @@ class ReplayEnvironmentTests(unittest.IsolatedAsyncioTestCase):
             ))
             manifest = await environment._capture_environment()
             self.assertEqual(manifest["status"], "incomplete")
+            self.assertGreaterEqual(manifest["capture_wall_seconds"], 0)
             path = Path(temporary) / "workspace-replay/task__trial__env/manifest.json"
             self.assertTrue(path.is_file())
             self.assertEqual(json.loads(path.read_text())["manifest_sha256"], manifest["manifest_sha256"])
@@ -341,6 +342,9 @@ class ReplayEnvironmentTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIs(observed, result)
                 environment._repeat_verifier.assert_not_awaited()
                 self.assertIsNotNone(environment._pending_verifier_replay)
+                self.assertGreaterEqual(
+                    environment._pending_verifier_replay["original_verifier_wall_seconds"], 0
+                )
                 await environment.stop(delete=True)
                 environment._repeat_verifier.assert_awaited_once()
                 base_stop.assert_awaited_once_with(delete=True)

@@ -291,6 +291,7 @@ class BlobSpool:
             "uploaded_at": None, "payload_etag": None, "manifest_etag": None,
             "remote_verified_at": None, "payload_verify_request_id": None,
             "manifest_verify_request_id": None,
+            "upload_wall_seconds": None,
             "manifest_bytes": None,
             "operations": {
                 name: {"started": 0, "succeeded": 0}
@@ -473,6 +474,7 @@ class BlobSpool:
     def _upload(self, directory: Path) -> None:
         state_path = directory / "state.json"
         state = json.loads(state_path.read_bytes())
+        upload_started = time.monotonic()
         delay = self.initial_backoff_seconds
         remaining_attempts = self.maximum_attempts
         while remaining_attempts and not self.stop_event.is_set():
@@ -528,6 +530,7 @@ class BlobSpool:
                     upload_state="uploaded", uploaded_at=completed_at,
                     payload_etag=payload_result["etag"], manifest_etag=manifest_result["etag"],
                     remote_verified_at=now(),
+                    upload_wall_seconds=time.monotonic() - upload_started,
                     payload_verify_request_id=payload_verification.get("request_id"),
                     manifest_verify_request_id=manifest_verification.get("request_id"),
                     last_error_category=None,
@@ -559,13 +562,15 @@ class BlobSpool:
 
     @staticmethod
     def _public_state(state: dict) -> dict:
-        return {key: state[key] for key in (
+        public = {key: state[key] for key in (
             "kind", "item_id", "metadata", "destination", "payload", "manifest_blob", "manifest_uploaded_last",
             "upload_state", "attempts", "first_attempt_at", "last_attempt_at",
             "last_error_category", "uploaded_at", "payload_etag", "manifest_etag",
             "remote_verified_at", "payload_verify_request_id", "manifest_verify_request_id",
             "manifest_bytes", "operations",
         )}
+        public["upload_wall_seconds"] = state.get("upload_wall_seconds")
+        return public
 
     def report(self) -> dict:
         with self.lock:

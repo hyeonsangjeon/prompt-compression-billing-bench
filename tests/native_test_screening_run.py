@@ -14,6 +14,7 @@ from src.screening_run import (
     _classify_attempt,
     _reported_task_id,
     _stage_checkpoint,
+    _verify_completed_batch,
     main,
     screening_harbor_config,
 )
@@ -188,6 +189,53 @@ class ScreeningRunTests(unittest.TestCase):
             "run-state-000001", "run-state-000002",
         ])
 
+    def test_batch_verification_requires_quality_replay_timings_and_remote_hashes(self):
+        attempt_id = self.attempt_id
+        timing = {
+            "task_process_wall_seconds": 10.0,
+            "state_save_wall_seconds": 1.0,
+            "first_verifier_wall_seconds": 2.0,
+            "state_restore_wall_seconds": 3.0,
+            "repeated_verifier_wall_seconds": 2.1,
+            "restore_and_repeated_verifier_wall_seconds": 5.2,
+        }
+        finalized = [{"record": {
+            "attempt_id": attempt_id,
+            "task_id": "cancel-async-tasks",
+            "classification": {
+                "result": "wrong_answer",
+                "replay_error": None,
+                "replay_checks": {
+                    "capture_status": "complete",
+                    "state_restored": True,
+                    "same_judgement": True,
+                },
+                "evidence_timing": timing,
+            },
+        }}]
+
+        class Spool:
+            def wait_for_upload(self, item_ids, wait_seconds):
+                return {"status": "uploaded", "items": [{
+                    "item_id": item_id,
+                    "upload_state": "uploaded",
+                    "remote_verified_at": "2026-09-15T00:00:00+00:00",
+                    "upload_wall_seconds": 0.5,
+                } for item_id in item_ids]}
+
+        checked = _verify_completed_batch(
+            finalized, {"item_id": "run-state-000001"}, Spool(), 30, 1
+        )
+        self.assertTrue(checked["additional_claims_allowed"])
+        self.assertEqual(checked["attempts"][0]["result"], "wrong_answer")
+
+        finalized[0]["record"]["classification"]["evidence_timing"]["state_save_wall_seconds"] = None
+        blocked = _verify_completed_batch(
+            finalized, {"item_id": "run-state-000001"}, Spool(), 30, 1
+        )
+        self.assertFalse(blocked["additional_claims_allowed"])
+        self.assertEqual(blocked["attempts"][0]["missing_timing_fields"], ["state_save_wall_seconds"])
+
     def test_cli_routes_resume_without_treating_it_as_a_new_run(self):
         ledger = self.root / "ledger.toml"
         ledger.write_bytes((ROOT / "ledgers/screening.template.toml").read_bytes())
@@ -201,6 +249,21 @@ class ScreeningRunTests(unittest.TestCase):
             ])
         self.assertEqual(result, 0)
         self.assertEqual(execute.call_args.kwargs["resume_directory"], resumed.resolve())
+
+    def test_cli_marks_single_task_diagnostic_separately(self):
+        ledger = self.root / "ledger.toml"
+        ledger.write_bytes((ROOT / "ledgers/screening.template.toml").read_bytes())
+        output = self.root / "screening-diagnostic"
+        output.mkdir()
+        (output / "summary.json").write_text(json.dumps({"status": "complete"}))
+        with patch("src.screening_run.execute_screening", return_value=output) as execute, \
+             patch("sys.stdout", new_callable=io.StringIO):
+            result = main([
+                str(ledger), "--source-commit", "a" * 40,
+                "--diagnose-task", "cancel-async-tasks",
+            ])
+        self.assertEqual(result, 0)
+        self.assertEqual(execute.call_args.kwargs["diagnostic_task_id"], "cancel-async-tasks")
 
 
 if __name__ == "__main__":

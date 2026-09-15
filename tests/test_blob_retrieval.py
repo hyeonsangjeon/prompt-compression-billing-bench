@@ -99,6 +99,7 @@ class BlobRetrievalTests(unittest.TestCase):
         manifest = json.loads(client.blobs[manifest_name])
         self.assertTrue(manifest["manifest_uploaded_last"])
         self.assertIsNotNone(report["items"][0]["remote_verified_at"])
+        self.assertIsNotNone(report["items"][0]["upload_wall_seconds"])
 
     def test_failed_upload_keeps_atomic_local_payload_and_error_classification(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -115,6 +116,7 @@ class BlobRetrievalTests(unittest.TestCase):
         self.assertEqual(report["upload_state"], "retrieval_pending")
         self.assertEqual(state["upload_state"], "failed")
         self.assertEqual(state["last_error_category"], "service_unavailable")
+        self.assertIsNone(state["upload_wall_seconds"])
         self.assertEqual(retained, b"private result")
 
     def test_preserved_failed_spool_can_resume_without_recreating_the_payload(self):

@@ -47,6 +47,13 @@ class ScreeningSchedulerTests(unittest.TestCase):
         claimed = self.state.claim(8)
         self.assertEqual([trial["task_id"] for trial in claimed], [selected])
 
+    def test_diagnostic_claim_selects_only_the_requested_task(self):
+        selected = self.manifest["trials"][17]["task_id"]
+        claimed = self.state.claim(1, task_id=selected)
+        self.assertEqual(len(claimed), 1)
+        self.assertEqual(claimed[0]["task_id"], selected)
+        self.assertEqual(claimed[0]["repetition"], 1)
+
     def test_third_quality_failure_cancels_only_unstarted_trials(self):
         target = None
         for _ in range(3):

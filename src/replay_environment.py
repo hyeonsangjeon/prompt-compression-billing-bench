@@ -649,6 +649,7 @@ flush_paths
         }
 
     async def _capture_environment(self, phase: str = "manual_preflight") -> dict:
+        started = asyncio.get_running_loop().time()
         root = self.trial_paths.trial_dir / "workspace-replay"
         root.mkdir(parents=True, exist_ok=True)
         directory = root / self._safe_name(self.session_id)
@@ -679,6 +680,7 @@ flush_paths
             "state_sha256": sha256(canonical_json({
                 "containers": [self._container_state_signature(container) for container in containers]
             })).hexdigest(),
+            "capture_wall_seconds": asyncio.get_running_loop().time() - started,
             "verifier_replay": None,
             "files": {},
             "error": error,
@@ -911,7 +913,10 @@ flush_paths
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(path, destination, follow_symlinks=False)
 
-    async def _repeat_verifier(self, command: str, original_result, *, cwd, env, timeout_sec, user) -> None:
+    async def _repeat_verifier(
+        self, command: str, original_result, *, cwd, env, timeout_sec, user,
+        original_verifier_wall_seconds: float,
+    ) -> None:
         if self._replay_manifest is None or self._replay_directory is None:
             raise RuntimeError("Verifier replay started without a preserved state")
         started = asyncio.get_running_loop().time()
@@ -931,12 +936,17 @@ flush_paths
             ],
             "state_restored": False,
             "same_judgement": False,
+            "original_verifier_wall_seconds": original_verifier_wall_seconds,
+            "restore_wall_seconds": None,
+            "repeated_verifier_wall_seconds": None,
             "wall_seconds": None,
             "error": None,
         }
         original_directory = self._replay_directory / "original-verifier"
         repeated_directory = self._replay_directory / "repeated-verifier"
         self._copy_host_tree(self.trial_paths.verifier_dir, original_directory)
+        phase = "restore"
+        phase_started = asyncio.get_running_loop().time()
         try:
             if self._replay_manifest["status"] != "complete":
                 raise RuntimeError("Verifier replay requires a complete pre-verifier capture")
@@ -951,6 +961,9 @@ flush_paths
             replay["state_restored"] = restored_hash == self._replay_manifest["state_sha256"]
             if not replay["state_restored"]:
                 raise RuntimeError("Verifier-visible state did not restore byte-for-byte")
+            replay["restore_wall_seconds"] = asyncio.get_running_loop().time() - phase_started
+            phase = "repeated_verifier"
+            phase_started = asyncio.get_running_loop().time()
             for prepared in self._preparatory_verifier_commands:
                 await super().exec(**prepared)
             repeated_result = await super().exec(
@@ -963,7 +976,10 @@ flush_paths
             replay["repeated_signature"] = repeated_signature
             replay["same_judgement"] = original_signature == repeated_signature
             replay["status"] = "complete" if replay["same_judgement"] else "mismatch"
+            replay["repeated_verifier_wall_seconds"] = asyncio.get_running_loop().time() - phase_started
         except BaseException as caught:
+            timing_name = "restore_wall_seconds" if phase == "restore" else "repeated_verifier_wall_seconds"
+            replay[timing_name] = asyncio.get_running_loop().time() - phase_started
             replay["error"] = {"type": type(caught).__name__, "message": str(caught)}
         finally:
             replay["wall_seconds"] = asyncio.get_running_loop().time() - started
@@ -991,6 +1007,10 @@ flush_paths
         if self._tests_uploaded and self._replay_manifest is None:
             await self._capture_environment("after_tests_upload_before_verifier")
         arguments = {"command": command, "cwd": cwd, "env": env, "timeout_sec": timeout_sec, "user": user}
+        verifier_command = (
+            self._tests_uploaded and not self._replay_started and self._verifier_test_command(command)
+        )
+        verifier_started = asyncio.get_running_loop().time() if verifier_command else None
         result = await super().exec(**arguments)
         if not self._tests_uploaded or self._replay_started:
             return result
@@ -1003,6 +1023,7 @@ flush_paths
                 "env": env,
                 "timeout_sec": timeout_sec,
                 "user": user,
+                "original_verifier_wall_seconds": asyncio.get_running_loop().time() - verifier_started,
             }
         else:
             self._preparatory_verifier_commands.append(arguments)

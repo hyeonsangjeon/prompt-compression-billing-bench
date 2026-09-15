@@ -165,9 +165,11 @@ class ScreeningState:
             (utc_now(), event, trial_id, attempt_id, json.dumps(details or {}, sort_keys=True, separators=(",", ":"))),
         )
 
-    def claim(self, maximum: int) -> list[dict]:
+    def claim(self, maximum: int, *, task_id: str | None = None) -> list[dict]:
         if maximum < 1:
             raise ValueError("Claim size must be positive")
+        if task_id is not None and not task_id:
+            raise ValueError("A diagnostic task identifier cannot be empty")
         claimed = []
         with self.transaction():
             rows = []
@@ -176,6 +178,7 @@ class ScreeningState:
                 candidates = self.connection.execute(
                     """SELECT tr.* FROM trials tr JOIN tasks ta USING(task_id)
                        WHERE tr.state=? AND ta.state='eligible_for_screening'
+                         AND (? IS NULL OR tr.task_id=?)
                          AND NOT EXISTS (
                            SELECT 1 FROM trials active
                            WHERE active.task_id=tr.task_id
@@ -183,7 +186,7 @@ class ScreeningState:
                              AND active.state IN ('running','paused','retry_pending')
                          )
                        ORDER BY tr.plan_index""",
-                    (state,),
+                    (state, task_id, task_id),
                 ).fetchall()
                 for candidate in candidates:
                     if candidate["task_id"] in selected_tasks:

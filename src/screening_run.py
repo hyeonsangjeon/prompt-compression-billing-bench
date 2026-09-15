@@ -32,7 +32,7 @@ from .replay_environment import replay_bundle_manifest
 from .screening_contract import load_screening_ledger, require_operational_screening
 from .screening_cost import allocate_active_vm_cost, blob_operation_cost, combined_direct_cost, provider_cost
 from .screening_inventory import REVISION, _task_files, canonical_json, verify_inventory
-from .screening_scheduler import ScreeningState, make_screening_manifest, verify_screening_manifest
+from .screening_scheduler import QUALITY_RESULTS, ScreeningState, make_screening_manifest, verify_screening_manifest
 from .task_metrics import collect_trial_metrics, read_events
 
 
@@ -174,7 +174,14 @@ def _task_artifact(task: dict, ledger: dict, source_commit: str) -> dict:
     return {**payload, "artifact_manifest_sha256": digest(canonical_json(payload))}
 
 
-def _prepare_inputs(directory: Path, setup: dict, source_commit: str, run_id: str) -> tuple[dict, dict]:
+def _prepare_inputs(
+    directory: Path,
+    setup: dict,
+    source_commit: str,
+    run_id: str,
+    *,
+    execution_scope: dict | None = None,
+) -> tuple[dict, dict]:
     inputs = directory / "inputs"
     inputs.mkdir(parents=True, exist_ok=False)
     for name, content in setup["snapshots"].items():
@@ -222,6 +229,10 @@ def _prepare_inputs(directory: Path, setup: dict, source_commit: str, run_id: st
             "source_reference": setup["ledger"]["queue"]["limits_source_reference"],
         },
         "verifier_replay": "same_preserved_state_one_additional_verifier_execution_no_model_call",
+        "execution_scope": execution_scope or {
+            "kind": "formal_terminal_bench_screening",
+            "included_in_formal_screening_denominator": True,
+        },
         "started_at": now(),
     }
     save_json(inputs / "execution.json", execution)
@@ -261,7 +272,12 @@ def _attempt_replay(job: Path) -> tuple[dict | None, str | None]:
     if replay.get("capture_phase") != "after_tests_upload_before_verifier":
         return replay, "replay_capture_phase_invalid"
     repeated = replay.get("verifier_replay") or {}
-    if replay.get("status") != "complete" or repeated.get("status") != "complete":
+    if (
+        replay.get("status") != "complete"
+        or repeated.get("status") != "complete"
+        or repeated.get("state_restored") is not True
+        or repeated.get("same_judgement") is not True
+    ):
         return replay, "replay_mismatch_or_incomplete"
     return replay, None
 
@@ -316,6 +332,31 @@ def _classify_attempt(attempt: dict, process: dict, recorder: LiveRecorder, tran
         "metrics": metrics,
         "replay_manifest_sha256": None if replay is None else replay.get("manifest_sha256"),
         "replay_error": replay_error,
+        "replay_checks": None if replay is None else {
+            "capture_status": replay.get("status"),
+            "state_restored": (replay.get("verifier_replay") or {}).get("state_restored"),
+            "same_judgement": (replay.get("verifier_replay") or {}).get("same_judgement"),
+        },
+        "evidence_timing": {
+            "task_process_wall_seconds": process.get("elapsed_seconds"),
+            "state_save_wall_seconds": None if replay is None else replay.get("capture_wall_seconds"),
+            "first_verifier_wall_seconds": (
+                None if replay is None else (replay.get("verifier_replay") or {}).get(
+                    "original_verifier_wall_seconds"
+                )
+            ),
+            "state_restore_wall_seconds": (
+                None if replay is None else (replay.get("verifier_replay") or {}).get("restore_wall_seconds")
+            ),
+            "repeated_verifier_wall_seconds": (
+                None if replay is None else (replay.get("verifier_replay") or {}).get(
+                    "repeated_verifier_wall_seconds"
+                )
+            ),
+            "restore_and_repeated_verifier_wall_seconds": (
+                None if replay is None else (replay.get("verifier_replay") or {}).get("wall_seconds")
+            ),
+        },
         "verifier_test_ids": test_ids,
         "request_failure": request_failure,
     }
@@ -587,6 +628,98 @@ def _stage_checkpoint(directory: Path, state: ScreeningState, summary: dict, spo
     return staged
 
 
+def _measured_seconds(value: object) -> bool:
+    return type(value) in (int, float) and not isinstance(value, bool) and math.isfinite(value) and value >= 0
+
+
+def _verify_completed_batch(
+    finalized: list[dict],
+    checkpoint: dict,
+    spool,
+    wait_seconds: float,
+    batch_number: int,
+) -> dict:
+    attempt_ids = [item["record"]["attempt_id"] for item in finalized]
+    item_ids = [*attempt_ids, checkpoint["item_id"]]
+    started = time.monotonic()
+    try:
+        retrieval = spool.wait_for_upload(item_ids, wait_seconds)
+        wait_error = None
+    except (OSError, RuntimeError, ValueError) as error:
+        retrieval = {"status": "retrieval_pending", "items": []}
+        wait_error = {"type": type(error).__name__, "message": str(error)}
+    indexed = {item["item_id"]: item for item in retrieval["items"]}
+    attempts = []
+    for finalized_attempt in finalized:
+        record = finalized_attempt["record"]
+        classification = record["classification"]
+        timing = classification["evidence_timing"]
+        retrieval_record = indexed.get(record["attempt_id"])
+        missing_timings = [
+            name for name in (
+                "task_process_wall_seconds",
+                "state_save_wall_seconds",
+                "first_verifier_wall_seconds",
+                "state_restore_wall_seconds",
+                "repeated_verifier_wall_seconds",
+            )
+            if not _measured_seconds(timing.get(name))
+        ]
+        upload_seconds = None if retrieval_record is None else retrieval_record.get("upload_wall_seconds")
+        if not _measured_seconds(upload_seconds):
+            missing_timings.append("upload_wall_seconds")
+        replay_checks = classification.get("replay_checks") or {}
+        attempts.append({
+            "attempt_id": record["attempt_id"],
+            "task_id": record["task_id"],
+            "result": classification["result"],
+            "quality_result": classification["result"] in QUALITY_RESULTS,
+            "strict_replay_complete": (
+                classification.get("replay_error") is None
+                and replay_checks.get("capture_status") == "complete"
+                and replay_checks.get("state_restored") is True
+                and replay_checks.get("same_judgement") is True
+            ),
+            "remote_hash_verified": (
+                retrieval_record is not None
+                and retrieval_record.get("upload_state") == "uploaded"
+                and retrieval_record.get("remote_verified_at") is not None
+            ),
+            "timing": {**timing, "upload_wall_seconds": upload_seconds},
+            "missing_timing_fields": missing_timings,
+        })
+    checkpoint_record = indexed.get(checkpoint["item_id"])
+    checkpoint_verified = (
+        checkpoint_record is not None
+        and checkpoint_record.get("upload_state") == "uploaded"
+        and checkpoint_record.get("remote_verified_at") is not None
+    )
+    complete = (
+        retrieval["status"] == "uploaded"
+        and checkpoint_verified
+        and bool(attempts)
+        and all(
+            item["quality_result"]
+            and item["strict_replay_complete"]
+            and item["remote_hash_verified"]
+            and not item["missing_timing_fields"]
+            for item in attempts
+        )
+    )
+    return {
+        "kind": "screening_batch_evidence_verification",
+        "batch_number": batch_number,
+        "attempt_count": len(attempts),
+        "attempts": attempts,
+        "checkpoint_item_id": checkpoint["item_id"],
+        "checkpoint_remote_hash_verified": checkpoint_verified,
+        "retrieval_status": retrieval["status"],
+        "retrieval_wait_wall_seconds": time.monotonic() - started,
+        "retrieval_error": wait_error,
+        "additional_claims_allowed": complete,
+    }
+
+
 def _resume_inputs(directory: Path, setup: dict, source_commit: str) -> tuple[dict, dict, ScreeningState, object, dict]:
     if directory.is_symlink():
         raise ValueError("Screening resume directory cannot be a symlink")
@@ -696,15 +829,44 @@ def _resume_inputs(directory: Path, setup: dict, source_commit: str) -> tuple[di
         raise
 
 
-def execute_screening(ledger_path: Path, source_commit: str, *, resume_directory: Path | None = None) -> Path:
+def execute_screening(
+    ledger_path: Path,
+    source_commit: str,
+    *,
+    resume_directory: Path | None = None,
+    diagnostic_task_id: str | None = None,
+) -> Path:
     setup = screening_preflight(ledger_path, source_commit)
     ledger = setup["ledger"]
+    if resume_directory is not None and diagnostic_task_id is not None:
+        raise ValueError("A single-task diagnostic cannot resume a formal screening run")
+    eligible_task_ids = {
+        task["task_id"] for task in setup["inventory"]["tasks"] if task["exclusion"] is None
+    }
+    if diagnostic_task_id is not None and diagnostic_task_id not in eligible_task_ids:
+        raise ValueError("The diagnostic task is absent from the fixed eligible inventory")
+    execution_scope = (
+        {
+            "kind": "single_task_full_path_diagnostic",
+            "task_id": diagnostic_task_id,
+            "maximum_attempts": 1,
+            "included_in_formal_screening_denominator": False,
+        }
+        if diagnostic_task_id is not None
+        else {
+            "kind": "formal_terminal_bench_screening",
+            "included_in_formal_screening_denominator": True,
+        }
+    )
     if resume_directory is None:
-        run_id = f"screening-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}-{secrets.token_hex(4)}"
+        prefix = "screening-diagnostic" if diagnostic_task_id is not None else "screening"
+        run_id = f"{prefix}-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}-{secrets.token_hex(4)}"
         directory = ROOT / ledger["output_dir"] / run_id
         directory.mkdir(parents=True, exist_ok=False)
         os.chmod(directory, 0o700)
-        manifest, artifacts = _prepare_inputs(directory, setup, source_commit, run_id)
+        manifest, artifacts = _prepare_inputs(
+            directory, setup, source_commit, run_id, execution_scope=execution_scope
+        )
         state = ScreeningState(directory / "state.sqlite3")
         state.initialize(manifest)
         spool = make_blob_spool(
@@ -733,6 +895,7 @@ def execute_screening(ledger_path: Path, source_commit: str, *, resume_directory
             "completed_attempts": 0,
             "retrieval_inputs": inputs_retrieval,
             "classification_policy": POLICY,
+            "execution_scope": execution_scope,
             "sessions": [{"kind": "initial", "started_at": now()}],
         }
     else:
@@ -753,12 +916,15 @@ def execute_screening(ledger_path: Path, source_commit: str, *, resume_directory
     setup["sender"].deadline = recorder.deadline
     key = secrets.token_urlsafe(32)
     server = start_live_proxy(recorder, key)
+    batch_number = 0
     try:
         while True:
             recorder.check()
-            claimed = state.claim(ledger["runner"]["concurrency"])
+            claim_size = 1 if diagnostic_task_id is not None else ledger["runner"]["concurrency"]
+            claimed = state.claim(claim_size, task_id=diagnostic_task_id)
             if not claimed:
                 break
+            batch_number += 1
             contexts = [_new_attempt_context(row, directory, artifacts) for row in claimed]
             for attempt in contexts:
                 state.mark_attempt_runtime(
@@ -776,27 +942,52 @@ def execute_screening(ledger_path: Path, source_commit: str, *, resume_directory
                     lambda attempt: _run_attempt(attempt, ledger, recorder, server, key, state.path), contexts
                 ))
             vm = allocate_active_vm_cost(_attempt_intervals(completed), ledger["cost"]["vm_hourly_usd"])
+            finalized = []
             for item in completed:
                 classification = _classify_attempt(item["attempt"], item["process"], recorder, transport)
-                _finalize_attempt(
+                finalized.append(_finalize_attempt(
                     item,
                     classification,
                     vm["attempts"][item["attempt"]["attempt_id"]],
                     state,
                     spool,
                     transport,
-                )
+                ))
                 summary["completed_attempts"] += 1
             summary["state"] = state.summary()
             summary["last_progress_at"] = now()
-            _stage_checkpoint(directory, state, summary, spool)
+            checkpoint = _stage_checkpoint(directory, state, summary, spool)
+            batch_verification = _verify_completed_batch(
+                finalized,
+                checkpoint,
+                spool,
+                ledger["retrieval"]["upload_timeout_seconds"],
+                batch_number,
+            )
+            summary.setdefault("batch_evidence_verifications", []).append(batch_verification)
+            summary["latest_batch_evidence_verification"] = batch_verification
+            atomic_json(directory / "summary.json", summary)
             print(json.dumps({
                 "run_id": run_id,
                 "completed_attempts": summary["completed_attempts"],
                 "state": summary["state"],
                 "known_provider_cost_usd": recorder.budget_used_usd,
+                "batch_evidence": batch_verification,
             }, ensure_ascii=False), flush=True)
-        summary["status"] = "complete"
+            if not batch_verification["additional_claims_allowed"]:
+                summary["status"] = "stopped"
+                summary["stop_reason"] = {
+                    "reason": "batch_evidence_incomplete",
+                    "details": {
+                        "batch_number": batch_number,
+                        "additional_claims": 0,
+                    },
+                }
+                break
+            if diagnostic_task_id is not None:
+                break
+        if summary.get("status") == "running":
+            summary["status"] = "complete"
     except BaseException as error:
         summary["status"] = "stopped"
         summary["error"] = {"type": type(error).__name__, "message": str(error)}
@@ -807,7 +998,8 @@ def execute_screening(ledger_path: Path, source_commit: str, *, resume_directory
         server.server_close()
         queue.close()
         summary["state"] = state.summary()
-        summary["stop_reason"] = recorder.failure
+        if recorder.failure is not None:
+            summary["stop_reason"] = recorder.failure
         summary["finished_at"] = now()
         try:
             _stage_checkpoint(directory, state, summary, spool)
@@ -901,6 +1093,7 @@ def main(arguments=None) -> int:
     action.add_argument("--install-preflight", type=Path)
     action.add_argument("--execute", action="store_true")
     action.add_argument("--resume", type=Path)
+    action.add_argument("--diagnose-task")
     args = parser.parse_args(arguments)
     try:
         if args.check:
@@ -925,6 +1118,7 @@ def main(arguments=None) -> int:
         directory = execute_screening(
             args.ledger.resolve(), args.source_commit,
             resume_directory=None if args.resume is None else args.resume.resolve(),
+            diagnostic_task_id=args.diagnose_task,
         )
         summary = json.loads((directory / "summary.json").read_bytes())
         print(json.dumps({"directory": str(directory), "status": summary["status"]}))
