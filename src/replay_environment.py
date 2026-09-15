@@ -302,6 +302,10 @@ class PreservingDockerEnvironment(DockerEnvironment):
         return any(path == destination or path.startswith(destination + "/") for destination in destinations)
 
     @staticmethod
+    def _contains_mount(path: str, destinations: list[str]) -> bool:
+        return any(destination.startswith(path.rstrip("/") + "/") for destination in destinations)
+
+    @staticmethod
     def _verifier_test_command(command: str) -> bool:
         return "/tests/" in command and "/logs/verifier/" in command and not command.lstrip().startswith("chmod ")
 
@@ -772,7 +776,7 @@ flush_paths
             if record["archived"] and (
                 record["change"] == "A"
                 or (record["change"] == "C" and record["kind"] != "directory")
-            )
+            ) and not self._contains_mount(record["path"], destinations)
         ]
         modified_base_paths = [
             record["path"]
@@ -812,6 +816,7 @@ flush_paths
         captured_deleted_paths = [
             path for path in deleted_root_paths(container["diff"])
             if not self._under_mount(path, destinations)
+            and not self._contains_mount(path, destinations)
         ]
         await self._remove_paths(
             container_id,
