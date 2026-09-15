@@ -267,6 +267,20 @@ class NativeRunTests(unittest.TestCase):
         self.assertFalse(result["timed_out"])
         self.assertLess(result["elapsed_seconds"], 5)
 
+    def test_supervisor_reports_the_started_at_used_in_its_result(self):
+        recorder = SimpleNamespace(
+            stopped=threading.Event(), check=lambda: None, stop=lambda _reason: None,
+        )
+        timing = []
+        result = supervise(
+            [sys.executable, "-c", "pass"],
+            self.root / "timing.log",
+            recorder,
+            runtime_environment("synthetic"),
+            on_timing_start=timing.append,
+        )
+        self.assertEqual(timing, [result["started_at"]])
+
     def test_supervisor_stops_child_when_runtime_identity_recording_fails(self):
         stopped = threading.Event()
         recorder = SimpleNamespace(

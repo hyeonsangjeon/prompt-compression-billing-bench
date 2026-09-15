@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from copy import deepcopy
 from datetime import datetime, timezone
 import importlib.metadata
@@ -17,6 +17,7 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import threading
 import time
 
 from accounting import now
@@ -542,6 +543,7 @@ def _run_attempt(
     server,
     key: str,
     state_path: Path,
+    vm_cost_tracker,
 ) -> dict:
     attempt_directory = attempt["attempt_directory"]
     config = screening_harbor_config(
@@ -569,6 +571,7 @@ def _run_attempt(
             state.close()
 
     started_at = now()
+    process_started_at = None
     started_monotonic = time.monotonic()
     process = {
         "returncode": None,
@@ -576,6 +579,12 @@ def _run_attempt(
         "stopped_by_guard": False,
         "started_at": started_at,
     }
+
+    def timing_started(value: str) -> None:
+        nonlocal process_started_at
+        process_started_at = value
+        vm_cost_tracker.mark_started(attempt["attempt_id"], value)
+
     try:
         process = supervise(
             command,
@@ -583,9 +592,11 @@ def _run_attempt(
             recorder,
             runtime_environment(key),
             on_start=started,
+            on_timing_start=timing_started,
         )
     except BaseException as error:
         process.update(
+            started_at=process_started_at or started_at,
             stopped_by_guard=recorder.stopped.is_set(),
             error_type=type(error).__name__,
             error_message=str(error),
@@ -593,7 +604,10 @@ def _run_attempt(
             elapsed_seconds=time.monotonic() - started_monotonic,
         )
     finally:
-        recorder.close_trial(attempt["attempt_id"])
+        try:
+            vm_cost_tracker.mark_finished(attempt["attempt_id"], process)
+        finally:
+            recorder.close_trial(attempt["attempt_id"])
     return {"attempt": attempt, "process": process}
 
 
@@ -623,6 +637,8 @@ def _finalize_attempt(
     state: ScreeningState,
     spool,
     transport: Path,
+    *,
+    complete_state: bool = True,
 ) -> dict:
     attempt = completed["attempt"]
     attempt_directory = attempt["attempt_directory"]
@@ -673,15 +689,23 @@ def _finalize_attempt(
             "result": classification["result"],
         },
     )
+    finalized = {"record": record, "retrieval": staged}
+    if complete_state:
+        _complete_finalized_attempt(finalized, state)
+    return finalized
+
+
+def _complete_finalized_attempt(finalized: dict, state: ScreeningState) -> None:
+    record = finalized["record"]
+    classification = record["classification"]
     state.complete_attempt(
-        attempt["attempt_id"],
+        record["attempt_id"],
         classification["result"],
         provider_dispatched=classification["provider_dispatched"],
-        evidence_sha256=staged["metadata"]["source_tree_sha256"],
-        cost_usd=direct["calculated_cost_usd"],
+        evidence_sha256=finalized["retrieval"]["metadata"]["source_tree_sha256"],
+        cost_usd=record["direct_cost_before_blob"]["calculated_cost_usd"],
         verifier_test_ids=classification["verifier_test_ids"],
     )
-    return {"record": record, "retrieval": staged}
 
 
 def _attempt_intervals(completed: list[dict]) -> list[dict]:
@@ -701,6 +725,119 @@ def _attempt_intervals(completed: list[dict]) -> list[dict]:
             "finished_epoch": finished,
         })
     return intervals
+
+
+class _ActiveVmCostTracker:
+    def __init__(self, hourly_rate_usd: float):
+        self.hourly_rate_usd = hourly_rate_usd
+        self.lock = threading.Lock()
+        self.intervals = {}
+
+    @staticmethod
+    def _epoch(value: object) -> float:
+        if not isinstance(value, str):
+            raise ValueError("Attempt timing is missing or invalid; VM cost cannot be replaced with zero")
+        try:
+            return datetime.fromisoformat(value).timestamp()
+        except ValueError as error:
+            raise ValueError(
+                "Attempt timing is missing or invalid; VM cost cannot be replaced with zero"
+            ) from error
+
+    def mark_started(self, attempt_id: str, started_at: str) -> None:
+        started_epoch = self._epoch(started_at)
+        with self.lock:
+            if attempt_id in self.intervals:
+                raise ValueError("Attempt VM timing start is duplicated")
+            self.intervals[attempt_id] = {
+                "attempt_id": attempt_id,
+                "started_epoch": started_epoch,
+                "finished_epoch": None,
+            }
+
+    def mark_finished(self, attempt_id: str, process: dict) -> None:
+        started_epoch = self._epoch(process.get("started_at"))
+        finished_epoch = self._epoch(process.get("finished_at"))
+        if finished_epoch < started_epoch:
+            raise ValueError("Attempt timing finishes before it starts")
+        with self.lock:
+            interval = self.intervals.get(attempt_id)
+            if interval is None:
+                interval = {
+                    "attempt_id": attempt_id,
+                    "started_epoch": started_epoch,
+                    "finished_epoch": None,
+                }
+                self.intervals[attempt_id] = interval
+            if interval["started_epoch"] != started_epoch:
+                raise ValueError("Attempt VM timing start changed during execution")
+            if interval["finished_epoch"] is not None:
+                raise ValueError("Attempt VM timing finish is duplicated")
+            interval["finished_epoch"] = finished_epoch
+
+    def allocation_for(self, attempt_id: str) -> dict:
+        with self.lock:
+            target = self.intervals.get(attempt_id)
+            if target is None or target["finished_epoch"] is None:
+                raise ValueError("Completed attempt VM timing is unavailable")
+            target_finished = target["finished_epoch"]
+            intervals = []
+            for interval in self.intervals.values():
+                if interval["started_epoch"] > target_finished:
+                    continue
+                finished = interval["finished_epoch"]
+                intervals.append({
+                    "attempt_id": interval["attempt_id"],
+                    "started_epoch": interval["started_epoch"],
+                    "finished_epoch": (
+                        target_finished if finished is None else min(finished, target_finished)
+                    ),
+                })
+        allocation = allocate_active_vm_cost(intervals, self.hourly_rate_usd)
+        if attempt_id not in allocation["attempts"] or not allocation["reconciles"]:
+            raise ValueError("Completed attempt VM cost allocation is incomplete")
+        return allocation["attempts"][attempt_id]
+
+
+def _run_completion_driven(max_workers: int, next_item, run_item, complete_item) -> bool:
+    if type(max_workers) is not int or max_workers < 1:
+        raise ValueError("Completion-driven worker count must be positive")
+    accepting_new = True
+    available_workers = max_workers
+    sequence = 0
+    with ThreadPoolExecutor(
+        max_workers=max_workers, thread_name_prefix="screening-trial"
+    ) as executor:
+        active = {}
+
+        def fill_open_workers() -> None:
+            nonlocal available_workers, sequence
+            while accepting_new and available_workers:
+                item = next_item()
+                if item is None:
+                    break
+                future = executor.submit(run_item, item)
+                active[future] = sequence
+                available_workers -= 1
+                sequence += 1
+
+        fill_open_workers()
+        while active:
+            completed_futures, _pending = wait(active, return_when=FIRST_COMPLETED)
+            completed = []
+            for future in completed_futures:
+                submitted_at = active.pop(future)
+                completed.append((submitted_at, future.result()))
+            for _submitted_at, result in sorted(completed, key=lambda item: item[0]):
+                replace_worker, stop_new = complete_item(result)
+                if type(replace_worker) is not bool or type(stop_new) is not bool:
+                    raise ValueError("Completed work decision must contain two booleans")
+                if replace_worker:
+                    available_workers += 1
+                if stop_new:
+                    accepting_new = False
+            fill_open_workers()
+    return accepting_new
 
 
 def _run_cost_summary(directory: Path, state: ScreeningState, retrieval: dict, ledger: dict) -> dict:
@@ -1022,6 +1159,29 @@ def _verify_completed_batch(
         "retrieval_wait_wall_seconds": time.monotonic() - started,
         "retrieval_error": wait_error,
         "additional_claims_allowed": complete,
+    }
+
+
+def _verify_finalized_attempt(finalized: dict, spool, wait_seconds: float, ledger: dict) -> dict:
+    attempt_id = finalized["record"]["attempt_id"]
+    started = time.monotonic()
+    try:
+        retrieval = spool.wait_for_upload([attempt_id], wait_seconds)
+        wait_error = None
+    except (OSError, RuntimeError, ValueError) as error:
+        retrieval = {"status": "retrieval_pending", "items": []}
+        wait_error = {"type": type(error).__name__, "message": str(error)}
+    indexed = {item["item_id"]: item for item in retrieval["items"]}
+    evidence = _completed_attempt_evidence(
+        finalized["record"], indexed.get(attempt_id), ledger
+    )
+    return {
+        "kind": "screening_completed_attempt_evidence_verification",
+        "attempt": evidence,
+        "retrieval_status": retrieval["status"],
+        "retrieval_wait_wall_seconds": time.monotonic() - started,
+        "retrieval_error": wait_error,
+        "completed_evidence_recording_allowed": evidence["evidence_complete"],
     }
 
 
@@ -1856,48 +2016,88 @@ def execute_screening(
     key = secrets.token_urlsafe(32)
     server = start_live_proxy(recorder, key)
     batch_number = 0
+    claimed_attempts = 0
+    evidence_stop = None
+    incomplete_attempts = []
+    vm_cost_tracker = _ActiveVmCostTracker(ledger["cost"]["vm_hourly_usd"])
     try:
-        while True:
+        def next_attempt():
+            nonlocal claimed_attempts
             recorder.check()
-            claim_size = 1 if diagnostic_task_id is not None else ledger["runner"]["concurrency"]
-            claimed = state.claim(claim_size, task_id=diagnostic_task_id)
+            if diagnostic_task_id is not None and claimed_attempts >= 1:
+                return None
+            claimed = state.claim(1, task_id=diagnostic_task_id)
             if not claimed:
-                break
+                return None
+            attempt = _new_attempt_context(claimed[0], directory, artifacts)
+            state.mark_attempt_runtime(
+                attempt["attempt_id"],
+                process_id=None,
+                artifact_manifest_hash=attempt["artifact_manifest_hash"],
+                container_instance_id=attempt["container_instance_id"],
+                workspace_instance_id=attempt["workspace_instance_id"],
+            )
+            recorder.register_trial(
+                attempt["attempt_id"], attempt["task_id"], attempt["repetition"]
+            )
+            claimed_attempts += 1
+            return attempt
+
+        def run_attempt(attempt):
+            return _run_attempt(
+                attempt, ledger, recorder, server, key, state.path, vm_cost_tracker
+            )
+
+        def complete_attempt(item):
+            nonlocal batch_number, evidence_stop
             batch_number += 1
-            contexts = [_new_attempt_context(row, directory, artifacts) for row in claimed]
-            for attempt in contexts:
-                state.mark_attempt_runtime(
-                    attempt["attempt_id"],
-                    process_id=None,
-                    artifact_manifest_hash=attempt["artifact_manifest_hash"],
-                    container_instance_id=attempt["container_instance_id"],
-                    workspace_instance_id=attempt["workspace_instance_id"],
-                )
-                recorder.register_trial(
-                    attempt["attempt_id"], attempt["task_id"], attempt["repetition"]
-                )
-            with ThreadPoolExecutor(max_workers=len(contexts), thread_name_prefix="screening-trial") as executor:
-                completed = list(executor.map(
-                    lambda attempt: _run_attempt(attempt, ledger, recorder, server, key, state.path), contexts
-                ))
-            vm = allocate_active_vm_cost(_attempt_intervals(completed), ledger["cost"]["vm_hourly_usd"])
-            finalized = []
-            for item in completed:
-                classification = _classify_attempt(item["attempt"], item["process"], recorder, transport)
-                finalized.append(_finalize_attempt(
-                    item,
-                    classification,
-                    vm["attempts"][item["attempt"]["attempt_id"]],
-                    state,
-                    spool,
-                    transport,
-                ))
-                summary["completed_attempts"] += 1
+            classification = _classify_attempt(
+                item["attempt"], item["process"], recorder, transport
+            )
+            finalized = _finalize_attempt(
+                item,
+                classification,
+                vm_cost_tracker.allocation_for(item["attempt"]["attempt_id"]),
+                state,
+                spool,
+                transport,
+                complete_state=False,
+            )
+            attempt_verification = _verify_finalized_attempt(
+                finalized,
+                spool,
+                ledger["retrieval"]["upload_timeout_seconds"],
+                ledger,
+            )
+            summary.setdefault("attempt_evidence_verifications", []).append(
+                attempt_verification
+            )
+            summary["latest_attempt_evidence_verification"] = attempt_verification
+            if not attempt_verification["completed_evidence_recording_allowed"]:
+                incomplete_attempts.append({
+                    "completion_number": batch_number,
+                    "attempt_id": item["attempt"]["attempt_id"],
+                    "task_id": item["attempt"]["task_id"],
+                    "verification": attempt_verification,
+                })
+                summary["state"] = state.summary()
+                summary["last_progress_at"] = now()
+                atomic_json(directory / "summary.json", summary)
+                print(json.dumps({
+                    "run_id": run_id,
+                    "completed_attempts": summary["completed_attempts"],
+                    "state": summary["state"],
+                    "attempt_evidence": attempt_verification,
+                    "replacement_scheduled": False,
+                }, ensure_ascii=False), flush=True)
+                return False, False
+            _complete_finalized_attempt(finalized, state)
+            summary["completed_attempts"] += 1
             summary["state"] = state.summary()
             summary["last_progress_at"] = now()
             checkpoint = _stage_checkpoint(directory, state, summary, spool)
             batch_verification = _verify_completed_batch(
-                finalized,
+                [finalized],
                 checkpoint,
                 spool,
                 ledger["retrieval"]["upload_timeout_seconds"],
@@ -1915,17 +2115,38 @@ def execute_screening(
                 "batch_evidence": batch_verification,
             }, ensure_ascii=False), flush=True)
             if not batch_verification["additional_claims_allowed"]:
-                summary["status"] = "stopped"
-                summary["stop_reason"] = {
-                    "reason": "batch_evidence_incomplete",
+                if evidence_stop is None:
+                    evidence_stop = {
+                        "reason": "post_commit_evidence_verification_incomplete",
+                        "details": {
+                            "completion_number": batch_number,
+                            "attempt_id": item["attempt"]["attempt_id"],
+                            "additional_claims": 0,
+                            "running_attempts_preserved": True,
+                        },
+                    }
+                return False, True
+            return True, False
+
+        _run_completion_driven(
+            ledger["runner"]["concurrency"], next_attempt, run_attempt, complete_attempt
+        )
+        if incomplete_attempts:
+            state.pause_interrupted()
+            if evidence_stop is None:
+                evidence_stop = {
+                    "reason": "completed_attempt_evidence_incomplete",
                     "details": {
-                        "batch_number": batch_number,
-                        "additional_claims": 0,
+                        "attempts": incomplete_attempts,
+                        "quality_results_recorded": 0,
+                        "additional_claims_for_incomplete_slots": 0,
                     },
                 }
-                break
-            if diagnostic_task_id is not None:
-                break
+            else:
+                evidence_stop["details"]["incomplete_attempts"] = incomplete_attempts
+        if evidence_stop is not None:
+            summary["status"] = "stopped"
+            summary["stop_reason"] = evidence_stop
         if summary.get("status") == "running":
             summary["status"] = "complete"
     except BaseException as error:

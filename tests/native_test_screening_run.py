@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 import io
 import json
 from pathlib import Path
+import threading
 from types import SimpleNamespace
 import tempfile
 import unittest
@@ -11,6 +12,7 @@ from unittest.mock import patch
 
 from src.screening_contract import load_screening_ledger
 from src.screening_run import (
+    _ActiveVmCostTracker,
     _attempt_intervals,
     _carried_continuation_records,
     _classify_attempt,
@@ -18,6 +20,7 @@ from src.screening_run import (
     _legacy_policy_transition,
     _no_limit_reuse_decision,
     _reported_task_id,
+    _run_completion_driven,
     _stage_checkpoint,
     _verify_completed_batch,
     main,
@@ -473,6 +476,126 @@ class ScreeningRunTests(unittest.TestCase):
         }
         with self.assertRaisesRegex(ValueError, "finishes before"):
             _attempt_intervals([reversed_time])
+
+    def test_incremental_vm_allocations_reconcile_after_open_slots_are_refilled(self):
+        tracker = _ActiveVmCostTracker(0.36)
+
+        def timestamp(seconds):
+            return (
+                datetime(2026, 9, 15, tzinfo=timezone.utc) + timedelta(seconds=seconds)
+            ).isoformat()
+
+        def finish(attempt_id, started, finished):
+            tracker.mark_finished(attempt_id, {
+                "started_at": timestamp(started),
+                "finished_at": timestamp(finished),
+            })
+
+        tracker.mark_started("a", timestamp(0))
+        tracker.mark_started("b", timestamp(0))
+        finish("a", 0, 20)
+        allocation_a = tracker.allocation_for("a")
+        tracker.mark_started("c", timestamp(21))
+        finish("b", 0, 30)
+        allocation_b = tracker.allocation_for("b")
+        finish("c", 21, 40)
+        allocation_c = tracker.allocation_for("c")
+
+        self.assertAlmostEqual(allocation_a["allocated_active_seconds"], 10)
+        self.assertAlmostEqual(allocation_b["allocated_active_seconds"], 15.5)
+        self.assertAlmostEqual(allocation_c["allocated_active_seconds"], 14.5)
+        self.assertAlmostEqual(
+            sum(record["calculated_cost_usd"] for record in (
+                allocation_a, allocation_b, allocation_c
+            )),
+            0.004,
+        )
+
+    def test_completion_driven_execution_refills_a_slot_before_slow_work_finishes(self):
+        items = iter(("slow", "fast", "replacement"))
+        replacement_started = threading.Event()
+        slow_finished = threading.Event()
+        started = []
+
+        def run_item(item):
+            started.append(item)
+            if item == "slow":
+                replacement_started.wait(2)
+                slow_finished.set()
+            elif item == "replacement":
+                replacement_started.set()
+            return item
+
+        accepting = _run_completion_driven(
+            2,
+            lambda: next(items, None),
+            run_item,
+            lambda _result: (True, False),
+        )
+
+        self.assertTrue(accepting)
+        self.assertTrue(replacement_started.is_set())
+        self.assertTrue(slow_finished.is_set())
+        self.assertEqual(started[:2], ["slow", "fast"])
+        self.assertEqual(started[2], "replacement")
+
+    def test_completion_driven_execution_stops_new_claims_but_drains_active_work(self):
+        items = iter(("slow", "incomplete", "must-not-start"))
+        release_slow = threading.Event()
+        started = []
+        completed = []
+
+        def run_item(item):
+            started.append(item)
+            if item == "slow":
+                release_slow.wait(2)
+            return item
+
+        def complete_item(item):
+            completed.append(item)
+            if item == "incomplete":
+                release_slow.set()
+                return False, True
+            return True, False
+
+        accepting = _run_completion_driven(
+            2,
+            lambda: next(items, None),
+            run_item,
+            complete_item,
+        )
+
+        self.assertFalse(accepting)
+        self.assertEqual(set(started), {"slow", "incomplete"})
+        self.assertEqual(set(completed), {"slow", "incomplete"})
+
+    def test_incomplete_evidence_holds_only_its_worker_slot(self):
+        items = iter(("incomplete", "slow", "replacement"))
+        release_slow = threading.Event()
+        started = []
+
+        def run_item(item):
+            started.append(item)
+            if item == "slow":
+                release_slow.wait(2)
+            return item
+
+        def complete_item(item):
+            if item == "incomplete":
+                release_slow.set()
+                return False, False
+            return True, False
+
+        accepting = _run_completion_driven(
+            2,
+            lambda: next(items, None),
+            run_item,
+            complete_item,
+        )
+
+        self.assertTrue(accepting)
+        self.assertEqual(started[:2], ["incomplete", "slow"])
+        self.assertEqual(started[2], "replacement")
 
     def test_repeated_checkpoints_replace_the_mutable_run_summary_atomically(self):
         class State:

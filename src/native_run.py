@@ -142,9 +142,18 @@ def terminate_group(process, grace_seconds: float = 2) -> None:
     process.wait(timeout=5)
 
 
-def supervise(command: list[str], log: Path, recorder, environment: dict, on_start=None) -> dict:
+def supervise(
+    command: list[str],
+    log: Path,
+    recorder,
+    environment: dict,
+    on_start=None,
+    on_timing_start=None,
+) -> dict:
     recorder.check()
     started, started_at = time.monotonic(), now()
+    if on_timing_start is not None:
+        on_timing_start(started_at)
     stopped = False
     with log.open("xb") as output:
         process = subprocess.Popen(command, stdout=output, stderr=subprocess.STDOUT,
