@@ -64,6 +64,38 @@ def deleted_root_paths(records: list[dict]) -> list[str]:
     ]
 
 
+def normalized_absolute_paths(paths: list[str]) -> list[str]:
+    normalized = []
+    for value in paths:
+        if "\0" in value:
+            raise ValueError("Replay path contains a NUL byte")
+        path = PurePosixPath(value)
+        if not path.is_absolute() or path == PurePosixPath("/") or ".." in path.parts:
+            raise ValueError("Replay paths must be absolute non-root paths")
+        normalized.append(path.as_posix())
+    if len(set(normalized)) != len(normalized):
+        raise ValueError("Replay path list contains duplicates")
+    return sorted(normalized)
+
+
+def nul_path_payload(paths: list[str], *, relative: bool) -> bytes:
+    normalized = normalized_absolute_paths(paths)
+    values = [path.removeprefix("/") if relative else path for path in normalized]
+    return b"".join(value.encode() + b"\0" for value in values)
+
+
+def sorted_mounts(inspect: dict) -> list[dict]:
+    mounts = list(inspect.get("Mounts", []))
+    return sorted(
+        mounts,
+        key=lambda mount: (
+            str(mount.get("Destination") or ""),
+            str(mount.get("Type") or ""),
+            str(mount.get("Name") or ""),
+        ),
+    )
+
+
 def _archive_member_kind(member: tarfile.TarInfo) -> str:
     if member.isfile():
         return "file"
@@ -258,6 +290,7 @@ class PreservingDockerEnvironment(DockerEnvironment):
     _preparatory_verifier_commands: list[dict]
     _replay_directory: Path | None = None
     _replay_manifest: dict | None = None
+    _pending_verifier_replay: dict | None = None
 
     @staticmethod
     def _safe_name(value: str) -> str:
@@ -280,14 +313,27 @@ class PreservingDockerEnvironment(DockerEnvironment):
         timeout: int = 300,
         check: bool = True,
     ) -> tuple[int, bytes]:
+        return_code, stdout, stderr = await self._command_streams(
+            arguments, input_bytes=input_bytes, timeout=timeout, check=check,
+        )
+        return return_code, stdout + stderr
+
+    async def _command_streams(
+        self,
+        arguments: list[str],
+        *,
+        input_bytes: bytes | None = None,
+        timeout: int = 300,
+        check: bool = True,
+    ) -> tuple[int, bytes, bytes]:
         process = await asyncio.create_subprocess_exec(
             *arguments,
             stdin=asyncio.subprocess.PIPE if input_bytes is not None else asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
+            stderr=asyncio.subprocess.PIPE,
         )
         try:
-            output, _ = await asyncio.wait_for(process.communicate(input_bytes), timeout=timeout)
+            stdout, stderr = await asyncio.wait_for(process.communicate(input_bytes), timeout=timeout)
         except asyncio.TimeoutError:
             process.kill()
             await process.wait()
@@ -295,7 +341,130 @@ class PreservingDockerEnvironment(DockerEnvironment):
         if check and process.returncode != 0:
             operation = " ".join(arguments[:2])
             raise RuntimeError(f"Docker evidence command failed: {operation} returned {process.returncode}")
-        return process.returncode, output
+        return process.returncode, stdout, stderr
+
+    async def _archive_paths(
+        self,
+        container_id: str,
+        paths: list[str],
+        *,
+        recursive: bool = False,
+    ) -> tuple[int, bytes, bytes]:
+        arguments = [
+            "docker", "exec", "-i", container_id,
+            "tar", "--create", "--file=-", "--format=pax", "--numeric-owner",
+        ]
+        if not recursive:
+            arguments.append("--no-recursion")
+        arguments.extend(["--null", "--verbatim-files-from", "--directory=/", "--files-from=-"])
+        return await self._command_streams(
+            arguments,
+            input_bytes=nul_path_payload(paths, relative=True),
+            timeout=600,
+            check=False,
+        )
+
+    async def _archive_image_paths(
+        self,
+        image_id: str,
+        paths: list[str],
+        *,
+        recursive: bool,
+    ) -> tuple[int, bytes, bytes]:
+        arguments = [
+            "docker", "run", "--rm", "-i", "--network", "none", "--user", "0",
+            "--entrypoint", "tar", image_id,
+            "--create", "--file=-", "--format=pax", "--numeric-owner",
+        ]
+        if not recursive:
+            arguments.append("--no-recursion")
+        arguments.extend(["--null", "--verbatim-files-from", "--directory=/", "--files-from=-"])
+        return await self._command_streams(
+            arguments,
+            input_bytes=nul_path_payload(paths, relative=True),
+            timeout=600,
+            check=False,
+        )
+
+    async def _special_path_kinds(self, container_id: str, paths: list[str]) -> list[dict]:
+        if not paths:
+            return []
+        script = """
+set -euo pipefail
+while IFS= read -r -d '' path; do
+    if [[ -S "$path" ]]; then kind=socket
+    elif [[ -p "$path" ]]; then kind=fifo
+    elif [[ -b "$path" ]]; then kind=block_device
+    elif [[ -c "$path" ]]; then kind=character_device
+    elif [[ -L "$path" ]]; then kind=symlink
+    elif [[ -f "$path" ]]; then kind=file
+    elif [[ -d "$path" ]]; then kind=directory
+    else kind=missing
+    fi
+    printf '%s\0%s\0' "$path" "$kind"
+done
+""".strip()
+        return_code, stdout, stderr = await self._command_streams(
+            ["docker", "exec", "-i", container_id, "bash", "-c", script],
+            input_bytes=nul_path_payload(paths, relative=False),
+            check=False,
+        )
+        if return_code != 0 or stderr:
+            raise RuntimeError("Could not classify unarchived replay paths")
+        fields = stdout.split(b"\0")
+        if fields[-1:] == [b""]:
+            fields.pop()
+        if len(fields) % 2:
+            raise ValueError("Special-path classification output is malformed")
+        records = [
+            {"path": fields[index].decode(), "kind": fields[index + 1].decode()}
+            for index in range(0, len(fields), 2)
+        ]
+        if [record["path"] for record in records] != normalized_absolute_paths(paths):
+            raise ValueError("Special-path classification changed path order")
+        return records
+
+    async def _remove_paths(self, container_id: str, paths: list[str]) -> None:
+        if not paths:
+            return
+        script = """
+set -euo pipefail
+paths=()
+flush_paths() {
+    if (( ${#paths[@]} )); then
+        rm -rf -- "${paths[@]}"
+        paths=()
+    fi
+}
+while IFS= read -r -d '' path; do
+    [[ "$path" == /* && "$path" != / ]] || exit 64
+    paths+=("$path")
+    if (( ${#paths[@]} >= 256 )); then flush_paths; fi
+done
+flush_paths
+""".strip()
+        return_code, output = await self._command(
+            ["docker", "exec", "-i", container_id, "bash", "-c", script],
+            input_bytes=nul_path_payload(paths, relative=False),
+            check=False,
+        )
+        if return_code != 0:
+            raise RuntimeError(f"Could not reset verifier-visible paths: {output.decode(errors='replace').strip()}")
+
+    async def _install_root_archive(self, container_id: str, payload: bytes) -> None:
+        inventory = archive_inventory(payload)
+        if not inventory["entries"]:
+            return
+        return_code, output = await self._command(
+            ["docker", "cp", "-", f"{container_id}:/"],
+            input_bytes=payload,
+            timeout=600,
+            check=False,
+        )
+        if return_code != 0:
+            raise RuntimeError(
+                "Could not install a root replay archive: " + output.decode(errors="replace").strip()
+            )
 
     async def _archive_path(self, container_id: str, source: str) -> tuple[int, bytes]:
         return await self._command(
@@ -330,6 +499,58 @@ class PreservingDockerEnvironment(DockerEnvironment):
         )
         return inspect, diff, process_code, process_bytes
 
+    async def _root_snapshot(
+        self,
+        container_id: str,
+        diff: list[dict],
+        mount_destinations: list[str],
+        target: Path | None = None,
+    ) -> tuple[dict, list[dict]]:
+        changed = [
+            entry for entry in diff
+            if entry["change"] in ("A", "C")
+            and not self._under_mount(entry["path"], mount_destinations)
+        ]
+        paths = [entry["path"] for entry in changed]
+        return_code, payload, stderr = await self._archive_paths(container_id, paths)
+        inventory = archive_inventory(payload)
+        entries = {"/" + entry["path"].lstrip("/"): entry for entry in inventory["entries"]}
+        missing = [path for path in normalized_absolute_paths(paths) if path not in entries]
+        special_paths = await self._special_path_kinds(container_id, missing)
+        unsupported = [record for record in special_paths if record["kind"] != "socket"]
+        if target is not None:
+            target.write_bytes(payload)
+            if stderr:
+                target.with_suffix(target.suffix + ".stderr").write_bytes(stderr)
+        records = []
+        for record in changed:
+            entry = entries.get(record["path"])
+            entry_payload = {"entries": [entry]} if entry is not None else None
+            special = next((item for item in special_paths if item["path"] == record["path"]), None)
+            records.append({
+                **record,
+                "kind": entry["kind"] if entry is not None else (special or {}).get("kind"),
+                "tree_sha256": sha256(canonical_json(entry_payload)).hexdigest() if entry_payload else None,
+                "archived": entry is not None,
+            })
+        snapshot = {
+            "status": "complete" if return_code == 0 and not unsupported else "incomplete",
+            "return_code": return_code,
+            "requested_path_count": len(paths),
+            "archived_path_count": len(entries),
+            "unarchived_special_paths": special_paths,
+            "stderr_sha256": sha256(stderr).hexdigest() if stderr else None,
+            "payload": {
+                "path": target.name if target is not None else None,
+                "bytes": len(payload),
+                "sha256": sha256(payload).hexdigest(),
+                "format": "gnu_tar_nul_path_list_no_recursion",
+                "tree_sha256": inventory["tree_sha256"],
+                "entries": len(inventory["entries"]),
+            },
+        }
+        return snapshot, records
+
     async def _capture_container(self, container_id: str, directory: Path) -> dict:
         inspect, diff, process_code, process_bytes = await self._container_details(container_id)
         safe_name = self._safe_name(inspect[0].get("Name", "").lstrip("/") or container_id[:12])
@@ -340,22 +561,17 @@ class PreservingDockerEnvironment(DockerEnvironment):
         (container_directory / "processes.txt").write_bytes(process_bytes)
         logs_code, logs_bytes = await self._command(["docker", "logs", container_id], check=False)
         (container_directory / "container.log").write_bytes(logs_bytes)
+        mounts_in_order = sorted_mounts(inspect[0])
         mount_destinations = [
             mount.get("Destination")
-            for mount in inspect[0].get("Mounts", [])
+            for mount in mounts_in_order
             if isinstance(mount.get("Destination"), str)
         ]
-        changed = []
-        root_changes = [
-            entry for entry in changed_leaf_paths(diff)
-            if not self._under_mount(entry["path"], mount_destinations)
-        ]
-        for index, entry in enumerate(root_changes):
-            target = container_directory / f"change-{index:05d}.tar"
-            copied = await self._copy_path(container_id, entry["path"], target)
-            changed.append({**entry, **copied})
+        root_snapshot, changed = await self._root_snapshot(
+            container_id, diff, mount_destinations, container_directory / "root-snapshot.tar",
+        )
         mounts = []
-        for index, mount in enumerate(inspect[0].get("Mounts", [])):
+        for index, mount in enumerate(mounts_in_order):
             record = {
                 "type": mount.get("Type"),
                 "destination": mount.get("Destination"),
@@ -380,7 +596,7 @@ class PreservingDockerEnvironment(DockerEnvironment):
                     "reason": "unsupported_mount_destination",
                 }
             mounts.append(record)
-        status = "complete" if process_code == 0 and all(record["return_code"] == 0 for record in changed) and all(
+        status = "complete" if process_code == 0 and root_snapshot["status"] == "complete" and all(
             mount["snapshot"].get("return_code") == 0 for mount in mounts
         ) else "incomplete"
         return {
@@ -394,6 +610,7 @@ class PreservingDockerEnvironment(DockerEnvironment):
             "processes_sha256": sha256(process_bytes).hexdigest(),
             "diff": diff,
             "changed_paths": changed,
+            "root_snapshot": root_snapshot,
             "mounts": mounts,
         }
 
@@ -408,10 +625,14 @@ class PreservingDockerEnvironment(DockerEnvironment):
                 {
                     "change": record["change"],
                     "path": record["path"],
-                    "tree_sha256": (record.get("payload") or {}).get("tree_sha256"),
+                    "kind": record["kind"],
+                    "archived": record["archived"],
+                    "tree_sha256": record["tree_sha256"],
                 }
                 for record in container["changed_paths"]
             ],
+            "root_snapshot_tree_sha256": container["root_snapshot"]["payload"]["tree_sha256"],
+            "unarchived_special_paths": container["root_snapshot"]["unarchived_special_paths"],
             "mounts": [
                 {
                     "type": mount["type"],
@@ -443,7 +664,7 @@ class PreservingDockerEnvironment(DockerEnvironment):
             container["status"] == "complete" for container in containers
         ) else "incomplete"
         payload = {
-            "schema_version": 2,
+            "schema_version": 3,
             "kind": "docker_verifier_replay_bundle",
             "session_id": self.session_id,
             "capture_phase": phase,
@@ -504,12 +725,6 @@ class PreservingDockerEnvironment(DockerEnvironment):
                 f"Could not install replay archive for {path}: {message or 'docker cp failed without output'}"
             )
 
-    async def _restore_from_base(self, helper_id: str, container_id: str, path: str) -> None:
-        await self._remove_path(container_id, path)
-        return_code, payload = await self._archive_path(helper_id, path)
-        if return_code == 0:
-            await self._install_archive(container_id, path, payload)
-
     async def _restore_mount(self, container_id: str, mount: dict, container_directory: Path) -> None:
         destination = mount["destination"]
         payload_record = mount["snapshot"].get("payload")
@@ -534,79 +749,96 @@ class PreservingDockerEnvironment(DockerEnvironment):
         container_id = container["container_id"]
         safe_name = self._safe_name((container["container_name"] or "").lstrip("/") or container_id[:12])
         container_directory = self._replay_directory / safe_name
-        inspect, current_diff, _, _ = await self._container_details(container_id)
+        inspect, current_diff, process_code, process_bytes = await self._container_details(container_id)
+        if process_code != 0:
+            raise RuntimeError("Could not inspect process state before replay")
+        if sha256(process_bytes).hexdigest() != container["processes_sha256"]:
+            raise RuntimeError("Process state changed and cannot be reconstructed for verifier replay")
         destinations = [
-            mount.get("Destination") for mount in inspect[0].get("Mounts", [])
+            mount.get("Destination") for mount in sorted_mounts(inspect[0])
             if isinstance(mount.get("Destination"), str)
         ]
-        create_code, helper_bytes = await self._command(
-            ["docker", "create", container["image_id"]], check=False
+        current_snapshot, current_changed = await self._root_snapshot(
+            container_id, current_diff, destinations,
         )
-        if create_code != 0:
-            raise RuntimeError("Could not create an immutable-image replay helper")
-        helper_id = helper_bytes.decode().strip()
-        try:
-            captured_archives = {
-                record["path"]: container_directory / record["payload"]["path"]
-                for record in container["changed_paths"]
-                if record.get("payload") is not None
-            }
-            empty_snapshot_paths = {
-                path for path, archive in captured_archives.items()
-                if not archive_has_members(archive.read_bytes())
-            }
-            reset_paths = [
-                entry["path"] for entry in changed_leaf_paths(current_diff)
-                if not self._under_mount(entry["path"], destinations)
-                and entry["path"] not in empty_snapshot_paths
-            ]
-            reset_paths.extend(
-                path for path in deleted_root_paths(current_diff)
-                if not self._under_mount(path, destinations)
-                and path not in empty_snapshot_paths
+        if current_snapshot["status"] != "complete":
+            raise RuntimeError("Current writable-layer state could not be archived for replay")
+        if current_snapshot["unarchived_special_paths"] != container["root_snapshot"]["unarchived_special_paths"]:
+            raise RuntimeError("Unarchived runtime paths changed and cannot be reconstructed for verifier replay")
+
+        remove_paths = [
+            record["path"]
+            for record in current_changed
+            if record["archived"] and (
+                record["change"] == "A"
+                or (record["change"] == "C" and record["kind"] != "directory")
             )
-            for path in sorted(set(reset_paths), key=lambda value: (value.count("/"), value), reverse=True):
-                await self._restore_from_base(helper_id, container_id, path)
-            for path in deleted_root_paths(container["diff"]):
-                if not self._under_mount(path, destinations):
-                    await self._remove_path(container_id, path)
-            for record in container["changed_paths"]:
-                payload_record = record.get("payload")
-                if payload_record is None:
-                    raise RuntimeError("A changed verifier-visible path lacks a snapshot")
-                if record["path"] in empty_snapshot_paths:
-                    continue
-                await self._remove_path(container_id, record["path"])
-                await self._install_archive(
-                    container_id,
-                    record["path"],
-                    captured_archives[record["path"]].read_bytes(),
+        ]
+        modified_base_paths = [
+            record["path"]
+            for record in current_changed
+            if record["archived"] and record["change"] == "C"
+        ]
+        deleted_base_paths = [
+            path for path in deleted_root_paths(current_diff)
+            if not self._under_mount(path, destinations)
+        ]
+
+        base_archives = []
+        for paths, recursive in ((modified_base_paths, False), (deleted_base_paths, True)):
+            if not paths:
+                continue
+            return_code, payload, stderr = await self._archive_image_paths(
+                container["image_id"], paths, recursive=recursive,
+            )
+            if return_code != 0:
+                raise RuntimeError(
+                    "Could not read immutable-image paths for replay: "
+                    + stderr.decode(errors="replace").strip()
                 )
-            for mount in container["mounts"]:
-                await self._restore_mount(container_id, mount, container_directory)
-        finally:
-            await self._command(["docker", "rm", "-f", helper_id], check=False)
+            inventory = archive_inventory(payload)
+            archived = {"/" + entry["path"].lstrip("/") for entry in inventory["entries"]}
+            if any(path not in archived for path in normalized_absolute_paths(paths)):
+                raise RuntimeError("An immutable-image replay path was not archived")
+            base_archives.append(payload)
+
+        await self._remove_paths(
+            container_id,
+            sorted(set(remove_paths), key=lambda value: (value.count("/"), value), reverse=True),
+        )
+        for payload in base_archives:
+            await self._install_root_archive(container_id, payload)
+
+        captured_deleted_paths = [
+            path for path in deleted_root_paths(container["diff"])
+            if not self._under_mount(path, destinations)
+        ]
+        await self._remove_paths(
+            container_id,
+            sorted(captured_deleted_paths, key=lambda value: (value.count("/"), value), reverse=True),
+        )
+        root_payload = container["root_snapshot"].get("payload")
+        if root_payload is None:
+            raise RuntimeError("A verifier-visible writable-layer snapshot is absent")
+        await self._install_root_archive(
+            container_id, (container_directory / root_payload["path"]).read_bytes(),
+        )
+        for mount in container["mounts"]:
+            await self._restore_mount(container_id, mount, container_directory)
 
     async def _state_signature(self, container_id: str) -> dict:
         inspect, diff, process_code, process_bytes = await self._container_details(container_id)
         if process_code != 0:
             raise RuntimeError("Could not inspect replay process state")
         destinations = [
-            mount.get("Destination") for mount in inspect[0].get("Mounts", [])
+            mount.get("Destination") for mount in sorted_mounts(inspect[0])
             if isinstance(mount.get("Destination"), str)
         ]
-        changed = []
-        for entry in changed_leaf_paths(diff):
-            if self._under_mount(entry["path"], destinations):
-                continue
-            return_code, payload = await self._archive_path(container_id, entry["path"])
-            changed.append({
-                "change": entry["change"],
-                "path": entry["path"],
-                "tree_sha256": archive_inventory(payload)["tree_sha256"] if return_code == 0 else None,
-            })
+        root_snapshot, changed = await self._root_snapshot(container_id, diff, destinations)
+        if root_snapshot["status"] != "complete":
+            raise RuntimeError("Could not calculate restored writable-layer state")
         mounts = []
-        for mount in inspect[0].get("Mounts", []):
+        for mount in sorted_mounts(inspect[0]):
             destination = mount.get("Destination")
             return_code, payload = await self._archive_path(container_id, destination)
             mounts.append({
@@ -620,7 +852,18 @@ class PreservingDockerEnvironment(DockerEnvironment):
             "configured_image": inspect[0].get("Config", {}).get("Image"),
             "processes_sha256": sha256(process_bytes).hexdigest(),
             "diff": diff,
-            "changed_paths": changed,
+            "changed_paths": [
+                {
+                    "change": record["change"],
+                    "path": record["path"],
+                    "kind": record["kind"],
+                    "archived": record["archived"],
+                    "tree_sha256": record["tree_sha256"],
+                }
+                for record in changed
+            ],
+            "root_snapshot_tree_sha256": root_snapshot["payload"]["tree_sha256"],
+            "unarchived_special_paths": root_snapshot["unarchived_special_paths"],
             "mounts": mounts,
         }
 
@@ -666,10 +909,10 @@ class PreservingDockerEnvironment(DockerEnvironment):
     async def _repeat_verifier(self, command: str, original_result, *, cwd, env, timeout_sec, user) -> None:
         if self._replay_manifest is None or self._replay_directory is None:
             raise RuntimeError("Verifier replay started without a preserved state")
-        if self._replay_manifest["status"] != "complete":
-            raise RuntimeError("Verifier replay requires a complete pre-verifier capture")
+        started = asyncio.get_running_loop().time()
         replay = {
             "status": "incomplete",
+            "execution_phase": "environment_stop_after_original_verifier",
             "command_sha256": sha256(command.encode()).hexdigest(),
             "preparatory_commands": [
                 {
@@ -683,12 +926,15 @@ class PreservingDockerEnvironment(DockerEnvironment):
             ],
             "state_restored": False,
             "same_judgement": False,
+            "wall_seconds": None,
             "error": None,
         }
         original_directory = self._replay_directory / "original-verifier"
         repeated_directory = self._replay_directory / "repeated-verifier"
         self._copy_host_tree(self.trial_paths.verifier_dir, original_directory)
         try:
+            if self._replay_manifest["status"] != "complete":
+                raise RuntimeError("Verifier replay requires a complete pre-verifier capture")
             for container in self._replay_manifest["containers"]:
                 await self._restore_container(container)
             restored = [
@@ -715,6 +961,7 @@ class PreservingDockerEnvironment(DockerEnvironment):
         except BaseException as caught:
             replay["error"] = {"type": type(caught).__name__, "message": str(caught)}
         finally:
+            replay["wall_seconds"] = asyncio.get_running_loop().time() - started
             self._replace_host_tree(original_directory, self.trial_paths.verifier_dir)
             self._replay_manifest["verifier_replay"] = replay
             if replay["status"] != "complete":
@@ -744,7 +991,14 @@ class PreservingDockerEnvironment(DockerEnvironment):
             return result
         if self._verifier_test_command(command):
             self._replay_started = True
-            await self._repeat_verifier(command, result, cwd=cwd, env=env, timeout_sec=timeout_sec, user=user)
+            self._pending_verifier_replay = {
+                "command": command,
+                "original_result": result,
+                "cwd": cwd,
+                "env": env,
+                "timeout_sec": timeout_sec,
+                "user": user,
+            }
         else:
             self._preparatory_verifier_commands.append(arguments)
         return result
@@ -756,6 +1010,12 @@ class PreservingDockerEnvironment(DockerEnvironment):
             / self._safe_name(self.session_id)
             / "manifest.json"
         )
-        if not manifest_path.exists():
-            await self._capture_environment("teardown_without_verifier")
-        await super().stop(delete=delete)
+        try:
+            if self._pending_verifier_replay is not None:
+                pending = self._pending_verifier_replay
+                self._pending_verifier_replay = None
+                await self._repeat_verifier(**pending)
+            elif not manifest_path.exists():
+                await self._capture_environment("teardown_without_verifier")
+        finally:
+            await super().stop(delete=delete)

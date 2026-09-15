@@ -91,7 +91,7 @@ randomization_seed = 20260915
 
 [replay]
 required = true
-bundle_revision = 1
+bundle_revision = 2
 require_complete_capture = true
 
 [cost]

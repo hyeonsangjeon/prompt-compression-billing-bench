@@ -115,7 +115,7 @@ def validate_screening_ledger(ledger: dict) -> None:
         "randomization_seed": 20260915,
     }:
         raise ValueError("Keep the fixed 18-of-20 screening rule and one preparation retry")
-    if ledger["replay"] != {"required": True, "bundle_revision": 1, "require_complete_capture": True}:
+    if ledger["replay"] != {"required": True, "bundle_revision": 2, "require_complete_capture": True}:
         raise ValueError("Every valid screening result needs a complete replay bundle")
     limits = ledger["limits"]
     for name in ("max_wall_seconds", "max_calls_per_trial", "request_timeout_seconds", "max_request_bytes",

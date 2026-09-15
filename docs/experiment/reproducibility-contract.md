@@ -1,6 +1,6 @@
 # 선별·평가 재현 계약
 
-**상태:** 실행 전 계약이다. 구현과 로컬 검사는 진행 중이며 모델을 호출한 선별·평가는 아직 0회다. 이 계약의 필수 증거가 빠진 실행은 품질 분모에 넣지 않는다.
+**상태:** 이 계약으로 선별을 세 번 시작했지만 기술 결함 때문에 유효한 품질 결과는 0건이다. 수정한 상태 보존 경로의 모델 호출 없는 검증은 끝났고, 새 source commit의 선별은 아직 시작하지 않았다. 이 계약의 필수 증거가 빠진 실행은 품질 분모에 넣지 않는다.
 
 ## 기록 단위
 
@@ -66,14 +66,16 @@ artifact나 설정을 바꾸는 복구는 재시도가 아니라 새 revision이
 
 ## 최종 workspace와 verifier 재실행
 
-verifier 실행 직전 다음 상태를 보존한다.
+verifier 실행 직전 다음 상태를 보존한다. 상태 재생 묶음 revision 2부터 컨테이너 writable layer의 변경 경로는 NUL 문자로 경계를 구분한 한 개의 tar 파일에 넣고, 마운트는 대상 경로 순서로 고정한다.
 
 - workspace와 마운트 파일의 상대 경로, 종류, mode, uid·gid, symlink 대상, 크기와 SHA-256
 - 컨테이너 이미지 SHA, writable layer의 변경·삭제 경로와 내용 hash
 - verifier가 읽는 서비스·process·container 상태와 로그
 - 민감한 환경 변수 값과 호스트 경로를 원문 대신 SHA-256으로 바꾼 inspect 기록
 
-보존한 상태를 같은 이미지와 verifier revision에 복원한 뒤 모델 호출 없이 verifier를 한 번 더 실행한다. workspace 상태 hash, verifier source·명령·의존성 hash, test별 pass/fail, exit code와 reward가 모두 같아야 재생 검사가 통과한다.
+보존한 상태를 같은 이미지와 verifier revision에 복원한 뒤 모델 호출 없이 verifier를 한 번 더 실행한다. 두 번째 실행은 첫 verifier 명령의 900초 제한이 끝난 뒤, 같은 컨테이너를 내리기 전에 수행한다. 복원 가능한 파일 상태 hash, verifier source·명령·의존성 hash, test별 pass/fail, exit code와 reward가 모두 같아야 재생 검사가 통과한다.
+
+실행 중인 process의 메모리 상태는 파일 archive로 재구성하지 않는다. 첫 판정 뒤에도 같은 컨테이너를 유지하며, 판정 직전과 파일 복원 직전의 process 목록이 다르거나 archive가 제외한 소켓 목록이 달라지면 재실행하지 않고 상태 복원 실패로 분류한다. 두 목록이 같아도 process 메모리의 byte 단위 일치를 증명한 것은 아니다.
 
 같은 상태에서 판정이 달라지면 verifier 변동으로 분류한다. 상태 복원이 불완전하면 모델 실행 변동과 verifier 변동을 구분할 수 없으므로 유효한 품질 결과로 세지 않는다.
 

@@ -10,7 +10,9 @@ import tempfile
 from types import SimpleNamespace
 import unittest
 import uuid
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
+
+from harbor.environments.docker.docker import DockerEnvironment
 
 from src.replay_environment import (
     PreservingDockerEnvironment,
@@ -19,9 +21,12 @@ from src.replay_environment import (
     archive_inventory,
     changed_leaf_paths,
     deleted_root_paths,
+    normalized_absolute_paths,
+    nul_path_payload,
     parse_docker_diff,
     redact_inspect,
     replay_bundle_manifest,
+    sorted_mounts,
     verifier_signature,
 )
 
@@ -60,6 +65,26 @@ class ReplayEnvironmentTests(unittest.IsolatedAsyncioTestCase):
     def test_deleted_paths_copy_only_outer_roots(self):
         records = parse_docker_diff("D /app/old\nD /app/old/child\nD /tmp/other\n")
         self.assertEqual(deleted_root_paths(records), ["/app/old", "/tmp/other"])
+
+    def test_nul_path_payload_is_sorted_and_keeps_spaces_and_newlines(self):
+        paths = ["/tmp/z value", "/tmp/a\nvalue"]
+        self.assertEqual(normalized_absolute_paths(paths), sorted(paths))
+        self.assertEqual(
+            nul_path_payload(paths, relative=True),
+            b"tmp/a\nvalue\0tmp/z value\0",
+        )
+        with self.assertRaises(ValueError):
+            nul_path_payload(["/"], relative=True)
+
+    def test_mounts_are_sorted_by_destination_before_hashing(self):
+        mounts = [
+            {"Destination": "/logs/verifier", "Type": "bind"},
+            {"Destination": "/logs/agent", "Type": "bind"},
+        ]
+        self.assertEqual(
+            [mount["Destination"] for mount in sorted_mounts({"Mounts": mounts})],
+            ["/logs/agent", "/logs/verifier"],
+        )
 
     def test_archive_inventory_records_file_identity_without_tar_header_noise(self):
         payload = io.BytesIO()
@@ -127,7 +152,7 @@ class ReplayEnvironmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(installation)
         self.assertFalse(archive_has_members(source))
 
-    async def test_restore_leaves_empty_special_path_snapshot_in_place(self):
+    async def test_restore_leaves_matching_unarchived_socket_in_place(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             container_directory = directory / "container"
@@ -142,24 +167,36 @@ class ReplayEnvironmentTests(unittest.IsolatedAsyncioTestCase):
             environment._container_details = AsyncMock(return_value=(
                 [{"Mounts": []}], [{"change": "A", "path": "/tmp/tmux-0/default"}], 0, b"",
             ))
-            environment._command = AsyncMock(side_effect=[(0, b"helper"), (0, b"")])
-            environment._restore_from_base = AsyncMock()
-            environment._remove_path = AsyncMock()
-            environment._install_archive = AsyncMock()
+            current_snapshot = {
+                "status": "complete",
+                "unarchived_special_paths": [{"path": "/tmp/tmux-0/default", "kind": "socket"}],
+            }
+            current_changed = [{
+                "change": "A", "path": "/tmp/tmux-0/default", "kind": "socket", "archived": False,
+            }]
+            environment._root_snapshot = AsyncMock(return_value=(current_snapshot, current_changed))
+            environment._remove_paths = AsyncMock()
+            environment._install_root_archive = AsyncMock()
+            environment._restore_mount = AsyncMock()
             await environment._restore_container({
                 "container_id": "container-id",
                 "container_name": "/container",
                 "image_id": "sha256:image",
+                "processes_sha256": sha256(b"").hexdigest(),
                 "diff": [{"change": "A", "path": "/tmp/tmux-0/default"}],
                 "changed_paths": [{
-                    "change": "A", "path": "/tmp/tmux-0/default",
-                    "payload": {"path": archive.name},
+                    "change": "A", "path": "/tmp/tmux-0/default", "kind": "socket",
+                    "archived": False, "tree_sha256": None,
                 }],
+                "root_snapshot": {
+                    "unarchived_special_paths": [{"path": "/tmp/tmux-0/default", "kind": "socket"}],
+                    "payload": {"path": archive.name},
+                },
                 "mounts": [],
             })
-            environment._restore_from_base.assert_not_awaited()
-            environment._remove_path.assert_not_awaited()
-            environment._install_archive.assert_not_awaited()
+            self.assertEqual(environment._remove_paths.await_count, 2)
+            self.assertTrue(all(call.args[1] == [] for call in environment._remove_paths.await_args_list))
+            environment._install_root_archive.assert_awaited_once()
 
     def test_verifier_signature_ignores_duration_but_keeps_test_identity(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -192,15 +229,50 @@ class ReplayEnvironmentTests(unittest.IsolatedAsyncioTestCase):
                 (0, b"A /app/result.txt\n"),
                 (0, b"processes"),
                 (0, b"logs"),
-                (1, b"copy failed"),
             ]
             environment._command = AsyncMock(side_effect=responses)
+            environment._root_snapshot = AsyncMock(return_value=(
+                {
+                    "status": "incomplete",
+                    "payload": {"tree_sha256": None},
+                    "unarchived_special_paths": [],
+                },
+                [],
+            ))
             manifest = await environment._capture_environment()
             self.assertEqual(manifest["status"], "incomplete")
             path = Path(temporary) / "workspace-replay/task__trial__env/manifest.json"
             self.assertTrue(path.is_file())
             self.assertEqual(json.loads(path.read_text())["manifest_sha256"], manifest["manifest_sha256"])
             self.assertEqual(replay_bundle_manifest(path)["status"], "incomplete")
+
+    async def test_verifier_replay_runs_during_stop_not_inside_verifier_timeout(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            verifier = root / "verifier"
+            verifier.mkdir()
+            environment = object.__new__(PreservingDockerEnvironment)
+            environment.session_id = "task__trial__env"
+            environment.trial_paths = SimpleNamespace(trial_dir=root, verifier_dir=verifier)
+            environment._tests_uploaded = True
+            environment._replay_started = False
+            environment._replay_manifest = {"status": "complete"}
+            environment._pending_verifier_replay = None
+            environment._preparatory_verifier_commands = []
+            environment._repeat_verifier = AsyncMock()
+            result = SimpleNamespace(return_code=0)
+            with patch.object(DockerEnvironment, "exec", AsyncMock(return_value=result)), patch.object(
+                DockerEnvironment, "stop", AsyncMock()
+            ) as base_stop:
+                observed = await environment.exec(
+                    "/tests/test.sh > /logs/verifier/test-stdout.txt",
+                )
+                self.assertIs(observed, result)
+                environment._repeat_verifier.assert_not_awaited()
+                self.assertIsNotNone(environment._pending_verifier_replay)
+                await environment.stop(delete=True)
+                environment._repeat_verifier.assert_awaited_once()
+                base_stop.assert_awaited_once_with(delete=True)
 
     @unittest.skipUnless(
         os.environ.get("RUN_DOCKER_REPLAY_TESTS") == "1",
@@ -215,11 +287,47 @@ class ReplayEnvironmentTests(unittest.IsolatedAsyncioTestCase):
             mounted = root / "mounted"
             mounted.mkdir()
             (mounted / "result.txt").write_text("captured mount\n")
+            seed_name = "replay-seed-" + uuid.uuid4().hex[:12]
+            seed = subprocess.run(
+                [
+                    "docker", "run", "-d", "--name", seed_name, "--user", "0", image,
+                    "sh", "-c", "sleep 600",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=120,
+            ).stdout.strip()
+            try:
+                subprocess.run(
+                    [
+                        "docker", "exec", seed, "sh", "-c",
+                        "printf 'base root\\n' > /replay-base-modified && "
+                        "mkdir /replay-base-deleted && printf 'base child\\n' > /replay-base-deleted/child && "
+                        "mkdir /replay-base-untouched && printf 'keep child\\n' > /replay-base-untouched/child",
+                    ],
+                    check=True,
+                    timeout=30,
+                )
+                committed_image = subprocess.run(
+                    ["docker", "commit", seed],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                ).stdout.strip()
+            finally:
+                subprocess.run(["docker", "rm", "-f", seed], capture_output=True, timeout=30)
+            self.addCleanup(
+                lambda: subprocess.run(
+                    ["docker", "image", "rm", committed_image], capture_output=True, timeout=30,
+                )
+            )
             name = "replay-contract-" + uuid.uuid4().hex[:12]
             created = subprocess.run(
                 [
                     "docker", "run", "-d", "--name", name, "--user", "0",
-                    "-v", f"{mounted}:/workspace", image,
+                    "-v", f"{mounted}:/workspace", committed_image,
                     "sh", "-c", "sleep 600",
                 ],
                 check=True,
@@ -234,7 +342,11 @@ class ReplayEnvironmentTests(unittest.IsolatedAsyncioTestCase):
                 )
             )
             subprocess.run(
-                ["docker", "exec", container_id, "sh", "-c", "printf 'captured root\\n' > /replay-root.txt"],
+                [
+                    "docker", "exec", container_id, "sh", "-c",
+                    "printf 'captured root\\n' > /replay-base-modified && "
+                    "rm -rf /replay-base-deleted && printf 'captured added\\n' > /replay-added",
+                ],
                 check=True,
                 timeout=30,
             )
@@ -257,7 +369,13 @@ class ReplayEnvironmentTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(manifest["status"], "complete")
 
             subprocess.run(
-                ["docker", "exec", container_id, "sh", "-c", "printf 'mutated root\\n' > /replay-root.txt"],
+                [
+                    "docker", "exec", container_id, "sh", "-c",
+                    "printf 'mutated root\\n' > /replay-base-modified && "
+                    "mkdir /replay-base-deleted && printf 'mutated child\\n' > /replay-base-deleted/child && "
+                    "rm -rf /replay-base-untouched /replay-added /usr/local/bin/replay-link && "
+                    "printf 'verifier only\\n' > /replay-verifier-only",
+                ],
                 check=True,
                 timeout=30,
             )
@@ -269,13 +387,34 @@ class ReplayEnvironmentTests(unittest.IsolatedAsyncioTestCase):
             ).encode()).hexdigest()
             self.assertEqual(restored_hash, manifest["state_sha256"])
             root_value = subprocess.run(
-                ["docker", "exec", container_id, "cat", "/replay-root.txt"],
+                ["docker", "exec", container_id, "cat", "/replay-base-modified"],
                 check=True,
                 capture_output=True,
                 text=True,
                 timeout=30,
             ).stdout
             self.assertEqual(root_value, "captured root\n")
+            self.assertEqual(subprocess.run(
+                ["docker", "exec", container_id, "cat", "/replay-added"],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            ).stdout, "captured added\n")
+            self.assertEqual(subprocess.run(
+                ["docker", "exec", container_id, "test", "!", "-e", "/replay-base-deleted"],
+                timeout=30,
+            ).returncode, 0)
+            self.assertEqual(subprocess.run(
+                ["docker", "exec", container_id, "cat", "/replay-base-untouched/child"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            ).stdout, "keep child\n")
+            self.assertEqual(subprocess.run(
+                ["docker", "exec", container_id, "test", "!", "-e", "/replay-verifier-only"],
+                timeout=30,
+            ).returncode, 0)
             self.assertEqual((mounted / "result.txt").read_text(), "captured mount\n")
             link_value = subprocess.run(
                 ["docker", "exec", container_id, "readlink", "/usr/local/bin/replay-link"],
