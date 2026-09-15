@@ -771,6 +771,9 @@ flush_paths
             raise RuntimeError("Current writable-layer state could not be archived for replay")
         if current_snapshot["unarchived_special_paths"] != container["root_snapshot"]["unarchived_special_paths"]:
             raise RuntimeError("Unarchived runtime paths changed and cannot be reconstructed for verifier replay")
+        protected_paths = destinations + [
+            record["path"] for record in current_snapshot["unarchived_special_paths"]
+        ]
 
         remove_paths = [
             record["path"]
@@ -778,7 +781,7 @@ flush_paths
             if record["archived"] and (
                 record["change"] == "A"
                 or (record["change"] == "C" and record["kind"] != "directory")
-            ) and not self._contains_mount(record["path"], destinations)
+            ) and not self._contains_mount(record["path"], protected_paths)
         ]
         modified_base_paths = [
             record["path"]
@@ -818,7 +821,7 @@ flush_paths
         captured_deleted_paths = [
             path for path in deleted_root_paths(container["diff"])
             if not self._under_mount(path, destinations)
-            and not self._contains_mount(path, destinations)
+            and not self._contains_mount(path, protected_paths)
         ]
         await self._remove_paths(
             container_id,

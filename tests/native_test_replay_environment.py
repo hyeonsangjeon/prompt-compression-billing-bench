@@ -166,15 +166,19 @@ class ReplayEnvironmentTests(unittest.IsolatedAsyncioTestCase):
             environment = object.__new__(PreservingDockerEnvironment)
             environment._replay_directory = directory
             environment._container_details = AsyncMock(return_value=(
-                [{"Mounts": []}], [{"change": "A", "path": "/tmp/tmux-0/default"}], 0, b"",
+                [{"Mounts": []}], [
+                    {"change": "A", "path": "/tmp/tmux-0"},
+                    {"change": "A", "path": "/tmp/tmux-0/default"},
+                ], 0, b"",
             ))
             current_snapshot = {
                 "status": "complete",
                 "unarchived_special_paths": [{"path": "/tmp/tmux-0/default", "kind": "socket"}],
             }
-            current_changed = [{
-                "change": "A", "path": "/tmp/tmux-0/default", "kind": "socket", "archived": False,
-            }]
+            current_changed = [
+                {"change": "A", "path": "/tmp/tmux-0", "kind": "directory", "archived": True},
+                {"change": "A", "path": "/tmp/tmux-0/default", "kind": "socket", "archived": False},
+            ]
             environment._root_snapshot = AsyncMock(return_value=(current_snapshot, current_changed))
             environment._remove_paths = AsyncMock()
             environment._install_root_archive = AsyncMock()
@@ -184,11 +188,20 @@ class ReplayEnvironmentTests(unittest.IsolatedAsyncioTestCase):
                 "container_name": "/container",
                 "image_id": "sha256:image",
                 "processes_sha256": sha256(b"").hexdigest(),
-                "diff": [{"change": "A", "path": "/tmp/tmux-0/default"}],
-                "changed_paths": [{
-                    "change": "A", "path": "/tmp/tmux-0/default", "kind": "socket",
-                    "archived": False, "tree_sha256": None,
-                }],
+                "diff": [
+                    {"change": "A", "path": "/tmp/tmux-0"},
+                    {"change": "A", "path": "/tmp/tmux-0/default"},
+                ],
+                "changed_paths": [
+                    {
+                        "change": "A", "path": "/tmp/tmux-0", "kind": "directory",
+                        "archived": True, "tree_sha256": "a" * 64,
+                    },
+                    {
+                        "change": "A", "path": "/tmp/tmux-0/default", "kind": "socket",
+                        "archived": False, "tree_sha256": None,
+                    },
+                ],
                 "root_snapshot": {
                     "unarchived_special_paths": [{"path": "/tmp/tmux-0/default", "kind": "socket"}],
                     "payload": {"path": archive.name},
