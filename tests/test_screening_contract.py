@@ -21,7 +21,6 @@ class ScreeningContractTests(unittest.TestCase):
             "execution_authorized": True,
             "reference": "delegated-final-design-2026-09-15",
         }
-        ledger["limits"]["api_cost_usd"] = 1
         with self.assertRaisesRegex(ValueError, "shared-deployment coordination"):
             require_operational_screening(ledger)
 

@@ -187,7 +187,7 @@ class LiveTransportTests(unittest.TestCase):
         self.assertEqual(failures, [])
         self.assertEqual(len(self.sent), 2)
 
-    def test_bounded_429_retries_count_every_attempt_and_keep_unknown_budget(self):
+    def test_bounded_429_retries_count_every_attempt_and_record_known_cost(self):
         responses = iter([(429, b'{"error":"synthetic limit"}', {"Retry-After": "0"}),
                           (200, response_fixture(), {})])
         self.recorder.sender = lambda body: (self.sent.append(body), next(responses))[1]
@@ -196,7 +196,7 @@ class LiveTransportTests(unittest.TestCase):
         events = read_events(self.root / "transport/events.jsonl")
         self.assertEqual(sum(event["event"] == "attempt_started" for event in events), 2)
         self.assertEqual(self.queue.cooldowns, [0])
-        self.assertGreater(self.recorder.budget_used_usd, 0.00002)
+        self.assertEqual(self.recorder.known_provider_cost_usd, 0.00002)
 
     def test_unknown_usage_or_ambiguous_network_failure_stops_without_outer_retry(self):
         def failed_sender(body):
@@ -282,31 +282,14 @@ class LiveTransportTests(unittest.TestCase):
             self.recorder.complete("trial-one", canonical(request_fixture()))
         self.assertTrue(self.recorder.stopped.is_set())
 
-    def test_budget_and_request_limits_fail_before_provider_dispatch(self):
-        self.ledger["limits"]["api_cost_usd"] = 0
-        with self.assertRaisesRegex(ValueError, "budget"):
-            self.recorder.complete("trial-one", canonical(request_fixture()))
-        self.assertEqual(self.sent, [])
-
-    def test_trial_call_limit_has_a_distinct_local_response(self):
-        self.ledger["limits"]["max_calls_per_trial"] = 1
-        self.recorder.request_error_scope = "trial"
-        server = start_live_proxy(self.recorder, "synthetic-key")
-        self.addCleanup(server.server_close)
-        self.addCleanup(server.shutdown)
-        request = urllib.request.Request(
-            f"http://127.0.0.1:{server.server_port}/trial-one/v1/chat/completions",
-            data=canonical(request_fixture()),
-            headers={"Authorization": "Bearer synthetic-key", "Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(request, timeout=3) as response:
-            self.assertEqual(response.status, 200)
-        with self.assertRaises(urllib.error.HTTPError) as error:
-            urllib.request.urlopen(request, timeout=3)
-        self.assertEqual(error.exception.code, 409)
-        self.assertEqual(json.load(error.exception)["error"]["type"], "trial_call_limit_reached")
-        self.assertEqual(self.recorder.trials["trial-one"]["failure"]["reason"], "TrialCallLimitReached")
-        self.assertEqual(len(self.sent), 1)
+    def test_sixty_first_call_is_dispatched_without_local_cost_or_call_stop(self):
+        for _ in range(61):
+            status, _body = self.recorder.complete("trial-one", canonical(request_fixture()))
+            self.assertEqual(status, 200)
+        self.assertEqual(len(self.sent), 61)
+        self.assertEqual(self.recorder.trials["trial-one"]["calls"], 61)
+        self.assertIsNone(self.recorder.trials["trial-one"]["failure"])
+        self.assertNotIn("max_completion_tokens", json.loads(self.sent[-1]))
 
 
 class QueueTests(unittest.TestCase):
@@ -316,7 +299,7 @@ class QueueTests(unittest.TestCase):
             queue = DeploymentQueue(path, "deployment", 5, 1000)
             with self.assertRaises(BlockingIOError):
                 DeploymentQueue(path, "deployment", 5, 1000)
-            queue.reserve(50, threading.Event(), time.time() + 5)
+            queue.reserve(50, threading.Event())
             queue.close()
             reopened = DeploymentQueue(path, "deployment", 5, 1000)
             self.assertEqual(len(reopened.reservations), 1)
@@ -324,15 +307,19 @@ class QueueTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 DeploymentQueue(path, "different-deployment", 5, 1000)
 
-    def test_rate_deadline_and_oversized_reservation_do_not_wait_forever(self):
+    def test_oversized_reservation_fails_and_explicit_stop_interrupts_rate_wait(self):
         with tempfile.TemporaryDirectory() as temporary:
             queue = DeploymentQueue(Path(temporary) / "queue", "deployment", 1, 100)
             self.addCleanup(queue.close)
             with self.assertRaises(ValueError):
-                queue.reserve(101, threading.Event(), time.time() + 5)
-            queue.reserve(50, threading.Event(), time.time() + 5)
-            with self.assertRaisesRegex(ValueError, "deadline"):
-                queue.reserve(50, threading.Event(), time.time() + 0.1)
+                queue.reserve(101, threading.Event())
+            queue.reserve(50, threading.Event())
+            stopped = threading.Event()
+            timer = threading.Timer(0.1, stopped.set)
+            timer.start()
+            self.addCleanup(timer.cancel)
+            with self.assertRaisesRegex(ProtectionViolation, "stopped"):
+                queue.reserve(50, stopped)
 
     def test_concurrent_reservations_are_persisted_without_loss(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -343,7 +330,7 @@ class QueueTests(unittest.TestCase):
 
             def reserve():
                 barrier.wait(timeout=2)
-                queue.reserve(50, threading.Event(), time.time() + 5)
+                queue.reserve(50, threading.Event())
 
             threads = [threading.Thread(target=reserve) for _ in range(8)]
             for thread in threads:
@@ -357,7 +344,7 @@ class QueueTests(unittest.TestCase):
     def test_credentials_cannot_be_forwarded_to_arbitrary_hosts(self):
         for endpoint in ("http://unsafe/openai/v1", "https://example.com/openai/v1", "https://user:secret@service.openai.azure.com/openai/v1"):
             with self.assertRaises(ValueError):
-                FoundrySender(endpoint, 1, lambda: "unused")
+                FoundrySender(endpoint, lambda: "unused")
 
 
 if __name__ == "__main__":

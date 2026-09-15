@@ -6,7 +6,7 @@ import socket
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import patch
 
 from native_helpers import FixtureEncoder, ImmediateQueue, ledger_fixture, response_fixture
 from src.compressors import NoOpCompressor
@@ -16,39 +16,24 @@ from src.task_metrics import read_events
 
 @unittest.skipUnless(importlib.util.find_spec("harbor"), "Install the locked native extra for Harbor integration")
 class HarborTransportTests(unittest.IsolatedAsyncioTestCase):
-    async def test_call_limit_ends_agent_loop_without_hiding_other_errors(self):
+    async def test_harbor_phase_time_limits_are_none_and_agent_loop_is_not_wrapped(self):
         from harbor.agents.terminus_2.terminus_2 import Terminus2
+        from harbor.trial.multi_step import MultiStepTrial
+        from harbor.trial.trial import Trial
+
         from src.harbor_agent import ObservedTerminus2
+        from src.harbor_no_time_limits import apply_no_time_limit_policy
 
-        agent = object.__new__(ObservedTerminus2)
-        agent.logger = Mock()
-        call_limit = RuntimeError("litellm.APIError: OpenAIException - trial_call_limit_reached")
-        call_limit.status_code = 409
-        with patch.object(
-            Terminus2,
-            "_run_agent_loop",
-            new=AsyncMock(side_effect=call_limit),
-        ):
-            self.assertIsNone(await agent._run_agent_loop())
-        agent.logger.warning.assert_called_once()
-
-        with patch.object(
-            Terminus2,
-            "_run_agent_loop",
-            new=AsyncMock(side_effect=RuntimeError("different failure")),
-        ):
-            with self.assertRaisesRegex(RuntimeError, "different failure"):
-                await agent._run_agent_loop()
-
-        wrong_status = RuntimeError("litellm.APIError: OpenAIException - trial_call_limit_reached")
-        wrong_status.status_code = 400
-        with patch.object(
-            Terminus2,
-            "_run_agent_loop",
-            new=AsyncMock(side_effect=wrong_status),
-        ):
-            with self.assertRaisesRegex(RuntimeError, "trial_call_limit_reached"):
-                await agent._run_agent_loop()
+        policy = apply_no_time_limit_policy()
+        placeholder = object()
+        self.assertIsNone(Trial._compute_agent_timeout_sec(placeholder))
+        self.assertIsNone(Trial._compute_verifier_timeout_sec(placeholder))
+        self.assertIsNone(Trial._compute_agent_setup_timeout_sec(placeholder))
+        self.assertIsNone(Trial._compute_environment_build_timeout_sec(placeholder))
+        self.assertIsNone(MultiStepTrial._step_agent_timeout_sec(placeholder, None))
+        self.assertIsNone(MultiStepTrial._step_verifier_timeout_sec(placeholder, None))
+        self.assertIs(ObservedTerminus2._run_agent_loop, Terminus2._run_agent_loop)
+        self.assertEqual(policy["terminus_max_turns_argument"], None)
 
     async def test_actual_harbor_sdk_serialization_reaches_only_fake_upstream(self):
         """Real SDK to loopback; non-loopback socket connections are forbidden."""
@@ -81,22 +66,22 @@ class HarborTransportTests(unittest.IsolatedAsyncioTestCase):
             agent = ObservedTerminus2(logs_dir=root / "agent", model_name="openai/gpt-5.4",
                                       api_base=f"http://127.0.0.1:{server.server_port}/trial/v1",
                                       temperature=0, reasoning_effort="none", enable_summarize=False,
-                                      use_responses_api=False, max_turns=60,
-                                      llm_kwargs={"max_completion_tokens": ledger["model"]["max_completion_tokens"],
-                                                  "num_retries": 0})
+                                      use_responses_api=False,
+                                      llm_kwargs={"num_retries": 0})
             response = await agent._llm.call("Synthetic protected instruction")
         recorder.close_trial("trial")
         self.assertIn("synthetic", response.content)
         self.assertEqual(len(sent), 1)
         self.assertEqual(sent[0]["temperature"], 0)
         self.assertEqual(sent[0]["reasoning_effort"], "none")
-        self.assertEqual(sent[0]["max_completion_tokens"], ledger["model"]["max_completion_tokens"])
+        self.assertNotIn("max_completion_tokens", sent[0])
         self.assertEqual(sent[0]["messages"][-1]["content"], "Synthetic protected instruction")
+        self.assertEqual(agent._max_episodes, 1_000_000)
         events = read_events(root / "transport/events.jsonl")
         self.assertEqual(sum(event["event"] == "response_delivered" for event in events), 1)
         self.assertFalse(recorder.stopped.is_set())
 
-    async def test_length_recovery_stops_before_sixty_first_upstream_call_and_allows_grading(self):
+    async def test_length_recovery_allows_calls_after_sixty_and_then_allows_grading(self):
         """Actual Harbor and LiteLLM code use loopback only; verifier output is deterministic input."""
         from harbor.agents.terminus_2.terminus_2 import Terminus2
         from harbor.llms.chat import Chat
@@ -114,10 +99,13 @@ class HarborTransportTests(unittest.IsolatedAsyncioTestCase):
 
         def sender(body):
             sent.append(json.loads(body))
-            response = json.loads(response_fixture(
-                "truncated" if len(sent) == 1 else
-                '{"analysis":"synthetic","plan":"continue","commands":[],"task_complete":false}'
-            ))
+            if len(sent) == 1:
+                content = "truncated"
+            elif len(sent) < 61:
+                content = '{"analysis":"synthetic","plan":"continue","commands":[],"task_complete":false}'
+            else:
+                content = '{"analysis":"synthetic","plan":"done","commands":[],"task_complete":true}'
+            response = json.loads(response_fixture(content))
             if len(sent) == 1:
                 response["choices"][0]["finish_reason"] = "length"
             response["id"] = f"synthetic-completion-{len(sent):02d}"
@@ -144,11 +132,8 @@ class HarborTransportTests(unittest.IsolatedAsyncioTestCase):
             logs_dir=root / "agent", model_name="openai/gpt-5.4",
             api_base=f"http://127.0.0.1:{server.server_port}/trial/v1",
             temperature=0, reasoning_effort="none", enable_summarize=False,
-            use_responses_api=False, max_turns=60,
-            llm_kwargs={
-                "max_completion_tokens": ledger["model"]["max_completion_tokens"],
-                "num_retries": 0,
-            },
+            use_responses_api=False,
+            llm_kwargs={"num_retries": 0},
         )
         agent._context = SimpleNamespace(
             n_input_tokens=0, n_output_tokens=0, n_cache_tokens=0, cost_usd=None,
@@ -175,12 +160,13 @@ class HarborTransportTests(unittest.IsolatedAsyncioTestCase):
             )
 
         events = read_events(root / "transport/events.jsonl")
-        self.assertEqual(len(sent), 60)
-        self.assertEqual(recorder.trials["trial"]["calls"], 60)
-        self.assertEqual(recorder.trials["trial"]["failure"]["reason"], "TrialCallLimitReached")
-        self.assertEqual(sum(event["event"] == "call_received" for event in events), 60)
-        self.assertEqual(sum(event["event"] == "http" for event in events), 60)
-        self.assertEqual(sum(event["event"] == "response_delivered" for event in events), 60)
+        self.assertEqual(len(sent), 62)
+        self.assertEqual(recorder.trials["trial"]["calls"], 62)
+        self.assertIsNone(recorder.trials["trial"]["failure"])
+        self.assertEqual(sum(event["event"] == "call_received" for event in events), 62)
+        self.assertEqual(sum(event["event"] == "http" for event in events), 62)
+        self.assertEqual(sum(event["event"] == "response_delivered" for event in events), 62)
+        self.assertTrue(all("max_completion_tokens" not in request for request in sent))
         self.assertIn("NONE of the actions", sent[1]["messages"][-1]["content"])
         self.assertEqual(sent[1]["messages"][-2]["content"], "truncated")
 
@@ -222,7 +208,7 @@ class HarborTransportTests(unittest.IsolatedAsyncioTestCase):
             )
         verifier.assert_called_once()
         self.assertEqual(classified["result"], "wrong_answer")
-        self.assertTrue(classified["provider_call_limit_reached"])
+        self.assertEqual(classified["provider_cost"]["http_attempts"], 62)
 
 
 if __name__ == "__main__":

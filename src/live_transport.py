@@ -1,7 +1,6 @@
 """One fail-closed loopback transport for every trial in a native run."""
 
 from collections import deque
-from datetime import datetime, timezone
 import fcntl
 import hmac
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -90,24 +89,17 @@ def compression_audit(result, source: str, condition: str) -> dict:
     worker_id = audit["worker_id"]
     if worker_id is not None and (type(worker_id) is not int or worker_id < 1):
         raise ProtectionViolation("Compressor worker identifier is invalid")
-    if condition == "llmlingua2":
-        expected_worker_text, expected_discarded_text = source[:5000], source[5000:]
-        expected_worker = {
-            "sha256": digest(expected_worker_text.encode()), "characters": len(expected_worker_text),
-            "utf8_bytes": len(expected_worker_text.encode()), "lines": len(expected_worker_text.splitlines()),
-        }
-        expected_discarded = {
-            "sha256": digest(expected_discarded_text.encode()), "characters": len(expected_discarded_text),
-            "utf8_bytes": len(expected_discarded_text.encode()), "lines": len(expected_discarded_text.splitlines()),
-        }
-        if (audit["overflow_policy"] != "keep_prefix_once_discard_suffix"
-                or worker_id not in range(1, 9) or worker_input != expected_worker
-                or discarded != expected_discarded
-                or bool(audit["discarded_suffix_artifact"]) != bool(expected_discarded_text)):
-            raise ProtectionViolation("LLMLingua input-cap audit differs from the fixed intervention")
-    elif (audit["overflow_policy"] != "none" or worker_id is not None
-          or discarded["characters"] or audit["discarded_suffix_artifact"] is not None):
-        raise ProtectionViolation("A non-LLMLingua adapter reported an unexpected input cap or worker")
+    if condition == "llmlingua2" and worker_id not in range(1, 9):
+        raise ProtectionViolation("LLMLingua worker identifier differs from the fixed intervention")
+    if condition != "llmlingua2" and worker_id is not None:
+        raise ProtectionViolation("A non-LLMLingua adapter reported an unexpected worker")
+    if (
+        audit["overflow_policy"] != "none"
+        or worker_input != expected_source
+        or discarded["characters"]
+        or audit["discarded_suffix_artifact"] is not None
+    ):
+        raise ProtectionViolation("A compressor reported an input cap under the no-cap policy")
     return audit
 
 
@@ -158,13 +150,6 @@ class TrialRequestBlocked(RuntimeError):
         self.failure = failure
 
 
-class TrialCallLimitReached(RuntimeError):
-    pass
-
-
-TRIAL_CALL_LIMIT_ERROR = "trial_call_limit_reached"
-
-
 class DeploymentQueue:
     def __init__(self, path: Path, deployment: str, rpm: int, tpm: int, *, clock=time.time):
         if type(rpm) is not int or type(tpm) is not int or rpm < 1 or tpm < 1:
@@ -212,14 +197,14 @@ class DeploymentQueue:
         self.file.flush()
         os.fsync(self.file.fileno())
 
-    def reserve(self, estimated_tokens: int, stopped: threading.Event, deadline: float) -> float:
+    def reserve(self, estimated_tokens: int, stopped: threading.Event) -> float:
         if type(estimated_tokens) is not int or estimated_tokens < 1 or estimated_tokens > self.tpm:
             raise ValueError("Request token reservation exceeds the configured TPM; do not wait forever")
         started = self.clock()
         while True:
             current = self.clock()
-            if stopped.is_set() or current >= deadline:
-                raise ProtectionViolation("Run stopped or deadline reached while waiting")
+            if stopped.is_set():
+                raise ProtectionViolation("Run stopped while waiting")
             with self.lock:
                 while self.reservations and self.reservations[0][0] <= current - 60:
                     self.reservations.popleft()
@@ -229,8 +214,6 @@ class DeploymentQueue:
                     self.reservations.append([current, estimated_tokens])
                     self.persist()
                     return current - started
-            if ready >= deadline:
-                raise ValueError("Queue wait would exceed the run deadline")
             stopped.wait(min(ready - current, 1.0))
 
     def cooldown(self, seconds: float):
@@ -245,7 +228,7 @@ class DeploymentQueue:
 
 
 class FoundrySender:
-    def __init__(self, endpoint: str, timeout: float, bearer, *, deadline: float | None = None):
+    def __init__(self, endpoint: str, bearer):
         parsed = urllib.parse.urlsplit(endpoint)
         if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
             raise ValueError("Foundry requires an explicit HTTPS base URL without credentials or query")
@@ -253,23 +236,19 @@ class FoundrySender:
             raise ValueError("Only the inspected Foundry OpenAI v1 base URL is supported")
         if not parsed.hostname.endswith((".openai.azure.com", ".services.ai.azure.com", ".cognitiveservices.azure.com")):
             raise ValueError("Credentials may only be sent to an explicit Azure Foundry host")
-        self.endpoint, self.timeout, self.bearer = endpoint.rstrip("/"), timeout, bearer
-        self.deadline = deadline
+        self.endpoint, self.bearer = endpoint.rstrip("/"), bearer
 
     def __call__(self, body: bytes) -> tuple[int, bytes, dict]:
         class NoRedirect(urllib.request.HTTPRedirectHandler):
             def redirect_request(self, *arguments, **keywords):
                 raise ValueError("Provider redirects are not allowed")
 
-        timeout = self.timeout if self.deadline is None else min(self.timeout, self.deadline - time.time())
-        if timeout <= 0:
-            raise TimeoutError("Run deadline reached before provider dispatch")
         request = urllib.request.Request(self.endpoint + "/chat/completions", data=body, headers={
             "Authorization": "Bearer " + self.bearer(), "Content-Type": "application/json",
         })
         opener = urllib.request.build_opener(NoRedirect())
         try:
-            with opener.open(request, timeout=timeout) as response:
+            with opener.open(request) as response:
                 return response.status, response.read(), dict(response.headers)
         except urllib.error.HTTPError as error:
             return error.code, error.read(), dict(error.headers)
@@ -287,7 +266,7 @@ class ManagedIdentity:
                 request = urllib.request.Request("http://169.254.169.254/metadata/identity/oauth2/token?" + query,
                                                  headers={"Metadata": "true"})
                 opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-                with opener.open(request, timeout=15) as response:
+                with opener.open(request) as response:
                     token = json.load(response)
                 self.token, self.expires = token["access_token"], int(token["expires_on"])
         return self.token
@@ -309,10 +288,8 @@ class LiveRecorder:
         self.failure = None
         self.trials = {}
         self.sequence = 0
-        self.budget_used_usd = 0.0
+        self.known_provider_cost_usd = 0.0
         self.serialize = canonical
-        self.deadline = min(datetime.fromisoformat(ledger["limits"]["deadline_utc"]).timestamp(),
-                            time.time() + ledger["limits"]["max_wall_seconds"])
 
     def event(self, payload):
         with self.event_lock, (self.directory / "events.jsonl").open("a", encoding="utf-8") as handle:
@@ -364,15 +341,13 @@ class LiveRecorder:
     def check(self):
         if self.stopped.is_set():
             raise ProtectionViolation("All subsequent requests are blocked", self.failure)
-        if time.time() >= self.deadline:
-            raise ValueError("Run deadline reached")
 
     def request_contract(self, payload):
-        required = {"model", "temperature", "reasoning_effort", "max_completion_tokens", "messages"}
+        required = {"model", "temperature", "reasoning_effort", "messages"}
         if not required <= payload.keys() or payload.keys() - required - {"stream"}:
             raise ProtectionViolation("Unexpected or missing live request fields")
         expected = self.ledger["model"]
-        for key in ("model", "temperature", "reasoning_effort", "max_completion_tokens"):
+        for key in ("model", "temperature", "reasoning_effort"):
             value = expected["name"] if key == "model" else expected[key]
             if type(payload[key]) is bool or payload[key] != value:
                 raise ProtectionViolation("Actual model settings differ from the ledger", {"field": key})
@@ -391,10 +366,7 @@ class LiveRecorder:
         except Exception as error:
             details = getattr(error, "details", {"message": str(error)})
             run_wide = self.request_error_scope == "run" or isinstance(error, ProtectionViolation) or str(error) in {
-                "Run deadline reached",
-                "Run budget reservation would exceed the ledger ceiling",
                 "Provider total tokens disagree with input plus output",
-                "Provider usage exceeded reservation; stop rather than silently expand it",
                 "Provider-reported model revision differs from the ledger",
             }
             if run_wide:
@@ -419,10 +391,6 @@ class LiveRecorder:
                 raise ProtectionViolation("A finished trial cannot issue another request")
             if trial["failure"] is not None:
                 raise TrialRequestBlocked(trial_id, trial["failure"])
-            if len(source) > limits["max_request_bytes"]:
-                raise ValueError("Request size limit reached")
-            if trial["calls"] >= limits["max_calls_per_trial"]:
-                raise TrialCallLimitReached("Provider call limit reached")
             self.sequence += 1
             request_number = self.sequence
             trial["calls"] += 1
@@ -473,8 +441,6 @@ class LiveRecorder:
         outgoing = self.serialize(transformed)
         (directory / "after.json").write_bytes(outgoing)
         proof = guard.verify_serialized(outgoing)
-        if len(outgoing) > limits["max_request_bytes"]:
-            raise ValueError("Transformed request exceeds the size cap")
         input_measurement = {
             "kind": "calculated", "before": counts(payload, originals, self.encoder),
             "after": counts(transformed, [result.text for result in compressed], self.encoder),
@@ -496,29 +462,22 @@ class LiveRecorder:
                     "after_sha256": digest(result.text.encode()), **segment,
                     "before_lines": len(original.splitlines()), "after_lines": len(result.text.splitlines()),
                 })
-        output_cap = payload["max_completion_tokens"]
-        input_reservation = len(outgoing) + limits["protocol_token_allowance"]
-        reservation = (input_reservation * prices["input_per_million_usd"] + output_cap * prices["output_per_million_usd"]) / 1_000_000
-        rate_estimate = token_count(outgoing.decode(), self.encoder) + output_cap + limits["protocol_token_allowance"]
-        for attempt in range(1, limits["max_attempts_per_call"] + 1):
-            with self.lock:
-                self.check()
-                if self.budget_used_usd + reservation > limits["api_cost_usd"]:
-                    raise ValueError("Run budget reservation would exceed the ledger ceiling")
-                self.budget_used_usd += reservation
+        local_input_tokens = token_count(outgoing.decode(), self.encoder)
+        input_cost_estimate = local_input_tokens * prices["input_per_million_usd"] / 1_000_000
+        rate_estimate = max(1, local_input_tokens)
+        for attempt in range(1, limits["transient_http_attempts"] + 1):
             try:
-                waited = self.queue.reserve(rate_estimate, self.stopped, self.deadline)
+                waited = self.queue.reserve(rate_estimate, self.stopped)
                 guard.verify_serialized(outgoing)
                 self.check()
             except Exception:
-                with self.lock:
-                    self.budget_used_usd -= reservation
                 raise
             self.event({"event": "attempt_started", "trial_id": trial_id, "request": request_number,
                         "attempt": attempt, "request_sha256": digest(outgoing),
                         "local_input_tokens": input_measurement["after"]["message_content_tokens"],
                         "queue_wait_seconds": waited, "rate_reservation_tokens": rate_estimate,
-                        "budget_reservation_usd": reservation, "reservation_is_provider_guarantee": False})
+                        "input_cost_estimate_usd": input_cost_estimate,
+                        "input_cost_estimate_is_total_cost_bound": False})
             started = time.monotonic()
             try:
                 status, raw, headers = self.sender(outgoing)
@@ -547,7 +506,7 @@ class LiveRecorder:
                 record.update(provider_timing(response, elapsed))
                 if tokens is None:
                     self.event(record)
-                    raise ValueError("Successful response lacks valid provider usage; reservation retained")
+                    raise ValueError("Successful response lacks valid provider usage; actual cost remains unknown")
                 choices = response.get("choices")
                 if not isinstance(choices, list) or len(choices) != 1:
                     self.event({**record, "provider_usage": response.get("usage"), "tokens": tokens})
@@ -571,11 +530,10 @@ class LiveRecorder:
                                             "content_tokens": token_count(content, self.encoder), "tokenizer": "o200k_base"})
                 self.event(record)
                 with self.lock:
-                    self.budget_used_usd += (upper_cost if exact_cost is None else exact_cost) - reservation
+                    if exact_cost is not None:
+                        self.known_provider_cost_usd += exact_cost
                 if response["usage"].get("total_tokens", tokens["input_tokens"] + tokens["output_tokens"]) != tokens["input_tokens"] + tokens["output_tokens"]:
                     raise ValueError("Provider total tokens disagree with input plus output")
-                if tokens["input_tokens"] > input_reservation or tokens["output_tokens"] > output_cap or upper_cost > reservation:
-                    raise ValueError("Provider usage exceeded reservation; stop rather than silently expand it")
                 expected_model = self.ledger["model"]["reported_model"]
                 if response.get("model") != expected_model:
                     raise ValueError("Provider-reported model revision differs from the ledger")
@@ -585,11 +543,11 @@ class LiveRecorder:
                 return status, raw
             self.event(record)
             if status == 429:
-                if attempt < limits["max_attempts_per_call"]:
+                if attempt < limits["transient_http_attempts"]:
                     normalized = {key.lower(): value for key, value in headers.items()}
                     wait = float(normalized.get("retry-after", "60"))
-                    if not math.isfinite(wait) or not 0 <= wait <= limits["max_retry_wait_seconds"]:
-                        raise ValueError("Retry-After exceeds the predeclared wait limit")
+                    if not math.isfinite(wait) or wait < 0:
+                        raise ValueError("Retry-After is invalid")
                     self.queue.cooldown(wait)
                     continue
             raise ValueError(f"Provider HTTP {status}; no outer retry budget restart")
@@ -598,10 +556,6 @@ class LiveRecorder:
 
 def start_live_proxy(recorder: LiveRecorder, key: str) -> ThreadingHTTPServer:
     class Handler(BaseHTTPRequestHandler):
-        def setup(self):
-            super().setup()
-            self.connection.settimeout(min(30, recorder.ledger["limits"]["request_timeout_seconds"]))
-
         def log_message(self, *arguments):
             return
 
@@ -617,7 +571,7 @@ def start_live_proxy(recorder: LiveRecorder, key: str) -> ThreadingHTTPServer:
                 if len(self.headers.get_all("Content-Length", [])) != 1 or self.headers.get("Transfer-Encoding"):
                     raise ValueError("Ambiguous request framing")
                 length = int(self.headers.get("Content-Length", "0"))
-                if not 0 < length <= recorder.ledger["limits"]["max_request_bytes"]:
+                if length < 1:
                     raise ValueError("Invalid request length")
                 source = self.rfile.read(length)
                 if len(source) != length:
@@ -629,20 +583,7 @@ def start_live_proxy(recorder: LiveRecorder, key: str) -> ThreadingHTTPServer:
             try:
                 status, body = recorder.complete(match[1], source)
             except Exception:
-                with recorder.lock:
-                    trial = recorder.trials.get(match[1])
-                    failure = None if trial is None else trial.get("failure")
-                if failure is not None and failure.get("reason") == "TrialCallLimitReached":
-                    status = 409
-                    body = json.dumps({
-                        "error": {
-                            "type": TRIAL_CALL_LIMIT_ERROR,
-                            "code": TRIAL_CALL_LIMIT_ERROR,
-                            "message": TRIAL_CALL_LIMIT_ERROR,
-                        },
-                    }, separators=(",", ":")).encode()
-                else:
-                    status, body = 503, b'{"error":{"type":"run_stopped","message":"See private run diagnostics; later requests are blocked"}}'
+                status, body = 503, b'{"error":{"type":"run_stopped","message":"See private run diagnostics; later requests are blocked"}}'
             try:
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")

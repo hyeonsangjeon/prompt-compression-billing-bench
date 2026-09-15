@@ -41,13 +41,17 @@ LLMLINGUA_FIXTURES = [
 ]
 FIELDS = {
     "benchmark": {"name", "revision", "root_env", "tasks", "images", "verifiers"},
-    "model": {"provider", "name", "reported_model", "endpoint_env", "temperature", "reasoning_effort", "max_completion_tokens"},
-    "runner": {"harbor_version", "agent_import_path", "concurrency", "max_turns", "agent_timeout_seconds", "verifier_timeout_seconds", "setup_timeout_seconds", "trial_timeout_seconds"},
+    "model": {"provider", "name", "reported_model", "endpoint_env", "temperature", "reasoning_effort"},
+    "runner": {"harbor_version", "agent_import_path", "concurrency"},
     "measurement": {"tokenizer", "tiktoken_version", "cache_env", "table_sha256"},
     "compressor": {"name", "target", "tools"},
     "queue": {"state_path_env", "rpm", "tpm", "limits_checked_at_utc", "limits_source_reference", "deployment_isolation_reference"},
     "retrieval": {"account_url_env", "spool_root_env", "container", "prefix", "upload_timeout_seconds", "maximum_attempts", "initial_backoff_seconds", "maximum_backoff_seconds", "final_flush_seconds"},
-    "limits": {"api_cost_usd", "deadline_utc", "max_wall_seconds", "max_calls_per_trial", "request_timeout_seconds", "max_request_bytes", "max_attempts_per_call", "max_retry_wait_seconds", "protocol_token_allowance"},
+    "limits": {
+        "provider_cost_stop", "provider_call_stop", "request_size_stop",
+        "provider_http_timeout", "run_deadline_stop", "transient_http_attempts",
+        "reporting_target_utc",
+    },
     "prices": {"input_per_million_usd", "cached_input_per_million_usd", "output_per_million_usd", "source_reference", "checked_at_utc"},
     "stability": {"rule", "interim_repetitions", "interim_max_range_width", "minimum_repetitions", "maximum_repetitions", "comparison_repetitions"},
     "approval": {"execution_approved", "rule_accepted", "reference"},
@@ -66,14 +70,14 @@ def validate_native_ledger(ledger: dict) -> None:
     for section, fields in FIELDS.items():
         if not isinstance(ledger[section], dict) or set(ledger[section]) != fields:
             raise ValueError(f"Unexpected or missing [{section}] fields")
-    if type(ledger["schema_version"]) is not int or ledger["schema_version"] != 1 or ledger["mode"] != "native_candidate_compression" or ledger["conditions"] != list(CONDITIONS):
+    if type(ledger["schema_version"]) is not int or ledger["schema_version"] != 2 or ledger["mode"] != "native_candidate_compression" or ledger["conditions"] != list(CONDITIONS):
         raise ValueError("Keep the fixed none, squeez, Headroom and LLMLingua-2 comparison")
     if ledger["output_dir"] != "runs":
         raise ValueError("Native raw artifacts must stay under the private runs directory")
     for section, fields in {
         "model": {"reported_model"}, "queue": {"limits_checked_at_utc", "limits_source_reference", "deployment_isolation_reference"},
         "prices": {"source_reference", "checked_at_utc"}, "approval": {"reference"},
-        "limits": {"deadline_utc"},
+        "limits": {"reporting_target_utc"},
     }.items():
         if any(not isinstance(ledger[section][field], str) for field in fields):
             raise ValueError(f"[{section}] reference and timestamp fields must be text")
@@ -104,15 +108,7 @@ def validate_native_ledger(ledger: dict) -> None:
     ):
         if not isinstance(value, str) or not re.fullmatch(r"[A-Z][A-Z0-9_]*", value):
             raise ValueError("Store environment variable names, not credentials")
-    for section, fields in {
-        "runner": FIELDS["runner"] - {"harbor_version", "agent_import_path"},
-        "model": {"max_completion_tokens"},
-        "limits": FIELDS["limits"] - {"api_cost_usd", "deadline_utc"},
-    }.items():
-        for field in fields:
-            if type(ledger[section][field]) is not int or ledger[section][field] < 1:
-                raise ValueError(f"{section}.{field} must be a positive integer")
-    for section, fields in {"queue": {"rpm", "tpm"}, "prices": FIELDS["prices"] - {"source_reference", "checked_at_utc"}, "limits": {"api_cost_usd"}}.items():
+    for section, fields in {"queue": {"rpm", "tpm"}, "prices": FIELDS["prices"] - {"source_reference", "checked_at_utc"}}.items():
         for field in fields:
             value = ledger[section][field]
             if type(value) not in (int, float) or not math.isfinite(value) or value < 0:
@@ -151,7 +147,7 @@ def validate_native_ledger(ledger: dict) -> None:
         raise ValueError("Keep the audited squeez binary")
     if not isinstance(fixed["binary_env"], str) or not re.fullmatch(r"[A-Z][A-Z0-9_]*", fixed["binary_env"]):
         raise ValueError("Use an environment name for the reviewed squeez binary")
-    if fixed["options"] != {"invocation": "wrap_cat_input_txt", "state": "fresh_home_per_span", "timeout_seconds": 10, "output": "complete_stdout"}:
+    if fixed["options"] != {"invocation": "wrap_cat_input_txt", "state": "fresh_home_per_span", "output": "complete_stdout"}:
         raise ValueError("Changing squeez strength or hiding its metadata changes the intervention")
     if compressor["tools"]["none"] != {"version": "unavailable", "options": {}}:
         raise ValueError("The baseline is the no-op compressor")
@@ -199,11 +195,18 @@ def validate_native_ledger(ledger: dict) -> None:
         "drop_consecutive": False, "chunk_end_tokens": [".", "\n"], "device": "cpu",
         "torch_dtype": "float32", "seed": 42, "torch_threads": 8, "torch_interop_threads": 1,
         "deterministic_algorithms": True, "worker_processes_per_run": 8, "parallel_inference": True,
-        "max_input_characters": 5000, "overflow_policy": "keep_prefix_once_discard_suffix",
-        "initialize_timeout_seconds": 180, "inference_timeout_seconds": 300,
-        "pool_wait_timeout_seconds": 600,
     }:
-        raise ValueError("Keep the reviewed LLMLingua-2 rate, input cap and eight-worker CPU profile")
+        raise ValueError("Keep the reviewed LLMLingua-2 rate and eight-worker CPU profile")
+    if ledger["limits"] != {
+        "provider_cost_stop": "none",
+        "provider_call_stop": "none",
+        "request_size_stop": "provider_enforced_only",
+        "provider_http_timeout": "none",
+        "run_deadline_stop": "none",
+        "transient_http_attempts": 3,
+        "reporting_target_utc": "2026-09-16T14:59:00+00:00",
+    }:
+        raise ValueError("Keep the delegated no-cost, no-call-count, no-size, no-time-stop policy")
 
 
 def require_operational_values(ledger: dict) -> float:
@@ -212,12 +215,12 @@ def require_operational_values(ledger: dict) -> float:
     queue, prices = ledger["queue"], ledger["prices"]
     if not queue["rpm"] or not queue["tpm"] or not queue["deployment_isolation_reference"].strip():
         raise ValueError("Verify deployment quotas and coordination with other callers")
-    if not ledger["limits"]["api_cost_usd"] or not prices["input_per_million_usd"] or not prices["output_per_million_usd"] or not prices["source_reference"].strip():
-        raise ValueError("Provide the remaining budget and verified rates, not example zeros")
-    deadline = datetime.fromisoformat(ledger["limits"]["deadline_utc"])
+    if not prices["input_per_million_usd"] or not prices["output_per_million_usd"] or not prices["source_reference"].strip():
+        raise ValueError("Provide verified rates for measurement")
+    reporting_target = datetime.fromisoformat(ledger["limits"]["reporting_target_utc"])
     checked_at = datetime.fromisoformat(prices["checked_at_utc"])
-    if deadline.utcoffset() is None or deadline.utcoffset().total_seconds() != 0 or checked_at.tzinfo is None:
-        raise ValueError("Use an explicit UTC deadline and timezone-aware rate-check timestamp")
-    if deadline <= datetime.now(timezone.utc) or checked_at > datetime.now(timezone.utc):
-        raise ValueError("Deadline expired or rate-check timestamp is in the future")
-    return deadline.timestamp()
+    if reporting_target.utcoffset() is None or reporting_target.utcoffset().total_seconds() != 0 or checked_at.tzinfo is None:
+        raise ValueError("Use an explicit UTC reporting target and timezone-aware rate-check timestamp")
+    if checked_at > datetime.now(timezone.utc):
+        raise ValueError("Rate-check timestamp is in the future")
+    return reporting_target.timestamp()

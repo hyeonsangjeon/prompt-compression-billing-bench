@@ -322,7 +322,7 @@ class PreservingDockerEnvironment(DockerEnvironment):
         arguments: list[str],
         *,
         input_bytes: bytes | None = None,
-        timeout: int = 300,
+        timeout: int | None = None,
         check: bool = True,
     ) -> tuple[int, bytes]:
         return_code, stdout, stderr = await self._command_streams(
@@ -335,7 +335,7 @@ class PreservingDockerEnvironment(DockerEnvironment):
         arguments: list[str],
         *,
         input_bytes: bytes | None = None,
-        timeout: int = 300,
+        timeout: int | None = None,
         check: bool = True,
     ) -> tuple[int, bytes, bytes]:
         process = await asyncio.create_subprocess_exec(
@@ -372,7 +372,6 @@ class PreservingDockerEnvironment(DockerEnvironment):
         return await self._command_streams(
             arguments,
             input_bytes=nul_path_payload(paths, relative=True),
-            timeout=600,
             check=False,
         )
 
@@ -394,7 +393,6 @@ class PreservingDockerEnvironment(DockerEnvironment):
         return await self._command_streams(
             arguments,
             input_bytes=nul_path_payload(paths, relative=True),
-            timeout=600,
             check=False,
         )
 
@@ -454,7 +452,6 @@ done
         return_code, output = await self._command(
             ["docker", "cp", "-", f"{container_id}:/"],
             input_bytes=payload,
-            timeout=600,
             check=False,
         )
         if return_code != 0:
@@ -464,7 +461,7 @@ done
 
     async def _archive_path(self, container_id: str, source: str) -> tuple[int, bytes]:
         return await self._command(
-            ["docker", "cp", f"{container_id}:{source}", "-"], timeout=600, check=False
+            ["docker", "cp", f"{container_id}:{source}", "-"], check=False
         )
 
     async def _copy_path(self, container_id: str, source: str, target: Path) -> dict:
@@ -646,7 +643,7 @@ done
         root.mkdir(parents=True, exist_ok=True)
         directory = root / self._safe_name(self.session_id)
         directory.mkdir(exist_ok=False)
-        compose = await self._run_docker_compose_command(["ps", "-aq"], check=False, timeout_sec=30)
+        compose = await self._run_docker_compose_command(["ps", "-aq"], check=False, timeout_sec=None)
         container_ids = sorted(line.strip() for line in (compose.stdout or "").splitlines() if line.strip())
         containers = []
         error = None
@@ -715,7 +712,7 @@ done
             raise RuntimeError("Could not create a replay parent directory")
         code, output = await self._command(
             ["docker", "cp", "-", f"{container_id}:{parent}"], input_bytes=installation,
-            timeout=600, check=False,
+            check=False,
         )
         if code != 0:
             message = output.decode(errors="replace").strip()

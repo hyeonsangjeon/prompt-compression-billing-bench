@@ -20,8 +20,12 @@ class ScreeningCostTests(unittest.TestCase):
         result = provider_cost(events, "attempt-a")
         self.assertIsNone(result["calculated_cost_usd"])
         self.assertEqual((result["known_cost_usd"], result["unknown_attempts"]), (0, 1))
-        self.assertEqual(result["conservative_unknown_reservation_usd"], 0.25)
-        self.assertEqual(result["budget_accounted_cost_usd"], 0.25)
+        self.assertEqual(result["unconfirmed_cost_estimate_usd"], 0.25)
+        self.assertEqual(result["unknown_attempts_without_estimate"], 0)
+        self.assertEqual(
+            result["requests"][0]["estimate_basis"],
+            "legacy_budget_reservation_with_output_cap",
+        )
 
     def test_active_vm_cost_is_shared_only_during_overlap(self):
         result = allocate_active_vm_cost([

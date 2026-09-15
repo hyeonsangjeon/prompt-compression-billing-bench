@@ -1,4 +1,4 @@
-schema_version = 1
+schema_version = 2
 mode = "terminal_bench_screening"
 output_dir = "runs"
 raw_retrieval = "not_exposed_to_agent"
@@ -24,18 +24,12 @@ reported_model = "gpt-5.4-2026-03-05"
 endpoint_env = "FOUNDRY_ENDPOINT"
 temperature = 0
 reasoning_effort = "none"
-max_completion_tokens = 2048
 
 [runner]
 harbor_version = "0.22.0"
 agent_import_path = "src.harbor_agent:ObservedTerminus2"
 environment_import_path = "src.replay_environment:PreservingDockerEnvironment"
 concurrency = 8
-max_turns = 60
-agent_timeout_seconds = 900
-verifier_timeout_seconds = 900
-setup_timeout_seconds = 600
-trial_timeout_seconds = 2400
 
 [measurement]
 tokenizer = "o200k_base"
@@ -63,15 +57,13 @@ maximum_backoff_seconds = 60
 final_flush_seconds = 600
 
 [limits]
-api_cost_usd = 0
-deadline_utc = "2026-09-17T00:00:00+00:00"
-max_wall_seconds = 161928
-max_calls_per_trial = 60
-request_timeout_seconds = 300
-max_request_bytes = 8000000
-max_attempts_per_call = 3
-max_retry_wait_seconds = 120
-protocol_token_allowance = 4096
+provider_cost_stop = "none"
+provider_call_stop = "none"
+request_size_stop = "provider_enforced_only"
+provider_http_timeout = "none"
+run_deadline_stop = "none"
+transient_http_attempts = 3
+reporting_target_utc = "2026-09-16T14:59:00+00:00"
 
 [prices]
 input_per_million_usd = 2.5

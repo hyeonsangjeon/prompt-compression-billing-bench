@@ -1,4 +1,5 @@
 from contextlib import nullcontext
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import io
 import json
@@ -14,9 +15,10 @@ from src.screening_run import (
     _carried_continuation_records,
     _classify_attempt,
     _completed_attempt_evidence,
+    _legacy_policy_transition,
+    _no_limit_reuse_decision,
     _reported_task_id,
     _stage_checkpoint,
-    _verified_provider_budget_record,
     _verify_completed_batch,
     main,
     screening_harbor_config,
@@ -71,7 +73,7 @@ class ScreeningRunTests(unittest.TestCase):
                 {"event": "http", "trial_id": self.attempt_id, "request": 1, "attempt": 1,
                  "status": 200, "calculated_cost_usd": 0.01},
             )
-            events[0]["budget_reservation_usd"] = 0.02
+            events[0]["input_cost_estimate_usd"] = 0.02
         metrics = {"measurement_complete": complete}
         with patch("src.screening_run._transport_events", return_value=list(events)), \
              patch("src.screening_run.collect_native_outcome", return_value=outcome), \
@@ -123,7 +125,7 @@ class ScreeningRunTests(unittest.TestCase):
 
         dispatched = [{
             "event": "attempt_started", "trial_id": self.attempt_id,
-            "request": 1, "attempt": 1, "budget_reservation_usd": 0.02,
+            "request": 1, "attempt": 1, "input_cost_estimate_usd": 0.02,
         }]
         self.recorder.trials[self.attempt_id]["failure"] = {
             "reason": "TimeoutError", "details": {"message": "synthetic"},
@@ -139,13 +141,6 @@ class ScreeningRunTests(unittest.TestCase):
         }
         disconnected = self.classify(quality_outcome(), events=dispatched)
         self.assertEqual(disconnected["result"], "network_error")
-
-        self.recorder.trials[self.attempt_id]["failure"] = {
-            "reason": "TrialCallLimitReached", "details": {"message": "synthetic"},
-        }
-        call_limited = self.classify(quality_outcome(reward=0, valid=True), events=dispatched)
-        self.assertEqual(call_limited["result"], "wrong_answer")
-        self.assertTrue(call_limited["provider_call_limit_reached"])
 
         self.recorder.trials[self.attempt_id]["failure"] = {
             "reason": "ClientDisconnectedAfterDispatch",
@@ -185,7 +180,7 @@ class ScreeningRunTests(unittest.TestCase):
                 "trial_id": self.attempt_id,
                 "request": 1,
                 "attempt": 1,
-                "budget_reservation_usd": 0.075,
+                "input_cost_estimate_usd": 0.075,
             },
             {
                 "event": "http",
@@ -230,7 +225,7 @@ class ScreeningRunTests(unittest.TestCase):
         )
         self.assertEqual(classified["provider_cost"]["known_cost_usd"], 0)
         self.assertEqual(
-            classified["provider_cost"]["conservative_unknown_reservation_usd"], 0.075
+            classified["provider_cost"]["unconfirmed_cost_estimate_usd"], 0.075
         )
 
         ledger = load_screening_ledger(ROOT / "ledgers/screening.template.toml")
@@ -418,7 +413,7 @@ class ScreeningRunTests(unittest.TestCase):
             "provider_request_count": 2,
             "provider_known_cost_usd": 0.2,
             "provider_unknown_requests": 0,
-            "provider_reserved_unknown_usd": 0,
+            "provider_unconfirmed_estimate_usd": 0,
             "active_vm_cost_usd": 0.1,
             "blob_network_cost_usd": 0.001,
             "direct_cost_usd": 0.301,
@@ -434,12 +429,10 @@ class ScreeningRunTests(unittest.TestCase):
             "source_diff_sha256": "e" * 64,
             "prior_active_vm_cost_usd": 0.1,
             "prior_blob_network_cost_usd": 0.001,
-            "provider_ceiling_usd": 10.0,
             "prior_provider_known_cost_usd": 0.2,
             "prior_provider_unknown_requests": 0,
-            "prior_provider_reserved_unknown_usd": 0,
-            "remaining_provider_budget_usd": 9.8,
-            "provider_budget_record_sha256": "f" * 64,
+            "prior_provider_unconfirmed_estimate_usd": 0,
+            "prior_provider_unknown_without_estimate": 0,
         }
         first_state.link_continuation(first_lineage, [record])
 
@@ -535,11 +528,13 @@ class ScreeningRunTests(unittest.TestCase):
                 },
                 "evidence_timing": timing,
                 "provider_cost": {
+                    "http_attempts": 1,
                     "calculated_cost_usd": 0.1,
                     "known_cost_usd": 0.1,
                     "unknown_attempts": 0,
-                    "unknown_attempts_without_reservation": 0,
-                    "conservative_unknown_reservation_usd": 0,
+                    "unconfirmed_cost_estimate_usd": 0,
+                    "unknown_attempts_without_estimate": 0,
+                    "requests": [{}],
                 },
             },
             "active_vm_cost": {"calculated_cost_usd": 0.2},
@@ -613,46 +608,53 @@ class ScreeningRunTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertEqual(execute.call_args.kwargs["diagnostic_task_id"], "cancel-async-tasks")
 
-    def test_provider_budget_record_separates_prior_cost_from_current_remaining_budget(self):
-        ledger = load_screening_ledger(ROOT / "ledgers/screening.template.toml")
-        ledger["limits"]["api_cost_usd"] = 8.4
-        payload = {
-            "schema_version": 1,
-            "kind": "screening_provider_budget_continuation",
-            "currency": "USD",
-            "continuation_source_run_id": "screening-prior",
-            "provider_ceiling_usd": 10.0,
-            "prior_known_cost_usd": 1.2,
-            "prior_unknown_requests": 1,
-            "prior_reserved_unknown_usd": 0.4,
-            "remaining_provider_budget_usd": 8.4,
-            "diagnostic_costs_included": True,
-            "source_reference": "synthetic reviewed provider accounting",
+    def test_legacy_limit_transition_reuses_only_results_unaffected_by_removed_limits(self):
+        current = load_screening_ledger(ROOT / "ledgers/screening.template.toml")
+        legacy = deepcopy(current)
+        legacy["schema_version"] = 1
+        legacy["model"]["max_completion_tokens"] = 2048
+        legacy["runner"].update({
+            "max_turns": 60,
+            "agent_timeout_seconds": 900,
+            "verifier_timeout_seconds": 900,
+            "setup_timeout_seconds": 600,
+            "trial_timeout_seconds": 2400,
+        })
+        legacy["limits"] = {
+            "api_cost_usd": 300,
+            "deadline_utc": "2026-09-17T00:00:00+00:00",
+            "max_wall_seconds": 161928,
+            "max_calls_per_trial": 60,
+            "request_timeout_seconds": 300,
+            "max_request_bytes": 8_000_000,
+            "max_attempts_per_call": 3,
+            "max_retry_wait_seconds": 120,
+            "protocol_token_allowance": 4096,
         }
-        record = {**payload, "record_sha256": digest(canonical_json(payload))}
-        path = self.root / "provider-budget.json"
-        path.write_text(json.dumps(record))
-        linked = {
-            "known_cost_usd": 0.2,
-            "unknown_requests": 1,
-            "conservative_unknown_reservation_usd": 0.4,
-        }
+        removed = _legacy_policy_transition(legacy, current)
+        self.assertEqual(removed, {"max_completion_tokens": 2048, "max_calls_per_trial": 60})
 
-        self.assertEqual(
-            _verified_provider_budget_record(path, ledger, "screening-prior", linked),
-            record,
-        )
-        ledger["limits"]["api_cost_usd"] = 8.5
-        with self.assertRaisesRegex(ValueError, "remaining provider budget"):
-            _verified_provider_budget_record(path, ledger, "screening-prior", linked)
+        unaffected = _no_limit_reuse_decision({
+            "result": "pass",
+            "provider_requests": [{"logical_request": 1, "finish_reason": "stop", "tokens": {"output_tokens": 8}}],
+        }, removed)
+        self.assertTrue(unaffected["reusable"])
+        call_limited = _no_limit_reuse_decision({
+            "result": "wrong_answer",
+            "provider_requests": [{"logical_request": 60, "finish_reason": "stop", "tokens": {"output_tokens": 8}}],
+        }, removed)
+        self.assertFalse(call_limited["reusable"])
+        output_limited = _no_limit_reuse_decision({
+            "result": "wrong_answer",
+            "provider_requests": [{"logical_request": 1, "finish_reason": "length", "tokens": {"output_tokens": 2048}}],
+        }, removed)
+        self.assertFalse(output_limited["reusable"])
 
-    def test_cli_routes_read_only_continuation_with_its_budget_record(self):
+    def test_cli_routes_read_only_continuation_without_a_budget_record(self):
         ledger = self.root / "ledger.toml"
         ledger.write_bytes((ROOT / "ledgers/screening.template.toml").read_bytes())
         prior = self.root / "screening-prior"
         prior.mkdir()
-        budget = self.root / "provider-budget.json"
-        budget.write_text("{}")
         output = self.root / "screening-continuation"
         output.mkdir()
         (output / "summary.json").write_text(json.dumps({"status": "complete"}))
@@ -661,11 +663,9 @@ class ScreeningRunTests(unittest.TestCase):
             result = main([
                 str(ledger), "--source-commit", "a" * 40,
                 "--continue-from", str(prior),
-                "--provider-budget-record", str(budget),
             ])
         self.assertEqual(result, 0)
         self.assertEqual(execute.call_args.kwargs["continuation_directory"], prior.resolve())
-        self.assertEqual(execute.call_args.kwargs["provider_budget_record_path"], budget.resolve())
 
 
 if __name__ == "__main__":

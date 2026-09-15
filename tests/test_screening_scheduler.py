@@ -105,33 +105,31 @@ class ScreeningSchedulerTests(unittest.TestCase):
         trial = self.state.claim(1)[0]
         self.state.mark_provider_dispatch(trial["attempt_id"], "provider-request-1", 0.25,
                                           logical_request=1, http_attempt=1,
-                                          budget_reservation_usd=0.3)
+                                          input_cost_estimate_usd=0.3)
         self.assertEqual(self.state.provider_cost_state(), {
             "requests": 1, "known_cost_usd": 0.25, "unknown_requests": 0,
-            "conservative_unknown_reservation_usd": 0,
-            "unknown_requests_without_reservation": 0,
-            "budget_accounted_cost_usd": 0.25,
+            "unconfirmed_input_cost_estimate_usd": 0,
+            "unknown_requests_without_input_estimate": 0,
         })
         with self.assertRaises(Exception):
             self.state.mark_provider_dispatch(trial["attempt_id"], "provider-request-1", 0.25,
                                               logical_request=1, http_attempt=2,
-                                              budget_reservation_usd=0.3)
+                                              input_cost_estimate_usd=0.3)
 
     def test_unknown_provider_cost_remains_distinct_from_zero(self):
         trial = self.state.claim(1)[0]
         self.state.mark_provider_dispatch(
             trial["attempt_id"], None, None, True,
             logical_request=1, http_attempt=1,
-            budget_reservation_usd=0.4,
+            input_cost_estimate_usd=0.4,
         )
         self.assertEqual(self.state.provider_cost_state(), {
             "requests": 1, "known_cost_usd": 0, "unknown_requests": 1,
-            "conservative_unknown_reservation_usd": 0.4,
-            "unknown_requests_without_reservation": 0,
-            "budget_accounted_cost_usd": 0.4,
+            "unconfirmed_input_cost_estimate_usd": 0.4,
+            "unknown_requests_without_input_estimate": 0,
         })
 
-    def test_read_only_continuation_counts_trials_once_without_spending_the_new_budget(self):
+    def test_read_only_continuation_counts_trials_and_costs_once_without_budget_blocking(self):
         by_task = {
             trial["task_id"]: trial
             for trial in self.manifest["trials"]
@@ -147,12 +145,10 @@ class ScreeningSchedulerTests(unittest.TestCase):
             "source_diff_sha256": "e" * 64,
             "prior_active_vm_cost_usd": 0.3,
             "prior_blob_network_cost_usd": 0.002,
-            "provider_ceiling_usd": 10.0,
             "prior_provider_known_cost_usd": 1.2,
             "prior_provider_unknown_requests": 1,
-            "prior_provider_reserved_unknown_usd": 0.4,
-            "remaining_provider_budget_usd": 8.4,
-            "provider_budget_record_sha256": "f" * 64,
+            "prior_provider_unconfirmed_estimate_usd": 0.4,
+            "prior_provider_unknown_without_estimate": 0,
         }
         records = [
             {
@@ -167,7 +163,7 @@ class ScreeningSchedulerTests(unittest.TestCase):
                 "provider_request_count": 2,
                 "provider_known_cost_usd": 0.2,
                 "provider_unknown_requests": 0,
-                "provider_reserved_unknown_usd": 0,
+                "provider_unconfirmed_estimate_usd": 0,
                 "active_vm_cost_usd": 0.1,
                 "blob_network_cost_usd": 0.001,
                 "direct_cost_usd": 0.301,
@@ -186,7 +182,7 @@ class ScreeningSchedulerTests(unittest.TestCase):
                 "provider_request_count": 1,
                 "provider_known_cost_usd": 0,
                 "provider_unknown_requests": 1,
-                "provider_reserved_unknown_usd": 0.4,
+                "provider_unconfirmed_estimate_usd": 0.4,
                 "active_vm_cost_usd": 0.2,
                 "blob_network_cost_usd": 0.001,
                 "direct_cost_usd": None,
@@ -204,27 +200,25 @@ class ScreeningSchedulerTests(unittest.TestCase):
             "requests": 0,
             "known_cost_usd": 0,
             "unknown_requests": 0,
-            "conservative_unknown_reservation_usd": 0,
-            "unknown_requests_without_reservation": 0,
-            "budget_accounted_cost_usd": 0,
+            "unconfirmed_input_cost_estimate_usd": 0,
+            "unknown_requests_without_input_estimate": 0,
         })
         provider = self.state.provider_cost_state()
         self.assertEqual({key: provider[key] for key in (
             "requests", "known_cost_usd", "unknown_requests",
-            "conservative_unknown_reservation_usd", "unknown_requests_without_reservation",
+            "unconfirmed_input_cost_estimate_usd", "unknown_requests_without_input_estimate",
         )}, {
             "requests": 3,
             "known_cost_usd": 0.2,
             "unknown_requests": 1,
-            "conservative_unknown_reservation_usd": 0.4,
-            "unknown_requests_without_reservation": 0,
+            "unconfirmed_input_cost_estimate_usd": 0.4,
+            "unknown_requests_without_input_estimate": 0,
         })
-        self.assertAlmostEqual(provider["budget_accounted_cost_usd"], 0.6)
-        provider_budget = self.state.provider_budget_state()
-        self.assertEqual(provider_budget["prior_known_cost_usd"], 1.2)
-        self.assertEqual(provider_budget["prior_unknown_requests"], 1)
-        self.assertEqual(provider_budget["provider_ceiling_usd"], 10.0)
-        self.assertAlmostEqual(provider_budget["budget_accounted_cost_usd"], 1.6)
+        all_cost = self.state.all_provider_cost_state()
+        self.assertEqual(all_cost["prior_known_cost_usd"], 1.2)
+        self.assertEqual(all_cost["prior_unknown_requests"], 1)
+        self.assertEqual(all_cost["known_cost_usd"], 1.2)
+        self.assertEqual(all_cost["unconfirmed_input_cost_estimate_usd"], 0.4)
         passed = self.state.connection.execute(
             "SELECT valid_results,passes,quality_failures FROM tasks WHERE task_id=?",
             (passed_task,),
@@ -245,10 +239,11 @@ class ScreeningSchedulerTests(unittest.TestCase):
         current = claimed_by_task[passed_task]
         self.state.mark_provider_dispatch(
             current["attempt_id"], "provider-request-current", 0.1,
-            logical_request=1, http_attempt=1, budget_reservation_usd=0.2,
+            logical_request=1, http_attempt=1, input_cost_estimate_usd=0.2,
         )
-        self.assertEqual(self.state.local_provider_cost_state()["budget_accounted_cost_usd"], 0.1)
-        self.assertAlmostEqual(self.state.provider_cost_state()["budget_accounted_cost_usd"], 0.7)
+        self.assertEqual(self.state.local_provider_cost_state()["known_cost_usd"], 0.1)
+        self.assertAlmostEqual(self.state.provider_cost_state()["known_cost_usd"], 0.3)
+        self.assertAlmostEqual(self.state.all_provider_cost_state()["known_cost_usd"], 1.3)
         with self.assertRaisesRegex(ValueError, "already linked"):
             self.state.link_continuation(lineage, records)
 

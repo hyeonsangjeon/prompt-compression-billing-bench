@@ -28,7 +28,7 @@ class NativeContractTests(unittest.TestCase):
                                       ("compressor", "tools", []), ("compressor", "tools", {"squeez": [], "none": {}}),
                                       ("runner", "concurrency", 4), ("queue", "rpm", 300),
                                       ("stability", "maximum_repetitions", 30), ("approval", "rule_accepted", "yes"),
-                                      ("limits", "api_cost_usd", float("nan"))):
+                                      ("limits", "provider_cost_stop", "300")):
             ledger = deepcopy(original)
             ledger[section][field] = value
             with self.subTest(section=section, field=field), self.assertRaises(ValueError):
@@ -45,9 +45,8 @@ class NativeContractTests(unittest.TestCase):
         changed["benchmark"]["verifiers"]["nginx-request-logging"]["effective_sha256"] = "0" * 64
         with self.assertRaises(ValueError):
             validate_native_ledger(changed)
-        original["limits"]["deadline_utc"] = "2020-01-01T00:00:00+00:00"
-        with self.assertRaises(ValueError):
-            require_operational_values(original)
+        original["limits"]["reporting_target_utc"] = "2020-01-01T00:00:00+00:00"
+        self.assertGreater(require_operational_values(original), 0)
 
     @unittest.skipUnless(importlib.util.find_spec("harbor"), "Install the locked native extra for Harbor integration")
     def test_real_job_schema_accepts_one_serial_trial_inside_fixed_outer_concurrency(self):
@@ -60,6 +59,8 @@ class NativeContractTests(unittest.TestCase):
         self.assertEqual(parsed.retry.max_retries, 0)
         self.assertFalse(parsed.verifier.disable)
         self.assertEqual(parsed.agents[0].kwargs["llm_kwargs"]["num_retries"], 0)
+        self.assertNotIn("max_turns", parsed.agents[0].kwargs)
+        self.assertNotIn("max_completion_tokens", parsed.agents[0].kwargs["llm_kwargs"])
         self.assertEqual(runtime_versions()["harbor"], "0.22.0")
 
 if __name__ == "__main__":

@@ -58,7 +58,7 @@ PUBLIC_FILES = {
     "docs/eda/figures/round1/05-corpus-bias.svg", "docs/eda/figures/round1/06-api-token-calibration.svg",
     "docs/eda/figures/round2/01-task-types.svg", "docs/eda/figures/round2/02-candidate-share-by-type.svg",
     "docs/eda/figures/round2/03-input-size-by-type.svg", "docs/eda/figures/round2/04-unknown-decomposition.svg",
-    "src/baseline.py", "src/command_trace.py", "src/harbor_agent.py", "src/live_observations.py",
+    "src/baseline.py", "src/command_trace.py", "src/harbor_agent.py", "src/harbor_no_time_limits.py", "src/live_observations.py",
     "src/live_transport.py", "src/native_contract.py", "src/native_judge.py", "src/native_run.py",
     "src/llmlingua_worker.py", "src/adapter_preflight.py", "src/blob_retrieval.py", "src/prompt_intake.py", "src/task_metrics.py",
     "src/verifier_revisions.py", "verifiers/terminal-bench-2.1/nginx-request-logging/revision.json",

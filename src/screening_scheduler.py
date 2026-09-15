@@ -137,7 +137,7 @@ class ScreeningState:
           provider_request_id TEXT UNIQUE, http_status INTEGER, response_sha256 TEXT,
           input_tokens INTEGER, cached_input_tokens INTEGER, output_tokens INTEGER,
           calculated_cost_usd REAL, billing_unknown INTEGER NOT NULL DEFAULT 0,
-          budget_reservation_usd REAL NOT NULL,
+          input_cost_estimate_usd REAL,
           UNIQUE(attempt_id, logical_request, http_attempt)
         );
         CREATE TABLE IF NOT EXISTS continuation_runs (
@@ -145,11 +145,10 @@ class ScreeningState:
           prior_ledger_sha256 TEXT NOT NULL, prior_inventory_sha256 TEXT NOT NULL,
           prior_manifest_sha256 TEXT NOT NULL, source_diff_sha256 TEXT NOT NULL,
           prior_active_vm_cost_usd REAL NOT NULL, prior_blob_network_cost_usd REAL NOT NULL,
-          provider_ceiling_usd REAL NOT NULL, prior_provider_known_cost_usd REAL NOT NULL,
+          prior_provider_known_cost_usd REAL NOT NULL,
           prior_provider_unknown_requests INTEGER NOT NULL,
-          prior_provider_reserved_unknown_usd REAL NOT NULL,
-          remaining_provider_budget_usd REAL NOT NULL,
-          provider_budget_record_sha256 TEXT NOT NULL,
+          prior_provider_unconfirmed_estimate_usd REAL,
+          prior_provider_unknown_without_estimate INTEGER NOT NULL,
           linked_at TEXT NOT NULL, record_json TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS continuation_links (
@@ -159,7 +158,7 @@ class ScreeningState:
           task_id TEXT NOT NULL, repetition INTEGER NOT NULL, result TEXT NOT NULL,
           evidence_disposition TEXT NOT NULL, evidence_sha256 TEXT NOT NULL,
           provider_request_count INTEGER NOT NULL, provider_known_cost_usd REAL NOT NULL,
-          provider_unknown_requests INTEGER NOT NULL, provider_reserved_unknown_usd REAL NOT NULL,
+          provider_unknown_requests INTEGER NOT NULL, provider_unconfirmed_estimate_usd REAL,
           active_vm_cost_usd REAL NOT NULL, blob_network_cost_usd REAL NOT NULL,
           direct_cost_usd REAL, record_json TEXT NOT NULL,
           UNIQUE(prior_run_id,task_id,repetition)
@@ -247,7 +246,7 @@ class ScreeningState:
                                http_status: int | None = None, response_sha256: str | None = None,
                                input_tokens: int | None = None, cached_input_tokens: int | None = None,
                                output_tokens: int | None = None,
-                               budget_reservation_usd: float) -> None:
+                               input_cost_estimate_usd: float | None = None) -> None:
         if type(logical_request) is not int or logical_request < 1 or type(http_attempt) is not int or http_attempt < 1:
             raise ValueError("Provider request positions must be positive integers")
         for value in (input_tokens, cached_input_tokens, output_tokens):
@@ -255,12 +254,12 @@ class ScreeningState:
                 raise ValueError("Provider token counts must be nonnegative integers")
         if response_sha256 is not None and not re.fullmatch(r"[0-9a-f]{64}", response_sha256):
             raise ValueError("Provider response hash is invalid")
-        if (
-            type(budget_reservation_usd) not in (int, float)
-            or isinstance(budget_reservation_usd, bool)
-            or not 0 <= budget_reservation_usd < float("inf")
+        if input_cost_estimate_usd is not None and (
+            type(input_cost_estimate_usd) not in (int, float)
+            or isinstance(input_cost_estimate_usd, bool)
+            or not 0 <= input_cost_estimate_usd < float("inf")
         ):
-            raise ValueError("Provider budget reservation must be finite and nonnegative")
+            raise ValueError("Provider input cost estimate must be finite and nonnegative")
         with self.transaction():
             row = self.connection.execute("SELECT trial_id,state FROM attempts WHERE attempt_id=?", (attempt_id,)).fetchone()
             if row is None or row["state"] != "running":
@@ -273,11 +272,11 @@ class ScreeningState:
                 """INSERT INTO provider_requests(
                      request_key,attempt_id,logical_request,http_attempt,provider_request_id,http_status,
                      response_sha256,input_tokens,cached_input_tokens,output_tokens,calculated_cost_usd,billing_unknown,
-                     budget_reservation_usd
+                     input_cost_estimate_usd
                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (request_key, attempt_id, logical_request, http_attempt, provider_request_id, http_status,
                  response_sha256, input_tokens, cached_input_tokens, output_tokens,
-                 calculated_cost_usd, int(billing_unknown), budget_reservation_usd),
+                 calculated_cost_usd, int(billing_unknown), input_cost_estimate_usd),
             )
             self._event("provider_dispatched", trial_id=row["trial_id"], attempt_id=attempt_id,
                         details={"provider_request_id": provider_request_id, "request_key": request_key,
@@ -443,10 +442,7 @@ class ScreeningState:
                 or not 0 <= value < float("inf")
             ):
                 raise ValueError(f"Continuation lineage has an invalid {name}")
-        for name in (
-            "provider_ceiling_usd", "prior_provider_known_cost_usd",
-            "prior_provider_reserved_unknown_usd", "remaining_provider_budget_usd",
-        ):
+        for name in ("prior_provider_known_cost_usd",):
             value = lineage.get(name)
             if (
                 type(value) not in (int, float)
@@ -454,32 +450,35 @@ class ScreeningState:
                 or not 0 <= value < float("inf")
             ):
                 raise ValueError(f"Continuation lineage has an invalid {name}")
-        if (
-            type(lineage.get("prior_provider_unknown_requests")) is not int
-            or lineage["prior_provider_unknown_requests"] < 0
+        for name in ("prior_provider_unconfirmed_estimate_usd",):
+            value = lineage.get(name)
+            if value is not None and (
+                type(value) not in (int, float)
+                or isinstance(value, bool)
+                or not 0 <= value < float("inf")
+            ):
+                raise ValueError(f"Continuation lineage has an invalid {name}")
+        if any(
+            type(lineage.get(name)) is not int or lineage[name] < 0
+            for name in ("prior_provider_unknown_requests", "prior_provider_unknown_without_estimate")
         ):
             raise ValueError("Continuation lineage has an invalid prior provider unknown count")
-        if not re.fullmatch(
-            r"[0-9a-f]{64}", lineage.get("provider_budget_record_sha256", "")
-        ):
-            raise ValueError("Continuation provider budget record hash is invalid")
 
         with self.transaction():
             if self.connection.execute("SELECT COUNT(*) FROM continuation_runs").fetchone()[0]:
                 raise ValueError("Continuation evidence is already linked")
             linked_at = utc_now()
             self.connection.execute(
-                "INSERT INTO continuation_runs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO continuation_runs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     lineage["prior_run_id"], lineage["prior_source_commit"],
                     lineage["prior_ledger_sha256"], lineage["prior_inventory_sha256"],
                     lineage["prior_manifest_sha256"], lineage["source_diff_sha256"],
                     lineage["prior_active_vm_cost_usd"], lineage["prior_blob_network_cost_usd"],
-                    lineage["provider_ceiling_usd"], lineage["prior_provider_known_cost_usd"],
+                    lineage["prior_provider_known_cost_usd"],
                     lineage["prior_provider_unknown_requests"],
-                    lineage["prior_provider_reserved_unknown_usd"],
-                    lineage["remaining_provider_budget_usd"],
-                    lineage["provider_budget_record_sha256"],
+                    lineage["prior_provider_unconfirmed_estimate_usd"],
+                    lineage["prior_provider_unknown_without_estimate"],
                     linked_at, json.dumps(lineage, sort_keys=True, separators=(",", ":")),
                 ),
             )
@@ -499,7 +498,7 @@ class ScreeningState:
                         raise ValueError(f"Continuation record has an invalid {name}")
                 numeric = (
                     "provider_request_count", "provider_known_cost_usd", "provider_unknown_requests",
-                    "provider_reserved_unknown_usd", "active_vm_cost_usd", "blob_network_cost_usd",
+                    "active_vm_cost_usd", "blob_network_cost_usd",
                 )
                 if any(
                     type(record.get(name)) not in (int, float)
@@ -510,8 +509,13 @@ class ScreeningState:
                     raise ValueError("Continuation cost or request count is invalid")
                 if any(type(record[name]) is not int for name in ("provider_request_count", "provider_unknown_requests")):
                     raise ValueError("Continuation request counts must be integers")
-                if record["provider_unknown_requests"] and record["provider_reserved_unknown_usd"] <= 0:
-                    raise ValueError("Unknown continuation provider cost lacks a conservative reservation")
+                unconfirmed_estimate = record.get("provider_unconfirmed_estimate_usd")
+                if unconfirmed_estimate is not None and (
+                    type(unconfirmed_estimate) not in (int, float)
+                    or isinstance(unconfirmed_estimate, bool)
+                    or not 0 <= unconfirmed_estimate < float("inf")
+                ):
+                    raise ValueError("Continuation provider estimate is invalid")
                 direct_cost = record.get("direct_cost_usd")
                 if direct_cost is not None and (
                     type(direct_cost) not in (int, float)
@@ -551,7 +555,7 @@ class ScreeningState:
                         record["prior_attempt_id"], record["task_id"], record["repetition"], result,
                         disposition, record["evidence_sha256"], record["provider_request_count"],
                         record["provider_known_cost_usd"], record["provider_unknown_requests"],
-                        record["provider_reserved_unknown_usd"], record["active_vm_cost_usd"],
+                        record["provider_unconfirmed_estimate_usd"], record["active_vm_cost_usd"],
                         record["blob_network_cost_usd"], direct_cost,
                         json.dumps(record, sort_keys=True, separators=(",", ":")),
                     ),
@@ -629,22 +633,25 @@ class ScreeningState:
             "requests": 0,
             "known_cost_usd": 0,
             "unknown_requests": 0,
-            "conservative_unknown_reservation_usd": 0,
+            "unconfirmed_input_cost_estimate_usd": 0,
+            "unknown_requests_without_input_estimate": 0,
         }
         requests = current["requests"] + linked["requests"]
         known = current["known_cost_usd"] + linked["known_cost_usd"]
         unknown = current["unknown_requests"] + linked["unknown_requests"]
-        reserved = (
-            current["conservative_unknown_reservation_usd"]
-            + linked["conservative_unknown_reservation_usd"]
+        estimated = (
+            current["unconfirmed_input_cost_estimate_usd"]
+            + linked["unconfirmed_input_cost_estimate_usd"]
         )
         return {
             "requests": requests,
             "known_cost_usd": known,
             "unknown_requests": unknown,
-            "conservative_unknown_reservation_usd": reserved,
-            "unknown_requests_without_reservation": 0,
-            "budget_accounted_cost_usd": known + reserved,
+            "unconfirmed_input_cost_estimate_usd": estimated,
+            "unknown_requests_without_input_estimate": (
+                current["unknown_requests_without_input_estimate"]
+                + linked["unknown_requests_without_input_estimate"]
+            ),
         }
 
     def local_provider_cost_state(self) -> dict:
@@ -652,8 +659,10 @@ class ScreeningState:
             """SELECT COUNT(*) AS requests,
                       COALESCE(SUM(calculated_cost_usd),0) AS known_cost_usd,
                       COALESCE(SUM(billing_unknown),0) AS unknown_requests,
-                      COALESCE(SUM(CASE WHEN billing_unknown THEN budget_reservation_usd ELSE 0 END),0)
-                        AS conservative_unknown_reservation_usd
+                      COALESCE(SUM(CASE WHEN billing_unknown THEN input_cost_estimate_usd ELSE 0 END),0)
+                        AS unconfirmed_input_cost_estimate_usd,
+                      COALESCE(SUM(CASE WHEN billing_unknown AND input_cost_estimate_usd IS NULL THEN 1 ELSE 0 END),0)
+                        AS unknown_requests_without_input_estimate
                FROM provider_requests"""
         ).fetchone()
         return self._provider_cost_totals(current)
@@ -664,48 +673,49 @@ class ScreeningState:
             """SELECT COALESCE(SUM(provider_request_count),0) AS requests,
                       COALESCE(SUM(provider_known_cost_usd),0) AS known_cost_usd,
                       COALESCE(SUM(provider_unknown_requests),0) AS unknown_requests,
-                      COALESCE(SUM(provider_reserved_unknown_usd),0) AS conservative_unknown_reservation_usd
+                      COALESCE(SUM(provider_unconfirmed_estimate_usd),0) AS unconfirmed_input_cost_estimate_usd
+                      ,COALESCE(SUM(CASE WHEN provider_unknown_requests > 0 AND provider_unconfirmed_estimate_usd IS NULL
+                                        THEN provider_unknown_requests ELSE 0 END),0)
+                        AS unknown_requests_without_input_estimate
                FROM continuation_links"""
         ).fetchone()
         return self._provider_cost_totals(current, linked)
 
-    def provider_budget_state(self) -> dict:
+    def all_provider_cost_state(self) -> dict:
         current = self.local_provider_cost_state()
         prior = self.connection.execute(
             """SELECT COALESCE(SUM(prior_provider_known_cost_usd),0) AS known_cost_usd,
                       COALESCE(SUM(prior_provider_unknown_requests),0) AS unknown_requests,
-                      COALESCE(SUM(prior_provider_reserved_unknown_usd),0)
-                        AS conservative_unknown_reservation_usd,
-                      MAX(provider_ceiling_usd) AS provider_ceiling_usd,
-                      MIN(remaining_provider_budget_usd) AS starting_remaining_provider_budget_usd
+                      COALESCE(SUM(prior_provider_unconfirmed_estimate_usd),0)
+                        AS unconfirmed_input_cost_estimate_usd,
+                      COALESCE(SUM(prior_provider_unknown_without_estimate),0)
+                        AS unknown_requests_without_input_estimate
                FROM continuation_runs"""
         ).fetchone()
         known = prior["known_cost_usd"] + current["known_cost_usd"]
         unknown = prior["unknown_requests"] + current["unknown_requests"]
-        reserved = (
-            prior["conservative_unknown_reservation_usd"]
-            + current["conservative_unknown_reservation_usd"]
+        estimated = (
+            prior["unconfirmed_input_cost_estimate_usd"]
+            + current["unconfirmed_input_cost_estimate_usd"]
         )
         return {
             "prior_known_cost_usd": prior["known_cost_usd"],
             "prior_unknown_requests": prior["unknown_requests"],
-            "prior_conservative_unknown_reservation_usd": prior[
-                "conservative_unknown_reservation_usd"
+            "prior_unconfirmed_input_cost_estimate_usd": prior[
+                "unconfirmed_input_cost_estimate_usd"
             ],
             "current_run_known_cost_usd": current["known_cost_usd"],
             "current_run_unknown_requests": current["unknown_requests"],
-            "current_run_conservative_unknown_reservation_usd": current[
-                "conservative_unknown_reservation_usd"
+            "current_run_unconfirmed_input_cost_estimate_usd": current[
+                "unconfirmed_input_cost_estimate_usd"
             ],
             "known_cost_usd": known,
             "unknown_requests": unknown,
-            "conservative_unknown_reservation_usd": reserved,
-            "unknown_requests_without_reservation": 0,
-            "budget_accounted_cost_usd": known + reserved,
-            "provider_ceiling_usd": prior["provider_ceiling_usd"],
-            "starting_remaining_provider_budget_usd": prior[
-                "starting_remaining_provider_budget_usd"
-            ],
+            "unconfirmed_input_cost_estimate_usd": estimated,
+            "unknown_requests_without_input_estimate": (
+                prior["unknown_requests_without_input_estimate"]
+                + current["unknown_requests_without_input_estimate"]
+            ),
         }
 
     def continuation_cost_state(self) -> dict:
@@ -750,4 +760,4 @@ class ScreeningState:
                 "local_completed_attempts": costs["attempts"], "linked_completed_attempts": linked,
                 "known_attempt_cost_usd": costs["cost"], "attempts_missing_cost": costs["missing_costs"],
                 "provider": self.provider_cost_state(),
-                "provider_budget": self.provider_budget_state()}
+                "all_attempt_provider_cost": self.all_provider_cost_state()}

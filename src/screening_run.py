@@ -23,6 +23,7 @@ from accounting import now
 from .blob_retrieval import atomic_json, make_blob_spool, resume_blob_spool, retrieval_settings
 from .compressors import NoOpCompressor
 from .contracts import safe_child, save_json
+from .harbor_no_time_limits import apply_no_time_limit_policy, command as harbor_command
 from .live_observations import POLICY
 from .live_transport import DeploymentQueue, FoundrySender, LiveRecorder, ManagedIdentity, start_live_proxy
 from .measurement import load_encoder
@@ -67,23 +68,20 @@ def screening_harbor_config(
         "retry": {"max_retries": 0},
         "quiet": True,
         "environment": environment,
-        "verifier": {"override_timeout_sec": runner["verifier_timeout_seconds"], "disable": False},
+        "verifier": {"disable": False},
         "tasks": [{"path": str(path)} for path in task_paths],
         "agents": [{
             "import_path": runner["agent_import_path"],
             "model_name": "openai/" + model["name"],
-            "override_timeout_sec": runner["agent_timeout_seconds"],
-            "override_setup_timeout_sec": runner["setup_timeout_seconds"],
             "n_concurrent": concurrency,
             "kwargs": {
                 "api_base": api_base,
-                "max_turns": runner["max_turns"],
                 "enable_summarize": False,
                 "use_responses_api": False,
                 "store_all_messages": True,
                 "temperature": model["temperature"],
                 "reasoning_effort": model["reasoning_effort"],
-                "llm_kwargs": {"max_completion_tokens": model["max_completion_tokens"], "num_retries": 0},
+                "llm_kwargs": {"num_retries": 0},
             },
         }],
     }
@@ -127,13 +125,14 @@ def _queue_path(ledger: dict) -> Path:
 
 
 def screening_preflight(ledger_path: Path, source_commit: str) -> dict:
-    deadline = require_operational_screening(load_screening_ledger(ledger_path))
+    reporting_target = require_operational_screening(load_screening_ledger(ledger_path))
     ledger = load_screening_ledger(ledger_path)
     provenance, snapshots = capture(ledger_path, source_commit)
     inventory_path, inventory, task_files = _load_inventory(ledger)
     versions = runtime_versions()
     from harbor.models.job.config import JobConfig
 
+    harbor_limit_policy = apply_no_time_limit_policy()
     first_task = Path("/screening/task")
     JobConfig.model_validate(screening_harbor_config(
         ledger, [first_task], Path("/screening/jobs"), "screening-check",
@@ -142,13 +141,11 @@ def screening_preflight(ledger_path: Path, source_commit: str) -> dict:
     encoder = load_encoder(ledger["measurement"])
     retrieval = retrieval_settings(ledger, ROOT)
     endpoint = os.environ.get(ledger["model"]["endpoint_env"], "")
-    sender = FoundrySender(
-        endpoint, ledger["limits"]["request_timeout_seconds"], ManagedIdentity(), deadline=deadline
-    )
+    sender = FoundrySender(endpoint, ManagedIdentity())
     queue_path = _queue_path(ledger)
     return {
         "ledger": ledger,
-        "deadline": deadline,
+        "reporting_target": reporting_target,
         "provenance": provenance,
         "snapshots": snapshots,
         "inventory_path": inventory_path,
@@ -159,6 +156,7 @@ def screening_preflight(ledger_path: Path, source_commit: str) -> dict:
         "retrieval": retrieval,
         "sender": sender,
         "queue_path": queue_path,
+        "harbor_limit_policy": harbor_limit_policy,
     }
 
 
@@ -173,6 +171,8 @@ def _task_artifact(task: dict, ledger: dict, source_commit: str) -> dict:
         "measurement": ledger["measurement"],
         "verifiers": ledger["benchmark"]["verifiers"],
     }
+    if ledger.get("schema_version") == 2:
+        payload["limits"] = ledger["limits"]
     return {**payload, "artifact_manifest_sha256": digest(canonical_json(payload))}
 
 
@@ -230,6 +230,8 @@ def _prepare_inputs(
             "checked_at_utc": setup["ledger"]["queue"]["limits_checked_at_utc"],
             "source_reference": setup["ledger"]["queue"]["limits_source_reference"],
         },
+        "harness_stop_policy": setup["ledger"]["limits"],
+        "harbor_limit_policy": setup["harbor_limit_policy"],
         "verifier_replay": "same_preserved_state_one_additional_verifier_execution_no_model_call",
         "execution_scope": execution_scope or {
             "kind": "formal_terminal_bench_screening",
@@ -297,7 +299,6 @@ def _explicit_provider_rejection(provider: dict, request_failure: dict | None, r
         and rejected
         and replay is not None
         and replay.get("capture_phase") == "teardown_without_verifier"
-        and provider.get("unknown_attempts_without_reservation") == 0
     )
 
 
@@ -431,10 +432,6 @@ def _classify_attempt(attempt: dict, process: dict, recorder: LiveRecorder, tran
     dispatched = provider["http_attempts"] > 0
     with recorder.lock:
         request_failure = recorder.trials[attempt_id]["failure"]
-    call_limit_reached = (
-        request_failure is not None
-        and request_failure.get("reason") == "TrialCallLimitReached"
-    )
     outcome = collect_native_outcome(job, process=process, transport_failure=None)
     completed_process = not process["timed_out"] and not process["stopped_by_guard"] and process["returncode"] == 0
     metrics = collect_trial_metrics(job, transport, attempt_id, process_complete=completed_process)
@@ -454,7 +451,7 @@ def _classify_attempt(attempt: dict, process: dict, recorder: LiveRecorder, tran
         result = "timeout"
     elif native_timeout:
         result = "timeout"
-    elif request_failure is not None and not call_limit_reached:
+    elif request_failure is not None:
         reason = request_failure["reason"]
         result = "network_error" if reason in {
             "TimeoutError", "ConnectionError", "OSError", "ClientDisconnectedAfterDispatch",
@@ -530,14 +527,11 @@ def _classify_attempt(attempt: dict, process: dict, recorder: LiveRecorder, tran
             "original_error_recorded": (
                 request_failure is not None or terminal_session_exit is not None
             ),
-            "provider_cost_or_reservation_complete": (
-                provider.get("unknown_attempts_without_reservation") == 0
-            ),
+            "provider_accounting_recorded": len(provider.get("requests") or []) == provider.get("http_attempts"),
             "terminal_session_exit": terminal_session_exit,
         },
         "verifier_test_ids": test_ids,
         "request_failure": request_failure,
-        "provider_call_limit_reached": call_limit_reached,
     }
 
 
@@ -559,7 +553,7 @@ def _run_attempt(
         preserve_for_replay=True,
     )
     save_json(attempt_directory / "harbor-config.json", config)
-    command = [str(Path(sys.executable).with_name("harbor")), "run", "--config", str(attempt_directory / "harbor-config.json")]
+    command = harbor_command("run", "--config", str(attempt_directory / "harbor-config.json"))
 
     def started(process_id: int) -> None:
         state = ScreeningState(state_path)
@@ -587,7 +581,6 @@ def _run_attempt(
             command,
             attempt_directory / "harbor.log",
             recorder,
-            ledger["runner"]["trial_timeout_seconds"],
             runtime_environment(key),
             on_start=started,
         )
@@ -619,7 +612,7 @@ def _record_provider_requests(state: ScreeningState, attempt_id: str, provider: 
             input_tokens=tokens.get("input_tokens"),
             cached_input_tokens=tokens.get("cached_input_tokens"),
             output_tokens=tokens.get("output_tokens"),
-            budget_reservation_usd=request["budget_reservation_usd"],
+            input_cost_estimate_usd=request.get("unconfirmed_cost_estimate_usd"),
         )
 
 
@@ -711,8 +704,7 @@ def _attempt_intervals(completed: list[dict]) -> list[dict]:
 
 
 def _run_cost_summary(directory: Path, state: ScreeningState, retrieval: dict, ledger: dict) -> dict:
-    provider_state = state.provider_cost_state()
-    provider_budget = state.provider_budget_state()
+    provider_state = state.all_provider_cost_state()
     continuation_cost = state.continuation_cost_state()
     provider = {
         "kind": "provider_usage_times_fixed_rates_not_invoice_reconciliation",
@@ -720,13 +712,12 @@ def _run_cost_summary(directory: Path, state: ScreeningState, retrieval: dict, l
         "requests": provider_state["requests"],
         "known_cost_usd": provider_state["known_cost_usd"],
         "unknown_attempts": provider_state["unknown_requests"],
-        "conservative_unknown_reservation_usd": provider_state[
-            "conservative_unknown_reservation_usd"
+        "unconfirmed_input_cost_estimate_usd": provider_state[
+            "unconfirmed_input_cost_estimate_usd"
         ],
-        "unknown_attempts_without_reservation": provider_state[
-            "unknown_requests_without_reservation"
+        "unknown_attempts_without_input_estimate": provider_state[
+            "unknown_requests_without_input_estimate"
         ],
-        "budget_accounted_cost_usd": provider_state["budget_accounted_cost_usd"],
         "calculated_cost_usd": (
             provider_state["known_cost_usd"] if provider_state["unknown_requests"] == 0 else None
         ),
@@ -781,13 +772,6 @@ def _run_cost_summary(directory: Path, state: ScreeningState, retrieval: dict, l
     return {
         "kind": "screening_direct_attributable_variable_cost",
         "provider": provider,
-        "provider_budget": {
-            "kind": "screening_wide_provider_cost_and_conservative_unknown_reservations",
-            "currency": "USD",
-            **provider_budget,
-            "current_run_ledger_ceiling_usd": ledger["limits"]["api_cost_usd"],
-            "linked_formal_attempt_cost_is_not_added_twice": True,
-        },
         "active_vm": vm,
         "blob_and_network": blob,
         "combined": combined_direct_cost(provider, vm, blob),
@@ -888,13 +872,10 @@ def _completed_attempt_evidence(record: dict, retrieval_record: dict | None, led
         and retrieval_record.get("remote_verified_at") is not None
     )
     provider = classification.get("provider_cost") or {}
-    provider_cost_complete = (
-        provider.get("calculated_cost_usd") is not None
-        or (
-            provider.get("unknown_attempts", 0) > 0
-            and provider.get("unknown_attempts_without_reservation") == 0
-            and provider.get("conservative_unknown_reservation_usd", 0) > 0
-        )
+    provider_accounting_complete = (
+        type(provider.get("http_attempts")) is int
+        and provider["http_attempts"] >= 0
+        and len(provider.get("requests") or []) == provider["http_attempts"]
     )
     vm = record.get("active_vm_cost") or {}
     active_vm_cost_complete = _measured_seconds(vm.get("calculated_cost_usd"))
@@ -910,7 +891,7 @@ def _completed_attempt_evidence(record: dict, retrieval_record: dict | None, led
         except (KeyError, TypeError, ValueError):
             blob = None
     blob_cost_complete = blob is not None and blob.get("calculated_cost_usd") is not None
-    cost_complete = provider_cost_complete and active_vm_cost_complete and blob_cost_complete
+    cost_accounting_complete = provider_accounting_complete and active_vm_cost_complete and blob_cost_complete
     strict_replay_complete = (
         classification.get("replay_error") is None
         and replay_checks.get("capture_status") == "complete"
@@ -951,7 +932,7 @@ def _completed_attempt_evidence(record: dict, retrieval_record: dict | None, led
     quality_result = result in QUALITY_RESULTS
     completed_evidence = (
         remote_hash_verified
-        and cost_complete
+        and cost_accounting_complete
         and (
             (strict_replay_complete and not required_timings)
             or explicit_rejection_complete
@@ -976,12 +957,12 @@ def _completed_attempt_evidence(record: dict, retrieval_record: dict | None, led
         "timing": {**timing, "upload_wall_seconds": upload_seconds},
         "missing_timing_fields": required_timings,
         "not_applicable_timing_fields": not_applicable_timings,
-        "cost_complete": cost_complete,
+        "cost_accounting_complete": cost_accounting_complete,
         "cost": {
             "provider_calculated_cost_usd": provider.get("calculated_cost_usd"),
             "provider_known_cost_usd": provider.get("known_cost_usd"),
-            "provider_conservative_unknown_reservation_usd": provider.get(
-                "conservative_unknown_reservation_usd"
+            "provider_unconfirmed_cost_estimate_usd": provider.get(
+                "unconfirmed_cost_estimate_usd"
             ),
             "active_vm_calculated_cost_usd": vm.get("calculated_cost_usd"),
             "blob_and_network_calculated_cost_usd": (
@@ -1051,108 +1032,37 @@ def _continuation_file(directory: Path, relative: str) -> Path:
     return path
 
 
-def _verified_provider_budget_record(
-    path: Path,
-    ledger: dict,
-    prior_run_id: str,
-    linked_provider: dict,
-) -> dict:
-    if path.is_symlink() or not path.is_file():
-        raise ValueError("Provider budget continuation record is missing or unsafe")
-    try:
-        value = json.loads(path.read_bytes())
-    except (OSError, TypeError, ValueError, json.JSONDecodeError) as error:
-        raise ValueError("Provider budget continuation record is not valid JSON") from error
-    fields = {
-        "schema_version", "kind", "currency", "continuation_source_run_id",
-        "provider_ceiling_usd", "prior_known_cost_usd", "prior_unknown_requests",
-        "prior_reserved_unknown_usd", "remaining_provider_budget_usd",
-        "diagnostic_costs_included", "source_reference", "record_sha256",
-    }
-    if not isinstance(value, dict) or set(value) != fields:
-        raise ValueError("Provider budget continuation record fields differ")
-    if (
-        value["schema_version"] != 1
-        or value["kind"] != "screening_provider_budget_continuation"
-        or value["currency"] != "USD"
-        or value["continuation_source_run_id"] != prior_run_id
-        or value["diagnostic_costs_included"] is not True
-        or not isinstance(value["source_reference"], str)
-        or not value["source_reference"].strip()
-    ):
-        raise ValueError("Provider budget continuation record identity or scope differs")
-    payload = {key: item for key, item in value.items() if key != "record_sha256"}
-    if (
-        not re.fullmatch(r"[0-9a-f]{64}", value["record_sha256"])
-        or digest(canonical_json(payload)) != value["record_sha256"]
-    ):
-        raise ValueError("Provider budget continuation record hash differs")
-    for name in (
-        "provider_ceiling_usd", "prior_known_cost_usd",
-        "prior_reserved_unknown_usd", "remaining_provider_budget_usd",
-    ):
-        number = value[name]
-        if (
-            type(number) not in (int, float)
-            or isinstance(number, bool)
-            or not math.isfinite(number)
-            or number < 0
-        ):
-            raise ValueError(f"Provider budget continuation record has an invalid {name}")
-    if type(value["prior_unknown_requests"]) is not int or value["prior_unknown_requests"] < 0:
-        raise ValueError("Provider budget continuation record has an invalid unknown request count")
-    if not math.isclose(
-        value["provider_ceiling_usd"],
-        value["prior_known_cost_usd"]
-        + value["prior_reserved_unknown_usd"]
-        + value["remaining_provider_budget_usd"],
-        rel_tol=0,
-        abs_tol=1e-9,
-    ):
-        raise ValueError("Provider budget continuation arithmetic differs")
-    if not math.isclose(
-        value["remaining_provider_budget_usd"],
-        ledger["limits"]["api_cost_usd"],
-        rel_tol=0,
-        abs_tol=1e-9,
-    ):
-        raise ValueError("Current ledger does not use the recorded remaining provider budget")
-    if (
-        value["prior_known_cost_usd"] + 1e-12 < linked_provider["known_cost_usd"]
-        or value["prior_unknown_requests"] < linked_provider["unknown_requests"]
-        or value["prior_reserved_unknown_usd"] + 1e-12
-            < linked_provider["conservative_unknown_reservation_usd"]
-    ):
-        raise ValueError("Provider budget record omits linked formal screening cost")
-    return value
-
-
 def _embedded_continuation(inputs: Path, execution: dict) -> dict | None:
     claimed = execution.get("continuation_sha256")
     if claimed is None:
         return None
     continuation = json.loads(_continuation_file(inputs, "continuation.json").read_bytes())
-    provider_budget = json.loads(
-        _continuation_file(inputs, "provider-budget-continuation.json").read_bytes()
-    )
     continuation_payload = {
         key: value for key, value in continuation.items() if key != "continuation_sha256"
     }
-    provider_payload = {
-        key: value for key, value in provider_budget.items() if key != "record_sha256"
-    }
-    if (
+    valid = (
         not re.fullmatch(r"[0-9a-f]{64}", claimed)
         or continuation.get("continuation_sha256") != claimed
         or digest(canonical_json(continuation_payload)) != claimed
-        or execution.get("provider_budget_record_sha256")
-            != provider_budget.get("record_sha256")
-        or digest(canonical_json(provider_payload)) != provider_budget.get("record_sha256")
-        or continuation.get("provider_budget_record_sha256")
-            != provider_budget.get("record_sha256")
         or not isinstance(continuation.get("records"), list)
         or len(continuation["records"]) != continuation.get("linked_completed_attempts")
-    ):
+    )
+    legacy_budget_hash = continuation.get("provider_budget_record_sha256")
+    if legacy_budget_hash is not None:
+        provider_budget = json.loads(
+            _continuation_file(inputs, "provider-budget-continuation.json").read_bytes()
+        )
+        provider_payload = {
+            key: value for key, value in provider_budget.items() if key != "record_sha256"
+        }
+        valid = valid or (
+            execution.get("provider_budget_record_sha256") != legacy_budget_hash
+            or provider_budget.get("record_sha256") != legacy_budget_hash
+            or digest(canonical_json(provider_payload)) != legacy_budget_hash
+        )
+    elif execution.get("provider_budget_record_sha256") is not None:
+        valid = True
+    if valid:
         raise ValueError("Embedded screening continuation record differs")
     return continuation
 
@@ -1195,6 +1105,11 @@ def _carried_continuation_records(
             "linked_quality_result" if record["result"] in QUALITY_RESULTS
             else "linked_technical_exclusion"
         )
+        estimate_column = (
+            "provider_unconfirmed_estimate_usd"
+            if "provider_unconfirmed_estimate_usd" in row
+            else "provider_reserved_unknown_usd"
+        )
         fields = {
             "prior_trial_id": "prior_trial_id",
             "prior_attempt_id": "prior_attempt_id",
@@ -1204,7 +1119,7 @@ def _carried_continuation_records(
             "provider_request_count": "provider_request_count",
             "provider_known_cost_usd": "provider_known_cost_usd",
             "provider_unknown_requests": "provider_unknown_requests",
-            "provider_reserved_unknown_usd": "provider_reserved_unknown_usd",
+            estimate_column: estimate_column,
             "active_vm_cost_usd": "active_vm_cost_usd",
             "blob_network_cost_usd": "blob_network_cost_usd",
             "direct_cost_usd": "direct_cost_usd",
@@ -1225,13 +1140,120 @@ def _carried_continuation_records(
     return checked
 
 
+def _legacy_policy_transition(prior: dict, current: dict) -> dict:
+    if prior["schema_version"] == current["schema_version"] == 2:
+        if prior != current:
+            raise ValueError("Continuation changes the fixed no-harness-limit screening ledger")
+        return {"max_completion_tokens": None, "max_calls_per_trial": None}
+    if prior["schema_version"] != 1 or current["schema_version"] != 2:
+        raise ValueError("Unsupported screening ledger transition")
+    for name in (
+        "mode", "output_dir", "raw_retrieval", "benchmark", "measurement", "queue",
+        "retrieval", "prices", "screening", "replay", "cost", "approval",
+    ):
+        if prior[name] != current[name]:
+            raise ValueError(f"Continuation changes the fixed screening {name}")
+    prior_model = {key: value for key, value in prior["model"].items() if key != "max_completion_tokens"}
+    if prior_model != current["model"] or prior["model"]["max_completion_tokens"] != 2048:
+        raise ValueError("Continuation changes model settings beyond removing the output-token cap")
+    removed_runner_limits = {
+        "max_turns": 60,
+        "agent_timeout_seconds": 900,
+        "verifier_timeout_seconds": 900,
+        "setup_timeout_seconds": 600,
+        "trial_timeout_seconds": 2400,
+    }
+    prior_runner = {key: value for key, value in prior["runner"].items() if key not in removed_runner_limits}
+    if prior_runner != current["runner"] or any(
+        prior["runner"].get(key) != value for key, value in removed_runner_limits.items()
+    ):
+        raise ValueError("Continuation changes runner settings beyond removing harness limits")
+    limits = prior["limits"]
+    if (
+        limits.get("max_calls_per_trial") != 60
+        or limits.get("request_timeout_seconds") != 300
+        or limits.get("max_request_bytes") != 8_000_000
+        or limits.get("max_attempts_per_call") != current["limits"]["transient_http_attempts"]
+        or limits.get("max_retry_wait_seconds") != 120
+        or limits.get("protocol_token_allowance") != 4096
+        or type(limits.get("api_cost_usd")) not in (int, float)
+        or limits["api_cost_usd"] < 0
+        or type(limits.get("max_wall_seconds")) is not int
+        or limits["max_wall_seconds"] < 1
+        or not isinstance(limits.get("deadline_utc"), str)
+    ):
+        raise ValueError("Legacy screening limits differ from the reviewed removal boundary")
+    return {
+        "max_completion_tokens": prior["model"]["max_completion_tokens"],
+        "max_calls_per_trial": limits["max_calls_per_trial"],
+    }
+
+
+def _no_limit_reuse_decision(record: dict, legacy_limits: dict) -> dict:
+    reasons = []
+    requests = record.get("provider_requests") or []
+    logical_calls = {
+        request.get("logical_request") for request in requests
+        if type(request.get("logical_request")) is int
+    }
+    call_boundary = legacy_limits.get("max_calls_per_trial")
+    output_boundary = legacy_limits.get("max_completion_tokens")
+    if call_boundary is not None and logical_calls and max(logical_calls) >= call_boundary:
+        reasons.append("legacy_provider_call_boundary_reached")
+    if output_boundary is not None and any(
+        request.get("finish_reason") == "length"
+        or (
+            isinstance(request.get("tokens"), dict)
+            and type(request["tokens"].get("output_tokens")) is int
+            and request["tokens"]["output_tokens"] >= output_boundary
+        )
+        for request in requests
+    ):
+        reasons.append("legacy_output_token_boundary_reached")
+    result = record.get("result")
+    if result in {"timeout", "setup_error", "image_error", "network_error"}:
+        reasons.append("legacy_time_limit_may_have_changed_the_technical_result")
+    if record.get("provider_call_limit_reached") is True:
+        reasons.append("legacy_provider_call_stop_recorded")
+    explicit_rejection = (
+        result == "provider_error"
+        and (
+            (record.get("technical_exclusion_basis") or {}).get("kind")
+                == "explicit_provider_rejection_before_first_verifier"
+            or any(
+                type(request.get("http_status")) is int
+                and 400 <= request["http_status"] < 500
+                and request["http_status"] not in {408, 409, 429}
+                for request in requests
+            )
+        )
+    )
+    reusable_result = result in QUALITY_RESULTS or explicit_rejection
+    if not reusable_result:
+        reasons.append("result_is_not_an_unaffected_quality_result_or_explicit_provider_rejection")
+    return {
+        "reusable": not reasons,
+        "reasons": sorted(set(reasons)),
+        "logical_provider_calls": len(logical_calls),
+        "legacy_limit_impact_observed_or_possible": bool(reasons),
+    }
+
+
+def _normalize_continuation_record(record: dict) -> dict:
+    normalized = json.loads(json.dumps(record))
+    if "provider_unconfirmed_estimate_usd" not in normalized:
+        normalized["provider_unconfirmed_estimate_usd"] = normalized.pop(
+            "provider_reserved_unknown_usd", None
+        )
+    return normalized
+
+
 def _prepare_continuation(
     directory: Path,
     setup: dict,
     source_commit: str,
     manifest: dict,
     prior_directory: Path,
-    provider_budget_record_path: Path,
 ) -> dict:
     if prior_directory.is_symlink():
         raise ValueError("Continuation source directory cannot be a symlink")
@@ -1247,14 +1269,7 @@ def _prepare_continuation(
         raise ValueError("Use ordinary resume when the screening source commit has not changed")
     git(ROOT, "merge-base", "--is-ancestor", prior_commit, source_commit)
     prior_ledger = load_screening_ledger(_continuation_file(prior_inputs, "ledger.toml"))
-    current_ledger = deepcopy(setup["ledger"])
-    prior_remaining_budget = prior_ledger["limits"]["api_cost_usd"]
-    current_remaining_budget = current_ledger["limits"]["api_cost_usd"]
-    prior_ledger["limits"]["api_cost_usd"] = current_remaining_budget
-    if prior_ledger != current_ledger:
-        raise ValueError("Continuation changes the execution ledger beyond its remaining provider budget")
-    if current_remaining_budget > prior_remaining_budget:
-        raise ValueError("Continuation cannot increase the prior run provider budget")
+    legacy_limits = _legacy_policy_transition(prior_ledger, setup["ledger"])
     prior_inventory_bytes = _continuation_file(prior_inputs, "inventory.json").read_bytes()
     if prior_inventory_bytes != setup["inventory_path"].read_bytes():
         raise ValueError("Continuation changes the fixed task inventory")
@@ -1280,7 +1295,7 @@ def _prepare_continuation(
 
     prior_artifacts = json.loads(_continuation_file(prior_inputs, "task-artifacts.json").read_bytes())
     expected_artifacts = {
-        task["task_id"]: _task_artifact(task, setup["ledger"], prior_commit)
+        task["task_id"]: _task_artifact(task, prior_ledger, prior_commit)
         for task in prior_inventory["tasks"] if task["exclusion"] is None
     }
     if prior_artifacts != expected_artifacts:
@@ -1351,7 +1366,24 @@ def _prepare_continuation(
         raise ValueError("Continuation completed-attempt count differs from its summary")
 
     tasks = {task["task_id"]: task for task in prior_inventory["tasks"]}
-    records = list(carried_records)
+    records = []
+    not_reused = []
+    for carried in carried_records:
+        normalized = _normalize_continuation_record(carried)
+        decision = _no_limit_reuse_decision(normalized, legacy_limits)
+        normalized["no_limit_policy_reuse"] = decision
+        if decision["reusable"]:
+            records.append(normalized)
+        else:
+            not_reused.append({
+                "prior_trial_id": normalized["prior_trial_id"],
+                "prior_attempt_id": normalized["prior_attempt_id"],
+                "task_id": normalized["task_id"],
+                "repetition": normalized["repetition"],
+                "result": normalized["result"],
+                "evidence_sha256": normalized["evidence_sha256"],
+                "reasons": decision["reasons"],
+            })
     for row in rows:
         row = dict(row)
         attempt_id = row["attempt_id"]
@@ -1429,20 +1461,13 @@ def _prepare_continuation(
                 classification.get("request_failure") is not None
                 or terminal_session_exit is not None
             ),
-            "provider_cost_or_reservation_complete": (
-                enriched_provider["unknown_attempts_without_reservation"] == 0
+            "provider_accounting_recorded": (
+                len(enriched_provider["requests"]) == enriched_provider["http_attempts"]
             ),
             "terminal_session_exit": terminal_session_exit,
         }
         checked_record = {**attempt, "classification": classification}
         checked = _completed_attempt_evidence(checked_record, retrieval_record, setup["ledger"])
-        if not checked["evidence_complete"]:
-            raise ValueError(
-                f"Continuation attempt evidence remains incomplete: {row['task_id']} "
-                f"({','.join(checked['missing_timing_fields']) or 'non-timing evidence'})"
-            )
-        if enriched_provider["http_attempts"] >= setup["ledger"]["limits"]["max_calls_per_trial"]:
-            raise ValueError("A prior attempt reached the changed provider-call boundary and needs separate review")
         blob = blob_operation_cost(
             [retrieval_record],
             setup["ledger"]["cost"]["blob_write_per_10000_operations_usd"],
@@ -1451,7 +1476,7 @@ def _prepare_continuation(
         )
         vm_cost = attempt["active_vm_cost"]["calculated_cost_usd"]
         direct = combined_direct_cost(enriched_provider, attempt["active_vm_cost"], blob)
-        records.append({
+        candidate = {
             "prior_trial_id": row["trial_id"],
             "prior_attempt_id": attempt_id,
             "task_id": row["task_id"],
@@ -1467,8 +1492,8 @@ def _prepare_continuation(
             "provider_request_count": enriched_provider["http_attempts"],
             "provider_known_cost_usd": enriched_provider["known_cost_usd"],
             "provider_unknown_requests": enriched_provider["unknown_attempts"],
-            "provider_reserved_unknown_usd": enriched_provider[
-                "conservative_unknown_reservation_usd"
+            "provider_unconfirmed_estimate_usd": enriched_provider[
+                "unconfirmed_cost_estimate_usd"
             ],
             "provider_requests": enriched_provider["requests"],
             "active_vm_cost_usd": vm_cost,
@@ -1476,8 +1501,28 @@ def _prepare_continuation(
             "direct_cost_usd": direct["calculated_cost_usd"],
             "blob_payload_sha256": retrieval_record["payload"]["sha256"],
             "blob_remote_verified_at": retrieval_record["remote_verified_at"],
-            "source_change_boundary_reached": False,
-        })
+            "technical_exclusion_basis": classification["technical_exclusion_basis"],
+            "provider_call_limit_reached": attempt["classification"].get(
+                "provider_call_limit_reached", False
+            ),
+        }
+        decision = _no_limit_reuse_decision(candidate, legacy_limits)
+        candidate["no_limit_policy_reuse"] = decision
+        if checked["evidence_complete"] and decision["reusable"]:
+            records.append(candidate)
+        else:
+            reasons = list(decision["reasons"])
+            if not checked["evidence_complete"]:
+                reasons.append("prior_evidence_incomplete")
+            not_reused.append({
+                "prior_trial_id": candidate["prior_trial_id"],
+                "prior_attempt_id": candidate["prior_attempt_id"],
+                "task_id": candidate["task_id"],
+                "repetition": candidate["repetition"],
+                "result": candidate["result"],
+                "evidence_sha256": candidate["evidence_sha256"],
+                "reasons": sorted(set(reasons)),
+            })
 
     changed_source_files = git(
         ROOT, "diff", "--name-only", prior_commit, source_commit, "--", "src", "schemas",
@@ -1495,17 +1540,38 @@ def _prepare_continuation(
     )
     if not _measured_seconds(prior_active_vm_cost) or not _measured_seconds(prior_blob_network_cost):
         raise ValueError("Continuation source run-level VM or Blob cost is incomplete")
-    linked_provider = {
-        "known_cost_usd": sum(record["provider_known_cost_usd"] for record in records),
-        "unknown_requests": sum(record["provider_unknown_requests"] for record in records),
-        "conservative_unknown_reservation_usd": sum(
-            record["provider_reserved_unknown_usd"] for record in records
-        ),
-    }
-    provider_budget = _verified_provider_budget_record(
-        provider_budget_record_path, setup["ledger"], prior_manifest["run_id"], linked_provider
+    prior_cost = prior_summary.get("cost") or {}
+    prior_provider = prior_cost.get("provider_budget") or prior_cost.get("provider") or {}
+    prior_provider_known = prior_provider.get("known_cost_usd")
+    prior_provider_unknown = prior_provider.get("unknown_requests")
+    prior_provider_estimate = prior_provider.get(
+        "unconfirmed_input_cost_estimate_usd",
+        prior_provider.get("conservative_unknown_reservation_usd"),
     )
-    save_json(directory / "inputs" / "provider-budget-continuation.json", provider_budget)
+    prior_provider_unknown_without_estimate = prior_provider.get(
+        "unknown_requests_without_input_estimate",
+        prior_provider.get("unknown_requests_without_reservation", 0),
+    )
+    if (
+        type(prior_provider_known) not in (int, float)
+        or isinstance(prior_provider_known, bool)
+        or not math.isfinite(prior_provider_known)
+        or prior_provider_known < 0
+        or type(prior_provider_unknown) is not int
+        or prior_provider_unknown < 0
+        or type(prior_provider_unknown_without_estimate) is not int
+        or prior_provider_unknown_without_estimate < 0
+        or (
+            prior_provider_estimate is not None
+            and (
+                type(prior_provider_estimate) not in (int, float)
+                or isinstance(prior_provider_estimate, bool)
+                or not math.isfinite(prior_provider_estimate)
+                or prior_provider_estimate < 0
+            )
+        )
+    ):
+        raise ValueError("Continuation source provider accounting is incomplete or invalid")
     lineage = {
         "kind": "screening_read_only_continuation",
         "prior_run_id": prior_manifest["run_id"],
@@ -1522,21 +1588,19 @@ def _prepare_continuation(
         "source_diff_sha256": digest(source_diff),
         "prior_active_vm_cost_usd": prior_active_vm_cost,
         "prior_blob_network_cost_usd": prior_blob_network_cost,
-        "provider_ceiling_usd": provider_budget["provider_ceiling_usd"],
-        "prior_provider_known_cost_usd": provider_budget["prior_known_cost_usd"],
-        "prior_provider_unknown_requests": provider_budget["prior_unknown_requests"],
-        "prior_provider_reserved_unknown_usd": provider_budget[
-            "prior_reserved_unknown_usd"
-        ],
-        "remaining_provider_budget_usd": provider_budget["remaining_provider_budget_usd"],
-        "provider_budget_record_sha256": provider_budget["record_sha256"],
+        "prior_provider_known_cost_usd": prior_provider_known,
+        "prior_provider_unknown_requests": prior_provider_unknown,
+        "prior_provider_unconfirmed_estimate_usd": prior_provider_estimate,
+        "prior_provider_unknown_without_estimate": prior_provider_unknown_without_estimate,
         "changed_source_files": changed_source_files,
+        "prior_completed_attempts": len(rows) + len(carried_records),
         "linked_completed_attempts": len(records),
         "linked_quality_results": sum(record["result"] in QUALITY_RESULTS for record in records),
         "linked_technical_exclusions": sum(record["result"] not in QUALITY_RESULTS for record in records),
+        "not_reused_attempts": not_reused,
         "link_basis": (
-            "all_prior_completed_attempts_have_complete_preserved_evidence_and_did_not_reach_"
-            "the_changed_provider_call_boundary"
+            "only_complete_results_without_observed_or_possible_binding_from_the_removed_"
+            "call_output_or_time_limits_are_linked_once"
         ),
         "records": records,
     }
@@ -1546,7 +1610,6 @@ def _prepare_continuation(
     execution = json.loads(execution_path.read_bytes())
     execution["continuation_sha256"] = payload["continuation_sha256"]
     execution["prior_run_id"] = prior_manifest["run_id"]
-    execution["provider_budget_record_sha256"] = provider_budget["record_sha256"]
     atomic_json(execution_path, execution)
     return payload
 
@@ -1593,24 +1656,9 @@ def _resume_inputs(directory: Path, setup: dict, source_commit: str) -> tuple[di
         state.initialize(manifest)
         continuation_sha256 = execution.get("continuation_sha256")
         if continuation_sha256 is not None:
-            continuation = json.loads((inputs / "continuation.json").read_bytes())
-            provider_budget = json.loads(
-                (inputs / "provider-budget-continuation.json").read_bytes()
-            )
-            continuation_payload = {
-                key: value for key, value in continuation.items() if key != "continuation_sha256"
-            }
+            continuation = _embedded_continuation(inputs, execution)
             if (
-                not re.fullmatch(r"[0-9a-f]{64}", continuation_sha256)
-                or continuation.get("continuation_sha256") != continuation_sha256
-                or digest(canonical_json(continuation_payload)) != continuation_sha256
-                or execution.get("provider_budget_record_sha256")
-                    != provider_budget.get("record_sha256")
-                or digest(canonical_json({
-                    key: value for key, value in provider_budget.items() if key != "record_sha256"
-                })) != provider_budget.get("record_sha256")
-                or continuation.get("provider_budget_record_sha256")
-                    != provider_budget.get("record_sha256")
+                continuation is None
                 or state.summary()["linked_completed_attempts"]
                     != continuation.get("linked_completed_attempts")
             ):
@@ -1627,11 +1675,6 @@ def _resume_inputs(directory: Path, setup: dict, source_commit: str) -> tuple[di
             })
             raise ValueError(
                 "Interrupted attempts require static evidence resolution before resume; no trial was rerun"
-            )
-        provider = state.provider_cost_state()
-        if provider["unknown_requests_without_reservation"]:
-            raise ValueError(
-                "Provider cost is unknown without a conservative reservation; resume cannot enforce the budget ceiling"
             )
         spool = resume_blob_spool(
             setup["retrieval"], setup["retrieval"]["spool_root"] / manifest["run_id"], accepting=True
@@ -1699,7 +1742,6 @@ def execute_screening(
     resume_directory: Path | None = None,
     diagnostic_task_id: str | None = None,
     continuation_directory: Path | None = None,
-    provider_budget_record_path: Path | None = None,
 ) -> Path:
     setup = screening_preflight(ledger_path, source_commit)
     ledger = setup["ledger"]
@@ -1707,8 +1749,6 @@ def execute_screening(
         resume_directory, diagnostic_task_id, continuation_directory
     )) > 1:
         raise ValueError("Resume, diagnostic, and read-only continuation modes are mutually exclusive")
-    if (continuation_directory is None) != (provider_budget_record_path is None):
-        raise ValueError("Read-only continuation requires exactly one provider budget record")
     eligible_task_ids = {
         task["task_id"] for task in setup["inventory"]["tasks"] if task["exclusion"] is None
     }
@@ -1748,7 +1788,6 @@ def execute_screening(
         if continuation_directory is not None:
             continuation = _prepare_continuation(
                 directory, setup, source_commit, manifest, continuation_directory,
-                provider_budget_record_path,
             )
             state.link_continuation(continuation, continuation["records"])
         spool = make_blob_spool(
@@ -1794,10 +1833,10 @@ def execute_screening(
                     "prior_summary_sha256", "prior_retrieval_sha256", "prior_state_sha256",
                     "source_diff_sha256", "prior_active_vm_cost_usd",
                     "prior_blob_network_cost_usd", "linked_completed_attempts", "linked_quality_results",
-                    "linked_technical_exclusions", "provider_ceiling_usd",
+                    "linked_technical_exclusions",
                     "prior_provider_known_cost_usd", "prior_provider_unknown_requests",
-                    "prior_provider_reserved_unknown_usd", "remaining_provider_budget_usd",
-                    "provider_budget_record_sha256", "link_basis",
+                    "prior_provider_unconfirmed_estimate_usd",
+                    "prior_provider_unknown_without_estimate", "link_basis",
                 )
             }
     else:
@@ -1814,8 +1853,6 @@ def execute_screening(
         transport, ledger, source_commit, compressor, setup["encoder"], queue, setup["sender"],
         condition="none", evidence_kind="terminal_bench_screening", request_error_scope="trial",
     )
-    recorder.budget_used_usd = state.local_provider_cost_state()["budget_accounted_cost_usd"]
-    setup["sender"].deadline = recorder.deadline
     key = secrets.token_urlsafe(32)
     server = start_live_proxy(recorder, key)
     batch_number = 0
@@ -1874,7 +1911,7 @@ def execute_screening(
                 "run_id": run_id,
                 "completed_attempts": summary["completed_attempts"],
                 "state": summary["state"],
-                "known_provider_cost_usd": recorder.budget_used_usd,
+                "known_provider_cost_usd": summary["state"]["provider"]["known_cost_usd"],
                 "batch_evidence": batch_verification,
             }, ensure_ascii=False), flush=True)
             if not batch_verification["additional_claims_allowed"]:
@@ -1944,7 +1981,7 @@ def run_install_preflight(ledger_path: Path, source_commit: str, output: Path) -
         "http://127.0.0.1:1/no-provider/v1", preserve_for_replay=False, install_only=True,
     )
     save_json(output / "harbor-config.json", config)
-    command = [str(Path(sys.executable).with_name("harbor")), "run", "--config", str(output / "harbor-config.json")]
+    command = harbor_command("run", "--config", str(output / "harbor-config.json"))
     started = time.monotonic()
     process = subprocess.run(
         command,
@@ -1952,7 +1989,6 @@ def run_install_preflight(ledger_path: Path, source_commit: str, output: Path) -
         env=runtime_environment("preflight-no-provider"),
         stdout=(output / "harbor.log").open("wb"),
         stderr=subprocess.STDOUT,
-        timeout=setup["ledger"]["limits"]["max_wall_seconds"],
     )
     expected = {task["task_id"] for task in setup["inventory"]["tasks"] if task["exclusion"] is None}
     results = {}
@@ -1998,7 +2034,6 @@ def main(arguments=None) -> int:
     action.add_argument("--resume", type=Path)
     action.add_argument("--diagnose-task")
     action.add_argument("--continue-from", type=Path)
-    parser.add_argument("--provider-budget-record", type=Path)
     args = parser.parse_args(arguments)
     try:
         if args.check:
@@ -2020,18 +2055,12 @@ def main(arguments=None) -> int:
                 "failures": record["failures"],
             }))
             return 0 if not record["failures"] and record["return_code"] == 0 else 3
-        if (args.continue_from is None) != (args.provider_budget_record is None):
-            raise ValueError("--continue-from and --provider-budget-record must be used together")
         directory = execute_screening(
             args.ledger.resolve(), args.source_commit,
             resume_directory=None if args.resume is None else args.resume.resolve(),
             diagnostic_task_id=args.diagnose_task,
             continuation_directory=(
                 None if args.continue_from is None else args.continue_from.resolve()
-            ),
-            provider_budget_record_path=(
-                None if args.provider_budget_record is None
-                else args.provider_budget_record.resolve()
             ),
         )
         summary = json.loads((directory / "summary.json").read_bytes())
