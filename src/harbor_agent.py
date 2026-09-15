@@ -25,7 +25,10 @@ class ObservedTerminus2(Terminus2):
         try:
             return await super()._run_agent_loop(*arguments, **keywords)
         except Exception as error:
-            if TRIAL_CALL_LIMIT_ERROR not in str(error):
+            if (
+                getattr(error, "status_code", None) != 409
+                or not str(error).endswith(TRIAL_CALL_LIMIT_ERROR)
+            ):
                 raise
             self.logger.warning(
                 "Provider call limit reached; preserving the current workspace for verification"

@@ -104,23 +104,153 @@ class ScreeningSchedulerTests(unittest.TestCase):
     def test_provider_request_and_attempt_ids_are_unique(self):
         trial = self.state.claim(1)[0]
         self.state.mark_provider_dispatch(trial["attempt_id"], "provider-request-1", 0.25,
-                                          logical_request=1, http_attempt=1)
+                                          logical_request=1, http_attempt=1,
+                                          budget_reservation_usd=0.3)
         self.assertEqual(self.state.provider_cost_state(), {
             "requests": 1, "known_cost_usd": 0.25, "unknown_requests": 0,
+            "conservative_unknown_reservation_usd": 0,
+            "unknown_requests_without_reservation": 0,
+            "budget_accounted_cost_usd": 0.25,
         })
         with self.assertRaises(Exception):
             self.state.mark_provider_dispatch(trial["attempt_id"], "provider-request-1", 0.25,
-                                              logical_request=1, http_attempt=2)
+                                              logical_request=1, http_attempt=2,
+                                              budget_reservation_usd=0.3)
 
     def test_unknown_provider_cost_remains_distinct_from_zero(self):
         trial = self.state.claim(1)[0]
         self.state.mark_provider_dispatch(
             trial["attempt_id"], None, None, True,
             logical_request=1, http_attempt=1,
+            budget_reservation_usd=0.4,
         )
         self.assertEqual(self.state.provider_cost_state(), {
             "requests": 1, "known_cost_usd": 0, "unknown_requests": 1,
+            "conservative_unknown_reservation_usd": 0.4,
+            "unknown_requests_without_reservation": 0,
+            "budget_accounted_cost_usd": 0.4,
         })
+
+    def test_read_only_continuation_counts_trials_once_without_spending_the_new_budget(self):
+        by_task = {
+            trial["task_id"]: trial
+            for trial in self.manifest["trials"]
+            if trial["repetition"] == 1
+        }
+        passed_task, rejected_task = sorted(by_task)[:2]
+        lineage = {
+            "prior_run_id": "screening-prior",
+            "prior_source_commit": "b" * 40,
+            "prior_ledger_sha256": "c" * 64,
+            "prior_inventory_sha256": self.inventory["inventory_sha256"],
+            "prior_manifest_sha256": "d" * 64,
+            "source_diff_sha256": "e" * 64,
+            "prior_active_vm_cost_usd": 0.3,
+            "prior_blob_network_cost_usd": 0.002,
+            "provider_ceiling_usd": 10.0,
+            "prior_provider_known_cost_usd": 1.2,
+            "prior_provider_unknown_requests": 1,
+            "prior_provider_reserved_unknown_usd": 0.4,
+            "remaining_provider_budget_usd": 8.4,
+            "provider_budget_record_sha256": "f" * 64,
+        }
+        records = [
+            {
+                "prior_trial_id": "1" * 64,
+                "prior_attempt_id": "2" * 64,
+                "task_id": passed_task,
+                "repetition": 1,
+                "plan_index": by_task[passed_task]["plan_index"],
+                "result": "pass",
+                "evidence_disposition": "quality_result_complete",
+                "evidence_sha256": "3" * 64,
+                "provider_request_count": 2,
+                "provider_known_cost_usd": 0.2,
+                "provider_unknown_requests": 0,
+                "provider_reserved_unknown_usd": 0,
+                "active_vm_cost_usd": 0.1,
+                "blob_network_cost_usd": 0.001,
+                "direct_cost_usd": 0.301,
+                "verifier_test_ids": [],
+                "finished_at": "2026-09-15T00:00:00+00:00",
+            },
+            {
+                "prior_trial_id": "4" * 64,
+                "prior_attempt_id": "5" * 64,
+                "task_id": rejected_task,
+                "repetition": 1,
+                "plan_index": by_task[rejected_task]["plan_index"],
+                "result": "provider_error",
+                "evidence_disposition": "technical_exclusion_complete",
+                "evidence_sha256": "6" * 64,
+                "provider_request_count": 1,
+                "provider_known_cost_usd": 0,
+                "provider_unknown_requests": 1,
+                "provider_reserved_unknown_usd": 0.4,
+                "active_vm_cost_usd": 0.2,
+                "blob_network_cost_usd": 0.001,
+                "direct_cost_usd": None,
+                "verifier_test_ids": [],
+                "finished_at": "2026-09-15T00:00:01+00:00",
+            },
+        ]
+
+        self.state.link_continuation(lineage, records)
+
+        summary = self.state.summary()
+        self.assertEqual(summary["completed_attempts"], 2)
+        self.assertEqual(summary["linked_completed_attempts"], 2)
+        self.assertEqual(self.state.local_provider_cost_state(), {
+            "requests": 0,
+            "known_cost_usd": 0,
+            "unknown_requests": 0,
+            "conservative_unknown_reservation_usd": 0,
+            "unknown_requests_without_reservation": 0,
+            "budget_accounted_cost_usd": 0,
+        })
+        provider = self.state.provider_cost_state()
+        self.assertEqual({key: provider[key] for key in (
+            "requests", "known_cost_usd", "unknown_requests",
+            "conservative_unknown_reservation_usd", "unknown_requests_without_reservation",
+        )}, {
+            "requests": 3,
+            "known_cost_usd": 0.2,
+            "unknown_requests": 1,
+            "conservative_unknown_reservation_usd": 0.4,
+            "unknown_requests_without_reservation": 0,
+        })
+        self.assertAlmostEqual(provider["budget_accounted_cost_usd"], 0.6)
+        provider_budget = self.state.provider_budget_state()
+        self.assertEqual(provider_budget["prior_known_cost_usd"], 1.2)
+        self.assertEqual(provider_budget["prior_unknown_requests"], 1)
+        self.assertEqual(provider_budget["provider_ceiling_usd"], 10.0)
+        self.assertAlmostEqual(provider_budget["budget_accounted_cost_usd"], 1.6)
+        passed = self.state.connection.execute(
+            "SELECT valid_results,passes,quality_failures FROM tasks WHERE task_id=?",
+            (passed_task,),
+        ).fetchone()
+        rejected = self.state.connection.execute(
+            "SELECT state,reason FROM tasks WHERE task_id=?", (rejected_task,)
+        ).fetchone()
+        self.assertEqual(tuple(passed), (1, 1, 0))
+        self.assertEqual(tuple(rejected), ("ineligible", "provider_error"))
+
+        claimed = self.state.claim(89)
+        claimed_by_task = {trial["task_id"]: trial for trial in claimed}
+        self.assertEqual(claimed_by_task[passed_task]["repetition"], 2)
+        self.assertNotIn(rejected_task, claimed_by_task)
+        self.assertFalse({trial["trial_id"] for trial in claimed} & {
+            by_task[passed_task]["trial_id"], by_task[rejected_task]["trial_id"],
+        })
+        current = claimed_by_task[passed_task]
+        self.state.mark_provider_dispatch(
+            current["attempt_id"], "provider-request-current", 0.1,
+            logical_request=1, http_attempt=1, budget_reservation_usd=0.2,
+        )
+        self.assertEqual(self.state.local_provider_cost_state()["budget_accounted_cost_usd"], 0.1)
+        self.assertAlmostEqual(self.state.provider_cost_state()["budget_accounted_cost_usd"], 0.7)
+        with self.assertRaisesRegex(ValueError, "already linked"):
+            self.state.link_continuation(lineage, records)
 
     def test_resume_pauses_unknown_running_attempt_without_duplicate(self):
         trial = self.state.claim(1)[0]

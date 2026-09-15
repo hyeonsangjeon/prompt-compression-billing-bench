@@ -31,6 +31,14 @@ def provider_cost(events: list[dict], transport_trial_id: str) -> dict:
         known = type(value) in (int, float) and not isinstance(value, bool) and math.isfinite(value) and value >= 0
         if value is not None and not known:
             raise ValueError("Provider calculated cost is invalid")
+        reservation = dispatch.get("budget_reservation_usd")
+        if (
+            type(reservation) not in (int, float)
+            or isinstance(reservation, bool)
+            or not math.isfinite(reservation)
+            or reservation < 0
+        ):
+            raise ValueError("Provider dispatch lacks a verifiable nonnegative budget reservation")
         records.append({
             "logical_request": key[0],
             "http_attempt": key[1],
@@ -41,8 +49,11 @@ def provider_cost(events: list[dict], transport_trial_id: str) -> dict:
             "tokens": None if response is None else response.get("tokens"),
             "calculated_cost_usd": value if known else None,
             "billing_unknown": not known,
+            "budget_reservation_usd": reservation,
         })
     known = [record["calculated_cost_usd"] for record in records if not record["billing_unknown"]]
+    unknown = [record for record in records if record["billing_unknown"]]
+    reserved_unknown = sum(record["budget_reservation_usd"] for record in unknown)
     return {
         "kind": "provider_usage_times_fixed_rates_not_invoice_reconciliation",
         "currency": "USD",
@@ -51,6 +62,9 @@ def provider_cost(events: list[dict], transport_trial_id: str) -> dict:
         "unknown_attempts": len(records) - len(known),
         "known_cost_usd": sum(known),
         "calculated_cost_usd": sum(known) if len(known) == len(records) else None,
+        "conservative_unknown_reservation_usd": reserved_unknown,
+        "unknown_attempts_without_reservation": 0,
+        "budget_accounted_cost_usd": sum(known) + reserved_unknown,
         "requests": records,
     }
 

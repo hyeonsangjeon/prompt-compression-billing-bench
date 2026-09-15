@@ -137,7 +137,32 @@ class ScreeningState:
           provider_request_id TEXT UNIQUE, http_status INTEGER, response_sha256 TEXT,
           input_tokens INTEGER, cached_input_tokens INTEGER, output_tokens INTEGER,
           calculated_cost_usd REAL, billing_unknown INTEGER NOT NULL DEFAULT 0,
+          budget_reservation_usd REAL NOT NULL,
           UNIQUE(attempt_id, logical_request, http_attempt)
+        );
+        CREATE TABLE IF NOT EXISTS continuation_runs (
+          prior_run_id TEXT PRIMARY KEY, prior_source_commit TEXT NOT NULL,
+          prior_ledger_sha256 TEXT NOT NULL, prior_inventory_sha256 TEXT NOT NULL,
+          prior_manifest_sha256 TEXT NOT NULL, source_diff_sha256 TEXT NOT NULL,
+          prior_active_vm_cost_usd REAL NOT NULL, prior_blob_network_cost_usd REAL NOT NULL,
+          provider_ceiling_usd REAL NOT NULL, prior_provider_known_cost_usd REAL NOT NULL,
+          prior_provider_unknown_requests INTEGER NOT NULL,
+          prior_provider_reserved_unknown_usd REAL NOT NULL,
+          remaining_provider_budget_usd REAL NOT NULL,
+          provider_budget_record_sha256 TEXT NOT NULL,
+          linked_at TEXT NOT NULL, record_json TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS continuation_links (
+          current_trial_id TEXT PRIMARY KEY REFERENCES trials(trial_id),
+          prior_run_id TEXT NOT NULL REFERENCES continuation_runs(prior_run_id),
+          prior_trial_id TEXT NOT NULL UNIQUE, prior_attempt_id TEXT NOT NULL UNIQUE,
+          task_id TEXT NOT NULL, repetition INTEGER NOT NULL, result TEXT NOT NULL,
+          evidence_disposition TEXT NOT NULL, evidence_sha256 TEXT NOT NULL,
+          provider_request_count INTEGER NOT NULL, provider_known_cost_usd REAL NOT NULL,
+          provider_unknown_requests INTEGER NOT NULL, provider_reserved_unknown_usd REAL NOT NULL,
+          active_vm_cost_usd REAL NOT NULL, blob_network_cost_usd REAL NOT NULL,
+          direct_cost_usd REAL, record_json TEXT NOT NULL,
+          UNIQUE(prior_run_id,task_id,repetition)
         );
         CREATE TABLE IF NOT EXISTS events (
           sequence INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, event TEXT NOT NULL,
@@ -221,7 +246,8 @@ class ScreeningState:
                                *, logical_request: int = 1, http_attempt: int = 1,
                                http_status: int | None = None, response_sha256: str | None = None,
                                input_tokens: int | None = None, cached_input_tokens: int | None = None,
-                               output_tokens: int | None = None) -> None:
+                               output_tokens: int | None = None,
+                               budget_reservation_usd: float) -> None:
         if type(logical_request) is not int or logical_request < 1 or type(http_attempt) is not int or http_attempt < 1:
             raise ValueError("Provider request positions must be positive integers")
         for value in (input_tokens, cached_input_tokens, output_tokens):
@@ -229,6 +255,12 @@ class ScreeningState:
                 raise ValueError("Provider token counts must be nonnegative integers")
         if response_sha256 is not None and not re.fullmatch(r"[0-9a-f]{64}", response_sha256):
             raise ValueError("Provider response hash is invalid")
+        if (
+            type(budget_reservation_usd) not in (int, float)
+            or isinstance(budget_reservation_usd, bool)
+            or not 0 <= budget_reservation_usd < float("inf")
+        ):
+            raise ValueError("Provider budget reservation must be finite and nonnegative")
         with self.transaction():
             row = self.connection.execute("SELECT trial_id,state FROM attempts WHERE attempt_id=?", (attempt_id,)).fetchone()
             if row is None or row["state"] != "running":
@@ -240,11 +272,12 @@ class ScreeningState:
             self.connection.execute(
                 """INSERT INTO provider_requests(
                      request_key,attempt_id,logical_request,http_attempt,provider_request_id,http_status,
-                     response_sha256,input_tokens,cached_input_tokens,output_tokens,calculated_cost_usd,billing_unknown
-                   ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                     response_sha256,input_tokens,cached_input_tokens,output_tokens,calculated_cost_usd,billing_unknown,
+                     budget_reservation_usd
+                   ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (request_key, attempt_id, logical_request, http_attempt, provider_request_id, http_status,
                  response_sha256, input_tokens, cached_input_tokens, output_tokens,
-                 calculated_cost_usd, int(billing_unknown)),
+                 calculated_cost_usd, int(billing_unknown), budget_reservation_usd),
             )
             self._event("provider_dispatched", trial_id=row["trial_id"], attempt_id=attempt_id,
                         details={"provider_request_id": provider_request_id, "request_key": request_key,
@@ -389,6 +422,191 @@ class ScreeningState:
             self._event("attempt_completed", trial_id=trial["trial_id"], attempt_id=attempt_id,
                         details={"result": result, "provider_dispatched": provider_dispatched})
 
+    def link_continuation(self, lineage: dict, records: list[dict]) -> None:
+        required_lineage = {
+            "prior_run_id", "prior_source_commit", "prior_ledger_sha256",
+            "prior_inventory_sha256", "prior_manifest_sha256", "source_diff_sha256",
+        }
+        if not records or not required_lineage.issubset(lineage):
+            raise ValueError("Continuation lineage or records are incomplete")
+        for name in required_lineage - {"prior_run_id"}:
+            size = 40 if name == "prior_source_commit" else 64
+            if not re.fullmatch(rf"[0-9a-f]{{{size}}}", lineage[name]):
+                raise ValueError(f"Continuation lineage has an invalid {name}")
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]{2,127}", lineage["prior_run_id"]):
+            raise ValueError("Continuation prior run identifier is invalid")
+        for name in ("prior_active_vm_cost_usd", "prior_blob_network_cost_usd"):
+            value = lineage.get(name)
+            if (
+                type(value) not in (int, float)
+                or isinstance(value, bool)
+                or not 0 <= value < float("inf")
+            ):
+                raise ValueError(f"Continuation lineage has an invalid {name}")
+        for name in (
+            "provider_ceiling_usd", "prior_provider_known_cost_usd",
+            "prior_provider_reserved_unknown_usd", "remaining_provider_budget_usd",
+        ):
+            value = lineage.get(name)
+            if (
+                type(value) not in (int, float)
+                or isinstance(value, bool)
+                or not 0 <= value < float("inf")
+            ):
+                raise ValueError(f"Continuation lineage has an invalid {name}")
+        if (
+            type(lineage.get("prior_provider_unknown_requests")) is not int
+            or lineage["prior_provider_unknown_requests"] < 0
+        ):
+            raise ValueError("Continuation lineage has an invalid prior provider unknown count")
+        if not re.fullmatch(
+            r"[0-9a-f]{64}", lineage.get("provider_budget_record_sha256", "")
+        ):
+            raise ValueError("Continuation provider budget record hash is invalid")
+
+        with self.transaction():
+            if self.connection.execute("SELECT COUNT(*) FROM continuation_runs").fetchone()[0]:
+                raise ValueError("Continuation evidence is already linked")
+            linked_at = utc_now()
+            self.connection.execute(
+                "INSERT INTO continuation_runs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    lineage["prior_run_id"], lineage["prior_source_commit"],
+                    lineage["prior_ledger_sha256"], lineage["prior_inventory_sha256"],
+                    lineage["prior_manifest_sha256"], lineage["source_diff_sha256"],
+                    lineage["prior_active_vm_cost_usd"], lineage["prior_blob_network_cost_usd"],
+                    lineage["provider_ceiling_usd"], lineage["prior_provider_known_cost_usd"],
+                    lineage["prior_provider_unknown_requests"],
+                    lineage["prior_provider_reserved_unknown_usd"],
+                    lineage["remaining_provider_budget_usd"],
+                    lineage["provider_budget_record_sha256"],
+                    linked_at, json.dumps(lineage, sort_keys=True, separators=(",", ":")),
+                ),
+            )
+            for record in sorted(records, key=lambda item: item["plan_index"]):
+                result = record.get("result")
+                disposition = record.get("evidence_disposition")
+                if result not in QUALITY_RESULTS | PREPARATION_ERRORS | TECHNICAL_ERRORS:
+                    raise ValueError("Continuation result is unknown")
+                expected_disposition = (
+                    "quality_result_complete" if result in QUALITY_RESULTS
+                    else "technical_exclusion_complete"
+                )
+                if disposition != expected_disposition:
+                    raise ValueError("Continuation evidence disposition does not match its result")
+                for name in ("prior_trial_id", "prior_attempt_id", "evidence_sha256"):
+                    if not re.fullmatch(r"[0-9a-f]{64}", record.get(name, "")):
+                        raise ValueError(f"Continuation record has an invalid {name}")
+                numeric = (
+                    "provider_request_count", "provider_known_cost_usd", "provider_unknown_requests",
+                    "provider_reserved_unknown_usd", "active_vm_cost_usd", "blob_network_cost_usd",
+                )
+                if any(
+                    type(record.get(name)) not in (int, float)
+                    or isinstance(record[name], bool)
+                    or not 0 <= record[name] < float("inf")
+                    for name in numeric
+                ):
+                    raise ValueError("Continuation cost or request count is invalid")
+                if any(type(record[name]) is not int for name in ("provider_request_count", "provider_unknown_requests")):
+                    raise ValueError("Continuation request counts must be integers")
+                if record["provider_unknown_requests"] and record["provider_reserved_unknown_usd"] <= 0:
+                    raise ValueError("Unknown continuation provider cost lacks a conservative reservation")
+                direct_cost = record.get("direct_cost_usd")
+                if direct_cost is not None and (
+                    type(direct_cost) not in (int, float)
+                    or isinstance(direct_cost, bool)
+                    or not 0 <= direct_cost < float("inf")
+                ):
+                    raise ValueError("Continuation direct cost is invalid")
+                trial = self.connection.execute(
+                    "SELECT * FROM trials WHERE task_id=? AND repetition=? AND condition_name='none'",
+                    (record["task_id"], record["repetition"]),
+                ).fetchone()
+                if trial is None or trial["state"] != "planned":
+                    raise ValueError("Continuation target trial is absent or already scheduled")
+                task = self.connection.execute(
+                    "SELECT * FROM tasks WHERE task_id=?", (record["task_id"],)
+                ).fetchone()
+                if task is None or task["state"] != "eligible_for_screening":
+                    raise ValueError("Continuation task is not eligible for an imported result")
+                current_state = (
+                    "linked_quality_result" if result in QUALITY_RESULTS
+                    else "linked_technical_exclusion"
+                )
+                self.connection.execute(
+                    """UPDATE trials SET state=?,quality_result=?,failure_category=?,verifier_test_ids=?,
+                       finished_at=?,evidence_sha256=?,cost_usd=? WHERE trial_id=?""",
+                    (
+                        current_state, result if result in QUALITY_RESULTS else None,
+                        None if result == "pass" else result,
+                        json.dumps(record.get("verifier_test_ids") or [], separators=(",", ":")),
+                        record["finished_at"], record["evidence_sha256"], direct_cost, trial["trial_id"],
+                    ),
+                )
+                self.connection.execute(
+                    """INSERT INTO continuation_links VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (
+                        trial["trial_id"], lineage["prior_run_id"], record["prior_trial_id"],
+                        record["prior_attempt_id"], record["task_id"], record["repetition"], result,
+                        disposition, record["evidence_sha256"], record["provider_request_count"],
+                        record["provider_known_cost_usd"], record["provider_unknown_requests"],
+                        record["provider_reserved_unknown_usd"], record["active_vm_cost_usd"],
+                        record["blob_network_cost_usd"], direct_cost,
+                        json.dumps(record, sort_keys=True, separators=(",", ":")),
+                    ),
+                )
+                if result in QUALITY_RESULTS:
+                    quality_failure = int(result != "pass")
+                    self.connection.execute(
+                        """UPDATE tasks SET valid_results=valid_results+1,passes=passes+?,
+                           quality_failures=quality_failures+? WHERE task_id=?""",
+                        (int(result == "pass"), quality_failure, record["task_id"]),
+                    )
+                    task = self.connection.execute(
+                        "SELECT * FROM tasks WHERE task_id=?", (record["task_id"],)
+                    ).fetchone()
+                    if task["quality_failures"] >= 3:
+                        self.connection.execute(
+                            "UPDATE tasks SET state='ineligible',reason='third_quality_failure' WHERE task_id=?",
+                            (record["task_id"],),
+                        )
+                        self.connection.execute(
+                            """UPDATE trials SET state='cancelled_by_futility',finished_at=?
+                               WHERE task_id=? AND state='planned'""",
+                            (linked_at, record["task_id"]),
+                        )
+                    elif task["valid_results"] == 20:
+                        final_state = "eligible" if task["passes"] >= 18 else "ineligible"
+                        self.connection.execute(
+                            "UPDATE tasks SET state=?,reason=? WHERE task_id=?",
+                            (
+                                final_state,
+                                "valid_results_18_of_20" if final_state == "eligible" else "fewer_than_18_passes",
+                                record["task_id"],
+                            ),
+                        )
+                else:
+                    self.connection.execute(
+                        "UPDATE tasks SET state='ineligible',reason=? WHERE task_id=?",
+                        (result, record["task_id"]),
+                    )
+                    self.connection.execute(
+                        """UPDATE trials SET state='cancelled_after_technical_error',finished_at=?
+                           WHERE task_id=? AND state IN ('planned','retry_pending')""",
+                        (linked_at, record["task_id"]),
+                    )
+                self._event(
+                    "continuation_result_linked", trial_id=trial["trial_id"],
+                    details={
+                        "prior_run_id": lineage["prior_run_id"],
+                        "prior_trial_id": record["prior_trial_id"],
+                        "prior_attempt_id": record["prior_attempt_id"],
+                        "result": result,
+                        "evidence_disposition": disposition,
+                    },
+                )
+
     def pause_interrupted(self) -> int:
         with self.transaction():
             rows = self.connection.execute("SELECT attempt_id,trial_id FROM attempts WHERE state='running'").fetchall()
@@ -405,18 +623,104 @@ class ScreeningState:
                WHERE a.state='paused' ORDER BY tr.plan_index,a.attempt_number"""
         )]
 
-    def provider_cost_state(self) -> dict:
-        row = self.connection.execute(
+    @staticmethod
+    def _provider_cost_totals(current, linked=None) -> dict:
+        linked = linked or {
+            "requests": 0,
+            "known_cost_usd": 0,
+            "unknown_requests": 0,
+            "conservative_unknown_reservation_usd": 0,
+        }
+        requests = current["requests"] + linked["requests"]
+        known = current["known_cost_usd"] + linked["known_cost_usd"]
+        unknown = current["unknown_requests"] + linked["unknown_requests"]
+        reserved = (
+            current["conservative_unknown_reservation_usd"]
+            + linked["conservative_unknown_reservation_usd"]
+        )
+        return {
+            "requests": requests,
+            "known_cost_usd": known,
+            "unknown_requests": unknown,
+            "conservative_unknown_reservation_usd": reserved,
+            "unknown_requests_without_reservation": 0,
+            "budget_accounted_cost_usd": known + reserved,
+        }
+
+    def local_provider_cost_state(self) -> dict:
+        current = self.connection.execute(
             """SELECT COUNT(*) AS requests,
                       COALESCE(SUM(calculated_cost_usd),0) AS known_cost_usd,
-                      COALESCE(SUM(billing_unknown),0) AS unknown_requests
+                      COALESCE(SUM(billing_unknown),0) AS unknown_requests,
+                      COALESCE(SUM(CASE WHEN billing_unknown THEN budget_reservation_usd ELSE 0 END),0)
+                        AS conservative_unknown_reservation_usd
                FROM provider_requests"""
         ).fetchone()
+        return self._provider_cost_totals(current)
+
+    def provider_cost_state(self) -> dict:
+        current = self.local_provider_cost_state()
+        linked = self.connection.execute(
+            """SELECT COALESCE(SUM(provider_request_count),0) AS requests,
+                      COALESCE(SUM(provider_known_cost_usd),0) AS known_cost_usd,
+                      COALESCE(SUM(provider_unknown_requests),0) AS unknown_requests,
+                      COALESCE(SUM(provider_reserved_unknown_usd),0) AS conservative_unknown_reservation_usd
+               FROM continuation_links"""
+        ).fetchone()
+        return self._provider_cost_totals(current, linked)
+
+    def provider_budget_state(self) -> dict:
+        current = self.local_provider_cost_state()
+        prior = self.connection.execute(
+            """SELECT COALESCE(SUM(prior_provider_known_cost_usd),0) AS known_cost_usd,
+                      COALESCE(SUM(prior_provider_unknown_requests),0) AS unknown_requests,
+                      COALESCE(SUM(prior_provider_reserved_unknown_usd),0)
+                        AS conservative_unknown_reservation_usd,
+                      MAX(provider_ceiling_usd) AS provider_ceiling_usd,
+                      MIN(remaining_provider_budget_usd) AS starting_remaining_provider_budget_usd
+               FROM continuation_runs"""
+        ).fetchone()
+        known = prior["known_cost_usd"] + current["known_cost_usd"]
+        unknown = prior["unknown_requests"] + current["unknown_requests"]
+        reserved = (
+            prior["conservative_unknown_reservation_usd"]
+            + current["conservative_unknown_reservation_usd"]
+        )
         return {
-            "requests": row["requests"],
-            "known_cost_usd": row["known_cost_usd"],
-            "unknown_requests": row["unknown_requests"],
+            "prior_known_cost_usd": prior["known_cost_usd"],
+            "prior_unknown_requests": prior["unknown_requests"],
+            "prior_conservative_unknown_reservation_usd": prior[
+                "conservative_unknown_reservation_usd"
+            ],
+            "current_run_known_cost_usd": current["known_cost_usd"],
+            "current_run_unknown_requests": current["unknown_requests"],
+            "current_run_conservative_unknown_reservation_usd": current[
+                "conservative_unknown_reservation_usd"
+            ],
+            "known_cost_usd": known,
+            "unknown_requests": unknown,
+            "conservative_unknown_reservation_usd": reserved,
+            "unknown_requests_without_reservation": 0,
+            "budget_accounted_cost_usd": known + reserved,
+            "provider_ceiling_usd": prior["provider_ceiling_usd"],
+            "starting_remaining_provider_budget_usd": prior[
+                "starting_remaining_provider_budget_usd"
+            ],
         }
+
+    def continuation_cost_state(self) -> dict:
+        attempts = self.connection.execute(
+            """SELECT COUNT(*) AS attempts,
+                      COALESCE(SUM(CASE WHEN direct_cost_usd IS NULL THEN 1 ELSE 0 END),0)
+                        AS attempts_with_unknown_direct_cost
+               FROM continuation_links"""
+        ).fetchone()
+        runs = self.connection.execute(
+            """SELECT COALESCE(SUM(prior_active_vm_cost_usd),0) AS active_vm_cost_usd,
+                      COALESCE(SUM(prior_blob_network_cost_usd),0) AS blob_network_cost_usd
+               FROM continuation_runs"""
+        ).fetchone()
+        return {**dict(attempts), **dict(runs)}
 
     def backup(self, target: Path) -> None:
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -440,6 +744,10 @@ class ScreeningState:
                       COALESCE(SUM(CASE WHEN cost_usd IS NULL THEN 1 ELSE 0 END),0) AS missing_costs
                FROM attempts WHERE state='completed'"""
         ).fetchone()
-        return {"tasks": task_states, "trials": trial_states, "completed_attempts": costs["attempts"],
+        linked = self.connection.execute("SELECT COUNT(*) FROM continuation_links").fetchone()[0]
+        return {"tasks": task_states, "trials": trial_states,
+                "completed_attempts": costs["attempts"] + linked,
+                "local_completed_attempts": costs["attempts"], "linked_completed_attempts": linked,
                 "known_attempt_cost_usd": costs["cost"], "attempts_missing_cost": costs["missing_costs"],
-                "provider": self.provider_cost_state()}
+                "provider": self.provider_cost_state(),
+                "provider_budget": self.provider_budget_state()}

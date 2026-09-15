@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 from datetime import datetime, timezone
 import importlib.metadata
 import json
@@ -13,6 +14,7 @@ from pathlib import Path
 import re
 import secrets
 import shutil
+import sqlite3
 import subprocess
 import sys
 import time
@@ -282,6 +284,44 @@ def _attempt_replay(job: Path) -> tuple[dict | None, str | None]:
     return replay, None
 
 
+def _explicit_provider_rejection(provider: dict, request_failure: dict | None, replay: dict | None) -> bool:
+    requests = provider.get("requests") or []
+    rejected = [
+        request for request in requests
+        if type(request.get("http_status")) is int
+        and 400 <= request["http_status"] < 500
+        and request["http_status"] not in {408, 409, 429}
+    ]
+    return bool(
+        request_failure
+        and rejected
+        and replay is not None
+        and replay.get("capture_phase") == "teardown_without_verifier"
+        and provider.get("unknown_attempts_without_reservation") == 0
+    )
+
+
+def _evidence_timing_status(timing: dict, *, provider_rejected_before_verifier: bool) -> dict:
+    unexecuted = {
+        "first_verifier_wall_seconds",
+        "state_restore_wall_seconds",
+        "repeated_verifier_wall_seconds",
+        "restore_and_repeated_verifier_wall_seconds",
+    }
+    result = {}
+    for name, value in timing.items():
+        if _measured_seconds(value):
+            result[name] = {"status": "measured", "reason": None}
+        elif provider_rejected_before_verifier and name in unexecuted:
+            result[name] = {
+                "status": "not_applicable",
+                "reason": "explicit_provider_rejection_before_first_verifier",
+            }
+        else:
+            result[name] = {"status": "missing", "reason": "required_stage_not_measured"}
+    return result
+
+
 def _classify_attempt(attempt: dict, process: dict, recorder: LiveRecorder, transport: Path) -> dict:
     attempt_id = attempt["attempt_id"]
     job = attempt["attempt_directory"] / "jobs" / attempt_id
@@ -335,6 +375,29 @@ def _classify_attempt(attempt: dict, process: dict, recorder: LiveRecorder, tran
         failure["test"] for failure in outcome["failures"]
         if isinstance(failure, dict) and isinstance(failure.get("test"), str)
     })
+    evidence_timing = {
+        "task_process_wall_seconds": process.get("elapsed_seconds"),
+        "state_save_wall_seconds": None if replay is None else replay.get("capture_wall_seconds"),
+        "first_verifier_wall_seconds": (
+            None if replay is None else (replay.get("verifier_replay") or {}).get(
+                "original_verifier_wall_seconds"
+            )
+        ),
+        "state_restore_wall_seconds": (
+            None if replay is None else (replay.get("verifier_replay") or {}).get("restore_wall_seconds")
+        ),
+        "repeated_verifier_wall_seconds": (
+            None if replay is None else (replay.get("verifier_replay") or {}).get(
+                "repeated_verifier_wall_seconds"
+            )
+        ),
+        "restore_and_repeated_verifier_wall_seconds": (
+            None if replay is None else (replay.get("verifier_replay") or {}).get("wall_seconds")
+        ),
+    }
+    provider_rejected_before_verifier = (
+        result == "provider_error" and _explicit_provider_rejection(provider, request_failure, replay)
+    )
     return {
         "result": result,
         "provider_dispatched": dispatched,
@@ -345,27 +408,23 @@ def _classify_attempt(attempt: dict, process: dict, recorder: LiveRecorder, tran
         "replay_error": replay_error,
         "replay_checks": None if replay is None else {
             "capture_status": replay.get("status"),
+            "capture_phase": replay.get("capture_phase"),
             "state_restored": (replay.get("verifier_replay") or {}).get("state_restored"),
             "same_judgement": (replay.get("verifier_replay") or {}).get("same_judgement"),
         },
-        "evidence_timing": {
-            "task_process_wall_seconds": process.get("elapsed_seconds"),
-            "state_save_wall_seconds": None if replay is None else replay.get("capture_wall_seconds"),
-            "first_verifier_wall_seconds": (
-                None if replay is None else (replay.get("verifier_replay") or {}).get(
-                    "original_verifier_wall_seconds"
-                )
+        "evidence_timing": evidence_timing,
+        "evidence_timing_status": _evidence_timing_status(
+            evidence_timing,
+            provider_rejected_before_verifier=provider_rejected_before_verifier,
+        ),
+        "technical_exclusion_basis": {
+            "kind": (
+                "explicit_provider_rejection_before_first_verifier"
+                if provider_rejected_before_verifier else None
             ),
-            "state_restore_wall_seconds": (
-                None if replay is None else (replay.get("verifier_replay") or {}).get("restore_wall_seconds")
-            ),
-            "repeated_verifier_wall_seconds": (
-                None if replay is None else (replay.get("verifier_replay") or {}).get(
-                    "repeated_verifier_wall_seconds"
-                )
-            ),
-            "restore_and_repeated_verifier_wall_seconds": (
-                None if replay is None else (replay.get("verifier_replay") or {}).get("wall_seconds")
+            "original_error_recorded": request_failure is not None,
+            "provider_cost_or_reservation_complete": (
+                provider.get("unknown_attempts_without_reservation") == 0
             ),
         },
         "verifier_test_ids": test_ids,
@@ -452,6 +511,7 @@ def _record_provider_requests(state: ScreeningState, attempt_id: str, provider: 
             input_tokens=tokens.get("input_tokens"),
             cached_input_tokens=tokens.get("cached_input_tokens"),
             output_tokens=tokens.get("output_tokens"),
+            budget_reservation_usd=request["budget_reservation_usd"],
         )
 
 
@@ -544,12 +604,21 @@ def _attempt_intervals(completed: list[dict]) -> list[dict]:
 
 def _run_cost_summary(directory: Path, state: ScreeningState, retrieval: dict, ledger: dict) -> dict:
     provider_state = state.provider_cost_state()
+    provider_budget = state.provider_budget_state()
+    continuation_cost = state.continuation_cost_state()
     provider = {
         "kind": "provider_usage_times_fixed_rates_not_invoice_reconciliation",
         "currency": "USD",
         "requests": provider_state["requests"],
         "known_cost_usd": provider_state["known_cost_usd"],
         "unknown_attempts": provider_state["unknown_requests"],
+        "conservative_unknown_reservation_usd": provider_state[
+            "conservative_unknown_reservation_usd"
+        ],
+        "unknown_attempts_without_reservation": provider_state[
+            "unknown_requests_without_reservation"
+        ],
+        "budget_accounted_cost_usd": provider_state["budget_accounted_cost_usd"],
         "calculated_cost_usd": (
             provider_state["known_cost_usd"] if provider_state["unknown_requests"] == 0 else None
         ),
@@ -568,25 +637,55 @@ def _run_cost_summary(directory: Path, state: ScreeningState, retrieval: dict, l
             missing_vm_records += 1
         else:
             vm_values.append(value)
+    local_vm_cost = sum(vm_values) if missing_vm_records == 0 else None
     vm = {
         "kind": "sum_of_attempt_active_vm_allocations",
         "currency": "USD",
-        "attempts_with_cost": len(vm_values),
+        "attempts_with_cost": len(vm_values) + continuation_cost["attempts"],
         "attempts_missing_cost": missing_vm_records,
-        "calculated_cost_usd": sum(vm_values) if missing_vm_records == 0 else None,
+        "linked_prior_attempts": continuation_cost["attempts"],
+        "linked_prior_cost_usd": continuation_cost["active_vm_cost_usd"],
+        "calculated_cost_usd": (
+            None if local_vm_cost is None
+            else local_vm_cost + continuation_cost["active_vm_cost_usd"]
+        ),
     }
-    blob = blob_operation_cost(
+    local_blob = blob_operation_cost(
         retrieval["items"],
         ledger["cost"]["blob_write_per_10000_operations_usd"],
         ledger["cost"]["blob_read_per_10000_operations_usd"],
         ledger["cost"]["same_region_network_per_gb_usd"],
     )
+    blob = {
+        **local_blob,
+        "kind": "current_spool_plus_linked_prior_blob_and_network_cost",
+        "current_run": local_blob,
+        "linked_prior_attempts": continuation_cost["attempts"],
+        "linked_prior_calculated_cost_usd": continuation_cost["blob_network_cost_usd"],
+        "calculated_cost_usd": (
+            None if local_blob["calculated_cost_usd"] is None
+            else local_blob["calculated_cost_usd"] + continuation_cost["blob_network_cost_usd"]
+        ),
+        "confirmed_cost_usd": (
+            local_blob["confirmed_cost_usd"] + continuation_cost["blob_network_cost_usd"]
+        ),
+    }
     return {
         "kind": "screening_direct_attributable_variable_cost",
         "provider": provider,
+        "provider_budget": {
+            "kind": "screening_wide_provider_cost_and_conservative_unknown_reservations",
+            "currency": "USD",
+            **provider_budget,
+            "current_run_ledger_ceiling_usd": ledger["limits"]["api_cost_usd"],
+            "linked_formal_attempt_cost_is_not_added_twice": True,
+        },
         "active_vm": vm,
         "blob_and_network": blob,
         "combined": combined_direct_cost(provider, vm, blob),
+        "linked_prior_attempts_with_unknown_direct_cost": continuation_cost[
+            "attempts_with_unknown_direct_cost"
+        ],
         "shared_idle_approval_wait_and_one_time_setup_included": False,
     }
 
@@ -644,12 +743,132 @@ def _measured_seconds(value: object) -> bool:
     return type(value) in (int, float) and not isinstance(value, bool) and math.isfinite(value) and value >= 0
 
 
+def _completed_attempt_evidence(record: dict, retrieval_record: dict | None, ledger: dict) -> dict:
+    classification = record["classification"]
+    timing = classification["evidence_timing"]
+    full_replay_timings = [
+        name for name in (
+            "task_process_wall_seconds",
+            "state_save_wall_seconds",
+            "first_verifier_wall_seconds",
+            "state_restore_wall_seconds",
+            "repeated_verifier_wall_seconds",
+        )
+        if not _measured_seconds(timing.get(name))
+    ]
+    upload_seconds = None if retrieval_record is None else retrieval_record.get("upload_wall_seconds")
+    explicit_rejection = (
+        (classification.get("technical_exclusion_basis") or {}).get("kind")
+        == "explicit_provider_rejection_before_first_verifier"
+    )
+    required_timings = [
+        name for name in ("task_process_wall_seconds", "state_save_wall_seconds")
+        if not _measured_seconds(timing.get(name))
+    ] if explicit_rejection else list(full_replay_timings)
+    if not _measured_seconds(upload_seconds):
+        required_timings.append("upload_wall_seconds")
+    timing_status = classification.get("evidence_timing_status") or {}
+    not_applicable_timings = sorted(
+        name for name, status in timing_status.items()
+        if status.get("status") == "not_applicable"
+    )
+    replay_checks = classification.get("replay_checks") or {}
+    remote_hash_verified = (
+        retrieval_record is not None
+        and retrieval_record.get("upload_state") == "uploaded"
+        and retrieval_record.get("remote_verified_at") is not None
+    )
+    provider = classification.get("provider_cost") or {}
+    provider_cost_complete = (
+        provider.get("calculated_cost_usd") is not None
+        or (
+            provider.get("unknown_attempts", 0) > 0
+            and provider.get("unknown_attempts_without_reservation") == 0
+            and provider.get("conservative_unknown_reservation_usd", 0) > 0
+        )
+    )
+    vm = record.get("active_vm_cost") or {}
+    active_vm_cost_complete = _measured_seconds(vm.get("calculated_cost_usd"))
+    blob = None
+    if retrieval_record is not None:
+        try:
+            blob = blob_operation_cost(
+                [retrieval_record],
+                ledger["cost"]["blob_write_per_10000_operations_usd"],
+                ledger["cost"]["blob_read_per_10000_operations_usd"],
+                ledger["cost"]["same_region_network_per_gb_usd"],
+            )
+        except (KeyError, TypeError, ValueError):
+            blob = None
+    blob_cost_complete = blob is not None and blob.get("calculated_cost_usd") is not None
+    cost_complete = provider_cost_complete and active_vm_cost_complete and blob_cost_complete
+    strict_replay_complete = (
+        classification.get("replay_error") is None
+        and replay_checks.get("capture_status") == "complete"
+        and replay_checks.get("state_restored") is True
+        and replay_checks.get("same_judgement") is True
+    )
+    explicit_rejection_complete = (
+        explicit_rejection
+        and classification["result"] == "provider_error"
+        and replay_checks.get("capture_status") == "complete"
+        and replay_checks.get("capture_phase") == "teardown_without_verifier"
+        and (classification.get("technical_exclusion_basis") or {}).get("original_error_recorded") is True
+        and not required_timings
+        and set(not_applicable_timings) == {
+            "first_verifier_wall_seconds",
+            "repeated_verifier_wall_seconds",
+            "restore_and_repeated_verifier_wall_seconds",
+            "state_restore_wall_seconds",
+        }
+    )
+    result = classification["result"]
+    quality_result = result in QUALITY_RESULTS
+    completed_evidence = (
+        remote_hash_verified
+        and cost_complete
+        and ((strict_replay_complete and not required_timings) or explicit_rejection_complete)
+    )
+    disposition = (
+        "quality_result_complete" if completed_evidence and quality_result
+        else "technical_exclusion_complete" if completed_evidence
+        else "incomplete"
+    )
+    return {
+        "attempt_id": record["attempt_id"],
+        "task_id": record["task_id"],
+        "result": result,
+        "quality_result": quality_result,
+        "evidence_disposition": disposition,
+        "strict_replay_complete": strict_replay_complete,
+        "explicit_provider_rejection_complete": explicit_rejection_complete,
+        "remote_hash_verified": remote_hash_verified,
+        "timing": {**timing, "upload_wall_seconds": upload_seconds},
+        "missing_timing_fields": required_timings,
+        "not_applicable_timing_fields": not_applicable_timings,
+        "cost_complete": cost_complete,
+        "cost": {
+            "provider_calculated_cost_usd": provider.get("calculated_cost_usd"),
+            "provider_known_cost_usd": provider.get("known_cost_usd"),
+            "provider_conservative_unknown_reservation_usd": provider.get(
+                "conservative_unknown_reservation_usd"
+            ),
+            "active_vm_calculated_cost_usd": vm.get("calculated_cost_usd"),
+            "blob_and_network_calculated_cost_usd": (
+                None if blob is None else blob.get("calculated_cost_usd")
+            ),
+        },
+        "evidence_complete": completed_evidence,
+    }
+
+
 def _verify_completed_batch(
     finalized: list[dict],
     checkpoint: dict,
     spool,
     wait_seconds: float,
     batch_number: int,
+    ledger: dict,
 ) -> dict:
     attempt_ids = [item["record"]["attempt_id"] for item in finalized]
     item_ids = [*attempt_ids, checkpoint["item_id"]]
@@ -661,50 +880,14 @@ def _verify_completed_batch(
         retrieval = {"status": "retrieval_pending", "items": []}
         wait_error = {"type": type(error).__name__, "message": str(error)}
     indexed = {item["item_id"]: item for item in retrieval["items"]}
-    attempts = []
-    for finalized_attempt in finalized:
-        record = finalized_attempt["record"]
-        classification = record["classification"]
-        timing = classification["evidence_timing"]
-        retrieval_record = indexed.get(record["attempt_id"])
-        missing_timings = [
-            name for name in (
-                "task_process_wall_seconds",
-                "state_save_wall_seconds",
-                "first_verifier_wall_seconds",
-                "state_restore_wall_seconds",
-                "repeated_verifier_wall_seconds",
-            )
-            if not _measured_seconds(timing.get(name))
-        ]
-        upload_seconds = None if retrieval_record is None else retrieval_record.get("upload_wall_seconds")
-        if not _measured_seconds(upload_seconds):
-            missing_timings.append("upload_wall_seconds")
-        replay_checks = classification.get("replay_checks") or {}
-        attempts.append({
-            "attempt_id": record["attempt_id"],
-            "task_id": record["task_id"],
-            "result": classification["result"],
-            "quality_result": classification["result"] in QUALITY_RESULTS,
-            "strict_replay_complete": (
-                classification.get("replay_error") is None
-                and replay_checks.get("capture_status") == "complete"
-                and replay_checks.get("state_restored") is True
-                and replay_checks.get("same_judgement") is True
-            ),
-            "remote_hash_verified": (
-                retrieval_record is not None
-                and retrieval_record.get("upload_state") == "uploaded"
-                and retrieval_record.get("remote_verified_at") is not None
-            ),
-            "timing": {**timing, "upload_wall_seconds": upload_seconds},
-            "missing_timing_fields": missing_timings,
-        })
-        attempts[-1]["evidence_complete"] = (
-            attempts[-1]["strict_replay_complete"]
-            and attempts[-1]["remote_hash_verified"]
-            and not missing_timings
+    attempts = [
+        _completed_attempt_evidence(
+            finalized_attempt["record"],
+            indexed.get(finalized_attempt["record"]["attempt_id"]),
+            ledger,
         )
+        for finalized_attempt in finalized
+    ]
     checkpoint_record = indexed.get(checkpoint["item_id"])
     checkpoint_verified = (
         checkpoint_record is not None
@@ -729,6 +912,379 @@ def _verify_completed_batch(
         "retrieval_error": wait_error,
         "additional_claims_allowed": complete,
     }
+
+
+def _continuation_file(directory: Path, relative: str) -> Path:
+    path = directory / relative
+    if path.is_symlink() or not path.is_file() or not path.resolve().is_relative_to(directory):
+        raise ValueError(f"Continuation evidence file is missing or unsafe: {relative}")
+    return path
+
+
+def _verified_provider_budget_record(
+    path: Path,
+    ledger: dict,
+    prior_run_id: str,
+    linked_provider: dict,
+) -> dict:
+    if path.is_symlink() or not path.is_file():
+        raise ValueError("Provider budget continuation record is missing or unsafe")
+    try:
+        value = json.loads(path.read_bytes())
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as error:
+        raise ValueError("Provider budget continuation record is not valid JSON") from error
+    fields = {
+        "schema_version", "kind", "currency", "continuation_source_run_id",
+        "provider_ceiling_usd", "prior_known_cost_usd", "prior_unknown_requests",
+        "prior_reserved_unknown_usd", "remaining_provider_budget_usd",
+        "diagnostic_costs_included", "source_reference", "record_sha256",
+    }
+    if not isinstance(value, dict) or set(value) != fields:
+        raise ValueError("Provider budget continuation record fields differ")
+    if (
+        value["schema_version"] != 1
+        or value["kind"] != "screening_provider_budget_continuation"
+        or value["currency"] != "USD"
+        or value["continuation_source_run_id"] != prior_run_id
+        or value["diagnostic_costs_included"] is not True
+        or not isinstance(value["source_reference"], str)
+        or not value["source_reference"].strip()
+    ):
+        raise ValueError("Provider budget continuation record identity or scope differs")
+    payload = {key: item for key, item in value.items() if key != "record_sha256"}
+    if (
+        not re.fullmatch(r"[0-9a-f]{64}", value["record_sha256"])
+        or digest(canonical_json(payload)) != value["record_sha256"]
+    ):
+        raise ValueError("Provider budget continuation record hash differs")
+    for name in (
+        "provider_ceiling_usd", "prior_known_cost_usd",
+        "prior_reserved_unknown_usd", "remaining_provider_budget_usd",
+    ):
+        number = value[name]
+        if (
+            type(number) not in (int, float)
+            or isinstance(number, bool)
+            or not math.isfinite(number)
+            or number < 0
+        ):
+            raise ValueError(f"Provider budget continuation record has an invalid {name}")
+    if type(value["prior_unknown_requests"]) is not int or value["prior_unknown_requests"] < 0:
+        raise ValueError("Provider budget continuation record has an invalid unknown request count")
+    if not math.isclose(
+        value["provider_ceiling_usd"],
+        value["prior_known_cost_usd"]
+        + value["prior_reserved_unknown_usd"]
+        + value["remaining_provider_budget_usd"],
+        rel_tol=0,
+        abs_tol=1e-9,
+    ):
+        raise ValueError("Provider budget continuation arithmetic differs")
+    if not math.isclose(
+        value["remaining_provider_budget_usd"],
+        ledger["limits"]["api_cost_usd"],
+        rel_tol=0,
+        abs_tol=1e-9,
+    ):
+        raise ValueError("Current ledger does not use the recorded remaining provider budget")
+    if (
+        value["prior_known_cost_usd"] + 1e-12 < linked_provider["known_cost_usd"]
+        or value["prior_unknown_requests"] < linked_provider["unknown_requests"]
+        or value["prior_reserved_unknown_usd"] + 1e-12
+            < linked_provider["conservative_unknown_reservation_usd"]
+    ):
+        raise ValueError("Provider budget record omits linked formal screening cost")
+    return value
+
+
+def _prepare_continuation(
+    directory: Path,
+    setup: dict,
+    source_commit: str,
+    manifest: dict,
+    prior_directory: Path,
+    provider_budget_record_path: Path,
+) -> dict:
+    if prior_directory.is_symlink():
+        raise ValueError("Continuation source directory cannot be a symlink")
+    prior_directory = prior_directory.resolve(strict=True)
+    if not prior_directory.name.startswith("screening-"):
+        raise ValueError("Continuation source is not a screening run")
+    prior_inputs = prior_directory / "inputs"
+    if prior_inputs.is_symlink() or not prior_inputs.is_dir():
+        raise ValueError("Continuation source inputs are missing or unsafe")
+    prior_provenance = verify_snapshot(prior_inputs)
+    prior_commit = prior_provenance["source_commit"]
+    if prior_commit == source_commit:
+        raise ValueError("Use ordinary resume when the screening source commit has not changed")
+    git(ROOT, "merge-base", "--is-ancestor", prior_commit, source_commit)
+    prior_ledger = load_screening_ledger(_continuation_file(prior_inputs, "ledger.toml"))
+    current_ledger = deepcopy(setup["ledger"])
+    prior_remaining_budget = prior_ledger["limits"]["api_cost_usd"]
+    current_remaining_budget = current_ledger["limits"]["api_cost_usd"]
+    prior_ledger["limits"]["api_cost_usd"] = current_remaining_budget
+    if prior_ledger != current_ledger:
+        raise ValueError("Continuation changes the execution ledger beyond its remaining provider budget")
+    if current_remaining_budget > prior_remaining_budget:
+        raise ValueError("Continuation cannot increase the prior run provider budget")
+    prior_inventory_bytes = _continuation_file(prior_inputs, "inventory.json").read_bytes()
+    if prior_inventory_bytes != setup["inventory_path"].read_bytes():
+        raise ValueError("Continuation changes the fixed task inventory")
+    prior_inventory = verify_inventory(json.loads(prior_inventory_bytes))
+    prior_manifest = verify_screening_manifest(
+        json.loads(_continuation_file(prior_inputs, "screening-manifest.json").read_bytes()),
+        prior_inventory,
+    )
+    if prior_manifest["run_id"] != prior_directory.name or prior_manifest["source_commit"] != prior_commit:
+        raise ValueError("Continuation source manifest lineage differs")
+    prior_execution = json.loads(_continuation_file(prior_inputs, "execution.json").read_bytes())
+    expected_execution = {
+        "run_id": prior_manifest["run_id"],
+        "source_commit": prior_commit,
+        "ledger_sha256": prior_provenance["ledger_sha256"],
+        "inventory_sha256": prior_inventory["inventory_sha256"],
+        "manifest_sha256": prior_manifest["manifest_sha256"],
+    }
+    if any(prior_execution.get(name) != value for name, value in expected_execution.items()):
+        raise ValueError("Continuation source execution record differs")
+    if (prior_execution.get("execution_scope") or {}).get("included_in_formal_screening_denominator") is not True:
+        raise ValueError("A diagnostic run cannot seed the formal screening denominator")
+
+    prior_artifacts = json.loads(_continuation_file(prior_inputs, "task-artifacts.json").read_bytes())
+    expected_artifacts = {
+        task["task_id"]: _task_artifact(task, setup["ledger"], prior_commit)
+        for task in prior_inventory["tasks"] if task["exclusion"] is None
+    }
+    if prior_artifacts != expected_artifacts:
+        raise ValueError("Continuation source task artifacts differ")
+    prior_summary_path = _continuation_file(prior_directory, "summary.json")
+    prior_retrieval_path = _continuation_file(prior_directory, "retrieval.json")
+    prior_state_path = _continuation_file(prior_directory, "state.sqlite3")
+    prior_summary = json.loads(prior_summary_path.read_bytes())
+    prior_retrieval = json.loads(prior_retrieval_path.read_bytes())
+    if prior_retrieval.get("upload_state") != "uploaded":
+        raise ValueError("Continuation source Blob evidence is not fully uploaded")
+    retrieval_by_attempt = {
+        item["item_id"]: item for item in prior_retrieval.get("items", [])
+        if re.fullmatch(r"[0-9a-f]{64}", item.get("item_id", ""))
+    }
+    batch_by_attempt = {}
+    for batch in prior_summary.get("batch_evidence_verifications") or []:
+        for attempt in batch.get("attempts") or []:
+            attempt_id = attempt.get("attempt_id")
+            if attempt_id in batch_by_attempt:
+                raise ValueError("Continuation source repeats an attempt in batch evidence")
+            batch_by_attempt[attempt_id] = attempt
+
+    connection = sqlite3.connect(f"file:{prior_state_path}?mode=ro", uri=True)
+    connection.row_factory = sqlite3.Row
+    try:
+        rows = connection.execute(
+            """SELECT tr.trial_id,tr.task_id,tr.repetition,tr.condition_name,tr.plan_index,
+                      tr.state AS trial_state,tr.quality_result,tr.failure_category,
+                      tr.verifier_test_ids,tr.finished_at,tr.evidence_sha256 AS trial_evidence_sha256,
+                      a.attempt_id,a.attempt_number,a.state AS attempt_state,a.provider_dispatched,
+                      a.artifact_manifest_hash,a.container_instance_id,a.workspace_instance_id,
+                      a.error_category,a.evidence_sha256 AS attempt_evidence_sha256
+               FROM attempts a JOIN trials tr USING(trial_id)
+               WHERE a.state='completed'
+               ORDER BY tr.plan_index,a.attempt_number"""
+        ).fetchall()
+        unfinished = connection.execute(
+            "SELECT COUNT(*) FROM attempts WHERE state!='completed'"
+        ).fetchone()[0]
+    finally:
+        connection.close()
+    if unfinished:
+        raise ValueError("Continuation source has unresolved attempts; do not rewrite their state")
+    if len(rows) != prior_summary.get("state", {}).get("completed_attempts"):
+        raise ValueError("Continuation completed-attempt count differs from its summary")
+
+    tasks = {task["task_id"]: task for task in prior_inventory["tasks"]}
+    records = []
+    for row in rows:
+        row = dict(row)
+        attempt_id = row["attempt_id"]
+        attempt_path = _continuation_file(
+            prior_directory, f"attempts/{attempt_id}/attempt.json"
+        )
+        attempt = json.loads(attempt_path.read_bytes())
+        if any(attempt.get(name) != row[name] for name in ("attempt_id", "trial_id", "task_id", "repetition")):
+            raise ValueError("Continuation attempt identity differs from its state database")
+        if row["attempt_number"] != attempt.get("attempt_number") or row["attempt_state"] != "completed":
+            raise ValueError("Continuation attempt state differs")
+        if row["attempt_evidence_sha256"] != row["trial_evidence_sha256"]:
+            raise ValueError("Continuation trial and attempt evidence hashes differ")
+        if attempt.get("artifact_manifest_sha256") != row["artifact_manifest_hash"]:
+            raise ValueError("Continuation attempt artifact hash differs from its state database")
+        if attempt["artifact_manifest_sha256"] != prior_artifacts[row["task_id"]]["artifact_manifest_sha256"]:
+            raise ValueError("Continuation attempt artifact differs from the frozen task artifact")
+        retrieval_record = retrieval_by_attempt.get(attempt_id)
+        if (
+            retrieval_record is None
+            or retrieval_record.get("upload_state") != "uploaded"
+            or retrieval_record.get("remote_verified_at") is None
+            or (retrieval_record.get("metadata") or {}).get("source_tree_sha256")
+                != row["attempt_evidence_sha256"]
+        ):
+            raise ValueError("Continuation attempt lacks matching remotely verified Blob evidence")
+        batch_record = batch_by_attempt.get(attempt_id)
+        if (
+            batch_record is None
+            or batch_record.get("result") != (attempt.get("classification") or {}).get("result")
+            or batch_record.get("remote_hash_verified") is not True
+        ):
+            raise ValueError("Continuation batch evidence differs from the attempt record")
+
+        events = read_events(_continuation_file(
+            prior_directory, f"attempts/{attempt_id}/transport/events.jsonl"
+        ))
+        enriched_provider = provider_cost(events, attempt_id)
+        recorded_provider = attempt["classification"]["provider_cost"]
+        for name in ("http_attempts", "known_attempts", "unknown_attempts", "known_cost_usd", "calculated_cost_usd"):
+            if recorded_provider.get(name) != enriched_provider.get(name):
+                raise ValueError("Continuation provider accounting differs from recorded evidence")
+        job = prior_directory / "attempts" / attempt_id / "jobs" / attempt_id
+        replay, _replay_error = _attempt_replay(job)
+        classification = json.loads(json.dumps(attempt["classification"]))
+        classification["provider_cost"] = enriched_provider
+        replay_checks = classification.get("replay_checks") or {}
+        if replay is not None:
+            replay_checks["capture_status"] = replay.get("status")
+            replay_checks["capture_phase"] = replay.get("capture_phase")
+        classification["replay_checks"] = replay_checks
+        explicit_rejection = (
+            classification["result"] == "provider_error"
+            and _explicit_provider_rejection(
+                enriched_provider, classification.get("request_failure"), replay
+            )
+        )
+        classification["evidence_timing_status"] = _evidence_timing_status(
+            classification["evidence_timing"],
+            provider_rejected_before_verifier=explicit_rejection,
+        )
+        classification["technical_exclusion_basis"] = {
+            "kind": "explicit_provider_rejection_before_first_verifier" if explicit_rejection else None,
+            "original_error_recorded": classification.get("request_failure") is not None,
+            "provider_cost_or_reservation_complete": (
+                enriched_provider["unknown_attempts_without_reservation"] == 0
+            ),
+        }
+        checked_record = {**attempt, "classification": classification}
+        checked = _completed_attempt_evidence(checked_record, retrieval_record, setup["ledger"])
+        if not checked["evidence_complete"]:
+            raise ValueError(
+                f"Continuation attempt evidence remains incomplete: {row['task_id']} "
+                f"({','.join(checked['missing_timing_fields']) or 'non-timing evidence'})"
+            )
+        if enriched_provider["http_attempts"] >= setup["ledger"]["limits"]["max_calls_per_trial"]:
+            raise ValueError("A prior attempt reached the changed provider-call boundary and needs separate review")
+        blob = blob_operation_cost(
+            [retrieval_record],
+            setup["ledger"]["cost"]["blob_write_per_10000_operations_usd"],
+            setup["ledger"]["cost"]["blob_read_per_10000_operations_usd"],
+            setup["ledger"]["cost"]["same_region_network_per_gb_usd"],
+        )
+        vm_cost = attempt["active_vm_cost"]["calculated_cost_usd"]
+        direct = combined_direct_cost(enriched_provider, attempt["active_vm_cost"], blob)
+        records.append({
+            "prior_trial_id": row["trial_id"],
+            "prior_attempt_id": attempt_id,
+            "task_id": row["task_id"],
+            "repetition": row["repetition"],
+            "plan_index": row["plan_index"],
+            "result": classification["result"],
+            "evidence_disposition": checked["evidence_disposition"],
+            "evidence_sha256": row["attempt_evidence_sha256"],
+            "artifact_manifest_sha256": attempt["artifact_manifest_sha256"],
+            "image_platform_digest": tasks[row["task_id"]]["image"]["platform_digest"],
+            "verifier_test_ids": json.loads(row["verifier_test_ids"] or "[]"),
+            "finished_at": row["finished_at"],
+            "provider_request_count": enriched_provider["http_attempts"],
+            "provider_known_cost_usd": enriched_provider["known_cost_usd"],
+            "provider_unknown_requests": enriched_provider["unknown_attempts"],
+            "provider_reserved_unknown_usd": enriched_provider[
+                "conservative_unknown_reservation_usd"
+            ],
+            "provider_requests": enriched_provider["requests"],
+            "active_vm_cost_usd": vm_cost,
+            "blob_network_cost_usd": blob["calculated_cost_usd"],
+            "direct_cost_usd": direct["calculated_cost_usd"],
+            "blob_payload_sha256": retrieval_record["payload"]["sha256"],
+            "blob_remote_verified_at": retrieval_record["remote_verified_at"],
+            "source_change_boundary_reached": False,
+        })
+
+    changed_source_files = git(
+        ROOT, "diff", "--name-only", prior_commit, source_commit, "--", "src", "schemas",
+        "requirements", "fixtures/llmlingua2", "run.py", "accounting.py", "pyproject.toml", "uv.lock",
+    ).decode().splitlines()
+    source_diff = git(
+        ROOT, "diff", "--binary", prior_commit, source_commit, "--", "src", "schemas",
+        "requirements", "fixtures/llmlingua2", "run.py", "accounting.py", "pyproject.toml", "uv.lock",
+    )
+    prior_active_vm_cost = (prior_summary.get("cost") or {}).get("active_vm", {}).get(
+        "calculated_cost_usd"
+    )
+    prior_blob_network_cost = (prior_summary.get("cost") or {}).get("blob_and_network", {}).get(
+        "calculated_cost_usd"
+    )
+    if not _measured_seconds(prior_active_vm_cost) or not _measured_seconds(prior_blob_network_cost):
+        raise ValueError("Continuation source run-level VM or Blob cost is incomplete")
+    linked_provider = {
+        "known_cost_usd": sum(record["provider_known_cost_usd"] for record in records),
+        "unknown_requests": sum(record["provider_unknown_requests"] for record in records),
+        "conservative_unknown_reservation_usd": sum(
+            record["provider_reserved_unknown_usd"] for record in records
+        ),
+    }
+    provider_budget = _verified_provider_budget_record(
+        provider_budget_record_path, setup["ledger"], prior_manifest["run_id"], linked_provider
+    )
+    save_json(directory / "inputs" / "provider-budget-continuation.json", provider_budget)
+    lineage = {
+        "kind": "screening_read_only_continuation",
+        "prior_run_id": prior_manifest["run_id"],
+        "prior_source_commit": prior_commit,
+        "prior_ledger_sha256": prior_provenance["ledger_sha256"],
+        "prior_inventory_sha256": prior_inventory["inventory_sha256"],
+        "prior_manifest_sha256": prior_manifest["manifest_sha256"],
+        "prior_summary_sha256": digest(prior_summary_path.read_bytes()),
+        "prior_retrieval_sha256": digest(prior_retrieval_path.read_bytes()),
+        "prior_state_sha256": digest(prior_state_path.read_bytes()),
+        "current_run_id": manifest["run_id"],
+        "current_source_commit": source_commit,
+        "current_manifest_sha256": manifest["manifest_sha256"],
+        "source_diff_sha256": digest(source_diff),
+        "prior_active_vm_cost_usd": prior_active_vm_cost,
+        "prior_blob_network_cost_usd": prior_blob_network_cost,
+        "provider_ceiling_usd": provider_budget["provider_ceiling_usd"],
+        "prior_provider_known_cost_usd": provider_budget["prior_known_cost_usd"],
+        "prior_provider_unknown_requests": provider_budget["prior_unknown_requests"],
+        "prior_provider_reserved_unknown_usd": provider_budget[
+            "prior_reserved_unknown_usd"
+        ],
+        "remaining_provider_budget_usd": provider_budget["remaining_provider_budget_usd"],
+        "provider_budget_record_sha256": provider_budget["record_sha256"],
+        "changed_source_files": changed_source_files,
+        "linked_completed_attempts": len(records),
+        "linked_quality_results": sum(record["result"] in QUALITY_RESULTS for record in records),
+        "linked_technical_exclusions": sum(record["result"] not in QUALITY_RESULTS for record in records),
+        "link_basis": (
+            "all_prior_completed_attempts_have_complete_preserved_evidence_and_did_not_reach_"
+            "the_changed_provider_call_boundary"
+        ),
+        "records": records,
+    }
+    payload = {**lineage, "continuation_sha256": digest(canonical_json(lineage))}
+    save_json(directory / "inputs" / "continuation.json", payload)
+    execution_path = directory / "inputs" / "execution.json"
+    execution = json.loads(execution_path.read_bytes())
+    execution["continuation_sha256"] = payload["continuation_sha256"]
+    execution["prior_run_id"] = prior_manifest["run_id"]
+    execution["provider_budget_record_sha256"] = provider_budget["record_sha256"]
+    save_json(execution_path, execution)
+    return payload
 
 
 def _resume_inputs(directory: Path, setup: dict, source_commit: str) -> tuple[dict, dict, ScreeningState, object, dict]:
@@ -771,6 +1327,32 @@ def _resume_inputs(directory: Path, setup: dict, source_commit: str) -> tuple[di
     spool = None
     try:
         state.initialize(manifest)
+        continuation_sha256 = execution.get("continuation_sha256")
+        if continuation_sha256 is not None:
+            continuation = json.loads((inputs / "continuation.json").read_bytes())
+            provider_budget = json.loads(
+                (inputs / "provider-budget-continuation.json").read_bytes()
+            )
+            continuation_payload = {
+                key: value for key, value in continuation.items() if key != "continuation_sha256"
+            }
+            if (
+                not re.fullmatch(r"[0-9a-f]{64}", continuation_sha256)
+                or continuation.get("continuation_sha256") != continuation_sha256
+                or digest(canonical_json(continuation_payload)) != continuation_sha256
+                or execution.get("provider_budget_record_sha256")
+                    != provider_budget.get("record_sha256")
+                or digest(canonical_json({
+                    key: value for key, value in provider_budget.items() if key != "record_sha256"
+                })) != provider_budget.get("record_sha256")
+                or continuation.get("provider_budget_record_sha256")
+                    != provider_budget.get("record_sha256")
+                or state.summary()["linked_completed_attempts"]
+                    != continuation.get("linked_completed_attempts")
+            ):
+                raise ValueError("Screening continuation record or linked state differs")
+        elif state.summary()["linked_completed_attempts"]:
+            raise ValueError("Screening state has continuation links without an execution record")
         state.pause_interrupted()
         paused = state.paused_attempts()
         if paused:
@@ -783,8 +1365,10 @@ def _resume_inputs(directory: Path, setup: dict, source_commit: str) -> tuple[di
                 "Interrupted attempts require static evidence resolution before resume; no trial was rerun"
             )
         provider = state.provider_cost_state()
-        if provider["unknown_requests"]:
-            raise ValueError("Provider cost is unknown for an earlier request; resume cannot enforce the budget ceiling")
+        if provider["unknown_requests_without_reservation"]:
+            raise ValueError(
+                "Provider cost is unknown without a conservative reservation; resume cannot enforce the budget ceiling"
+            )
         spool = resume_blob_spool(
             setup["retrieval"], setup["retrieval"]["spool_root"] / manifest["run_id"], accepting=True
         )
@@ -815,6 +1399,10 @@ def _resume_inputs(directory: Path, setup: dict, source_commit: str) -> tuple[di
         for name, value in expected_execution.items():
             if summary.get(name) != value:
                 raise ValueError(f"Screening resume summary differs: {name}")
+        if continuation_sha256 is not None and (
+            summary.get("continuation") or {}
+        ).get("continuation_sha256") != continuation_sha256:
+            raise ValueError("Screening resume continuation summary differs")
         previous_status = summary.get("status")
         previous_reason = (summary.get("stop_reason") or {}).get("reason")
         previous_error = (summary.get("error") or {}).get("type")
@@ -846,11 +1434,17 @@ def execute_screening(
     *,
     resume_directory: Path | None = None,
     diagnostic_task_id: str | None = None,
+    continuation_directory: Path | None = None,
+    provider_budget_record_path: Path | None = None,
 ) -> Path:
     setup = screening_preflight(ledger_path, source_commit)
     ledger = setup["ledger"]
-    if resume_directory is not None and diagnostic_task_id is not None:
-        raise ValueError("A single-task diagnostic cannot resume a formal screening run")
+    if sum(value is not None for value in (
+        resume_directory, diagnostic_task_id, continuation_directory
+    )) > 1:
+        raise ValueError("Resume, diagnostic, and read-only continuation modes are mutually exclusive")
+    if (continuation_directory is None) != (provider_budget_record_path is None):
+        raise ValueError("Read-only continuation requires exactly one provider budget record")
     eligible_task_ids = {
         task["task_id"] for task in setup["inventory"]["tasks"] if task["exclusion"] is None
     }
@@ -864,6 +1458,12 @@ def execute_screening(
             "included_in_formal_screening_denominator": False,
         }
         if diagnostic_task_id is not None
+        else {
+            "kind": "formal_terminal_bench_screening_continuation",
+            "included_in_formal_screening_denominator": True,
+            "prior_evidence_linked_read_only": True,
+        }
+        if continuation_directory is not None
         else {
             "kind": "formal_terminal_bench_screening",
             "included_in_formal_screening_denominator": True,
@@ -880,12 +1480,25 @@ def execute_screening(
         )
         state = ScreeningState(directory / "state.sqlite3")
         state.initialize(manifest)
+        continuation = None
+        if continuation_directory is not None:
+            continuation = _prepare_continuation(
+                directory, setup, source_commit, manifest, continuation_directory,
+                provider_budget_record_path,
+            )
+            state.link_continuation(continuation, continuation["records"])
         spool = make_blob_spool(
             setup["retrieval"], run_id, source_commit, setup["provenance"]["ledger_sha256"], "none"
         )
         inputs_retrieval = spool.stage_directory(
             directory / "inputs", "run-inputs", kind="terminal_bench_screening_inputs",
-            metadata={"manifest_sha256": manifest["manifest_sha256"], "inventory_sha256": manifest["inventory_sha256"]},
+            metadata={
+                "manifest_sha256": manifest["manifest_sha256"],
+                "inventory_sha256": manifest["inventory_sha256"],
+                "continuation_sha256": (
+                    None if continuation is None else continuation["continuation_sha256"]
+                ),
+            },
         )
         if spool.wait_for_upload(
             ["run-inputs"], ledger["retrieval"]["upload_timeout_seconds"]
@@ -903,12 +1516,26 @@ def execute_screening(
             "manifest_sha256": manifest["manifest_sha256"],
             "status": "running",
             "started_at": now(),
-            "completed_attempts": 0,
+            "completed_attempts": state.summary()["completed_attempts"],
             "retrieval_inputs": inputs_retrieval,
             "classification_policy": POLICY,
             "execution_scope": execution_scope,
             "sessions": [{"kind": "initial", "started_at": now()}],
         }
+        if continuation is not None:
+            summary["continuation"] = {
+                key: continuation[key] for key in (
+                    "continuation_sha256", "prior_run_id", "prior_source_commit",
+                    "prior_ledger_sha256", "prior_inventory_sha256", "prior_manifest_sha256",
+                    "prior_summary_sha256", "prior_retrieval_sha256", "prior_state_sha256",
+                    "source_diff_sha256", "prior_active_vm_cost_usd",
+                    "prior_blob_network_cost_usd", "linked_completed_attempts", "linked_quality_results",
+                    "linked_technical_exclusions", "provider_ceiling_usd",
+                    "prior_provider_known_cost_usd", "prior_provider_unknown_requests",
+                    "prior_provider_reserved_unknown_usd", "remaining_provider_budget_usd",
+                    "provider_budget_record_sha256", "link_basis",
+                )
+            }
     else:
         directory = resume_directory
         manifest, artifacts, state, spool, summary = _resume_inputs(directory, setup, source_commit)
@@ -923,7 +1550,7 @@ def execute_screening(
         transport, ledger, source_commit, compressor, setup["encoder"], queue, setup["sender"],
         condition="none", evidence_kind="terminal_bench_screening", request_error_scope="trial",
     )
-    recorder.budget_used_usd = state.provider_cost_state()["known_cost_usd"]
+    recorder.budget_used_usd = state.local_provider_cost_state()["budget_accounted_cost_usd"]
     setup["sender"].deadline = recorder.deadline
     key = secrets.token_urlsafe(32)
     server = start_live_proxy(recorder, key)
@@ -974,6 +1601,7 @@ def execute_screening(
                 spool,
                 ledger["retrieval"]["upload_timeout_seconds"],
                 batch_number,
+                ledger,
             )
             summary.setdefault("batch_evidence_verifications", []).append(batch_verification)
             summary["latest_batch_evidence_verification"] = batch_verification
@@ -1105,6 +1733,8 @@ def main(arguments=None) -> int:
     action.add_argument("--execute", action="store_true")
     action.add_argument("--resume", type=Path)
     action.add_argument("--diagnose-task")
+    action.add_argument("--continue-from", type=Path)
+    parser.add_argument("--provider-budget-record", type=Path)
     args = parser.parse_args(arguments)
     try:
         if args.check:
@@ -1126,10 +1756,19 @@ def main(arguments=None) -> int:
                 "failures": record["failures"],
             }))
             return 0 if not record["failures"] and record["return_code"] == 0 else 3
+        if (args.continue_from is None) != (args.provider_budget_record is None):
+            raise ValueError("--continue-from and --provider-budget-record must be used together")
         directory = execute_screening(
             args.ledger.resolve(), args.source_commit,
             resume_directory=None if args.resume is None else args.resume.resolve(),
             diagnostic_task_id=args.diagnose_task,
+            continuation_directory=(
+                None if args.continue_from is None else args.continue_from.resolve()
+            ),
+            provider_budget_record_path=(
+                None if args.provider_budget_record is None
+                else args.provider_budget_record.resolve()
+            ),
         )
         summary = json.loads((directory / "summary.json").read_bytes())
         print(json.dumps({"directory": str(directory), "status": summary["status"]}))

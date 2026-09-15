@@ -13,13 +13,15 @@ class ScreeningCostTests(unittest.TestCase):
     def test_provider_failure_remains_unknown_instead_of_becoming_zero(self):
         events = [
             {"event": "attempt_started", "trial_id": "attempt-a", "request": 1, "attempt": 1,
-             "request_sha256": "a" * 64},
+             "request_sha256": "a" * 64, "budget_reservation_usd": 0.25},
             {"event": "http", "trial_id": "attempt-a", "request": 1, "attempt": 1,
              "status": None, "calculated_cost_usd": None},
         ]
         result = provider_cost(events, "attempt-a")
         self.assertIsNone(result["calculated_cost_usd"])
         self.assertEqual((result["known_cost_usd"], result["unknown_attempts"]), (0, 1))
+        self.assertEqual(result["conservative_unknown_reservation_usd"], 0.25)
+        self.assertEqual(result["budget_accounted_cost_usd"], 0.25)
 
     def test_active_vm_cost_is_shared_only_during_overlap(self):
         result = allocate_active_vm_cost([

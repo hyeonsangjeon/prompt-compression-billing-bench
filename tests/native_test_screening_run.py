@@ -14,10 +14,13 @@ from src.screening_run import (
     _classify_attempt,
     _reported_task_id,
     _stage_checkpoint,
+    _verified_provider_budget_record,
     _verify_completed_batch,
     main,
     screening_harbor_config,
 )
+from src.protection import digest
+from src.screening_inventory import canonical_json
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -55,6 +58,7 @@ class ScreeningRunTests(unittest.TestCase):
             "stopped_by_guard": False,
             "started_at": "2026-09-15T00:00:00+00:00",
             "finished_at": "2026-09-15T00:00:01+00:00",
+            "elapsed_seconds": 1.0,
         }
 
     def classify(self, outcome, *, events=None, replay=({"manifest_sha256": "b" * 64}, None), complete=True):
@@ -64,6 +68,7 @@ class ScreeningRunTests(unittest.TestCase):
                 {"event": "http", "trial_id": self.attempt_id, "request": 1, "attempt": 1,
                  "status": 200, "calculated_cost_usd": 0.01},
             )
+            events[0]["budget_reservation_usd"] = 0.02
         metrics = {"measurement_complete": complete}
         with patch("src.screening_run._transport_events", return_value=list(events)), \
              patch("src.screening_run.collect_native_outcome", return_value=outcome), \
@@ -113,7 +118,10 @@ class ScreeningRunTests(unittest.TestCase):
         )
         self.assertEqual(missing["result"], "setup_error")
 
-        dispatched = [{"event": "attempt_started", "trial_id": self.attempt_id, "request": 1, "attempt": 1}]
+        dispatched = [{
+            "event": "attempt_started", "trial_id": self.attempt_id,
+            "request": 1, "attempt": 1, "budget_reservation_usd": 0.02,
+        }]
         self.recorder.trials[self.attempt_id]["failure"] = {
             "reason": "TimeoutError", "details": {"message": "synthetic"},
         }
@@ -167,6 +175,95 @@ class ScreeningRunTests(unittest.TestCase):
         )
         self.assertEqual(classified["result"], "replay_mismatch")
 
+    def test_explicit_provider_rejection_preserves_unexecuted_verifier_stages_as_not_applicable(self):
+        events = [
+            {
+                "event": "attempt_started",
+                "trial_id": self.attempt_id,
+                "request": 1,
+                "attempt": 1,
+                "budget_reservation_usd": 0.075,
+            },
+            {
+                "event": "http",
+                "trial_id": self.attempt_id,
+                "request": 1,
+                "attempt": 1,
+                "status": 400,
+                "calculated_cost_usd": None,
+            },
+        ]
+        self.recorder.trials[self.attempt_id]["failure"] = {
+            "reason": "ValueError",
+            "details": {"message": "Provider HTTP 400; no outer retry budget restart"},
+        }
+        replay = {
+            "status": "complete",
+            "capture_phase": "teardown_without_verifier",
+            "capture_wall_seconds": 1.25,
+            "manifest_sha256": "b" * 64,
+        }
+        classified = self.classify(
+            quality_outcome(), events=events, replay=(replay, "replay_capture_phase_invalid"),
+            complete=False,
+        )
+
+        self.assertEqual(classified["result"], "provider_error")
+        self.assertEqual(
+            classified["technical_exclusion_basis"]["kind"],
+            "explicit_provider_rejection_before_first_verifier",
+        )
+        self.assertEqual(
+            {
+                name for name, status in classified["evidence_timing_status"].items()
+                if status["status"] == "not_applicable"
+            },
+            {
+                "first_verifier_wall_seconds",
+                "state_restore_wall_seconds",
+                "repeated_verifier_wall_seconds",
+                "restore_and_repeated_verifier_wall_seconds",
+            },
+        )
+        self.assertEqual(classified["provider_cost"]["known_cost_usd"], 0)
+        self.assertEqual(
+            classified["provider_cost"]["conservative_unknown_reservation_usd"], 0.075
+        )
+
+        ledger = load_screening_ledger(ROOT / "ledgers/screening.template.toml")
+        finalized = [{"record": {
+            "attempt_id": self.attempt_id,
+            "task_id": "gpt2-codegolf",
+            "classification": classified,
+            "active_vm_cost": {"calculated_cost_usd": 0.02},
+        }}]
+
+        class Spool:
+            def wait_for_upload(self, item_ids, wait_seconds):
+                return {"status": "uploaded", "items": [{
+                    "item_id": item_id,
+                    "upload_state": "uploaded",
+                    "remote_verified_at": "2026-09-15T00:00:00+00:00",
+                    "upload_wall_seconds": 0.5,
+                    "payload": {"bytes": 1000},
+                    "manifest_bytes": 200,
+                    "operations": {
+                        "payload_write": {"started": 1, "succeeded": 1},
+                        "manifest_write": {"started": 1, "succeeded": 1},
+                        "payload_verify_read": {"started": 1, "succeeded": 1},
+                        "manifest_verify_read": {"started": 1, "succeeded": 1},
+                    },
+                } for item_id in item_ids]}
+
+        checked = _verify_completed_batch(
+            finalized, {"item_id": "run-state-000001"}, Spool(), 30, 1, ledger
+        )
+        attempt = checked["attempts"][0]
+        self.assertTrue(attempt["evidence_complete"])
+        self.assertFalse(attempt["quality_result"])
+        self.assertEqual(attempt["evidence_disposition"], "technical_exclusion_complete")
+        self.assertTrue(checked["additional_claims_allowed"])
+
     def test_active_vm_intervals_require_real_ordered_timestamps(self):
         attempt = {"attempt": {"attempt_id": self.attempt_id}, "process": self.process}
         intervals = _attempt_intervals([attempt])
@@ -217,6 +314,7 @@ class ScreeningRunTests(unittest.TestCase):
 
     def test_batch_verification_requires_replay_timings_and_remote_hashes(self):
         attempt_id = self.attempt_id
+        ledger = load_screening_ledger(ROOT / "ledgers/screening.template.toml")
         timing = {
             "task_process_wall_seconds": 10.0,
             "state_save_wall_seconds": 1.0,
@@ -233,11 +331,20 @@ class ScreeningRunTests(unittest.TestCase):
                 "replay_error": None,
                 "replay_checks": {
                     "capture_status": "complete",
+                    "capture_phase": "after_tests_upload_before_verifier",
                     "state_restored": True,
                     "same_judgement": True,
                 },
                 "evidence_timing": timing,
+                "provider_cost": {
+                    "calculated_cost_usd": 0.1,
+                    "known_cost_usd": 0.1,
+                    "unknown_attempts": 0,
+                    "unknown_attempts_without_reservation": 0,
+                    "conservative_unknown_reservation_usd": 0,
+                },
             },
+            "active_vm_cost": {"calculated_cost_usd": 0.2},
         }}]
 
         class Spool:
@@ -247,10 +354,18 @@ class ScreeningRunTests(unittest.TestCase):
                     "upload_state": "uploaded",
                     "remote_verified_at": "2026-09-15T00:00:00+00:00",
                     "upload_wall_seconds": 0.5,
+                    "payload": {"bytes": 1000},
+                    "manifest_bytes": 200,
+                    "operations": {
+                        "payload_write": {"started": 1, "succeeded": 1},
+                        "manifest_write": {"started": 1, "succeeded": 1},
+                        "payload_verify_read": {"started": 1, "succeeded": 1},
+                        "manifest_verify_read": {"started": 1, "succeeded": 1},
+                    },
                 } for item_id in item_ids]}
 
         checked = _verify_completed_batch(
-            finalized, {"item_id": "run-state-000001"}, Spool(), 30, 1
+            finalized, {"item_id": "run-state-000001"}, Spool(), 30, 1, ledger
         )
         self.assertTrue(checked["additional_claims_allowed"])
         self.assertEqual(checked["attempts"][0]["result"], "wrong_answer")
@@ -258,7 +373,7 @@ class ScreeningRunTests(unittest.TestCase):
 
         finalized[0]["record"]["classification"]["result"] = "timeout"
         complete_timeout = _verify_completed_batch(
-            finalized, {"item_id": "run-state-000001"}, Spool(), 30, 1
+            finalized, {"item_id": "run-state-000001"}, Spool(), 30, 1, ledger
         )
         self.assertFalse(complete_timeout["attempts"][0]["quality_result"])
         self.assertTrue(complete_timeout["attempts"][0]["evidence_complete"])
@@ -266,7 +381,7 @@ class ScreeningRunTests(unittest.TestCase):
 
         finalized[0]["record"]["classification"]["evidence_timing"]["state_save_wall_seconds"] = None
         blocked = _verify_completed_batch(
-            finalized, {"item_id": "run-state-000001"}, Spool(), 30, 1
+            finalized, {"item_id": "run-state-000001"}, Spool(), 30, 1, ledger
         )
         self.assertFalse(blocked["additional_claims_allowed"])
         self.assertEqual(blocked["attempts"][0]["missing_timing_fields"], ["state_save_wall_seconds"])
@@ -299,6 +414,60 @@ class ScreeningRunTests(unittest.TestCase):
             ])
         self.assertEqual(result, 0)
         self.assertEqual(execute.call_args.kwargs["diagnostic_task_id"], "cancel-async-tasks")
+
+    def test_provider_budget_record_separates_prior_cost_from_current_remaining_budget(self):
+        ledger = load_screening_ledger(ROOT / "ledgers/screening.template.toml")
+        ledger["limits"]["api_cost_usd"] = 8.4
+        payload = {
+            "schema_version": 1,
+            "kind": "screening_provider_budget_continuation",
+            "currency": "USD",
+            "continuation_source_run_id": "screening-prior",
+            "provider_ceiling_usd": 10.0,
+            "prior_known_cost_usd": 1.2,
+            "prior_unknown_requests": 1,
+            "prior_reserved_unknown_usd": 0.4,
+            "remaining_provider_budget_usd": 8.4,
+            "diagnostic_costs_included": True,
+            "source_reference": "synthetic reviewed provider accounting",
+        }
+        record = {**payload, "record_sha256": digest(canonical_json(payload))}
+        path = self.root / "provider-budget.json"
+        path.write_text(json.dumps(record))
+        linked = {
+            "known_cost_usd": 0.2,
+            "unknown_requests": 1,
+            "conservative_unknown_reservation_usd": 0.4,
+        }
+
+        self.assertEqual(
+            _verified_provider_budget_record(path, ledger, "screening-prior", linked),
+            record,
+        )
+        ledger["limits"]["api_cost_usd"] = 8.5
+        with self.assertRaisesRegex(ValueError, "remaining provider budget"):
+            _verified_provider_budget_record(path, ledger, "screening-prior", linked)
+
+    def test_cli_routes_read_only_continuation_with_its_budget_record(self):
+        ledger = self.root / "ledger.toml"
+        ledger.write_bytes((ROOT / "ledgers/screening.template.toml").read_bytes())
+        prior = self.root / "screening-prior"
+        prior.mkdir()
+        budget = self.root / "provider-budget.json"
+        budget.write_text("{}")
+        output = self.root / "screening-continuation"
+        output.mkdir()
+        (output / "summary.json").write_text(json.dumps({"status": "complete"}))
+        with patch("src.screening_run.execute_screening", return_value=output) as execute, \
+             patch("sys.stdout", new_callable=io.StringIO):
+            result = main([
+                str(ledger), "--source-commit", "a" * 40,
+                "--continue-from", str(prior),
+                "--provider-budget-record", str(budget),
+            ])
+        self.assertEqual(result, 0)
+        self.assertEqual(execute.call_args.kwargs["continuation_directory"], prior.resolve())
+        self.assertEqual(execute.call_args.kwargs["provider_budget_record_path"], budget.resolve())
 
 
 if __name__ == "__main__":
