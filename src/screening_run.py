@@ -301,7 +301,108 @@ def _explicit_provider_rejection(provider: dict, request_failure: dict | None, r
     )
 
 
-def _evidence_timing_status(timing: dict, *, provider_rejected_before_verifier: bool) -> dict:
+def _terminal_session_exit_evidence(
+    job: Path,
+    replay: dict | None,
+    request_failure: dict | None,
+) -> dict | None:
+    if (
+        request_failure is not None
+        or replay is None
+        or replay.get("status") != "complete"
+        or replay.get("capture_phase") != "teardown_without_verifier"
+    ):
+        return None
+    result_paths = list(job.glob("*/result.json"))
+    trace_paths = list(job.glob("*/agent/command-trace/events.jsonl"))
+    if len(result_paths) != 1 or len(trace_paths) != 1:
+        return None
+    try:
+        result_bytes = result_paths[0].read_bytes()
+        trace_bytes = trace_paths[0].read_bytes()
+        result = json.loads(result_bytes)
+        trace = read_events(trace_paths[0])
+    except (OSError, TypeError, ValueError, json.JSONDecodeError):
+        return None
+    exception = result.get("exception_info") or {}
+    message = exception.get("exception_message")
+    if (
+        exception.get("exception_type") != "RuntimeError"
+        or not isinstance(message, str)
+        or not re.search(
+            r"failed to send (?:non-blocking )?keys:.*no server running on /tmp/tmux-",
+            message,
+            re.DOTALL,
+        )
+    ):
+        return None
+    started = {
+        event.get("command_id"): event
+        for event in trace
+        if event.get("event") == "submission_started"
+        and type(event.get("command_id")) is int
+    }
+    finished = {
+        event.get("command_id"): event
+        for event in trace
+        if event.get("event") == "submission_finished"
+        and type(event.get("command_id")) is int
+    }
+    started_events = [
+        event for event in trace
+        if event.get("event") == "submission_started"
+        and type(event.get("command_id")) is int
+    ]
+    finished_events = [
+        event for event in trace
+        if event.get("event") == "submission_finished"
+        and type(event.get("command_id")) is int
+    ]
+    if (
+        len(started) != len(started_events)
+        or len(finished) != len(finished_events)
+        or any(
+            not isinstance(event.get("keystrokes"), str)
+            or event.get("command_sha256") != digest(event["keystrokes"].encode())
+            or type(event.get("batch")) is not int
+            for event in started_events
+        )
+    ):
+        return None
+    failed = [
+        identifier for identifier, event in finished.items()
+        if event.get("status") in {"uncertain", "rejected_terminal_session_ended"}
+        and event.get("error_type") == "RuntimeError"
+        and identifier in started
+    ]
+    if len(failed) != 1:
+        return None
+    failed_id = failed[0]
+    failed_batch = started[failed_id]["batch"]
+    accepted_exit_commands = [
+        identifier for identifier, event in started.items()
+        if identifier < failed_id
+        and event["batch"] == failed_batch
+        and finished.get(identifier, {}).get("status") == "accepted_by_terminal"
+        and re.search(r"(?:^|[;&|]\s*)exit(?:\s|$)", event.get("keystrokes", ""), re.MULTILINE)
+    ]
+    if not accepted_exit_commands:
+        return None
+    return {
+        "kind": "terminal_session_ended_after_accepted_exit_command",
+        "batch": failed_batch,
+        "failed_command_id": failed_id,
+        "accepted_exit_command_ids": accepted_exit_commands,
+        "native_result_sha256": digest(result_bytes),
+        "command_trace_sha256": digest(trace_bytes),
+    }
+
+
+def _evidence_timing_status(
+    timing: dict,
+    *,
+    pre_verifier_exclusion_reason: str | None,
+) -> dict:
     unexecuted = {
         "first_verifier_wall_seconds",
         "state_restore_wall_seconds",
@@ -312,10 +413,10 @@ def _evidence_timing_status(timing: dict, *, provider_rejected_before_verifier: 
     for name, value in timing.items():
         if _measured_seconds(value):
             result[name] = {"status": "measured", "reason": None}
-        elif provider_rejected_before_verifier and name in unexecuted:
+        elif pre_verifier_exclusion_reason is not None and name in unexecuted:
             result[name] = {
                 "status": "not_applicable",
-                "reason": "explicit_provider_rejection_before_first_verifier",
+                "reason": pre_verifier_exclusion_reason,
             }
         else:
             result[name] = {"status": "missing", "reason": "required_stage_not_measured"}
@@ -338,6 +439,7 @@ def _classify_attempt(attempt: dict, process: dict, recorder: LiveRecorder, tran
     completed_process = not process["timed_out"] and not process["stopped_by_guard"] and process["returncode"] == 0
     metrics = collect_trial_metrics(job, transport, attempt_id, process_complete=completed_process)
     replay, replay_error = _attempt_replay(job)
+    terminal_session_exit = _terminal_session_exit_evidence(job, replay, request_failure)
     log_text = (attempt["attempt_directory"] / "harbor.log").read_text(errors="replace")
     native_timeout = any(
         failure.get("reason") in {"native_execution_timeout", "test_timeout_evidence"}
@@ -398,6 +500,12 @@ def _classify_attempt(attempt: dict, process: dict, recorder: LiveRecorder, tran
     provider_rejected_before_verifier = (
         result == "provider_error" and _explicit_provider_rejection(provider, request_failure, replay)
     )
+    pre_verifier_exclusion_reason = (
+        "explicit_provider_rejection_before_first_verifier"
+        if provider_rejected_before_verifier else
+        "terminal_session_ended_before_first_verifier"
+        if result == "replay_mismatch" and terminal_session_exit is not None else None
+    )
     return {
         "result": result,
         "provider_dispatched": dispatched,
@@ -415,17 +523,17 @@ def _classify_attempt(attempt: dict, process: dict, recorder: LiveRecorder, tran
         "evidence_timing": evidence_timing,
         "evidence_timing_status": _evidence_timing_status(
             evidence_timing,
-            provider_rejected_before_verifier=provider_rejected_before_verifier,
+            pre_verifier_exclusion_reason=pre_verifier_exclusion_reason,
         ),
         "technical_exclusion_basis": {
-            "kind": (
-                "explicit_provider_rejection_before_first_verifier"
-                if provider_rejected_before_verifier else None
+            "kind": pre_verifier_exclusion_reason,
+            "original_error_recorded": (
+                request_failure is not None or terminal_session_exit is not None
             ),
-            "original_error_recorded": request_failure is not None,
             "provider_cost_or_reservation_complete": (
                 provider.get("unknown_attempts_without_reservation") == 0
             ),
+            "terminal_session_exit": terminal_session_exit,
         },
         "verifier_test_ids": test_ids,
         "request_failure": request_failure,
@@ -757,14 +865,15 @@ def _completed_attempt_evidence(record: dict, retrieval_record: dict | None, led
         if not _measured_seconds(timing.get(name))
     ]
     upload_seconds = None if retrieval_record is None else retrieval_record.get("upload_wall_seconds")
-    explicit_rejection = (
-        (classification.get("technical_exclusion_basis") or {}).get("kind")
-        == "explicit_provider_rejection_before_first_verifier"
-    )
+    exclusion_basis = classification.get("technical_exclusion_basis") or {}
+    exclusion_kind = exclusion_basis.get("kind")
+    explicit_rejection = exclusion_kind == "explicit_provider_rejection_before_first_verifier"
+    terminal_session_exit = exclusion_kind == "terminal_session_ended_before_first_verifier"
+    pre_verifier_technical_exclusion = explicit_rejection or terminal_session_exit
     required_timings = [
         name for name in ("task_process_wall_seconds", "state_save_wall_seconds")
         if not _measured_seconds(timing.get(name))
-    ] if explicit_rejection else list(full_replay_timings)
+    ] if pre_verifier_technical_exclusion else list(full_replay_timings)
     if not _measured_seconds(upload_seconds):
         required_timings.append("upload_wall_seconds")
     timing_status = classification.get("evidence_timing_status") or {}
@@ -822,12 +931,32 @@ def _completed_attempt_evidence(record: dict, retrieval_record: dict | None, led
             "state_restore_wall_seconds",
         }
     )
+    terminal_session_exit_complete = (
+        terminal_session_exit
+        and classification["result"] == "replay_mismatch"
+        and replay_checks.get("capture_status") == "complete"
+        and replay_checks.get("capture_phase") == "teardown_without_verifier"
+        and exclusion_basis.get("original_error_recorded") is True
+        and (exclusion_basis.get("terminal_session_exit") or {}).get("kind")
+            == "terminal_session_ended_after_accepted_exit_command"
+        and not required_timings
+        and set(not_applicable_timings) == {
+            "first_verifier_wall_seconds",
+            "repeated_verifier_wall_seconds",
+            "restore_and_repeated_verifier_wall_seconds",
+            "state_restore_wall_seconds",
+        }
+    )
     result = classification["result"]
     quality_result = result in QUALITY_RESULTS
     completed_evidence = (
         remote_hash_verified
         and cost_complete
-        and ((strict_replay_complete and not required_timings) or explicit_rejection_complete)
+        and (
+            (strict_replay_complete and not required_timings)
+            or explicit_rejection_complete
+            or terminal_session_exit_complete
+        )
     )
     disposition = (
         "quality_result_complete" if completed_evidence and quality_result
@@ -842,6 +971,7 @@ def _completed_attempt_evidence(record: dict, retrieval_record: dict | None, led
         "evidence_disposition": disposition,
         "strict_replay_complete": strict_replay_complete,
         "explicit_provider_rejection_complete": explicit_rejection_complete,
+        "terminal_session_exit_complete": terminal_session_exit_complete,
         "remote_hash_verified": remote_hash_verified,
         "timing": {**timing, "upload_wall_seconds": upload_seconds},
         "missing_timing_fields": required_timings,
@@ -997,6 +1127,104 @@ def _verified_provider_budget_record(
     return value
 
 
+def _embedded_continuation(inputs: Path, execution: dict) -> dict | None:
+    claimed = execution.get("continuation_sha256")
+    if claimed is None:
+        return None
+    continuation = json.loads(_continuation_file(inputs, "continuation.json").read_bytes())
+    provider_budget = json.loads(
+        _continuation_file(inputs, "provider-budget-continuation.json").read_bytes()
+    )
+    continuation_payload = {
+        key: value for key, value in continuation.items() if key != "continuation_sha256"
+    }
+    provider_payload = {
+        key: value for key, value in provider_budget.items() if key != "record_sha256"
+    }
+    if (
+        not re.fullmatch(r"[0-9a-f]{64}", claimed)
+        or continuation.get("continuation_sha256") != claimed
+        or digest(canonical_json(continuation_payload)) != claimed
+        or execution.get("provider_budget_record_sha256")
+            != provider_budget.get("record_sha256")
+        or digest(canonical_json(provider_payload)) != provider_budget.get("record_sha256")
+        or continuation.get("provider_budget_record_sha256")
+            != provider_budget.get("record_sha256")
+        or not isinstance(continuation.get("records"), list)
+        or len(continuation["records"]) != continuation.get("linked_completed_attempts")
+    ):
+        raise ValueError("Embedded screening continuation record differs")
+    return continuation
+
+
+def _carried_continuation_records(
+    connection: sqlite3.Connection,
+    embedded: dict | None,
+) -> list[dict]:
+    has_table = connection.execute(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='continuation_links'"
+    ).fetchone()[0]
+    if not has_table:
+        if embedded is not None:
+            raise ValueError("Embedded continuation lacks linked state tables")
+        return []
+    rows = connection.execute(
+        """SELECT cl.*,tr.state AS trial_state,tr.quality_result,tr.failure_category,
+                  tr.verifier_test_ids,tr.finished_at,tr.evidence_sha256 AS trial_evidence_sha256,
+                  tr.plan_index
+           FROM continuation_links cl JOIN trials tr ON tr.trial_id=cl.current_trial_id
+           ORDER BY tr.plan_index"""
+    ).fetchall()
+    if embedded is None:
+        if rows:
+            raise ValueError("Linked continuation state lacks its embedded record")
+        return []
+    records = embedded["records"]
+    if len(rows) != len(records):
+        raise ValueError("Embedded continuation count differs from linked state")
+    indexed = {(record["task_id"], record["repetition"]): record for record in records}
+    if len(indexed) != len(records):
+        raise ValueError("Embedded continuation repeats a task and repetition")
+    checked = []
+    for row_value in rows:
+        row = dict(row_value)
+        record = indexed.get((row["task_id"], row["repetition"]))
+        if record is None or json.loads(row["record_json"]) != record:
+            raise ValueError("Embedded continuation record differs from linked state")
+        expected_state = (
+            "linked_quality_result" if record["result"] in QUALITY_RESULTS
+            else "linked_technical_exclusion"
+        )
+        fields = {
+            "prior_trial_id": "prior_trial_id",
+            "prior_attempt_id": "prior_attempt_id",
+            "result": "result",
+            "evidence_disposition": "evidence_disposition",
+            "evidence_sha256": "evidence_sha256",
+            "provider_request_count": "provider_request_count",
+            "provider_known_cost_usd": "provider_known_cost_usd",
+            "provider_unknown_requests": "provider_unknown_requests",
+            "provider_reserved_unknown_usd": "provider_reserved_unknown_usd",
+            "active_vm_cost_usd": "active_vm_cost_usd",
+            "blob_network_cost_usd": "blob_network_cost_usd",
+            "direct_cost_usd": "direct_cost_usd",
+        }
+        if any(row[column] != record[name] for column, name in fields.items()):
+            raise ValueError("Embedded continuation values differ from linked state")
+        expected_quality = record["result"] if record["result"] in QUALITY_RESULTS else None
+        expected_failure = None if record["result"] == "pass" else record["result"]
+        if (
+            row["trial_state"] != expected_state
+            or row["quality_result"] != expected_quality
+            or row["failure_category"] != expected_failure
+            or row["trial_evidence_sha256"] != record["evidence_sha256"]
+            or row["plan_index"] != record["plan_index"]
+        ):
+            raise ValueError("Embedded continuation trial state differs")
+        checked.append(record)
+    return checked
+
+
 def _prepare_continuation(
     directory: Path,
     setup: dict,
@@ -1064,6 +1292,27 @@ def _prepare_continuation(
     prior_retrieval = json.loads(prior_retrieval_path.read_bytes())
     if prior_retrieval.get("upload_state") != "uploaded":
         raise ValueError("Continuation source Blob evidence is not fully uploaded")
+    embedded = _embedded_continuation(prior_inputs, prior_execution)
+    if embedded is not None:
+        if (
+            (prior_summary.get("continuation") or {}).get("continuation_sha256")
+                != embedded["continuation_sha256"]
+            or embedded.get("current_run_id") != prior_manifest["run_id"]
+            or embedded.get("current_source_commit") != prior_commit
+        ):
+            raise ValueError("Continuation source summary or lineage differs")
+        input_records = [
+            item for item in prior_retrieval.get("items", [])
+            if item.get("item_id") == "run-inputs"
+        ]
+        if (
+            len(input_records) != 1
+            or input_records[0].get("upload_state") != "uploaded"
+            or input_records[0].get("remote_verified_at") is None
+            or (input_records[0].get("metadata") or {}).get("continuation_sha256")
+                != embedded["continuation_sha256"]
+        ):
+            raise ValueError("Embedded continuation inputs lack matching remote evidence")
     retrieval_by_attempt = {
         item["item_id"]: item for item in prior_retrieval.get("items", [])
         if re.fullmatch(r"[0-9a-f]{64}", item.get("item_id", ""))
@@ -1079,6 +1328,7 @@ def _prepare_continuation(
     connection = sqlite3.connect(f"file:{prior_state_path}?mode=ro", uri=True)
     connection.row_factory = sqlite3.Row
     try:
+        carried_records = _carried_continuation_records(connection, embedded)
         rows = connection.execute(
             """SELECT tr.trial_id,tr.task_id,tr.repetition,tr.condition_name,tr.plan_index,
                       tr.state AS trial_state,tr.quality_result,tr.failure_category,
@@ -1097,11 +1347,11 @@ def _prepare_continuation(
         connection.close()
     if unfinished:
         raise ValueError("Continuation source has unresolved attempts; do not rewrite their state")
-    if len(rows) != prior_summary.get("state", {}).get("completed_attempts"):
+    if len(rows) + len(carried_records) != prior_summary.get("state", {}).get("completed_attempts"):
         raise ValueError("Continuation completed-attempt count differs from its summary")
 
     tasks = {task["task_id"]: task for task in prior_inventory["tasks"]}
-    records = []
+    records = list(carried_records)
     for row in rows:
         row = dict(row)
         attempt_id = row["attempt_id"]
@@ -1159,16 +1409,30 @@ def _prepare_continuation(
                 enriched_provider, classification.get("request_failure"), replay
             )
         )
+        terminal_session_exit = _terminal_session_exit_evidence(
+            job, replay, classification.get("request_failure")
+        )
+        pre_verifier_exclusion_reason = (
+            "explicit_provider_rejection_before_first_verifier"
+            if explicit_rejection else
+            "terminal_session_ended_before_first_verifier"
+            if classification["result"] == "replay_mismatch"
+            and terminal_session_exit is not None else None
+        )
         classification["evidence_timing_status"] = _evidence_timing_status(
             classification["evidence_timing"],
-            provider_rejected_before_verifier=explicit_rejection,
+            pre_verifier_exclusion_reason=pre_verifier_exclusion_reason,
         )
         classification["technical_exclusion_basis"] = {
-            "kind": "explicit_provider_rejection_before_first_verifier" if explicit_rejection else None,
-            "original_error_recorded": classification.get("request_failure") is not None,
+            "kind": pre_verifier_exclusion_reason,
+            "original_error_recorded": (
+                classification.get("request_failure") is not None
+                or terminal_session_exit is not None
+            ),
             "provider_cost_or_reservation_complete": (
                 enriched_provider["unknown_attempts_without_reservation"] == 0
             ),
+            "terminal_session_exit": terminal_session_exit,
         }
         checked_record = {**attempt, "classification": classification}
         checked = _completed_attempt_evidence(checked_record, retrieval_record, setup["ledger"])

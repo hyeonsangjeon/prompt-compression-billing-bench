@@ -14,7 +14,19 @@ class ObservedTerminus2(Terminus2):
 
     async def _execute_commands(self, commands, session):
         traced = self.command_trace.session(session)
-        result = await super()._execute_commands(commands, traced)
+        try:
+            result = await super()._execute_commands(commands, traced)
+        except RuntimeError as error:
+            if await session.is_session_alive() is not False:
+                raise
+            self.command_trace.append({
+                "event": "batch_finished", "batch": self.command_trace.batch,
+                "terminal_session_ended": True, "error_type": type(error).__name__,
+            })
+            self.logger.warning(
+                "Terminal session ended; preserving the current workspace for verification"
+            )
+            return False, ""
         self.command_trace.append({
             "event": "batch_finished", "batch": self.command_trace.batch,
             "timed_out": result[0], "terminal_output_sha256": digest(result[1].encode()),

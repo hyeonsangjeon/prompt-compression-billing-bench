@@ -11,7 +11,9 @@ from unittest.mock import patch
 from src.screening_contract import load_screening_ledger
 from src.screening_run import (
     _attempt_intervals,
+    _carried_continuation_records,
     _classify_attempt,
+    _completed_attempt_evidence,
     _reported_task_id,
     _stage_checkpoint,
     _verified_provider_budget_record,
@@ -21,6 +23,7 @@ from src.screening_run import (
 )
 from src.protection import digest
 from src.screening_inventory import canonical_json
+from src.screening_scheduler import ScreeningState, make_screening_manifest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -263,6 +266,201 @@ class ScreeningRunTests(unittest.TestCase):
         self.assertFalse(attempt["quality_result"])
         self.assertEqual(attempt["evidence_disposition"], "technical_exclusion_complete")
         self.assertTrue(checked["additional_claims_allowed"])
+
+    def test_terminal_exit_preserves_narrow_pre_verifier_technical_exclusion(self):
+        job = self.attempt_directory / "jobs" / self.attempt_id / "task"
+        trace_directory = job / "agent" / "command-trace"
+        trace_directory.mkdir(parents=True)
+        result = {
+            "exception_info": {
+                "exception_type": "RuntimeError",
+                "exception_message": (
+                    "task__env: failed to send non-blocking keys: "
+                    "command='tmux send-keys', return_code=1, "
+                    "stdout='no server running on /tmp/tmux-0/default\\n'"
+                ),
+            },
+        }
+        (job / "result.json").write_text(json.dumps(result))
+        trace = [
+            {
+                "event": "submission_started",
+                "command_id": 19,
+                "batch": 7,
+                "keystrokes": "build; rc=$?; exit $rc\n",
+                "command_sha256": digest(b"build; rc=$?; exit $rc\n"),
+            },
+            {
+                "event": "submission_finished",
+                "command_id": 19,
+                "status": "accepted_by_terminal",
+            },
+            {
+                "event": "submission_started",
+                "command_id": 20,
+                "batch": 7,
+                "keystrokes": "echo unreachable\n",
+                "command_sha256": digest(b"echo unreachable\n"),
+            },
+            {
+                "event": "submission_finished",
+                "command_id": 20,
+                "status": "uncertain",
+                "error_type": "RuntimeError",
+            },
+        ]
+        (trace_directory / "events.jsonl").write_text(
+            "".join(json.dumps(event) + "\n" for event in trace)
+        )
+        replay = {
+            "status": "complete",
+            "capture_phase": "teardown_without_verifier",
+            "capture_wall_seconds": 1.25,
+            "manifest_sha256": "b" * 64,
+        }
+        classified = self.classify(
+            quality_outcome(),
+            replay=(replay, "replay_capture_phase_invalid"),
+            complete=False,
+        )
+
+        self.assertEqual(classified["result"], "replay_mismatch")
+        self.assertEqual(
+            classified["technical_exclusion_basis"]["kind"],
+            "terminal_session_ended_before_first_verifier",
+        )
+        terminal_evidence = classified["technical_exclusion_basis"]["terminal_session_exit"]
+        self.assertEqual(terminal_evidence["batch"], 7)
+        self.assertEqual(terminal_evidence["failed_command_id"], 20)
+        self.assertEqual(terminal_evidence["accepted_exit_command_ids"], [19])
+        self.assertEqual(
+            {
+                name for name, status in classified["evidence_timing_status"].items()
+                if status["status"] == "not_applicable"
+            },
+            {
+                "first_verifier_wall_seconds",
+                "state_restore_wall_seconds",
+                "repeated_verifier_wall_seconds",
+                "restore_and_repeated_verifier_wall_seconds",
+            },
+        )
+
+        retrieval = {
+            "upload_state": "uploaded",
+            "remote_verified_at": "2026-09-15T00:00:00+00:00",
+            "upload_wall_seconds": 0.5,
+            "payload": {"bytes": 1000},
+            "manifest_bytes": 200,
+            "operations": {
+                "payload_write": {"started": 1, "succeeded": 1},
+                "manifest_write": {"started": 1, "succeeded": 1},
+                "payload_verify_read": {"started": 1, "succeeded": 1},
+                "manifest_verify_read": {"started": 1, "succeeded": 1},
+            },
+        }
+        checked = _completed_attempt_evidence(
+            {
+                "attempt_id": self.attempt_id,
+                "task_id": "make-doom-for-mips",
+                "classification": classified,
+                "active_vm_cost": {"calculated_cost_usd": 0.02},
+            },
+            retrieval,
+            load_screening_ledger(ROOT / "ledgers/screening.template.toml"),
+        )
+        self.assertTrue(checked["terminal_session_exit_complete"])
+        self.assertEqual(checked["evidence_disposition"], "technical_exclusion_complete")
+
+        result["exception_info"]["exception_message"] = "unrelated runtime failure"
+        (job / "result.json").write_text(json.dumps(result))
+        unrelated = self.classify(
+            quality_outcome(),
+            replay=(replay, "replay_capture_phase_invalid"),
+            complete=False,
+        )
+        self.assertIsNone(unrelated["technical_exclusion_basis"]["kind"])
+
+    def test_carried_continuation_records_can_be_linked_once_into_the_next_run(self):
+        inventory_payload = {
+            "tasks": [
+                {
+                    "task_id": f"task-{index:03d}",
+                    "exclusion": None,
+                    "image": {
+                        "pinned_reference": "owner/image@sha256:" + f"{index:064x}",
+                    },
+                }
+                for index in range(89)
+            ],
+        }
+        inventory = {
+            **inventory_payload,
+            "inventory_sha256": digest(canonical_json(inventory_payload)),
+        }
+        manifest = make_screening_manifest(inventory, "a" * 40, "screening-first")
+        first_state = ScreeningState(self.root / "first.sqlite3")
+        self.addCleanup(first_state.close)
+        first_state.initialize(manifest)
+        first_trial = next(
+            trial for trial in manifest["trials"]
+            if trial["task_id"] == "task-000" and trial["repetition"] == 1
+        )
+        record = {
+            "prior_trial_id": "1" * 64,
+            "prior_attempt_id": "2" * 64,
+            "task_id": "task-000",
+            "repetition": 1,
+            "plan_index": first_trial["plan_index"],
+            "result": "pass",
+            "evidence_disposition": "quality_result_complete",
+            "evidence_sha256": "3" * 64,
+            "provider_request_count": 2,
+            "provider_known_cost_usd": 0.2,
+            "provider_unknown_requests": 0,
+            "provider_reserved_unknown_usd": 0,
+            "active_vm_cost_usd": 0.1,
+            "blob_network_cost_usd": 0.001,
+            "direct_cost_usd": 0.301,
+            "verifier_test_ids": [],
+            "finished_at": "2026-09-15T00:00:00+00:00",
+        }
+        first_lineage = {
+            "prior_run_id": "screening-prior",
+            "prior_source_commit": "b" * 40,
+            "prior_ledger_sha256": "c" * 64,
+            "prior_inventory_sha256": inventory["inventory_sha256"],
+            "prior_manifest_sha256": "d" * 64,
+            "source_diff_sha256": "e" * 64,
+            "prior_active_vm_cost_usd": 0.1,
+            "prior_blob_network_cost_usd": 0.001,
+            "provider_ceiling_usd": 10.0,
+            "prior_provider_known_cost_usd": 0.2,
+            "prior_provider_unknown_requests": 0,
+            "prior_provider_reserved_unknown_usd": 0,
+            "remaining_provider_budget_usd": 9.8,
+            "provider_budget_record_sha256": "f" * 64,
+        }
+        first_state.link_continuation(first_lineage, [record])
+
+        carried = _carried_continuation_records(
+            first_state.connection,
+            {"records": [record]},
+        )
+        self.assertEqual(carried, [record])
+
+        next_manifest = make_screening_manifest(inventory, "a" * 40, "screening-next")
+        next_state = ScreeningState(self.root / "next.sqlite3")
+        self.addCleanup(next_state.close)
+        next_state.initialize(next_manifest)
+        next_lineage = {**first_lineage, "prior_run_id": "screening-first"}
+        next_state.link_continuation(next_lineage, carried)
+        next_trial = next(
+            trial for trial in next_state.claim(89) if trial["task_id"] == "task-000"
+        )
+        self.assertEqual(next_trial["task_id"], "task-000")
+        self.assertEqual(next_trial["repetition"], 2)
+        self.assertEqual(next_state.summary()["linked_completed_attempts"], 1)
 
     def test_active_vm_intervals_require_real_ordered_timestamps(self):
         attempt = {"attempt": {"attempt_id": self.attempt_id}, "process": self.process}
