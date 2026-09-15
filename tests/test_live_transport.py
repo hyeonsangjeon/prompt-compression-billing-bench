@@ -222,6 +222,28 @@ class LiveTransportTests(unittest.TestCase):
         recorder.sender = lambda _body: (200, response_fixture(), {})
         self.assertEqual(recorder.complete("trial-two", canonical(request_fixture()))[0], 200)
 
+    def test_trial_scoped_delivery_failure_does_not_stop_other_screening_trial(self):
+        recorder = LiveRecorder(
+            self.root / "screening-delivery", self.ledger, "a" * 40,
+            NoOpCompressor({"options": {}}, self.root), FixtureEncoder(), self.queue,
+            lambda _body: (200, response_fixture(), {}),
+            evidence_kind="synthetic_validation", request_error_scope="trial",
+        )
+        recorder.register_trial("trial-one", "task-one", 1)
+        recorder.register_trial("trial-two", "task-two", 1)
+        recorder.record_delivery_failure("trial-one", OSError("synthetic client disconnect"))
+        self.assertFalse(recorder.stopped.is_set())
+        with self.assertRaises(TrialRequestBlocked):
+            recorder.complete("trial-one", canonical(request_fixture()))
+        self.assertEqual(recorder.complete("trial-two", canonical(request_fixture()))[0], 200)
+
+    def test_run_scoped_delivery_failure_stops_subsequent_requests(self):
+        self.recorder.record_delivery_failure("trial-one", OSError("synthetic client disconnect"))
+        self.assertTrue(self.recorder.stopped.is_set())
+        self.assertEqual(self.recorder.failure["reason"], "ClientDisconnectedAfterDispatch")
+        with self.assertRaises(ProtectionViolation):
+            self.recorder.complete("trial-one", canonical(request_fixture()))
+
     def test_trial_scope_keeps_protection_failure_run_wide(self):
         self.recorder.request_error_scope = "trial"
         self.recorder.serialize = lambda payload: canonical({**payload, "temperature": 1})

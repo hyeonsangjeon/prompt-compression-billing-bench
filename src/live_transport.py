@@ -337,6 +337,23 @@ class LiveRecorder:
                 self.failure = {"reason": reason, "details": details or {}}
                 self.event({"event": "run_stopped", **self.failure})
 
+    def record_delivery_failure(self, trial_id: str, error: OSError) -> None:
+        failure = {
+            "reason": "ClientDisconnectedAfterDispatch",
+            "details": {"error_type": type(error).__name__, "message": str(error)},
+        }
+        if self.request_error_scope == "run":
+            self.stop(failure["reason"], failure["details"])
+            return
+        with self.lock:
+            trial = self.trials.get(trial_id)
+            if trial is not None and trial["failure"] is None:
+                trial["failure"] = failure
+                self.event({
+                    "event": "trial_response_delivery_failed", "trial_id": trial_id,
+                    **failure,
+                })
+
     def check(self):
         if self.stopped.is_set():
             raise ProtectionViolation("All subsequent requests are blocked", self.failure)
@@ -613,8 +630,8 @@ def start_live_proxy(recorder: LiveRecorder, key: str) -> ThreadingHTTPServer:
                 self.wfile.flush()
                 if status == 200:
                     recorder.event({"event": "response_delivered", "trial_id": match[1]})
-            except OSError:
-                recorder.stop("ClientDisconnectedAfterDispatch")
+            except OSError as error:
+                recorder.record_delivery_failure(match[1], error)
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     server.daemon_threads = False

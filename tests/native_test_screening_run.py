@@ -121,6 +121,13 @@ class ScreeningRunTests(unittest.TestCase):
         self.assertTrue(network["provider_dispatched"])
         self.assertEqual(network["provider_cost"]["unknown_attempts"], 1)
 
+        self.recorder.trials[self.attempt_id]["failure"] = {
+            "reason": "ClientDisconnectedAfterDispatch",
+            "details": {"error_type": "OSError", "message": "synthetic"},
+        }
+        disconnected = self.classify(quality_outcome(), events=dispatched)
+        self.assertEqual(disconnected["result"], "network_error")
+
     def test_verifier_pass_without_provider_dispatch_is_a_preparation_error(self):
         classified = self.classify(quality_outcome(reward=1, valid=True), events=())
         self.assertEqual(classified["result"], "setup_error")

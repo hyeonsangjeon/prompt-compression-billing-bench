@@ -8,6 +8,7 @@ import io
 import json
 import os
 from pathlib import Path, PurePosixPath
+import posixpath
 import re
 import shutil
 import tarfile
@@ -112,6 +113,62 @@ def archive_inventory(payload: bytes) -> dict:
         **payload_record,
         "tree_sha256": sha256(canonical_json(payload_record)).hexdigest(),
     }
+
+
+def archive_has_members(payload: bytes) -> bool:
+    with tarfile.open(fileobj=io.BytesIO(payload), mode="r:*") as archive:
+        return archive.next() is not None
+
+
+def archive_installation(payload: bytes, target: str) -> tuple[bytes | None, str]:
+    target_path = PurePosixPath(target)
+    if not target_path.is_absolute() or target_path == PurePosixPath("/"):
+        raise ValueError("Replay archive target must be an absolute non-root path")
+    with tarfile.open(fileobj=io.BytesIO(payload), mode="r:*") as archive:
+        members = archive.getmembers()
+        if not members:
+            return None, target_path.parent.as_posix()
+        member_paths = [PurePosixPath(member.name) for member in members]
+        if any(
+            path.is_absolute() or ".." in path.parts or not path.parts
+            or path.parts[0] != target_path.name
+            for path in member_paths
+        ):
+            raise ValueError("Replay archive members do not match the target path")
+
+        def link_leaves_archive(member: tarfile.TarInfo, path: PurePosixPath) -> bool:
+            if not (member.issym() or member.islnk()):
+                return False
+            link = PurePosixPath(member.linkname)
+            if link.is_absolute():
+                return True
+            base = PurePosixPath() if member.islnk() else path.parent
+            normalized = PurePosixPath(posixpath.normpath((base / link).as_posix()))
+            return bool(normalized.parts) and normalized.parts[0] == ".."
+
+        if not any(link_leaves_archive(member, path) for member, path in zip(members, member_paths, strict=True)):
+            return payload, target_path.parent.as_posix()
+
+        prefix = target_path.parent.relative_to("/")
+        destination = io.BytesIO()
+        with tarfile.open(fileobj=destination, mode="w", format=tarfile.PAX_FORMAT) as rebased:
+            for member, path in zip(members, member_paths, strict=True):
+                linkname = member.linkname
+                if member.islnk():
+                    link_path = PurePosixPath(linkname)
+                    linkname = (
+                        link_path.relative_to("/").as_posix()
+                        if link_path.is_absolute()
+                        else (prefix / link_path).as_posix()
+                    )
+                replacement = member.replace(
+                    name=(prefix / path).as_posix(), linkname=linkname, deep=True,
+                )
+                replacement.pax_headers.pop("path", None)
+                replacement.pax_headers.pop("linkpath", None)
+                source = archive.extractfile(member) if member.isfile() else None
+                rebased.addfile(replacement, source)
+        return destination.getvalue(), "/"
 
 
 def redact_inspect(document: list[dict]) -> list[dict]:
@@ -429,17 +486,23 @@ class PreservingDockerEnvironment(DockerEnvironment):
             raise RuntimeError("Could not reset a verifier-visible path")
 
     async def _install_archive(self, container_id: str, path: str, payload: bytes) -> None:
-        parent = PurePosixPath(path).parent.as_posix()
+        installation, parent = archive_installation(payload, path)
+        if installation is None:
+            return
         code, _ = await self._command(
             ["docker", "exec", container_id, "mkdir", "-p", "--", parent], check=False
         )
         if code != 0:
             raise RuntimeError("Could not create a replay parent directory")
-        code, _ = await self._command(
-            ["docker", "cp", "-", f"{container_id}:{parent}"], input_bytes=payload, timeout=600, check=False
+        code, output = await self._command(
+            ["docker", "cp", "-", f"{container_id}:{parent}"], input_bytes=installation,
+            timeout=600, check=False,
         )
         if code != 0:
-            raise RuntimeError("Could not install a replay archive")
+            message = output.decode(errors="replace").strip()
+            raise RuntimeError(
+                f"Could not install replay archive for {path}: {message or 'docker cp failed without output'}"
+            )
 
     async def _restore_from_base(self, helper_id: str, container_id: str, path: str) -> None:
         await self._remove_path(container_id, path)
@@ -483,13 +546,24 @@ class PreservingDockerEnvironment(DockerEnvironment):
             raise RuntimeError("Could not create an immutable-image replay helper")
         helper_id = helper_bytes.decode().strip()
         try:
+            captured_archives = {
+                record["path"]: container_directory / record["payload"]["path"]
+                for record in container["changed_paths"]
+                if record.get("payload") is not None
+            }
+            empty_snapshot_paths = {
+                path for path, archive in captured_archives.items()
+                if not archive_has_members(archive.read_bytes())
+            }
             reset_paths = [
                 entry["path"] for entry in changed_leaf_paths(current_diff)
                 if not self._under_mount(entry["path"], destinations)
+                and entry["path"] not in empty_snapshot_paths
             ]
             reset_paths.extend(
                 path for path in deleted_root_paths(current_diff)
                 if not self._under_mount(path, destinations)
+                and path not in empty_snapshot_paths
             )
             for path in sorted(set(reset_paths), key=lambda value: (value.count("/"), value), reverse=True):
                 await self._restore_from_base(helper_id, container_id, path)
@@ -500,11 +574,13 @@ class PreservingDockerEnvironment(DockerEnvironment):
                 payload_record = record.get("payload")
                 if payload_record is None:
                     raise RuntimeError("A changed verifier-visible path lacks a snapshot")
+                if record["path"] in empty_snapshot_paths:
+                    continue
                 await self._remove_path(container_id, record["path"])
                 await self._install_archive(
                     container_id,
                     record["path"],
-                    (container_directory / payload_record["path"]).read_bytes(),
+                    captured_archives[record["path"]].read_bytes(),
                 )
             for mount in container["mounts"]:
                 await self._restore_mount(container_id, mount, container_directory)

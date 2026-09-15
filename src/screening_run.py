@@ -287,7 +287,9 @@ def _classify_attempt(attempt: dict, process: dict, recorder: LiveRecorder, tran
         result = "timeout"
     elif request_failure is not None:
         reason = request_failure["reason"]
-        result = "network_error" if reason in {"TimeoutError", "ConnectionError", "OSError"} else "provider_error"
+        result = "network_error" if reason in {
+            "TimeoutError", "ConnectionError", "OSError", "ClientDisconnectedAfterDispatch",
+        } else "provider_error"
     elif any(failure.get("reason") == "native_exception" and re.search(
         r"Verifier|Reward", failure.get("exception_type") or ""
     ) for failure in outcome["failures"]):

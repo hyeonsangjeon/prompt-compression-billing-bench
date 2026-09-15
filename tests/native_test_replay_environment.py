@@ -14,6 +14,8 @@ from unittest.mock import AsyncMock
 
 from src.replay_environment import (
     PreservingDockerEnvironment,
+    archive_has_members,
+    archive_installation,
     archive_inventory,
     changed_leaf_paths,
     deleted_root_paths,
@@ -80,6 +82,85 @@ class ReplayEnvironmentTests(unittest.IsolatedAsyncioTestCase):
             "sha256": sha256(b"answer\n").hexdigest(),
         })
 
+    def test_archive_installation_rebases_symlink_that_leaves_copy_destination(self):
+        payload = io.BytesIO()
+        with tarfile.open(fileobj=payload, mode="w") as archive:
+            link = tarfile.TarInfo("pdb3.11")
+            link.type = tarfile.SYMTYPE
+            link.linkname = "../lib/python3.11/pdb.py"
+            archive.addfile(link)
+        installation, destination = archive_installation(payload.getvalue(), "/usr/bin/pdb3.11")
+        self.assertEqual(destination, "/")
+        with tarfile.open(fileobj=io.BytesIO(installation), mode="r:*") as archive:
+            member = archive.getmembers()[0]
+        self.assertEqual(member.name, "usr/bin/pdb3.11")
+        self.assertEqual(member.linkname, "../lib/python3.11/pdb.py")
+
+    def test_archive_installation_keeps_internal_symlink_payload_byte_exact(self):
+        payload = io.BytesIO()
+        with tarfile.open(fileobj=payload, mode="w") as archive:
+            link = tarfile.TarInfo("pdb3")
+            link.type = tarfile.SYMTYPE
+            link.linkname = "pdb3.11"
+            archive.addfile(link)
+        source = payload.getvalue()
+        installation, destination = archive_installation(source, "/usr/bin/pdb3")
+        self.assertEqual(destination, "/usr/bin")
+        self.assertEqual(installation, source)
+
+    def test_archive_installation_rejects_members_from_another_target(self):
+        payload = io.BytesIO()
+        with tarfile.open(fileobj=payload, mode="w") as archive:
+            file = tarfile.TarInfo("other")
+            file.size = 0
+            archive.addfile(file, io.BytesIO())
+        with self.assertRaisesRegex(ValueError, "do not match"):
+            archive_installation(payload.getvalue(), "/usr/bin/pdb3")
+
+    def test_archive_installation_keeps_empty_socket_snapshot_as_no_op(self):
+        payload = io.BytesIO()
+        with tarfile.open(fileobj=payload, mode="w"):
+            pass
+        source = payload.getvalue()
+        installation, destination = archive_installation(source, "/tmp/tmux-0/default")
+        self.assertEqual(destination, "/tmp/tmux-0")
+        self.assertIsNone(installation)
+        self.assertFalse(archive_has_members(source))
+
+    async def test_restore_leaves_empty_special_path_snapshot_in_place(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            container_directory = directory / "container"
+            container_directory.mkdir()
+            payload = io.BytesIO()
+            with tarfile.open(fileobj=payload, mode="w"):
+                pass
+            archive = container_directory / "change-00000.tar"
+            archive.write_bytes(payload.getvalue())
+            environment = object.__new__(PreservingDockerEnvironment)
+            environment._replay_directory = directory
+            environment._container_details = AsyncMock(return_value=(
+                [{"Mounts": []}], [{"change": "A", "path": "/tmp/tmux-0/default"}], 0, b"",
+            ))
+            environment._command = AsyncMock(side_effect=[(0, b"helper"), (0, b"")])
+            environment._restore_from_base = AsyncMock()
+            environment._remove_path = AsyncMock()
+            environment._install_archive = AsyncMock()
+            await environment._restore_container({
+                "container_id": "container-id",
+                "container_name": "/container",
+                "image_id": "sha256:image",
+                "diff": [{"change": "A", "path": "/tmp/tmux-0/default"}],
+                "changed_paths": [{
+                    "change": "A", "path": "/tmp/tmux-0/default",
+                    "payload": {"path": archive.name},
+                }],
+                "mounts": [],
+            })
+            environment._restore_from_base.assert_not_awaited()
+            environment._remove_path.assert_not_awaited()
+            environment._install_archive.assert_not_awaited()
+
     def test_verifier_signature_ignores_duration_but_keeps_test_identity(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
@@ -137,7 +218,7 @@ class ReplayEnvironmentTests(unittest.IsolatedAsyncioTestCase):
             name = "replay-contract-" + uuid.uuid4().hex[:12]
             created = subprocess.run(
                 [
-                    "docker", "run", "-d", "--name", name,
+                    "docker", "run", "-d", "--name", name, "--user", "0",
                     "-v", f"{mounted}:/workspace", image,
                     "sh", "-c", "sleep 600",
                 ],
@@ -154,6 +235,14 @@ class ReplayEnvironmentTests(unittest.IsolatedAsyncioTestCase):
             )
             subprocess.run(
                 ["docker", "exec", container_id, "sh", "-c", "printf 'captured root\\n' > /replay-root.txt"],
+                check=True,
+                timeout=30,
+            )
+            subprocess.run(
+                [
+                    "docker", "exec", container_id, "sh", "-c",
+                    "mkdir -p /usr/local/bin && ln -s ../../../tmp/replay-target /usr/local/bin/replay-link",
+                ],
                 check=True,
                 timeout=30,
             )
@@ -188,6 +277,14 @@ class ReplayEnvironmentTests(unittest.IsolatedAsyncioTestCase):
             ).stdout
             self.assertEqual(root_value, "captured root\n")
             self.assertEqual((mounted / "result.txt").read_text(), "captured mount\n")
+            link_value = subprocess.run(
+                ["docker", "exec", container_id, "readlink", "/usr/local/bin/replay-link"],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            ).stdout
+            self.assertEqual(link_value, "../../../tmp/replay-target\n")
 
 
 if __name__ == "__main__":
