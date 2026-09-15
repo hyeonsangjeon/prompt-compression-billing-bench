@@ -24,6 +24,7 @@ from src.replay_environment import (
     deleted_root_paths,
     normalized_absolute_paths,
     nul_path_payload,
+    outermost_absolute_paths,
     parse_docker_diff,
     redact_inspect,
     replay_bundle_manifest,
@@ -76,6 +77,29 @@ class ReplayEnvironmentTests(unittest.IsolatedAsyncioTestCase):
         )
         with self.assertRaises(ValueError):
             nul_path_payload(["/"], relative=True)
+
+    def test_outermost_paths_remove_descendants_without_hiding_siblings(self):
+        self.assertEqual(
+            outermost_absolute_paths([
+                "/tmp/tree/child", "/tmp/tree", "/tmp/other", "/tmp/tree/second",
+            ]),
+            ["/tmp/other", "/tmp/tree"],
+        )
+
+    async def test_remove_paths_uses_one_find_process_with_literal_path_arguments(self):
+        environment = object.__new__(PreservingDockerEnvironment)
+        environment._command = AsyncMock(return_value=(0, b""))
+
+        await environment._remove_paths(
+            "container-id", ["/tmp/tree/child", "/tmp/tree", "/tmp/other\nvalue"],
+        )
+
+        arguments = environment._command.await_args.args[0]
+        self.assertEqual(arguments, [
+            "docker", "exec", "container-id", "find",
+            "/tmp/other\nvalue", "/tmp/tree", "-depth", "-delete",
+        ])
+        self.assertNotIn("input_bytes", environment._command.await_args.kwargs)
 
     def test_mounts_are_sorted_by_destination_before_hashing(self):
         mounts = [

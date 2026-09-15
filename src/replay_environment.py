@@ -78,6 +78,14 @@ def normalized_absolute_paths(paths: list[str]) -> list[str]:
     return sorted(normalized)
 
 
+def outermost_absolute_paths(paths: list[str]) -> list[str]:
+    selected = []
+    for path in sorted(normalized_absolute_paths(paths), key=lambda value: (value.count("/"), value)):
+        if not any(path.startswith(parent.rstrip("/") + "/") for parent in selected):
+            selected.append(path)
+    return selected
+
+
 def nul_path_payload(paths: list[str], *, relative: bool) -> bytes:
     normalized = normalized_absolute_paths(paths)
     values = [path.removeprefix("/") if relative else path for path in normalized]
@@ -431,25 +439,9 @@ done
     async def _remove_paths(self, container_id: str, paths: list[str]) -> None:
         if not paths:
             return
-        script = """
-set -euo pipefail
-paths=()
-flush_paths() {
-    if (( ${#paths[@]} )); then
-        rm -rf -- "${paths[@]}"
-        paths=()
-    fi
-}
-while IFS= read -r -d '' path; do
-    [[ "$path" == /* && "$path" != / ]] || exit 64
-    paths+=("$path")
-    if (( ${#paths[@]} >= 256 )); then flush_paths; fi
-done
-flush_paths
-""".strip()
+        roots = outermost_absolute_paths(paths)
         return_code, output = await self._command(
-            ["docker", "exec", "-i", container_id, "bash", "-c", script],
-            input_bytes=nul_path_payload(paths, relative=False),
+            ["docker", "exec", container_id, "find", *roots, "-depth", "-delete"],
             check=False,
         )
         if return_code != 0:

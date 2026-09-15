@@ -129,6 +129,20 @@ class ScreeningRunTests(unittest.TestCase):
         disconnected = self.classify(quality_outcome(), events=dispatched)
         self.assertEqual(disconnected["result"], "network_error")
 
+        timed_out = quality_outcome(
+            reward=0,
+            valid=True,
+            categories=("timeout", "wrong_answer"),
+            failures=(
+                {"category": "timeout", "reason": "native_execution_timeout",
+                 "exception_type": "AgentTimeoutError"},
+                {"category": "wrong_answer", "reason": "native_assertion_failed"},
+            ),
+        )
+        timeout = self.classify(timed_out, events=dispatched)
+        self.assertEqual(timeout["result"], "timeout")
+        self.assertEqual(timeout["request_failure"]["reason"], "ClientDisconnectedAfterDispatch")
+
     def test_verifier_pass_without_provider_dispatch_is_a_preparation_error(self):
         classified = self.classify(quality_outcome(reward=1, valid=True), events=())
         self.assertEqual(classified["result"], "setup_error")
@@ -189,7 +203,7 @@ class ScreeningRunTests(unittest.TestCase):
             "run-state-000001", "run-state-000002",
         ])
 
-    def test_batch_verification_requires_quality_replay_timings_and_remote_hashes(self):
+    def test_batch_verification_requires_replay_timings_and_remote_hashes(self):
         attempt_id = self.attempt_id
         timing = {
             "task_process_wall_seconds": 10.0,
@@ -228,6 +242,15 @@ class ScreeningRunTests(unittest.TestCase):
         )
         self.assertTrue(checked["additional_claims_allowed"])
         self.assertEqual(checked["attempts"][0]["result"], "wrong_answer")
+        self.assertTrue(checked["attempts"][0]["evidence_complete"])
+
+        finalized[0]["record"]["classification"]["result"] = "timeout"
+        complete_timeout = _verify_completed_batch(
+            finalized, {"item_id": "run-state-000001"}, Spool(), 30, 1
+        )
+        self.assertFalse(complete_timeout["attempts"][0]["quality_result"])
+        self.assertTrue(complete_timeout["attempts"][0]["evidence_complete"])
+        self.assertTrue(complete_timeout["additional_claims_allowed"])
 
         finalized[0]["record"]["classification"]["evidence_timing"]["state_save_wall_seconds"] = None
         blocked = _verify_completed_batch(

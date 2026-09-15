@@ -295,11 +295,18 @@ def _classify_attempt(attempt: dict, process: dict, recorder: LiveRecorder, tran
     metrics = collect_trial_metrics(job, transport, attempt_id, process_complete=completed_process)
     replay, replay_error = _attempt_replay(job)
     log_text = (attempt["attempt_directory"] / "harbor.log").read_text(errors="replace")
+    native_timeout = any(
+        failure.get("reason") in {"native_execution_timeout", "test_timeout_evidence"}
+        for failure in outcome["failures"]
+        if isinstance(failure, dict)
+    )
     result = None
     if not dispatched:
         image_markers = r"(?:manifest unknown|pull access denied|No such image|failed to pull|ImagePull)"
         result = "image_error" if re.search(image_markers, log_text, re.IGNORECASE) else "setup_error"
     elif process["timed_out"]:
+        result = "timeout"
+    elif native_timeout:
         result = "timeout"
     elif request_failure is not None:
         reason = request_failure["reason"]
@@ -688,6 +695,11 @@ def _verify_completed_batch(
             "timing": {**timing, "upload_wall_seconds": upload_seconds},
             "missing_timing_fields": missing_timings,
         })
+        attempts[-1]["evidence_complete"] = (
+            attempts[-1]["strict_replay_complete"]
+            and attempts[-1]["remote_hash_verified"]
+            and not missing_timings
+        )
     checkpoint_record = indexed.get(checkpoint["item_id"])
     checkpoint_verified = (
         checkpoint_record is not None
@@ -698,13 +710,7 @@ def _verify_completed_batch(
         retrieval["status"] == "uploaded"
         and checkpoint_verified
         and bool(attempts)
-        and all(
-            item["quality_result"]
-            and item["strict_replay_complete"]
-            and item["remote_hash_verified"]
-            and not item["missing_timing_fields"]
-            for item in attempts
-        )
+        and all(item["evidence_complete"] for item in attempts)
     )
     return {
         "kind": "screening_batch_evidence_verification",
