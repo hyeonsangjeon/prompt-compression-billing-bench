@@ -401,7 +401,7 @@ while IFS= read -r -d '' path; do
     elif [[ -d "$path" ]]; then kind=directory
     else kind=missing
     fi
-    printf '%s\0%s\0' "$path" "$kind"
+    printf '%s\\0%s\\0' "$path" "$kind"
 done
 """.strip()
         return_code, stdout, stderr = await self._command_streams(

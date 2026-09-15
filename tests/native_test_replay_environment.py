@@ -4,6 +4,7 @@ import io
 import json
 import os
 from pathlib import Path
+import socket
 import subprocess
 import tarfile
 import tempfile
@@ -197,6 +198,25 @@ class ReplayEnvironmentTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(environment._remove_paths.await_count, 2)
             self.assertTrue(all(call.args[1] == [] for call in environment._remove_paths.await_args_list))
             environment._install_root_archive.assert_awaited_once()
+
+    async def test_special_path_classifier_passes_nul_delimiters_through_stdin_only(self):
+        environment = object.__new__(PreservingDockerEnvironment)
+        environment._command_streams = AsyncMock(return_value=(
+            0, b"/tmp/socket path\0socket\0", b"",
+        ))
+
+        records = await environment._special_path_kinds(
+            "container-id", ["/tmp/socket path"],
+        )
+
+        self.assertEqual(records, [{"path": "/tmp/socket path", "kind": "socket"}])
+        arguments = environment._command_streams.await_args.args[0]
+        self.assertNotIn("\0", arguments[-1])
+        self.assertIn(r"printf '%s\0%s\0'", arguments[-1])
+        self.assertEqual(
+            environment._command_streams.await_args.kwargs["input_bytes"],
+            b"/tmp/socket path\0",
+        )
 
     def test_verifier_signature_ignores_duration_but_keeps_test_identity(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -424,6 +444,20 @@ class ReplayEnvironmentTests(unittest.IsolatedAsyncioTestCase):
                 timeout=30,
             ).stdout
             self.assertEqual(link_value, "../../../tmp/replay-target\n")
+
+            socket_path = mounted / "replay-special.sock"
+            unix_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            try:
+                unix_socket.bind(str(socket_path))
+                self.assertEqual(
+                    await environment._special_path_kinds(
+                        container_id, ["/workspace/replay-special.sock"],
+                    ),
+                    [{"path": "/workspace/replay-special.sock", "kind": "socket"}],
+                )
+            finally:
+                unix_socket.close()
+                socket_path.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
