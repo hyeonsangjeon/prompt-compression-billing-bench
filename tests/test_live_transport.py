@@ -1,6 +1,8 @@
 from copy import deepcopy
 import json
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -293,19 +295,68 @@ class LiveTransportTests(unittest.TestCase):
 
 
 class QueueTests(unittest.TestCase):
-    def test_same_deployment_queue_is_exclusive_and_survives_restarts(self):
+    def test_same_deployment_queue_is_shared_and_survives_restarts(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "queue.json"
             queue = DeploymentQueue(path, "deployment", 5, 1000)
-            with self.assertRaises(BlockingIOError):
-                DeploymentQueue(path, "deployment", 5, 1000)
+            second = DeploymentQueue(path, "deployment", 5, 1000)
             queue.reserve(50, threading.Event())
+            second.reserve(60, threading.Event())
+            self.assertEqual(len(json.loads(path.read_text())["reservations"]), 2)
+            second.close()
             queue.close()
             reopened = DeploymentQueue(path, "deployment", 5, 1000)
-            self.assertEqual(len(reopened.reservations), 1)
+            self.assertEqual(len(reopened.reservations), 2)
             reopened.close()
             with self.assertRaises(ValueError):
                 DeploymentQueue(path, "different-deployment", 5, 1000)
+
+    def test_independent_queue_instances_do_not_lose_concurrent_reservations(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "queue.json"
+            queues = [DeploymentQueue(path, "deployment", 8, 1000) for _ in range(8)]
+            self.addCleanup(lambda: [queue.close() for queue in queues])
+            barrier = threading.Barrier(8)
+            failures = []
+
+            def reserve(queue):
+                try:
+                    barrier.wait(timeout=2)
+                    queue.reserve(50, threading.Event())
+                except Exception as error:
+                    failures.append(error)
+
+            threads = [threading.Thread(target=reserve, args=(queue,)) for queue in queues]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(3)
+            self.assertTrue(all(not thread.is_alive() for thread in threads))
+            self.assertEqual(failures, [])
+            self.assertEqual(len(json.loads(path.read_text())["reservations"]), 8)
+
+    def test_separate_processes_share_one_persisted_rate_window(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "queue.json"
+            program = (
+                "from pathlib import Path; import sys,threading; "
+                "from src.live_transport import DeploymentQueue; "
+                "queue=DeploymentQueue(Path(sys.argv[1]),'deployment',8,1000); "
+                "queue.reserve(50,threading.Event()); queue.close()"
+            )
+            processes = [
+                subprocess.Popen(
+                    [sys.executable, "-c", program, str(path)],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                for _ in range(8)
+            ]
+            for process in processes:
+                stdout, stderr = process.communicate(timeout=10)
+                self.assertEqual((process.returncode, stdout, stderr), (0, "", ""))
+            self.assertEqual(len(json.loads(path.read_text())["reservations"]), 8)
 
     def test_oversized_reservation_fails_and_explicit_stop_interrupts_rate_wait(self):
         with tempfile.TemporaryDirectory() as temporary:

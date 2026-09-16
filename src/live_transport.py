@@ -163,31 +163,44 @@ class DeploymentQueue:
             os.close(descriptor)
             raise ValueError("Shared queue must be a regular file")
         self.file = os.fdopen(descriptor, "r+", encoding="utf-8")
+        self.deployment, self.rpm, self.tpm, self.clock = deployment, rpm, tpm, clock
+        self.reservations = deque()
+        self.not_before = 0
+        self.lock = threading.Lock()
         try:
-            fcntl.flock(self.file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            self.file.seek(0)
-            saved = self.file.read()
-            state = json.loads(saved) if saved else {"deployment": deployment, "reservations": [], "not_before": 0}
-            if state["deployment"] != deployment:
-                raise ValueError("Shared queue belongs to another deployment")
-            reservations = state["reservations"]
-            if not isinstance(reservations, list) or any(
-                not isinstance(row, list) or len(row) != 2
-                or type(row[0]) not in (int, float) or not math.isfinite(row[0])
-                or type(row[1]) is not int or row[1] < 1 for row in reservations
-            ) or reservations != sorted(reservations, key=lambda row: row[0]):
-                raise ValueError("Shared queue reservations are invalid")
-            if type(state["not_before"]) not in (int, float) or not math.isfinite(state["not_before"]):
-                raise ValueError("Shared queue cooldown is invalid")
-            if reservations and reservations[-1][0] > clock() + 1:
-                raise ValueError("Clock moved backwards; shared reservations must not be discarded")
+            fcntl.flock(self.file, fcntl.LOCK_EX)
+            empty = not self._reload()
+            if empty:
+                self.persist()
         except Exception:
             self.file.close()
             raise
-        self.deployment, self.rpm, self.tpm, self.clock = deployment, rpm, tpm, clock
-        self.reservations = deque(state["reservations"])
+        finally:
+            if not self.file.closed:
+                fcntl.flock(self.file, fcntl.LOCK_UN)
+
+    def _reload(self) -> bool:
+        self.file.seek(0)
+        saved = self.file.read()
+        state = json.loads(saved) if saved else {
+            "deployment": self.deployment, "reservations": [], "not_before": 0,
+        }
+        if state["deployment"] != self.deployment:
+            raise ValueError("Shared queue belongs to another deployment")
+        reservations = state["reservations"]
+        if not isinstance(reservations, list) or any(
+            not isinstance(row, list) or len(row) != 2
+            or type(row[0]) not in (int, float) or not math.isfinite(row[0])
+            or type(row[1]) is not int or row[1] < 1 for row in reservations
+        ) or reservations != sorted(reservations, key=lambda row: row[0]):
+            raise ValueError("Shared queue reservations are invalid")
+        if type(state["not_before"]) not in (int, float) or not math.isfinite(state["not_before"]):
+            raise ValueError("Shared queue cooldown is invalid")
+        if reservations and reservations[-1][0] > self.clock() + 1:
+            raise ValueError("Clock moved backwards; shared reservations must not be discarded")
+        self.reservations = deque(reservations)
         self.not_before = state["not_before"]
-        self.lock = threading.Lock()
+        return bool(saved)
 
     def persist(self):
         self.file.seek(0)
@@ -202,26 +215,36 @@ class DeploymentQueue:
             raise ValueError("Request token reservation exceeds the configured TPM; do not wait forever")
         started = self.clock()
         while True:
-            current = self.clock()
             if stopped.is_set():
                 raise ProtectionViolation("Run stopped while waiting")
             with self.lock:
-                while self.reservations and self.reservations[0][0] <= current - 60:
-                    self.reservations.popleft()
-                limited = len(self.reservations) >= self.rpm or sum(row[1] for row in self.reservations) + estimated_tokens > self.tpm
-                ready = max(self.not_before, self.reservations[0][0] + 60 if limited else current)
-                if ready <= current:
-                    self.reservations.append([current, estimated_tokens])
-                    self.persist()
-                    return current - started
+                fcntl.flock(self.file, fcntl.LOCK_EX)
+                try:
+                    current = self.clock()
+                    self._reload()
+                    while self.reservations and self.reservations[0][0] <= current - 60:
+                        self.reservations.popleft()
+                    limited = len(self.reservations) >= self.rpm or sum(row[1] for row in self.reservations) + estimated_tokens > self.tpm
+                    ready = max(self.not_before, self.reservations[0][0] + 60 if limited else current)
+                    if ready <= current:
+                        self.reservations.append([current, estimated_tokens])
+                        self.persist()
+                        return current - started
+                finally:
+                    fcntl.flock(self.file, fcntl.LOCK_UN)
             stopped.wait(min(ready - current, 1.0))
 
     def cooldown(self, seconds: float):
         if type(seconds) not in (int, float) or not math.isfinite(seconds) or seconds < 0:
             raise ValueError("Invalid provider cooldown")
         with self.lock:
-            self.not_before = max(self.not_before, self.clock() + seconds)
-            self.persist()
+            fcntl.flock(self.file, fcntl.LOCK_EX)
+            try:
+                self._reload()
+                self.not_before = max(self.not_before, self.clock() + seconds)
+                self.persist()
+            finally:
+                fcntl.flock(self.file, fcntl.LOCK_UN)
 
     def close(self):
         self.file.close()
