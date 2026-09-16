@@ -34,6 +34,8 @@ def apply_no_time_limit_policy() -> dict:
         "verifier_time_limit_seconds": None,
         "agent_setup_time_limit_seconds": None,
         "environment_setup_time_limit_seconds": None,
+        "llm_http_timeout_seconds": None,
+        "llm_http_timeout_implementation": "httpx.Timeout(None)",
         "terminus_max_turns_argument": None,
         "terminus_omitted_argument_internal_default": 1_000_000,
         "terminus_internal_default_is_harness_stop_policy": False,

@@ -4,9 +4,13 @@ import os
 from pathlib import Path
 import socket
 import tempfile
+import time
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
+
+import httpx
+import litellm
 
 from native_helpers import FixtureEncoder, ImmediateQueue, ledger_fixture, response_fixture
 from src.compressors import NoOpCompressor
@@ -34,6 +38,69 @@ class HarborTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(MultiStepTrial._step_verifier_timeout_sec(placeholder, None))
         self.assertIs(ObservedTerminus2._run_agent_loop, Terminus2._run_agent_loop)
         self.assertEqual(policy["terminus_max_turns_argument"], None)
+        self.assertEqual(policy["llm_http_timeout_seconds"], None)
+
+    async def test_actual_harbor_sdk_has_no_http_timeout(self):
+        from harbor.llms.lite_llm import LiteLLM
+        from tenacity import wait_none
+
+        from src.harbor_agent import ObservedTerminus2
+
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        ledger = ledger_fixture()
+        sent = []
+
+        def sender(body):
+            sent.append(json.loads(body))
+            time.sleep(0.2)
+            return 200, response_fixture(
+                '{"analysis":"synthetic","plan":"done","commands":[],"task_complete":true}'
+            ), {}
+
+        recorder = LiveRecorder(
+            root / "transport", ledger, "a" * 40,
+            NoOpCompressor({"options": {}}, root), FixtureEncoder(), ImmediateQueue(), sender,
+            evidence_kind="synthetic_validation", request_error_scope="trial",
+        )
+        recorder.register_trial("trial", "synthetic", 1)
+        server = start_live_proxy(recorder, "synthetic-key")
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        original_connect = socket.socket.connect
+
+        def local_only(connection, address):
+            if not isinstance(address, tuple) or address[0] not in ("127.0.0.1", "::1"):
+                raise AssertionError("Synthetic validation attempted a non-loopback connection")
+            return original_connect(connection, address)
+
+        environment = {
+            "OPENAI_API_KEY": "synthetic-key",
+            "LITELLM_LOCAL_MODEL_COST_MAP": "true",
+            "NO_PROXY": "127.0.0.1,localhost",
+        }
+        agent = ObservedTerminus2(
+            logs_dir=root / "agent", model_name="openai/gpt-5.4",
+            api_base=f"http://127.0.0.1:{server.server_port}/trial/v1",
+            temperature=0, reasoning_effort="none", enable_summarize=False,
+            use_responses_api=False, llm_kwargs={"num_retries": 0},
+        )
+        timeout = agent._llm._llm_kwargs["timeout"]
+        self.assertIsInstance(timeout, httpx.Timeout)
+        self.assertIsNone(timeout.connect)
+        self.assertIsNone(timeout.read)
+        self.assertIsNone(timeout.write)
+        self.assertIsNone(timeout.pool)
+        with patch.dict(os.environ, environment), \
+             patch.object(socket.socket, "connect", local_only), \
+             patch.object(litellm, "request_timeout", 0.05), \
+             patch.object(LiteLLM.call.retry, "wait", wait_none()):
+            response = await agent._llm.call("Synthetic protected instruction")
+        self.assertIn("synthetic", response.content)
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(recorder.trials["trial"]["calls"], 1)
+        self.assertIsNone(recorder.trials["trial"]["failure"])
 
     async def test_actual_harbor_sdk_serialization_reaches_only_fake_upstream(self):
         """Real SDK to loopback; non-loopback socket connections are forbidden."""
