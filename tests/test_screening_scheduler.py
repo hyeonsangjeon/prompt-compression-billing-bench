@@ -248,6 +248,8 @@ class ScreeningSchedulerTests(unittest.TestCase):
             "unknown_requests_without_input_estimate": 0,
         })
         all_cost = self.state.all_provider_cost_state()
+        self.assertIsNone(all_cost["requests"])
+        self.assertEqual(all_cost["request_count_scope"], "unavailable_for_linked_legacy_runs")
         self.assertEqual(all_cost["prior_known_cost_usd"], 1.2)
         self.assertEqual(all_cost["prior_unknown_requests"], 1)
         self.assertEqual(all_cost["known_cost_usd"], 1.2)

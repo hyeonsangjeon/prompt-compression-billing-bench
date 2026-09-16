@@ -736,7 +736,8 @@ class ScreeningState:
     def all_provider_cost_state(self) -> dict:
         current = self.local_provider_cost_state()
         prior = self.connection.execute(
-            """SELECT COALESCE(SUM(prior_provider_known_cost_usd),0) AS known_cost_usd,
+            """SELECT COUNT(*) AS runs,
+                      COALESCE(SUM(prior_provider_known_cost_usd),0) AS known_cost_usd,
                       COALESCE(SUM(prior_provider_unknown_requests),0) AS unknown_requests,
                       COALESCE(SUM(prior_provider_unconfirmed_estimate_usd),0)
                         AS unconfirmed_input_cost_estimate_usd,
@@ -751,6 +752,11 @@ class ScreeningState:
             + current["unconfirmed_input_cost_estimate_usd"]
         )
         return {
+            "requests": current["requests"] if prior["runs"] == 0 else None,
+            "request_count_scope": (
+                "current_run" if prior["runs"] == 0
+                else "unavailable_for_linked_legacy_runs"
+            ),
             "prior_known_cost_usd": prior["known_cost_usd"],
             "prior_unknown_requests": prior["unknown_requests"],
             "prior_unconfirmed_input_cost_estimate_usd": prior[

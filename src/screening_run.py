@@ -21,7 +21,13 @@ import threading
 import time
 
 from accounting import now
-from .blob_retrieval import atomic_json, make_blob_spool, resume_blob_spool, retrieval_settings
+from .blob_retrieval import (
+    atomic_json,
+    file_digest,
+    make_blob_spool,
+    resume_blob_spool,
+    retrieval_settings,
+)
 from .compressors import NoOpCompressor
 from .contracts import safe_child, save_json
 from .harbor_no_time_limits import apply_no_time_limit_policy, command as harbor_command
@@ -1192,6 +1198,301 @@ def _continuation_file(directory: Path, relative: str) -> Path:
     return path
 
 
+_PUBLIC_BLOB_STATE_FIELDS = (
+    "kind", "item_id", "metadata", "destination", "payload", "manifest_blob",
+    "manifest_uploaded_last", "upload_state", "attempts", "first_attempt_at",
+    "last_attempt_at", "last_error_category", "uploaded_at", "payload_etag",
+    "manifest_etag", "remote_verified_at", "payload_verify_request_id",
+    "manifest_verify_request_id", "manifest_bytes", "operations",
+)
+
+
+def _verified_prior_blob_spool(
+    directory: Path,
+    setup: dict,
+    *,
+    run_id: str,
+    source_commit: str,
+    ledger_sha256: str,
+) -> tuple[dict, dict]:
+    if directory.is_symlink():
+        raise ValueError("Continuation Blob spool cannot be a symlink")
+    directory = directory.resolve(strict=True)
+    if not directory.is_dir() or directory.name != run_id:
+        raise ValueError("Continuation Blob spool does not match the prior run")
+    state_paths = sorted(directory.glob("*/state.json"))
+    if not state_paths:
+        raise ValueError("Continuation Blob spool has no staged items")
+    client = setup["retrieval"]["client"]
+    prefix = setup["retrieval"]["prefix"]
+    destination = {
+        "account_url_sha256": digest(client.account_url.encode()),
+        "container": client.container,
+        "prefix": prefix,
+    }
+    items = []
+    inventory = []
+    seen = set()
+    for state_path in state_paths:
+        item_directory = state_path.parent
+        if (
+            item_directory.is_symlink()
+            or state_path.is_symlink()
+            or not state_path.is_file()
+            or item_directory.parent != directory
+        ):
+            raise ValueError("Continuation Blob spool item path is unsafe")
+        try:
+            state_bytes = state_path.read_bytes()
+            state = json.loads(state_bytes)
+        except (OSError, TypeError, ValueError, json.JSONDecodeError) as error:
+            raise ValueError("Continuation Blob spool state is unreadable") from error
+        item_id = state.get("item_id")
+        if (
+            not isinstance(item_id, str)
+            or not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,63}", item_id)
+            or item_id != item_directory.name
+            or item_id in seen
+        ):
+            raise ValueError("Continuation Blob spool item identity is invalid or duplicated")
+        seen.add(item_id)
+        if (
+            state.get("run_id") != run_id
+            or state.get("source_commit") != source_commit
+            or state.get("ledger_sha256") != ledger_sha256
+            or state.get("condition") != "none"
+            or state.get("destination") != destination
+        ):
+            raise ValueError("Continuation Blob spool lineage or destination differs")
+        remote = f"{prefix}/{source_commit}/{run_id}/none/{item_id}"
+        payload_record = state.get("payload") or {}
+        payload = item_directory / payload_record.get("name", "")
+        if (
+            payload_record.get("name") != "payload.tar"
+            or payload_record.get("blob") != remote + "/payload.tar"
+            or state.get("manifest_blob") != remote + "/manifest.json"
+            or payload.is_symlink()
+            or not payload.is_file()
+            or payload.parent != item_directory
+        ):
+            raise ValueError("Continuation Blob spool payload boundary differs")
+        payload_bytes = payload_record.get("bytes")
+        payload_sha256 = payload_record.get("sha256")
+        if (
+            type(payload_bytes) is not int
+            or payload_bytes < 0
+            or not re.fullmatch(r"[0-9a-f]{64}", payload_sha256 or "")
+            or payload.stat().st_size != payload_bytes
+            or file_digest(payload) != payload_sha256
+        ):
+            raise ValueError("Continuation Blob spool payload differs from its recorded hash")
+        operations = state.get("operations") or {}
+        if (
+            state.get("manifest_uploaded_last") is not True
+            or state.get("upload_state") != "uploaded"
+            or not state.get("remote_verified_at")
+            or not state.get("payload_verify_request_id")
+            or not state.get("manifest_verify_request_id")
+            or any(
+                type((operations.get(name) or {}).get("succeeded")) is not int
+                or operations[name]["succeeded"] < 1
+                for name in (
+                    "payload_write", "manifest_write",
+                    "payload_verify_read", "manifest_verify_read",
+                )
+            )
+        ):
+            raise ValueError("Continuation Blob spool item lacks completed remote verification")
+        try:
+            public = {name: state[name] for name in _PUBLIC_BLOB_STATE_FIELDS}
+        except KeyError as error:
+            raise ValueError("Continuation Blob spool state is incomplete") from error
+        public["upload_wall_seconds"] = state.get("upload_wall_seconds")
+        items.append(public)
+        inventory.append({
+            "item_id": item_id,
+            "state_sha256": digest(state_bytes),
+            "payload_bytes": payload_bytes,
+            "payload_sha256": payload_sha256,
+        })
+    report = {
+        "schema_version": 1,
+        "kind": "native_blob_retrieval",
+        **destination,
+        "run_id": run_id,
+        "source_commit": source_commit,
+        "ledger_sha256": ledger_sha256,
+        "condition": "none",
+        "upload_state": "uploaded",
+        "items": sorted(items, key=lambda item: item["item_id"]),
+        "nas_read_verification": "pending_external",
+        "credentials_recorded": False,
+    }
+    inventory_record = {
+        "kind": "read_only_verified_blob_spool_inventory",
+        "run_id": run_id,
+        "source_commit": source_commit,
+        "ledger_sha256": ledger_sha256,
+        "condition": "none",
+        "items": inventory,
+    }
+    recovery = {
+        "kind": "read_only_local_spool_payload_and_remote_verification_state",
+        "item_count": len(items),
+        "inventory_sha256": digest(canonical_json(inventory_record)),
+    }
+    return report, recovery
+
+
+def _merge_prior_retrieval(persisted: dict, spool: dict) -> tuple[dict, dict]:
+    lineage_fields = (
+        "schema_version", "kind", "account_url_sha256", "container", "prefix",
+        "run_id", "source_commit", "ledger_sha256", "condition", "credentials_recorded",
+    )
+    if any(persisted.get(name) != spool.get(name) for name in lineage_fields):
+        raise ValueError("Persisted retrieval and continuation Blob spool lineage differ")
+    persisted_items = persisted.get("items")
+    spool_items = spool.get("items")
+    if not isinstance(persisted_items, list) or not isinstance(spool_items, list):
+        raise ValueError("Continuation retrieval items are invalid")
+    persisted_by_id = {item.get("item_id"): item for item in persisted_items}
+    spool_by_id = {item.get("item_id"): item for item in spool_items}
+    if (
+        None in persisted_by_id
+        or None in spool_by_id
+        or len(persisted_by_id) != len(persisted_items)
+        or len(spool_by_id) != len(spool_items)
+    ):
+        raise ValueError("Continuation retrieval repeats or omits an item identity")
+    if set(persisted_by_id) - set(spool_by_id):
+        raise ValueError("Continuation Blob spool omits a persisted retrieval item")
+    if any(spool_by_id[item_id] != item for item_id, item in persisted_by_id.items()):
+        raise ValueError("Continuation Blob spool changed a persisted retrieval item")
+    recovered = sorted(set(spool_by_id) - set(persisted_by_id))
+    return spool, {
+        "persisted_item_count": len(persisted_items),
+        "effective_item_count": len(spool_items),
+        "recovered_item_count": len(recovered),
+        "recovered_item_ids": recovered,
+    }
+
+
+def _continuation_state_costs(connection: sqlite3.Connection) -> dict:
+    local_provider = dict(connection.execute(
+        """SELECT COUNT(*) AS requests,
+                  COALESCE(SUM(calculated_cost_usd),0) AS known_cost_usd,
+                  COALESCE(SUM(billing_unknown),0) AS unknown_requests,
+                  COALESCE(SUM(CASE WHEN billing_unknown THEN input_cost_estimate_usd ELSE 0 END),0)
+                    AS unconfirmed_input_cost_estimate_usd,
+                  COALESCE(SUM(CASE WHEN billing_unknown AND input_cost_estimate_usd IS NULL
+                                    THEN 1 ELSE 0 END),0)
+                    AS unknown_requests_without_input_estimate,
+                  COALESCE(SUM(CASE WHEN NOT billing_unknown AND calculated_cost_usd IS NULL
+                                    THEN 1 ELSE 0 END),0)
+                    AS invalid_known_requests
+           FROM provider_requests"""
+    ).fetchone())
+    if local_provider.pop("invalid_known_requests"):
+        raise ValueError("Continuation state has a provider cost missing without an unknown marker")
+    has_continuation_runs = connection.execute(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='continuation_runs'"
+    ).fetchone()[0]
+    if has_continuation_runs:
+        linked = dict(connection.execute(
+            """SELECT COUNT(*) AS runs,
+                      COALESCE(SUM(prior_active_vm_cost_usd),0) AS active_vm_cost_usd,
+                      COALESCE(SUM(prior_blob_network_cost_usd),0) AS blob_network_cost_usd,
+                      COALESCE(SUM(prior_provider_known_cost_usd),0) AS provider_known_cost_usd,
+                      COALESCE(SUM(prior_provider_unknown_requests),0) AS provider_unknown_requests,
+                      COALESCE(SUM(prior_provider_unconfirmed_estimate_usd),0)
+                        AS provider_unconfirmed_estimate_usd,
+                      COALESCE(SUM(prior_provider_unknown_without_estimate),0)
+                        AS provider_unknown_without_estimate
+               FROM continuation_runs"""
+        ).fetchone())
+    else:
+        linked = {
+            "runs": 0,
+            "active_vm_cost_usd": 0,
+            "blob_network_cost_usd": 0,
+            "provider_known_cost_usd": 0,
+            "provider_unknown_requests": 0,
+            "provider_unconfirmed_estimate_usd": 0,
+            "provider_unknown_without_estimate": 0,
+        }
+    return {"local_provider": local_provider, "linked_runs": linked}
+
+
+def _recovered_continuation_cost(
+    local_provider: dict,
+    linked_runs: dict,
+    local_active_vm_costs: list[float],
+    retrieval: dict,
+    ledger: dict,
+) -> tuple[dict, dict]:
+    for name in (
+        "requests", "unknown_requests", "unknown_requests_without_input_estimate",
+    ):
+        if type(local_provider.get(name)) is not int or local_provider[name] < 0:
+            raise ValueError("Continuation provider count is invalid")
+    for name in ("known_cost_usd", "unconfirmed_input_cost_estimate_usd"):
+        if not _measured_seconds(local_provider.get(name)):
+            raise ValueError("Continuation provider cost is invalid")
+    for name in (
+        "active_vm_cost_usd", "blob_network_cost_usd", "provider_known_cost_usd",
+        "provider_unconfirmed_estimate_usd",
+    ):
+        if not _measured_seconds(linked_runs.get(name)):
+            raise ValueError("Linked continuation cost is invalid")
+    for name in ("runs", "provider_unknown_requests", "provider_unknown_without_estimate"):
+        if type(linked_runs.get(name)) is not int or linked_runs[name] < 0:
+            raise ValueError("Linked continuation count is invalid")
+    if any(not _measured_seconds(value) for value in local_active_vm_costs):
+        raise ValueError("Continuation attempt VM cost is missing; it cannot be replaced with zero")
+    local_blob = blob_operation_cost(
+        retrieval["items"],
+        ledger["cost"]["blob_write_per_10000_operations_usd"],
+        ledger["cost"]["blob_read_per_10000_operations_usd"],
+        ledger["cost"]["same_region_network_per_gb_usd"],
+    )
+    if local_blob["calculated_cost_usd"] is None:
+        raise ValueError("Continuation Blob or network cost is not fully determined")
+    provider_known = (
+        local_provider["known_cost_usd"] + linked_runs["provider_known_cost_usd"]
+    )
+    provider_unknown = (
+        local_provider["unknown_requests"] + linked_runs["provider_unknown_requests"]
+    )
+    provider_estimate = (
+        local_provider["unconfirmed_input_cost_estimate_usd"]
+        + linked_runs["provider_unconfirmed_estimate_usd"]
+    )
+    provider_unknown_without_estimate = (
+        local_provider["unknown_requests_without_input_estimate"]
+        + linked_runs["provider_unknown_without_estimate"]
+    )
+    active_vm = sum(local_active_vm_costs) + linked_runs["active_vm_cost_usd"]
+    blob_network = local_blob["calculated_cost_usd"] + linked_runs["blob_network_cost_usd"]
+    values = {
+        "prior_active_vm_cost_usd": active_vm,
+        "prior_blob_network_cost_usd": blob_network,
+        "prior_provider_known_cost_usd": provider_known,
+        "prior_provider_unknown_requests": provider_unknown,
+        "prior_provider_unconfirmed_estimate_usd": provider_estimate,
+        "prior_provider_unknown_without_estimate": provider_unknown_without_estimate,
+    }
+    record = {
+        "kind": "read_only_cost_recalculation_from_state_attempts_and_verified_blob_spool",
+        "local_provider_request_count": local_provider["requests"],
+        "linked_prior_run_count": linked_runs["runs"],
+        "local_attempts_with_vm_cost": len(local_active_vm_costs),
+        "local_blob_item_count": len(retrieval["items"]),
+        "local_blob_and_network_cost": local_blob,
+        **values,
+    }
+    return values, record
+
+
 def _embedded_continuation(inputs: Path, execution: dict) -> dict | None:
     claimed = execution.get("continuation_sha256")
     if claimed is None:
@@ -1414,6 +1715,7 @@ def _prepare_continuation(
     source_commit: str,
     manifest: dict,
     prior_directory: Path,
+    prior_spool_directory: Path | None = None,
 ) -> dict:
     if prior_directory.is_symlink():
         raise ValueError("Continuation source directory cannot be a symlink")
@@ -1464,7 +1766,30 @@ def _prepare_continuation(
     prior_retrieval_path = _continuation_file(prior_directory, "retrieval.json")
     prior_state_path = _continuation_file(prior_directory, "state.sqlite3")
     prior_summary = json.loads(prior_summary_path.read_bytes())
-    prior_retrieval = json.loads(prior_retrieval_path.read_bytes())
+    persisted_retrieval = json.loads(prior_retrieval_path.read_bytes())
+    persisted_retrieval_ids = {
+        item.get("item_id") for item in persisted_retrieval.get("items", [])
+    }
+    prior_retrieval = persisted_retrieval
+    retrieval_recovery = None
+    if prior_spool_directory is not None:
+        spool_retrieval, spool_recovery = _verified_prior_blob_spool(
+            prior_spool_directory,
+            setup,
+            run_id=prior_manifest["run_id"],
+            source_commit=prior_commit,
+            ledger_sha256=prior_provenance["ledger_sha256"],
+        )
+        prior_retrieval, merge_recovery = _merge_prior_retrieval(
+            persisted_retrieval, spool_retrieval
+        )
+        retrieval_recovery = {
+            "kind": "persisted_retrieval_plus_read_only_verified_blob_spool",
+            "persisted_retrieval_sha256": digest(prior_retrieval_path.read_bytes()),
+            "effective_retrieval_sha256": digest(canonical_json(prior_retrieval)),
+            **spool_recovery,
+            **merge_recovery,
+        }
     if prior_retrieval.get("upload_state") != "uploaded":
         raise ValueError("Continuation source Blob evidence is not fully uploaded")
     embedded = _embedded_continuation(prior_inputs, prior_execution)
@@ -1518,6 +1843,7 @@ def _prepare_continuation(
         unfinished = connection.execute(
             "SELECT COUNT(*) FROM attempts WHERE state!='completed'"
         ).fetchone()[0]
+        prior_cost_state = _continuation_state_costs(connection)
     finally:
         connection.close()
     if unfinished:
@@ -1528,6 +1854,7 @@ def _prepare_continuation(
     tasks = {task["task_id"]: task for task in prior_inventory["tasks"]}
     records = []
     not_reused = []
+    local_active_vm_costs = []
     for carried in carried_records:
         normalized = _normalize_continuation_record(carried)
         decision = _no_limit_reuse_decision(normalized, legacy_limits)
@@ -1561,6 +1888,9 @@ def _prepare_continuation(
             raise ValueError("Continuation attempt artifact hash differs from its state database")
         if attempt["artifact_manifest_sha256"] != prior_artifacts[row["task_id"]]["artifact_manifest_sha256"]:
             raise ValueError("Continuation attempt artifact differs from the frozen task artifact")
+        local_active_vm_costs.append(
+            (attempt.get("active_vm_cost") or {}).get("calculated_cost_usd")
+        )
         retrieval_record = retrieval_by_attempt.get(attempt_id)
         if (
             retrieval_record is None
@@ -1571,12 +1901,21 @@ def _prepare_continuation(
         ):
             raise ValueError("Continuation attempt lacks matching remotely verified Blob evidence")
         batch_record = batch_by_attempt.get(attempt_id)
-        if (
-            batch_record is None
-            or batch_record.get("result") != (attempt.get("classification") or {}).get("result")
+        if batch_record is not None and (
+            batch_record.get("result") != (attempt.get("classification") or {}).get("result")
             or batch_record.get("remote_hash_verified") is not True
         ):
             raise ValueError("Continuation batch evidence differs from the attempt record")
+        persisted_individual_verification = (
+            batch_record is None and attempt_id in persisted_retrieval_ids
+        )
+        prior_verification_source = (
+            "recorded_batch_evidence_verification"
+            if batch_record is not None else
+            "persisted_retrieval_and_read_only_individual_evidence_verification"
+            if persisted_individual_verification else
+            "missing_recorded_batch_evidence_verification"
+        )
 
         events = read_events(_continuation_file(
             prior_directory, f"attempts/{attempt_id}/transport/events.jsonl"
@@ -1662,18 +2001,22 @@ def _prepare_continuation(
             "blob_payload_sha256": retrieval_record["payload"]["sha256"],
             "blob_remote_verified_at": retrieval_record["remote_verified_at"],
             "technical_exclusion_basis": classification["technical_exclusion_basis"],
+            "prior_verification_source": prior_verification_source,
             "provider_call_limit_reached": attempt["classification"].get(
                 "provider_call_limit_reached", False
             ),
         }
         decision = _no_limit_reuse_decision(candidate, legacy_limits)
         candidate["no_limit_policy_reuse"] = decision
-        if checked["evidence_complete"] and decision["reusable"]:
+        verification_reusable = batch_record is not None or persisted_individual_verification
+        if checked["evidence_complete"] and decision["reusable"] and verification_reusable:
             records.append(candidate)
         else:
             reasons = list(decision["reasons"])
             if not checked["evidence_complete"]:
                 reasons.append("prior_evidence_incomplete")
+            if not verification_reusable:
+                reasons.append("prior_batch_evidence_missing_outside_persisted_retrieval")
             not_reused.append({
                 "prior_trial_id": candidate["prior_trial_id"],
                 "prior_attempt_id": candidate["prior_attempt_id"],
@@ -1692,46 +2035,13 @@ def _prepare_continuation(
         ROOT, "diff", "--binary", prior_commit, source_commit, "--", "src", "schemas",
         "requirements", "fixtures/llmlingua2", "run.py", "accounting.py", "pyproject.toml", "uv.lock",
     )
-    prior_active_vm_cost = (prior_summary.get("cost") or {}).get("active_vm", {}).get(
-        "calculated_cost_usd"
+    recovered_costs, cost_recovery = _recovered_continuation_cost(
+        prior_cost_state["local_provider"],
+        prior_cost_state["linked_runs"],
+        local_active_vm_costs,
+        prior_retrieval,
+        setup["ledger"],
     )
-    prior_blob_network_cost = (prior_summary.get("cost") or {}).get("blob_and_network", {}).get(
-        "calculated_cost_usd"
-    )
-    if not _measured_seconds(prior_active_vm_cost) or not _measured_seconds(prior_blob_network_cost):
-        raise ValueError("Continuation source run-level VM or Blob cost is incomplete")
-    prior_cost = prior_summary.get("cost") or {}
-    prior_provider = prior_cost.get("provider_budget") or prior_cost.get("provider") or {}
-    prior_provider_known = prior_provider.get("known_cost_usd")
-    prior_provider_unknown = prior_provider.get("unknown_requests")
-    prior_provider_estimate = prior_provider.get(
-        "unconfirmed_input_cost_estimate_usd",
-        prior_provider.get("conservative_unknown_reservation_usd"),
-    )
-    prior_provider_unknown_without_estimate = prior_provider.get(
-        "unknown_requests_without_input_estimate",
-        prior_provider.get("unknown_requests_without_reservation", 0),
-    )
-    if (
-        type(prior_provider_known) not in (int, float)
-        or isinstance(prior_provider_known, bool)
-        or not math.isfinite(prior_provider_known)
-        or prior_provider_known < 0
-        or type(prior_provider_unknown) is not int
-        or prior_provider_unknown < 0
-        or type(prior_provider_unknown_without_estimate) is not int
-        or prior_provider_unknown_without_estimate < 0
-        or (
-            prior_provider_estimate is not None
-            and (
-                type(prior_provider_estimate) not in (int, float)
-                or isinstance(prior_provider_estimate, bool)
-                or not math.isfinite(prior_provider_estimate)
-                or prior_provider_estimate < 0
-            )
-        )
-    ):
-        raise ValueError("Continuation source provider accounting is incomplete or invalid")
     lineage = {
         "kind": "screening_read_only_continuation",
         "prior_run_id": prior_manifest["run_id"],
@@ -1741,17 +2051,15 @@ def _prepare_continuation(
         "prior_manifest_sha256": prior_manifest["manifest_sha256"],
         "prior_summary_sha256": digest(prior_summary_path.read_bytes()),
         "prior_retrieval_sha256": digest(prior_retrieval_path.read_bytes()),
+        "prior_effective_retrieval_sha256": digest(canonical_json(prior_retrieval)),
         "prior_state_sha256": digest(prior_state_path.read_bytes()),
         "current_run_id": manifest["run_id"],
         "current_source_commit": source_commit,
         "current_manifest_sha256": manifest["manifest_sha256"],
         "source_diff_sha256": digest(source_diff),
-        "prior_active_vm_cost_usd": prior_active_vm_cost,
-        "prior_blob_network_cost_usd": prior_blob_network_cost,
-        "prior_provider_known_cost_usd": prior_provider_known,
-        "prior_provider_unknown_requests": prior_provider_unknown,
-        "prior_provider_unconfirmed_estimate_usd": prior_provider_estimate,
-        "prior_provider_unknown_without_estimate": prior_provider_unknown_without_estimate,
+        **recovered_costs,
+        "retrieval_recovery": retrieval_recovery,
+        "cost_recovery": cost_recovery,
         "changed_source_files": changed_source_files,
         "prior_completed_attempts": len(rows) + len(carried_records),
         "linked_completed_attempts": len(records),
@@ -1902,6 +2210,7 @@ def execute_screening(
     resume_directory: Path | None = None,
     diagnostic_task_id: str | None = None,
     continuation_directory: Path | None = None,
+    continuation_spool_directory: Path | None = None,
 ) -> Path:
     setup = screening_preflight(ledger_path, source_commit)
     ledger = setup["ledger"]
@@ -1909,6 +2218,8 @@ def execute_screening(
         resume_directory, diagnostic_task_id, continuation_directory
     )) > 1:
         raise ValueError("Resume, diagnostic, and read-only continuation modes are mutually exclusive")
+    if continuation_spool_directory is not None and continuation_directory is None:
+        raise ValueError("A continuation Blob spool requires --continue-from")
     eligible_task_ids = {
         task["task_id"] for task in setup["inventory"]["tasks"] if task["exclusion"] is None
     }
@@ -1947,7 +2258,12 @@ def execute_screening(
         continuation = None
         if continuation_directory is not None:
             continuation = _prepare_continuation(
-                directory, setup, source_commit, manifest, continuation_directory,
+                directory,
+                setup,
+                source_commit,
+                manifest,
+                continuation_directory,
+                continuation_spool_directory,
             )
             state.link_continuation(continuation, continuation["records"])
         spool = make_blob_spool(
@@ -1990,13 +2306,15 @@ def execute_screening(
                 key: continuation[key] for key in (
                     "continuation_sha256", "prior_run_id", "prior_source_commit",
                     "prior_ledger_sha256", "prior_inventory_sha256", "prior_manifest_sha256",
-                    "prior_summary_sha256", "prior_retrieval_sha256", "prior_state_sha256",
+                    "prior_summary_sha256", "prior_retrieval_sha256",
+                    "prior_effective_retrieval_sha256", "prior_state_sha256",
                     "source_diff_sha256", "prior_active_vm_cost_usd",
                     "prior_blob_network_cost_usd", "linked_completed_attempts", "linked_quality_results",
                     "linked_technical_exclusions",
                     "prior_provider_known_cost_usd", "prior_provider_unknown_requests",
                     "prior_provider_unconfirmed_estimate_usd",
-                    "prior_provider_unknown_without_estimate", "link_basis",
+                    "prior_provider_unknown_without_estimate", "retrieval_recovery",
+                    "cost_recovery", "link_basis",
                 )
             }
     else:
@@ -2255,6 +2573,7 @@ def main(arguments=None) -> int:
     action.add_argument("--resume", type=Path)
     action.add_argument("--diagnose-task")
     action.add_argument("--continue-from", type=Path)
+    parser.add_argument("--continue-blob-spool", type=Path)
     args = parser.parse_args(arguments)
     try:
         if args.check:
@@ -2282,6 +2601,9 @@ def main(arguments=None) -> int:
             diagnostic_task_id=args.diagnose_task,
             continuation_directory=(
                 None if args.continue_from is None else args.continue_from.resolve()
+            ),
+            continuation_spool_directory=(
+                None if args.continue_blob_spool is None else args.continue_blob_spool.resolve()
             ),
         )
         summary = json.loads((directory / "summary.json").read_bytes())

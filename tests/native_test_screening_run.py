@@ -18,10 +18,13 @@ from src.screening_run import (
     _classify_attempt,
     _completed_attempt_evidence,
     _legacy_policy_transition,
+    _merge_prior_retrieval,
     _no_limit_reuse_decision,
+    _recovered_continuation_cost,
     _reported_task_id,
     _run_completion_driven,
     _stage_checkpoint,
+    _verified_prior_blob_spool,
     _verify_completed_batch,
     main,
     screening_harbor_config,
@@ -458,6 +461,144 @@ class ScreeningRunTests(unittest.TestCase):
         self.assertEqual(next_trial["repetition"], 2)
         self.assertEqual(next_state.summary()["linked_completed_attempts"], 1)
 
+    def test_read_only_blob_spool_recovers_only_hash_matched_verified_items(self):
+        run_id = "screening-prior"
+        source_commit = "a" * 40
+        ledger_sha256 = "b" * 64
+        spool = self.root / run_id
+        spool.mkdir()
+        client = SimpleNamespace(
+            account_url="https://synthetic.blob.core.windows.net",
+            container="runs",
+        )
+        setup = {"retrieval": {"client": client, "prefix": "screening"}}
+        destination = {
+            "account_url_sha256": digest(client.account_url.encode()),
+            "container": "runs",
+            "prefix": "screening",
+        }
+        item_ids = ["run-inputs", "c" * 64]
+        for item_id in item_ids:
+            item = spool / item_id
+            item.mkdir()
+            payload = item / "payload.tar"
+            payload.write_bytes((item_id + "-evidence").encode())
+            remote = f"screening/{source_commit}/{run_id}/none/{item_id}"
+            operations = {
+                name: {"started": 1, "succeeded": 1}
+                for name in (
+                    "payload_write", "manifest_write",
+                    "payload_verify_read", "manifest_verify_read",
+                )
+            }
+            state = {
+                "kind": "terminal_bench_screening_attempt",
+                "item_id": item_id,
+                "metadata": {},
+                "destination": destination,
+                "payload": {
+                    "name": "payload.tar",
+                    "bytes": payload.stat().st_size,
+                    "sha256": digest(payload.read_bytes()),
+                    "blob": remote + "/payload.tar",
+                },
+                "manifest_blob": remote + "/manifest.json",
+                "manifest_uploaded_last": True,
+                "upload_state": "uploaded",
+                "attempts": 1,
+                "first_attempt_at": "2026-09-16T00:00:00+00:00",
+                "last_attempt_at": "2026-09-16T00:00:00+00:00",
+                "last_error_category": None,
+                "uploaded_at": "2026-09-16T00:00:01+00:00",
+                "payload_etag": "payload-etag",
+                "manifest_etag": "manifest-etag",
+                "remote_verified_at": "2026-09-16T00:00:02+00:00",
+                "payload_verify_request_id": "payload-request",
+                "manifest_verify_request_id": "manifest-request",
+                "manifest_bytes": 100,
+                "operations": operations,
+                "upload_wall_seconds": 2.0,
+                "run_id": run_id,
+                "source_commit": source_commit,
+                "ledger_sha256": ledger_sha256,
+                "condition": "none",
+            }
+            (item / "state.json").write_text(json.dumps(state))
+
+        report, spool_recovery = _verified_prior_blob_spool(
+            spool,
+            setup,
+            run_id=run_id,
+            source_commit=source_commit,
+            ledger_sha256=ledger_sha256,
+        )
+        persisted = deepcopy(report)
+        persisted["items"] = persisted["items"][:1]
+        merged, merge_recovery = _merge_prior_retrieval(persisted, report)
+        self.assertEqual(len(merged["items"]), 2)
+        self.assertEqual(spool_recovery["item_count"], 2)
+        self.assertEqual(merge_recovery["recovered_item_count"], 1)
+
+        changed = deepcopy(persisted)
+        changed["items"][0]["metadata"] = {"changed": True}
+        with self.assertRaisesRegex(ValueError, "changed a persisted"):
+            _merge_prior_retrieval(changed, report)
+
+        state_path = spool / item_ids[1] / "state.json"
+        state = json.loads(state_path.read_text())
+        state["remote_verified_at"] = None
+        state_path.write_text(json.dumps(state))
+        with self.assertRaisesRegex(ValueError, "completed remote verification"):
+            _verified_prior_blob_spool(
+                spool,
+                setup,
+                run_id=run_id,
+                source_commit=source_commit,
+                ledger_sha256=ledger_sha256,
+            )
+
+    def test_recovered_continuation_cost_keeps_unknown_provider_cost_distinct(self):
+        ledger = load_screening_ledger(ROOT / "ledgers/screening.template.toml")
+        retrieval_item = {
+            "upload_state": "uploaded",
+            "remote_verified_at": "2026-09-16T00:00:00+00:00",
+            "payload": {"bytes": 1000},
+            "manifest_bytes": 100,
+            "operations": {
+                name: {"started": 1, "succeeded": 1}
+                for name in (
+                    "payload_write", "manifest_write",
+                    "payload_verify_read", "manifest_verify_read",
+                )
+            },
+        }
+        values, record = _recovered_continuation_cost(
+            {
+                "requests": 2,
+                "known_cost_usd": 0.5,
+                "unknown_requests": 1,
+                "unconfirmed_input_cost_estimate_usd": 0.3,
+                "unknown_requests_without_input_estimate": 0,
+            },
+            {
+                "runs": 1,
+                "active_vm_cost_usd": 0.2,
+                "blob_network_cost_usd": 0.001,
+                "provider_known_cost_usd": 0.4,
+                "provider_unknown_requests": 1,
+                "provider_unconfirmed_estimate_usd": 0,
+                "provider_unknown_without_estimate": 1,
+            },
+            [0.1],
+            {"items": [retrieval_item]},
+            ledger,
+        )
+        self.assertEqual(values["prior_provider_unknown_requests"], 2)
+        self.assertEqual(values["prior_provider_unknown_without_estimate"], 1)
+        self.assertAlmostEqual(values["prior_provider_known_cost_usd"], 0.9)
+        self.assertAlmostEqual(values["prior_active_vm_cost_usd"], 0.3)
+        self.assertEqual(record["local_provider_request_count"], 2)
+
     def test_active_vm_intervals_require_real_ordered_timestamps(self):
         attempt = {"attempt": {"attempt_id": self.attempt_id}, "process": self.process}
         intervals = _attempt_intervals([attempt])
@@ -778,6 +919,8 @@ class ScreeningRunTests(unittest.TestCase):
         ledger.write_bytes((ROOT / "ledgers/screening.template.toml").read_bytes())
         prior = self.root / "screening-prior"
         prior.mkdir()
+        prior_spool = self.root / "prior-spool"
+        prior_spool.mkdir()
         output = self.root / "screening-continuation"
         output.mkdir()
         (output / "summary.json").write_text(json.dumps({"status": "complete"}))
@@ -786,9 +929,13 @@ class ScreeningRunTests(unittest.TestCase):
             result = main([
                 str(ledger), "--source-commit", "a" * 40,
                 "--continue-from", str(prior),
+                "--continue-blob-spool", str(prior_spool),
             ])
         self.assertEqual(result, 0)
         self.assertEqual(execute.call_args.kwargs["continuation_directory"], prior.resolve())
+        self.assertEqual(
+            execute.call_args.kwargs["continuation_spool_directory"], prior_spool.resolve()
+        )
 
 
 if __name__ == "__main__":
