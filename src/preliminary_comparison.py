@@ -19,13 +19,6 @@ from .contracts import save_json
 from .native_contract import CONDITIONS, load_native_ledger
 from .protection import digest
 from .provenance import ROOT
-from .screening_run import (
-    _completed_attempt_evidence,
-    _merge_prior_retrieval,
-    _verified_prior_blob_spool,
-    execute_screening,
-    screening_preflight,
-)
 from .screening_scheduler import QUALITY_RESULTS, identifier
 
 
@@ -88,6 +81,8 @@ def _local_candidates(
     retrieval: dict,
     ledger: dict,
 ) -> dict[str, dict]:
+    from .screening_run import _completed_attempt_evidence
+
     retrieval_by_id = {item["item_id"]: item for item in retrieval["items"]}
     artifacts = json.loads(_safe_file(run_directory, "inputs/task-artifacts.json").read_bytes())
     candidates = {}
@@ -140,6 +135,8 @@ def select_first_task(
     spool_directory: Path,
     state_snapshot: Path | None = None,
 ) -> tuple[dict, dict]:
+    from .screening_run import _merge_prior_retrieval, _verified_prior_blob_spool
+
     run_directory = run_directory.resolve(strict=True)
     spool_directory = spool_directory.resolve(strict=True)
     summary_path = _safe_file(run_directory, "summary.json")
@@ -275,6 +272,8 @@ def prepare_comparison(
     *,
     output: Path | None = None,
 ) -> tuple[dict, dict, dict, bytes, Path | None]:
+    from .screening_run import screening_preflight
+
     setup = screening_preflight(screening_ledger_path, source_commit)
     compressor_ledger_bytes = compressor_ledger_path.read_bytes()
     compressor_ledger = load_native_ledger(compressor_ledger_path)
@@ -355,6 +354,8 @@ def execute_comparison(
     selection_run: Path,
     selection_spool: Path,
 ) -> Path:
+    from .screening_run import execute_screening
+
     parent = ROOT / "runs" / (
         "preliminary-preparation-" + time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
         + "-" + secrets.token_hex(4)
