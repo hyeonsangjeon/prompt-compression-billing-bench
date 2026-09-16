@@ -1,5 +1,5 @@
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 
@@ -11,9 +11,6 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def ledger_fixture():
     ledger = load_native_ledger(ROOT / "ledgers/native.template.toml")
-    ledger["model"]["max_completion_tokens"] = 16
-    ledger["limits"]["protocol_token_allowance"] = 1
-    ledger["limits"].update(api_cost_usd=100, deadline_utc=(datetime.now(timezone.utc) + timedelta(hours=1)).isoformat())
     ledger["prices"].update(input_per_million_usd=1, cached_input_per_million_usd=0.1,
                              output_per_million_usd=2, source_reference="synthetic test rates",
                              checked_at_utc=datetime.now(timezone.utc).isoformat())
@@ -23,7 +20,7 @@ def ledger_fixture():
 
 
 def request_fixture(content="Protected instruction"):
-    return {"model": "gpt-5.4", "temperature": 0, "reasoning_effort": "none", "max_completion_tokens": 16,
+    return {"model": "gpt-5.4", "temperature": 0, "reasoning_effort": "none",
             "messages": [{"role": "user", "content": content}]}
 
 
@@ -47,7 +44,7 @@ class ImmediateQueue:
         self.calls = []
         self.cooldowns = []
 
-    def reserve(self, estimate, stopped, deadline):
+    def reserve(self, estimate, stopped):
         self.calls.append(estimate)
         return 0
 

@@ -10,9 +10,8 @@ import json
 import math
 import os
 from pathlib import Path
-from queue import Empty, Queue
+from queue import Queue
 import re
-import select
 import signal
 import subprocess
 import tempfile
@@ -145,7 +144,7 @@ class SqueezCompressor:
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True,
         )
         try:
-            stdout, stderr = process.communicate(timeout=self.options["timeout_seconds"])
+            stdout, stderr = process.communicate(timeout=self.options.get("timeout_seconds"))
         except BaseException as error:
             try:
                 os.killpg(process.pid, signal.SIGKILL)
@@ -403,13 +402,10 @@ class LLMLingua2Compressor:
         process.stdin.write(json.dumps(payload, ensure_ascii=False, allow_nan=False) + "\n")
         process.stdin.flush()
 
-    def _receive(self, worker: dict, timeout: float) -> dict:
+    def _receive(self, worker: dict) -> dict:
         process = worker["process"]
         if process.stdout is None:
             raise CompressorError(f"LLMLingua worker {worker['id']} stdout is unavailable")
-        readable, _, _ = select.select([process.stdout], [], [], timeout)
-        if not readable:
-            raise CompressorError(f"LLMLingua worker {worker['id']} timed out")
         line = process.stdout.readline()
         if not line:
             raise CompressorError(f"LLMLingua worker {worker['id']} exited; inspect its stderr.txt")
@@ -445,9 +441,9 @@ class LLMLingua2Compressor:
             if type(response[key]) not in (int, float) or not math.isfinite(response[key]) or response[key] < 0:
                 raise CompressorError("LLMLingua worker returned invalid timing")
 
-    def _exchange(self, worker: dict, identifier, text: str, timeout: float) -> dict:
+    def _exchange(self, worker: dict, identifier, text: str) -> dict:
         self._send(worker, {"operation": "compress", "id": identifier, "text": text})
-        response = self._receive(worker, timeout)
+        response = self._receive(worker)
         required = {"operation", "ok", "id", "text", "inference_seconds", "tool_reported"}
         if set(response) != required or response["operation"] != "compressed" or response["id"] != identifier:
             raise CompressorError("LLMLingua worker response lineage differs")
@@ -461,7 +457,7 @@ class LLMLingua2Compressor:
     def _initialize_worker(self, worker: dict) -> dict:
         self._send(worker, {"operation": "initialize", "model_path": str(self.model),
                             "specification": self.worker_specification})
-        initialized = self._receive(worker, self.options["initialize_timeout_seconds"])
+        initialized = self._receive(worker)
         if initialized.get("operation") != "initialized" or initialized.get("ok") is not True:
             raise CompressorError(f"LLMLingua worker {worker['id']} initialization failed")
         self._validate_initialized(initialized, self.worker_specification)
@@ -475,8 +471,7 @@ class LLMLingua2Compressor:
         for fixture, path in self.fixtures:
             text = path.read_text(encoding="utf-8")
             started = time.monotonic()
-            response = self._exchange(worker, f"fixture-{worker['id']:02d}-{fixture['name']}", text,
-                                      self.options["inference_timeout_seconds"])
+            response = self._exchange(worker, f"fixture-{worker['id']:02d}-{fixture['name']}", text)
             wall = time.monotonic() - started
             output_sha256 = digest(response["text"].encode("utf-8"))
             target = directory / fixture["name"]
@@ -513,22 +508,18 @@ class LLMLingua2Compressor:
         directory = self.artifacts / f"span-{call:05d}"
         directory.mkdir()
         (directory / "input.txt").write_text(text, encoding="utf-8")
-        maximum = self.options["max_input_characters"]
-        worker_input, discarded_suffix = text[:maximum], text[maximum:]
+        worker_input, discarded_suffix = text, ""
         (directory / "worker-input.txt").write_text(worker_input, encoding="utf-8")
         discarded_suffix_artifact = None
         if discarded_suffix:
             discarded_suffix_artifact = f"span-{call:05d}/discarded-suffix.txt"
             (directory / "discarded-suffix.txt").write_text(discarded_suffix, encoding="utf-8")
         wait_started = time.monotonic()
-        try:
-            worker = self.worker_pool.get(timeout=self.options["pool_wait_timeout_seconds"])
-        except Empty:
-            raise CompressorError("LLMLingua worker-pool wait exceeded its fixed limit") from None
+        worker = self.worker_pool.get()
         wait_seconds = time.monotonic() - wait_started
         try:
             execution_started = time.monotonic()
-            response = self._exchange(worker, call, worker_input, self.options["inference_timeout_seconds"])
+            response = self._exchange(worker, call, worker_input)
             execution_seconds = time.monotonic() - execution_started
         finally:
             self.worker_pool.put(worker)
@@ -536,7 +527,7 @@ class LLMLingua2Compressor:
         (directory / "output.txt").write_text(transformed, encoding="utf-8")
         audit = compression_audit(
             text, worker_input, transformed, discarded_suffix=discarded_suffix,
-            worker_id=worker["id"], overflow_policy=self.options["overflow_policy"],
+            worker_id=worker["id"], overflow_policy="none",
             discarded_suffix_artifact=discarded_suffix_artifact,
         )
         observation = {
@@ -587,13 +578,13 @@ class LLMLingua2Compressor:
             if process.poll() is not None:
                 raise CompressorError(f"LLMLingua worker {worker['id']} exited before the close handshake")
             self._send(worker, {"operation": "close"})
-            response = self._receive(worker, 10)
+            response = self._receive(worker)
             if response != {"operation": "closed", "ok": True}:
                 raise CompressorError(f"LLMLingua worker {worker['id']} did not close cleanly")
-            process.wait(timeout=10)
+            process.wait()
             if process.returncode != 0:
                 raise CompressorError(f"LLMLingua worker {worker['id']} exited unsuccessfully")
-        except (CompressorError, subprocess.TimeoutExpired) as error:
+        except CompressorError as error:
             self._terminate(worker)
             raise CompressorError(
                 f"LLMLingua worker {worker['id']} did not close cleanly; inspect its stderr.txt"
@@ -609,16 +600,9 @@ class LLMLingua2Compressor:
                 return
             self.closed = True
         available = []
-        deadline = time.monotonic() + self.options["pool_wait_timeout_seconds"]
         try:
             for _ in range(self.worker_count):
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    raise CompressorError("LLMLingua workers did not return to the pool before close")
-                try:
-                    available.append(self.worker_pool.get(timeout=remaining))
-                except Empty:
-                    raise CompressorError("LLMLingua workers did not return to the pool before close") from None
+                available.append(self.worker_pool.get())
             errors = []
             with ThreadPoolExecutor(max_workers=self.worker_count, thread_name_prefix="llmlingua-close") as executor:
                 futures = [executor.submit(self._close_worker, worker) for worker in available]

@@ -29,7 +29,7 @@ def command_metrics(trace: list[dict], changes: list[dict]) -> dict:
         target[identifier] = event
     if set(started) != set(finished):
         issues.append("command_submission_outcome_missing")
-    accepted, uncertain = [], []
+    accepted, rejected, uncertain = [], [], []
     for identifier, event in sorted(started.items()):
         content = event["keystrokes"]
         if digest(content.encode()) != event["command_sha256"] or submission_kind(content) != event["submission_kind"] or shell_units(content) != event["shell_units"]:
@@ -37,8 +37,11 @@ def command_metrics(trace: list[dict], changes: list[dict]) -> dict:
         timestamp(event["at"])
         if event["submission_kind"] != "command_block":
             continue
-        if finished.get(identifier, {}).get("status") == "accepted_by_terminal":
+        status = finished.get(identifier, {}).get("status")
+        if status == "accepted_by_terminal":
             accepted.append(event)
+        elif status == "rejected_terminal_session_ended":
+            rejected.append(identifier)
         else:
             uncertain.append(identifier)
     if uncertain:
@@ -74,7 +77,7 @@ def command_metrics(trace: list[dict], changes: list[dict]) -> dict:
         "kind": "calculated_from_terminal_submission_events",
         "unit": "terminal_accepted_command_blocks_not_shell_exit_successes",
         "submitted_command_blocks": len(accepted) + len(uncertain), "accepted_command_blocks": len(accepted),
-        "uncertain_command_ids": uncertain,
+        "rejected_terminal_session_ended_command_ids": rejected, "uncertain_command_ids": uncertain,
         "same_command_reexecutions": sum(count - 1 for count in block_counts.values()),
         "repeated_command_texts": sum(count > 1 for count in block_counts.values()),
         "same_subcommand_reexecutions": sum(count - 1 for count in unit_counts.values()),

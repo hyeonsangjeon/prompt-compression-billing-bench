@@ -4,6 +4,7 @@ from pathlib import Path
 import tempfile
 from types import SimpleNamespace
 import unittest
+from unittest.mock import Mock
 
 from src.command_trace import CommandTrace, shell_parts, shell_units, submission_kind
 from src.protection import digest
@@ -39,6 +40,15 @@ class TaskMetricTests(unittest.TestCase):
         trace[0]["keystrokes"] = "cat source.py\n"
         with self.assertRaises(ValueError):
             command_metrics(trace, [])
+
+    def test_command_rejected_after_terminal_exit_is_not_counted_as_submitted(self):
+        trace = submission(1, "exit\n", 1)
+        trace += submission(2, "echo unreachable\n", 2, "rejected_terminal_session_ended")
+        metrics = command_metrics(trace, [])
+        self.assertEqual(metrics["submitted_command_blocks"], 1)
+        self.assertEqual(metrics["accepted_command_blocks"], 1)
+        self.assertEqual(metrics["rejected_terminal_session_ended_command_ids"], [2])
+        self.assertEqual(metrics["integrity_issues"], [])
 
     def test_shell_decomposition_is_lexical_and_preserves_separators(self):
         self.assertEqual(shell_parts("echo 'a && b' | sort && ls"), (["echo 'a && b'", "sort", "ls"], ["|", "&&"]))
@@ -164,16 +174,28 @@ class CommandTraceTests(unittest.IsolatedAsyncioTestCase):
         from src.harbor_agent import ObservedTerminus2
 
         class Session:
+            alive = True
+
             async def send_keys(self, keystrokes, **keywords):
                 if keystrokes == "timeout\n":
                     raise TimeoutError("synthetic terminal timeout")
+                if keystrokes == "runtime-error\n":
+                    raise RuntimeError("synthetic unrelated runtime failure")
+                if keystrokes == "exit\n":
+                    self.alive = False
+                elif not self.alive:
+                    raise RuntimeError("no server running")
 
             async def get_incremental_output(self):
                 return "z" * 12000
 
+            async def is_session_alive(self):
+                return self.alive
+
         with tempfile.TemporaryDirectory() as temporary:
             agent = object.__new__(ObservedTerminus2)
             agent.command_trace = CommandTrace(Path(temporary) / "trace")
+            agent.logger = Mock()
             agent._timeout_template = "{timeout_sec} {command} {terminal_state}"
             commands = [SimpleNamespace(keystrokes="ls\n", duration_sec=0.1)]
             timed_out, output = await agent._execute_commands(commands, Session())
@@ -182,8 +204,19 @@ class CommandTraceTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len((agent.command_trace.directory / "terminal-00001.txt").read_text()), 12000)
             commands = [SimpleNamespace(keystrokes="timeout\n", duration_sec=0.1)]
             self.assertTrue((await agent._execute_commands(commands, Session()))[0])
+            commands = [SimpleNamespace(keystrokes="runtime-error\n", duration_sec=0.1)]
+            with self.assertRaisesRegex(RuntimeError, "unrelated runtime failure"):
+                await agent._execute_commands(commands, Session())
+            commands = [
+                SimpleNamespace(keystrokes="exit\n", duration_sec=0.1),
+                SimpleNamespace(keystrokes="echo unreachable\n", duration_sec=0.1),
+            ]
+            self.assertEqual(await agent._execute_commands(commands, Session()), (False, ""))
             events = read_events(agent.command_trace.events)
             self.assertTrue(any(event.get("status") == "uncertain" for event in events))
+            self.assertTrue(any(
+                event.get("status") == "rejected_terminal_session_ended" for event in events
+            ))
 
 
 if __name__ == "__main__":

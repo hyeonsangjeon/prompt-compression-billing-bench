@@ -51,6 +51,8 @@ class NativeRunTests(unittest.TestCase):
                  "tasks": {task: deepcopy(files) for task in TASKS}, "benchmark_root": str(self.root / "benchmark"),
                  "sender": sender, "queue_path": self.root / "shared-queue.json", "runtime_versions": {"kind": "synthetic"},
                  "retrieval": {"client": retrieval_client, "container": "runs", "prefix": "runs"},
+                 "reporting_target": 1_789_578_340.0,
+                 "harbor_limit_policy": {"agent_time_limit_seconds": None},
                  "evidence_kind": evidence_kind}
 
         class SyntheticRetrieval:
@@ -83,7 +85,7 @@ class NativeRunTests(unittest.TestCase):
 
         synthetic_retrieval = SyntheticRetrieval()
 
-        def synthetic_supervisor(command, log, recorder, timeout, environment):
+        def synthetic_supervisor(command, log, recorder, environment):
             self.supervised.append(command)
             with self.activity_lock:
                 self.active_supervisors += 1
@@ -131,6 +133,7 @@ class NativeRunTests(unittest.TestCase):
         synthetic_retrieval.finish = finish
         with patch("src.native_run.ROOT", self.root), patch("src.native_run.preflight", return_value=setup), \
              patch("src.native_run.supervise", synthetic_supervisor), \
+             patch("src.native_run.apply_verifier_revision", side_effect=lambda _task, source, _specs: (deepcopy(source), {"revision": "synthetic", "modified": False})), \
              patch("src.native_run.make_blob_spool", side_effect=make_retrieval):
             directory = execute_native(self.ledger_path, self.ledger, "a" * 40, "none")
         return directory, provenance
@@ -236,20 +239,64 @@ class NativeRunTests(unittest.TestCase):
         self.assertNotIn("AZURE_API_KEY", environment)
         self.assertNotIn("FOUNDRY_ENDPOINT", environment)
 
-    def test_supervisor_stops_a_local_dummy_process_on_guard_or_deadline(self):
-        for mode in ("guard", "deadline"):
-            stopped = threading.Event()
-            recorder = SimpleNamespace(stopped=stopped, deadline=time.time() + 5, check=lambda: None,
-                                       stop=lambda reason: stopped.set())
-            timer = threading.Timer(0.2, stopped.set)
-            if mode == "guard":
-                timer.start()
-                self.addCleanup(timer.cancel)
-            result = supervise([sys.executable, "-c", "import time; time.sleep(60)"], self.root / (mode + ".log"),
-                               recorder, 0.15 if mode == "deadline" else 5, runtime_environment("synthetic"))
-            self.assertIsNotNone(result["returncode"])
-            self.assertTrue(result["stopped_by_guard"] if mode == "guard" else result["timed_out"])
-            self.assertLess(result["elapsed_seconds"], 5)
+    def test_supervisor_has_no_deadline_and_still_honors_an_explicit_run_stop(self):
+        completed = SimpleNamespace(
+            stopped=threading.Event(), check=lambda: None, stop=lambda _reason: None,
+        )
+        result = supervise(
+            [sys.executable, "-c", "import time; time.sleep(0.05)"],
+            self.root / "completed.log", completed, runtime_environment("synthetic"),
+        )
+        self.assertEqual(result["returncode"], 0)
+        self.assertFalse(result["timed_out"])
+        self.assertFalse(result["stopped_by_guard"])
+
+        stopped = threading.Event()
+        guarded = SimpleNamespace(
+            stopped=stopped, check=lambda: None, stop=lambda _reason: stopped.set(),
+        )
+        timer = threading.Timer(0.2, stopped.set)
+        timer.start()
+        self.addCleanup(timer.cancel)
+        result = supervise(
+            [sys.executable, "-c", "import time; time.sleep(60)"],
+            self.root / "guarded.log", guarded, runtime_environment("synthetic"),
+        )
+        self.assertIsNotNone(result["returncode"])
+        self.assertTrue(result["stopped_by_guard"])
+        self.assertFalse(result["timed_out"])
+        self.assertLess(result["elapsed_seconds"], 5)
+
+    def test_supervisor_reports_the_started_at_used_in_its_result(self):
+        recorder = SimpleNamespace(
+            stopped=threading.Event(), check=lambda: None, stop=lambda _reason: None,
+        )
+        timing = []
+        result = supervise(
+            [sys.executable, "-c", "pass"],
+            self.root / "timing.log",
+            recorder,
+            runtime_environment("synthetic"),
+            on_timing_start=timing.append,
+        )
+        self.assertEqual(timing, [result["started_at"]])
+
+    def test_supervisor_stops_child_when_runtime_identity_recording_fails(self):
+        stopped = threading.Event()
+        recorder = SimpleNamespace(
+            stopped=stopped,
+            check=lambda: None,
+            stop=lambda _reason: stopped.set(),
+        )
+        with self.assertRaisesRegex(RuntimeError, "synthetic state failure"):
+            supervise(
+                [sys.executable, "-c", "import time; time.sleep(60)"],
+                self.root / "callback-failure.log",
+                recorder,
+                runtime_environment("synthetic"),
+                on_start=lambda _process_id: (_ for _ in ()).throw(RuntimeError("synthetic state failure")),
+            )
+        self.assertTrue(stopped.is_set())
 
 
 if __name__ == "__main__":

@@ -164,18 +164,18 @@ class LLMLinguaAdapterTests(unittest.TestCase):
             compressor.close()
         self.assertGreater(max(result.telemetry["serialization_wait_seconds"] for result in results), 0.01)
 
-    def test_input_over_5000_characters_is_compressed_once_and_suffix_is_audited(self):
+    def test_input_over_5000_characters_is_compressed_without_a_local_cap(self):
         source = "a" * 5000 + "discarded"
         with patch.dict(os.environ, self.environment):
             compressor = LLMLingua2Compressor(self.specification, self.root / "cap-artifacts")
             result = compressor.compress(source)
             compressor.close()
-        self.assertEqual(result.text, "A" * 5000)
+        self.assertEqual(result.text, source.upper())
         self.assertEqual(result.audit["source"]["characters"], 5009)
-        self.assertEqual(result.audit["worker_input"]["characters"], 5000)
-        self.assertEqual(result.audit["discarded_suffix"]["characters"], 9)
-        self.assertTrue(result.audit["overflow_applied"])
-        self.assertEqual((self.root / "cap-artifacts/span-00001/discarded-suffix.txt").read_text(), "discarded")
+        self.assertEqual(result.audit["worker_input"]["characters"], 5009)
+        self.assertEqual(result.audit["discarded_suffix"]["characters"], 0)
+        self.assertFalse(result.audit["overflow_applied"])
+        self.assertFalse((self.root / "cap-artifacts/span-00001/discarded-suffix.txt").exists())
 
     def test_input_at_cap_has_no_discarded_suffix_artifact(self):
         with patch.dict(os.environ, self.environment):

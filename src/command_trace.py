@@ -92,8 +92,14 @@ class TracedSession:
         try:
             result = await self.original.send_keys(keystrokes, *arguments, **keywords)
         except BaseException as error:
+            status = "uncertain"
+            try:
+                if await self.original.is_session_alive() is False:
+                    status = "rejected_terminal_session_ended"
+            except BaseException:
+                pass
             self.trace.append({"event": "submission_finished", "command_id": identifier,
-                               "status": "uncertain", "error_type": type(error).__name__})
+                               "status": status, "error_type": type(error).__name__})
             raise
         self.trace.append({"event": "submission_finished", "command_id": identifier, "status": "accepted_by_terminal"})
         return result
