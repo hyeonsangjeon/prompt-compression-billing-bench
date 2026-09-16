@@ -76,6 +76,7 @@ PUBLIC_FILES = {
     "src/evaluation_coverage.py", "src/evaluation_statistics.py", "src/replay_environment.py",
     "src/screening_contract.py", "src/screening_cost.py", "src/screening_inventory.py",
     "src/screening_run.py", "src/screening_scheduler.py",
+    "src/preliminary_comparison.py", "tests/test_preliminary_comparison.py",
     "tests/native_test_replay_environment.py", "tests/native_test_screening_run.py",
     "tests/test_evaluation_coverage.py", "tests/test_evaluation_statistics.py",
     "tests/test_screening_contract.py", "tests/test_screening_cost.py",
