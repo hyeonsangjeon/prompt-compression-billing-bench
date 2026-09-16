@@ -33,6 +33,17 @@ class ScreeningSchedulerTests(unittest.TestCase):
         self.assertEqual(self.manifest, make_screening_manifest(self.inventory, "a" * 40, "screening-test"))
         self.assertIs(verify_screening_manifest(self.manifest, self.inventory), self.manifest)
 
+        compressed = make_screening_manifest(
+            self.inventory, "a" * 40, "screening-compressed", condition="squeez"
+        )
+        self.assertEqual(compressed["condition"], "squeez")
+        self.assertTrue(all(trial["condition"] == "squeez" for trial in compressed["trials"]))
+        self.assertTrue(
+            set(trial["trial_id"] for trial in compressed["trials"]).isdisjoint(
+                trial["trial_id"] for trial in self.manifest["trials"]
+            )
+        )
+
     def test_claim_never_runs_two_trials_for_one_task(self):
         first = self.state.claim(8)
         second = self.state.claim(8)

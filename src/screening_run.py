@@ -28,7 +28,7 @@ from .blob_retrieval import (
     resume_blob_spool,
     retrieval_settings,
 )
-from .compressors import NoOpCompressor
+from .compressors import NoOpCompressor, make_compressor
 from .contracts import safe_child, save_json
 from .harbor_no_time_limits import apply_no_time_limit_policy, command as harbor_command
 from .live_observations import POLICY
@@ -167,7 +167,12 @@ def screening_preflight(ledger_path: Path, source_commit: str) -> dict:
     }
 
 
-def _task_artifact(task: dict, ledger: dict, source_commit: str) -> dict:
+def _task_artifact(
+    task: dict,
+    ledger: dict,
+    source_commit: str,
+    intervention: dict | None = None,
+) -> dict:
     payload = {
         "schema_version": 1,
         "kind": "screening_attempt_immutable_artifact",
@@ -180,6 +185,8 @@ def _task_artifact(task: dict, ledger: dict, source_commit: str) -> dict:
     }
     if ledger.get("schema_version") == 2:
         payload["limits"] = ledger["limits"]
+    if intervention is not None:
+        payload["intervention"] = intervention
     return {**payload, "artifact_manifest_sha256": digest(canonical_json(payload))}
 
 
@@ -190,6 +197,10 @@ def _prepare_inputs(
     run_id: str,
     *,
     execution_scope: dict | None = None,
+    condition: str = "none",
+    intervention: dict | None = None,
+    preliminary_manifest: dict | None = None,
+    compressor_ledger_bytes: bytes | None = None,
 ) -> tuple[dict, dict]:
     inputs = directory / "inputs"
     inputs.mkdir(parents=True, exist_ok=False)
@@ -199,7 +210,9 @@ def _prepare_inputs(
         path.write_bytes(content)
     save_json(inputs / "provenance.json", setup["provenance"])
     (inputs / "inventory.json").write_bytes(setup["inventory_path"].read_bytes())
-    manifest = make_screening_manifest(setup["inventory"], source_commit, run_id)
+    manifest = make_screening_manifest(
+        setup["inventory"], source_commit, run_id, condition=condition
+    )
     verify_screening_manifest(manifest, setup["inventory"])
     save_json(inputs / "screening-manifest.json", manifest)
     artifacts = {}
@@ -217,9 +230,16 @@ def _prepare_inputs(
             task["image"]["pinned_reference"],
             setup["ledger"]["benchmark"]["verifiers"],
         )
-        artifacts[task_id] = _task_artifact(task, setup["ledger"], source_commit)
+        artifacts[task_id] = _task_artifact(
+            task, setup["ledger"], source_commit, intervention
+        )
     save_json(inputs / "task-sources.json", sources)
     save_json(inputs / "task-artifacts.json", artifacts)
+    if (preliminary_manifest is None) != (compressor_ledger_bytes is None):
+        raise ValueError("Preliminary comparison inputs must be supplied together")
+    if preliminary_manifest is not None:
+        save_json(inputs / "preliminary-comparison-manifest.json", preliminary_manifest)
+        (inputs / "compressor-ledger.toml").write_bytes(compressor_ledger_bytes)
     execution = {
         "schema_version": 1,
         "kind": "terminal_bench_screening_execution",
@@ -228,6 +248,7 @@ def _prepare_inputs(
         "ledger_sha256": setup["provenance"]["ledger_sha256"],
         "inventory_sha256": setup["inventory"]["inventory_sha256"],
         "manifest_sha256": manifest["manifest_sha256"],
+        "condition": condition,
         "runtime_versions": setup["runtime_versions"],
         "python": sys.version,
         "concurrency": setup["ledger"]["runner"]["concurrency"],
@@ -246,6 +267,8 @@ def _prepare_inputs(
         },
         "started_at": now(),
     }
+    if intervention is not None:
+        execution["intervention"] = intervention
     save_json(inputs / "execution.json", execution)
     return manifest, artifacts
 
@@ -648,6 +671,8 @@ def _finalize_attempt(
 ) -> dict:
     attempt = completed["attempt"]
     attempt_directory = attempt["attempt_directory"]
+    evidence_kind = attempt.get("evidence_kind", "terminal_bench_screening")
+    condition = attempt.get("condition_name", "none")
     _copy_transport_evidence(transport, attempt_directory, attempt["attempt_id"])
     _record_provider_requests(state, attempt["attempt_id"], classification["provider_cost"])
     vm = {
@@ -666,13 +691,13 @@ def _finalize_attempt(
     )
     record = {
         "schema_version": 1,
-        "kind": "terminal_bench_screening_attempt",
+        "kind": evidence_kind + "_attempt",
         "trial_id": attempt["trial_id"],
         "attempt_id": attempt["attempt_id"],
         "attempt_number": attempt["attempt_number"],
         "task_id": attempt["task_id"],
         "repetition": attempt["repetition"],
-        "condition": "none",
+        "condition": condition,
         "artifact_manifest_sha256": attempt["artifact_manifest_hash"],
         "container_instance_id": attempt["container_instance_id"],
         "workspace_instance_id": attempt["workspace_instance_id"],
@@ -686,12 +711,13 @@ def _finalize_attempt(
     staged = spool.stage_directory(
         attempt_directory,
         attempt["attempt_id"],
-        kind="terminal_bench_screening_attempt",
+        kind=evidence_kind + "_attempt",
         metadata={
             "trial_id": attempt["trial_id"],
             "attempt_id": attempt["attempt_id"],
             "task_id": attempt["task_id"],
             "repetition": attempt["repetition"],
+            "condition": condition,
             "result": classification["result"],
         },
     )
@@ -2211,6 +2237,10 @@ def execute_screening(
     diagnostic_task_id: str | None = None,
     continuation_directory: Path | None = None,
     continuation_spool_directory: Path | None = None,
+    condition: str = "none",
+    compressor_configuration: dict | None = None,
+    compressor_ledger_bytes: bytes | None = None,
+    preliminary_manifest: dict | None = None,
 ) -> Path:
     setup = screening_preflight(ledger_path, source_commit)
     ledger = setup["ledger"]
@@ -2220,12 +2250,45 @@ def execute_screening(
         raise ValueError("Resume, diagnostic, and read-only continuation modes are mutually exclusive")
     if continuation_spool_directory is not None and continuation_directory is None:
         raise ValueError("A continuation Blob spool requires --continue-from")
+    preliminary = preliminary_manifest is not None
+    if preliminary:
+        if (
+            diagnostic_task_id is None
+            or resume_directory is not None
+            or continuation_directory is not None
+            or compressor_configuration is None
+            or compressor_ledger_bytes is None
+        ):
+            raise ValueError("A preliminary comparison needs one fresh diagnostic task and compressor inputs")
+        if preliminary_manifest.get("selected_task", {}).get("task_id") != diagnostic_task_id:
+            raise ValueError("Preliminary comparison task differs from its immutable manifest")
+        if condition not in preliminary_manifest.get("condition_order", []):
+            raise ValueError("Preliminary comparison condition differs from its immutable manifest")
+    elif (
+        condition != "none"
+        or compressor_configuration is not None
+        or compressor_ledger_bytes is not None
+    ):
+        raise ValueError("Compression conditions are allowed only in the separate preliminary comparison")
     eligible_task_ids = {
         task["task_id"] for task in setup["inventory"]["tasks"] if task["exclusion"] is None
     }
     if diagnostic_task_id is not None and diagnostic_task_id not in eligible_task_ids:
         raise ValueError("The diagnostic task is absent from the fixed eligible inventory")
     execution_scope = (
+        {
+            "kind": "single_task_preliminary_comparison_condition",
+            "comparison_id": preliminary_manifest["comparison_id"],
+            "comparison_manifest_sha256": preliminary_manifest["manifest_sha256"],
+            "task_id": diagnostic_task_id,
+            "condition": condition,
+            "logical_trials": 1,
+            "maximum_attempts": 2,
+            "preparation_retry_only": True,
+            "included_in_formal_screening_denominator": False,
+        }
+        if preliminary
+        else
         {
             "kind": "single_task_full_path_diagnostic",
             "task_id": diagnostic_task_id,
@@ -2245,13 +2308,39 @@ def execute_screening(
         }
     )
     if resume_directory is None:
-        prefix = "screening-diagnostic" if diagnostic_task_id is not None else "screening"
+        prefix = (
+            f"preliminary-{condition}"
+            if preliminary else
+            "screening-diagnostic"
+            if diagnostic_task_id is not None else
+            "screening"
+        )
         run_id = f"{prefix}-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}-{secrets.token_hex(4)}"
         directory = ROOT / ledger["output_dir"] / run_id
         directory.mkdir(parents=True, exist_ok=False)
         os.chmod(directory, 0o700)
         manifest, artifacts = _prepare_inputs(
-            directory, setup, source_commit, run_id, execution_scope=execution_scope
+            directory,
+            setup,
+            source_commit,
+            run_id,
+            execution_scope=execution_scope,
+            condition=condition,
+            intervention=(
+                None if not preliminary else {
+                    "kind": "candidate_log_compression",
+                    "condition": condition,
+                    "target": compressor_configuration["target"],
+                    "compressor": {
+                        **compressor_configuration,
+                        "name": condition,
+                    },
+                    "compressor_ledger_sha256": digest(compressor_ledger_bytes),
+                    "comparison_manifest_sha256": preliminary_manifest["manifest_sha256"],
+                }
+            ),
+            preliminary_manifest=preliminary_manifest,
+            compressor_ledger_bytes=compressor_ledger_bytes,
         )
         state = ScreeningState(directory / "state.sqlite3")
         state.initialize(manifest)
@@ -2267,13 +2356,21 @@ def execute_screening(
             )
             state.link_continuation(continuation, continuation["records"])
         spool = make_blob_spool(
-            setup["retrieval"], run_id, source_commit, setup["provenance"]["ledger_sha256"], "none"
+            setup["retrieval"],
+            run_id,
+            source_commit,
+            setup["provenance"]["ledger_sha256"],
+            condition,
         )
         inputs_retrieval = spool.stage_directory(
-            directory / "inputs", "run-inputs", kind="terminal_bench_screening_inputs",
+            directory / "inputs", "run-inputs", kind=(
+                "terminal_bench_preliminary_comparison_inputs"
+                if preliminary else "terminal_bench_screening_inputs"
+            ),
             metadata={
                 "manifest_sha256": manifest["manifest_sha256"],
                 "inventory_sha256": manifest["inventory_sha256"],
+                "condition": condition,
                 "continuation_sha256": (
                     None if continuation is None else continuation["continuation_sha256"]
                 ),
@@ -2287,12 +2384,16 @@ def execute_screening(
             raise RuntimeError("Screening inputs were not verified in Blob before provider execution")
         summary = {
             "schema_version": 1,
-            "kind": "terminal_bench_screening",
+            "kind": (
+                "terminal_bench_preliminary_comparison"
+                if preliminary else "terminal_bench_screening"
+            ),
             "run_id": run_id,
             "source_commit": source_commit,
             "ledger_sha256": setup["provenance"]["ledger_sha256"],
             "inventory_sha256": manifest["inventory_sha256"],
             "manifest_sha256": manifest["manifest_sha256"],
+            "condition": condition,
             "status": "running",
             "started_at": now(),
             "completed_attempts": state.summary()["completed_attempts"],
@@ -2324,12 +2425,22 @@ def execute_screening(
         run_id = manifest["run_id"]
     deployment = digest((setup["sender"].endpoint + "/" + ledger["model"]["name"]).encode())
     queue = DeploymentQueue(setup["queue_path"], deployment, ledger["queue"]["rpm"], ledger["queue"]["tpm"])
-    compressor = NoOpCompressor({"options": {}}, directory / "compressor")
+    compressor = (
+        make_compressor(
+            {**compressor_configuration, "name": condition},
+            directory / "compressor",
+        )
+        if preliminary else
+        NoOpCompressor({"options": {}}, directory / "compressor")
+    )
+    summary["compressor"] = compressor.metadata
     session = f"session-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}-{secrets.token_hex(3)}"
     transport = directory / "transport" / session
     recorder = LiveRecorder(
         transport, ledger, source_commit, compressor, setup["encoder"], queue, setup["sender"],
-        condition="none", evidence_kind="terminal_bench_screening", request_error_scope="trial",
+        condition=condition,
+        evidence_kind=summary["kind"],
+        request_error_scope="trial",
     )
     key = secrets.token_urlsafe(32)
     server = start_live_proxy(recorder, key)
@@ -2343,11 +2454,19 @@ def execute_screening(
             nonlocal claimed_attempts
             recorder.check()
             if diagnostic_task_id is not None and claimed_attempts >= 1:
-                return None
+                if not preliminary or claimed_attempts >= 2:
+                    return None
+                retry_pending = state.connection.execute(
+                    "SELECT COUNT(*) FROM trials WHERE task_id=? AND state='retry_pending'",
+                    (diagnostic_task_id,),
+                ).fetchone()[0]
+                if retry_pending != 1:
+                    return None
             claimed = state.claim(1, task_id=diagnostic_task_id)
             if not claimed:
                 return None
             attempt = _new_attempt_context(claimed[0], directory, artifacts)
+            attempt["evidence_kind"] = summary["kind"]
             state.mark_attempt_runtime(
                 attempt["attempt_id"],
                 process_id=None,
@@ -2475,6 +2594,14 @@ def execute_screening(
     finally:
         server.shutdown()
         server.server_close()
+        try:
+            compressor.close()
+        except BaseException as compressor_error:
+            summary["compressor_close_error"] = {
+                "type": type(compressor_error).__name__,
+                "message": str(compressor_error),
+            }
+            summary["status"] = "stopped"
         queue.close()
         summary["state"] = state.summary()
         if recorder.failure is not None:

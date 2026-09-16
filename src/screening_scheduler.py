@@ -19,6 +19,7 @@ PREPARATION_ERRORS = {"image_error", "setup_error"}
 TECHNICAL_ERRORS = {
     "provider_error", "network_error", "timeout", "verifier_crash", "evidence_missing", "replay_mismatch",
 }
+COMPARISON_CONDITIONS = ("none", "squeez", "headroom", "llmlingua2")
 
 
 def utc_now() -> str:
@@ -30,7 +31,7 @@ def identifier(value: object) -> str:
 
 
 def make_screening_manifest(inventory: dict, source_commit: str, run_id: str, *, seed: int = 20260915,
-                            repetitions: int = 20) -> dict:
+                            repetitions: int = 20, condition: str = "none") -> dict:
     verify_inventory(inventory)
     if len(source_commit) != 40 or any(character not in "0123456789abcdef" for character in source_commit):
         raise ValueError("A full lowercase source commit is required")
@@ -38,6 +39,8 @@ def make_screening_manifest(inventory: dict, source_commit: str, run_id: str, *,
         raise ValueError("Run identifier is absent or too long")
     if repetitions != 20:
         raise ValueError("Screening uses at most 20 valid results per task")
+    if condition not in COMPARISON_CONDITIONS:
+        raise ValueError("Unknown comparison condition")
     plans = []
     task_ids = [task["task_id"] for task in inventory["tasks"] if task["exclusion"] is None]
     plan_index = 0
@@ -45,7 +48,12 @@ def make_screening_manifest(inventory: dict, source_commit: str, run_id: str, *,
         ordered = list(task_ids)
         random.Random(identifier({"seed": seed, "repetition": repetition})).shuffle(ordered)
         for position, task_id in enumerate(ordered, start=1):
-            trial_tuple = {"run_id": run_id, "task_id": task_id, "repetition": repetition, "condition": "none"}
+            trial_tuple = {
+                "run_id": run_id,
+                "task_id": task_id,
+                "repetition": repetition,
+                "condition": condition,
+            }
             plans.append({
                 **trial_tuple,
                 "trial_id": identifier(trial_tuple),
@@ -59,7 +67,7 @@ def make_screening_manifest(inventory: dict, source_commit: str, run_id: str, *,
         "run_id": run_id,
         "source_commit": source_commit,
         "inventory_sha256": inventory["inventory_sha256"],
-        "condition": "none",
+        "condition": condition,
         "concurrency": 8,
         "maximum_repetitions_per_task": repetitions,
         "eligibility": {"valid_results_required": 20, "passes_required": 18, "stop_after_quality_failures": 3},
@@ -80,7 +88,9 @@ def verify_screening_manifest(value: dict, inventory: dict) -> dict:
         raise ValueError("Screening manifest hash does not match")
     expected = make_screening_manifest(
         inventory, value["source_commit"], value["run_id"],
-        seed=value["randomization"]["base_seed"], repetitions=value["maximum_repetitions_per_task"],
+        seed=value["randomization"]["base_seed"],
+        repetitions=value["maximum_repetitions_per_task"],
+        condition=value["condition"],
     )
     if value != expected:
         raise ValueError("Screening manifest differs from the deterministic plan")
