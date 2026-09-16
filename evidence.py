@@ -49,6 +49,7 @@ PUBLIC_FILES = {
     "docs/experiment/compressors.md", "docs/experiment/decisions.md",
     "docs/experiment/screening-protocol.md", "docs/experiment/evaluation-protocol.md",
     "docs/experiment/reproducibility-contract.md",
+    "docs/experiment/preliminary-comparison-20260916.md",
     "data/experiment/coverage-validation-v1.json",
     "data/experiment/terminal-bench-2.1-task-types.json", "ledgers/screening.template.toml",
     "tests/test_protection.py", "tests/test_static.py", "tests/test_eda.py", "tests/test_compare.py",
