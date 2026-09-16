@@ -9,9 +9,6 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-import httpx
-import litellm
-
 from native_helpers import FixtureEncoder, ImmediateQueue, ledger_fixture, response_fixture
 from src.compressors import NoOpCompressor
 from src.live_transport import LiveRecorder, start_live_proxy
@@ -41,6 +38,9 @@ class HarborTransportTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(policy["llm_http_timeout_seconds"], None)
 
     async def test_actual_harbor_sdk_has_no_http_timeout(self):
+        import httpx
+        import litellm
+
         from harbor.llms.lite_llm import LiteLLM
         from tenacity import wait_none
 
