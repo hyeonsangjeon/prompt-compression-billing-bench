@@ -3,6 +3,7 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import io
 import json
+import os
 from pathlib import Path
 import threading
 from types import SimpleNamespace
@@ -876,6 +877,14 @@ class ScreeningRunTests(unittest.TestCase):
         current = load_screening_ledger(ROOT / "ledgers/screening.template.toml")
         legacy = deepcopy(current)
         legacy["schema_version"] = 1
+        legacy["queue"] = {
+            "state_path_env": current["queue"]["state_path_env"],
+            "rpm": 17,
+            "tpm": 1700,
+            "limits_checked_at_utc": current["queue"]["limits_checked_at_utc"],
+            "limits_source_reference": current["queue"]["limits_source_reference"],
+            "deployment_isolation_reference": current["queue"]["deployment_isolation_reference"],
+        }
         legacy["model"]["max_completion_tokens"] = 2048
         legacy["runner"].update({
             "max_turns": 60,
@@ -895,8 +904,29 @@ class ScreeningRunTests(unittest.TestCase):
             "max_retry_wait_seconds": 120,
             "protocol_token_allowance": 4096,
         }
-        removed = _legacy_policy_transition(legacy, current)
+        with patch.dict(os.environ, {
+            "PROVIDER_RPM_LIMIT": "17",
+            "PROVIDER_TPM_LIMIT": "1700",
+        }):
+            removed = _legacy_policy_transition(legacy, current)
         self.assertEqual(removed, {"max_completion_tokens": 2048, "max_calls_per_trial": 60})
+
+        schema_two = deepcopy(current)
+        schema_two["schema_version"] = 2
+        schema_two["queue"] = deepcopy(legacy["queue"])
+        with patch.dict(os.environ, {
+            "PROVIDER_RPM_LIMIT": "17",
+            "PROVIDER_TPM_LIMIT": "1700",
+        }):
+            self.assertEqual(_legacy_policy_transition(schema_two, current), {
+                "max_completion_tokens": None,
+                "max_calls_per_trial": None,
+            })
+        with patch.dict(os.environ, {
+            "PROVIDER_RPM_LIMIT": "17",
+            "PROVIDER_TPM_LIMIT": "1701",
+        }), self.assertRaisesRegex(ValueError, "runtime limits differ"):
+            _legacy_policy_transition(schema_two, current)
 
         unaffected = _no_limit_reuse_decision({
             "result": "pass",

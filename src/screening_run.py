@@ -1627,18 +1627,38 @@ def _carried_continuation_records(
 
 
 def _legacy_policy_transition(prior: dict, current: dict) -> dict:
-    if prior["schema_version"] == current["schema_version"] == 2:
+    prior_version = prior["schema_version"]
+    current_version = current["schema_version"]
+    if prior_version == current_version and current_version in (2, 3):
         if prior != current:
             raise ValueError("Continuation changes the fixed no-harness-limit screening ledger")
         return {"max_completion_tokens": None, "max_calls_per_trial": None}
-    if prior["schema_version"] != 1 or current["schema_version"] != 2:
+    if prior_version not in (1, 2) or current_version not in (2, 3):
         raise ValueError("Unsupported screening ledger transition")
     for name in (
-        "mode", "output_dir", "raw_retrieval", "benchmark", "measurement", "queue",
+        "mode", "output_dir", "raw_retrieval", "benchmark", "measurement",
         "retrieval", "prices", "screening", "replay", "cost", "approval",
     ):
         if prior[name] != current[name]:
             raise ValueError(f"Continuation changes the fixed screening {name}")
+    if current_version == 3:
+        queue_fields = (
+            "state_path_env",
+            "limits_checked_at_utc",
+            "limits_source_reference",
+            "deployment_isolation_reference",
+        )
+        if any(prior["queue"][name] != current["queue"][name] for name in queue_fields):
+            raise ValueError("Continuation changes the fixed screening queue")
+        if (prior["queue"]["rpm"], prior["queue"]["tpm"]) != runtime_queue_limits(
+            current["queue"],
+            current_version,
+        ):
+            raise ValueError("Private runtime limits differ from the legacy screening ledger")
+    elif prior["queue"] != current["queue"]:
+        raise ValueError("Continuation changes the fixed screening queue")
+    if prior_version == 2:
+        return {"max_completion_tokens": None, "max_calls_per_trial": None}
     prior_model = {key: value for key, value in prior["model"].items() if key != "max_completion_tokens"}
     if prior_model != current["model"] or prior["model"]["max_completion_tokens"] != 2048:
         raise ValueError("Continuation changes model settings beyond removing the output-token cap")
