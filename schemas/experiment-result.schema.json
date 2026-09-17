@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Common result for checked or executed static and native experiments",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "started_at", "finished_at", "status", "outcome", "error", "labels", "experiment_type", "provider", "model", "condition", "compressor", "input", "output", "lineage", "provider_usage", "local_measurement", "cost", "quality", "completion", "artifacts"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "started_at": {"$ref": "#/$defs/timestamp"},
+    "finished_at": {"$ref": "#/$defs/timestamp"},
+    "status": {"enum": ["checked", "completed", "failed"]},
+    "outcome": {"enum": ["preflight_passed", "measurement_completed", "technical_incomplete"]},
+    "error": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object", "additionalProperties": false, "required": ["category", "message"],
+          "properties": {"category": {"type": "string", "minLength": 1}, "message": {"type": "string", "minLength": 1}}
+        }
+      ]
+    },
+    "labels": {
+      "type": "object", "additionalProperties": false, "required": ["measured", "synthetic", "projected"],
+      "properties": {"measured": {"type": "boolean"}, "synthetic": {"type": "boolean"}, "projected": {"type": "boolean"}}
+    },
+    "experiment_type": {"enum": ["static", "native"]},
+    "provider": {
+      "type": "object", "additionalProperties": false, "required": ["kind", "endpoint"],
+      "properties": {
+        "kind": {"enum": ["none", "foundry"]},
+        "endpoint": {
+          "type": "object", "additionalProperties": false, "required": ["source", "env_name"],
+          "properties": {
+            "source": {"enum": ["not_applicable", "environment_variable"]},
+            "env_name": {"oneOf": [{"$ref": "#/$defs/env"}, {"type": "null"}]}
+          }
+        }
+      }
+    },
+    "model": {
+      "type": "object", "additionalProperties": false, "required": ["name", "settings"],
+      "properties": {
+        "name": {"type": ["string", "null"]},
+        "settings": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "reported_model": {"type": "string", "minLength": 1},
+            "temperature": {"type": "number"},
+            "reasoning_effort": {"enum": ["none", "low", "medium", "high"]}
+          }
+        }
+      }
+    },
+    "condition": {"type": "string", "minLength": 1},
+    "compressor": {
+      "type": "object", "additionalProperties": false, "required": ["name", "version"],
+      "properties": {"name": {"type": "string", "minLength": 1}, "version": {"type": "string", "minLength": 1}}
+    },
+    "input": {
+      "type": "object", "additionalProperties": false, "required": ["kind", "root_env", "manifest_path"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "root_env": {"$ref": "#/$defs/env"},
+        "manifest_path": {"oneOf": [{"$ref": "#/$defs/path"}, {"type": "null"}]}
+      }
+    },
+    "output": {
+      "type": "object", "additionalProperties": false, "required": ["directory", "publication_tier"],
+      "properties": {
+        "directory": {"$ref": "#/$defs/path"},
+        "publication_tier": {"enum": ["public_fixture", "private_evidence", "aggregate_only"]},
+        "result_json": {"$ref": "#/$defs/path"}
+      }
+    },
+    "lineage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_commit", "source_sha256", "config_path", "config_sha256", "ledger_sha256", "manifest_sha256"],
+      "properties": {
+        "source_commit": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40}$"},
+        "source_sha256": {"oneOf": [{"$ref": "#/$defs/sha"}, {"type": "null"}]},
+        "config_path": {"$ref": "#/$defs/path"},
+        "config_sha256": {"$ref": "#/$defs/sha"},
+        "ledger_sha256": {"$ref": "#/$defs/sha"},
+        "manifest_sha256": {"oneOf": [{"$ref": "#/$defs/sha"}, {"type": "null"}]}
+      }
+    },
+    "provider_usage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "input_tokens", "cached_input_tokens", "output_tokens"],
+      "properties": {
+        "status": {"enum": ["not_applicable", "not_measured", "measured", "requires_review"]},
+        "input_tokens": {"type": ["integer", "null"], "minimum": 0},
+        "cached_input_tokens": {"type": ["integer", "null"], "minimum": 0},
+        "output_tokens": {"type": ["integer", "null"], "minimum": 0}
+      }
+    },
+    "local_measurement": {
+      "type": "object", "additionalProperties": false, "required": ["status", "values"],
+      "properties": {
+        "status": {"enum": ["not_applicable", "not_measured", "measured", "requires_review"]},
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["name", "value", "unit"],
+            "properties": {"name": {"type": "string", "minLength": 1}, "value": {"type": "number"}, "unit": {"type": "string", "minLength": 1}}
+          }
+        }
+      }
+    },
+    "cost": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "calculated_usd", "invoice_reconciled"],
+      "properties": {
+        "status": {"enum": ["not_applicable", "not_measured", "calculated", "requires_review"]},
+        "calculated_usd": {"type": ["number", "null"], "minimum": 0},
+        "invoice_reconciled": {"type": ["boolean", "null"]}
+      }
+    },
+    "quality": {
+      "type": "object", "additionalProperties": false, "required": ["status", "judge"],
+      "properties": {
+        "status": {"enum": ["pass", "wrong_answer", "wrong_format", "aggregate_measured", "not_measured", "unknown"]},
+        "judge": {"type": ["string", "null"]}
+      }
+    },
+    "completion": {
+      "type": "object", "additionalProperties": false, "required": ["technical_status", "operator_status"],
+      "properties": {
+        "technical_status": {"enum": ["complete", "incomplete", "not_run"]},
+        "operator_status": {"enum": ["not_stopped", "stopped", "not_applicable", "not_recorded"]}
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/path"},
+      "additionalProperties": {"$ref": "#/$defs/sha"}
+    },
+    "benchmark": {
+      "type": "object", "additionalProperties": false, "required": ["name", "revision", "task"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "task": {"type": "string", "minLength": 1}
+      }
+    },
+    "resolved_contract": {
+      "type": "object", "additionalProperties": false,
+      "required": ["reference_ledger", "execution_ledger_sha256", "runner", "protection", "retry", "clean_checkout"],
+      "properties": {
+        "reference_ledger": {
+          "type": "object", "additionalProperties": false, "required": ["path", "sha256"],
+          "properties": {"path": {"$ref": "#/$defs/path"}, "sha256": {"$ref": "#/$defs/sha"}}
+        },
+        "execution_ledger_sha256": {"oneOf": [{"$ref": "#/$defs/sha"}, {"type": "null"}]},
+        "runner": {
+          "type": "object", "additionalProperties": false, "required": ["module", "action"],
+          "properties": {
+            "module": {"const": "src.screening_run"},
+            "action": {"const": "diagnose-task"}
+          }
+        },
+        "protection": {
+          "type": "object", "additionalProperties": false,
+          "required": ["replay_required", "complete_capture_required", "bundle_revision"],
+          "properties": {
+            "replay_required": {"type": "boolean"},
+            "complete_capture_required": {"type": "boolean"},
+            "bundle_revision": {"type": "integer", "minimum": 1}
+          }
+        },
+        "retry": {
+          "type": "object", "additionalProperties": false,
+          "required": ["provider_transient_http_attempts", "preparation_retry_maximum"],
+          "properties": {
+            "provider_transient_http_attempts": {"type": "integer", "minimum": 1},
+            "preparation_retry_maximum": {"type": "integer", "minimum": 0}
+          }
+        },
+        "clean_checkout": {"type": "boolean"}
+      }
+    }
+  },
+  "$defs": {
+    "sha": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "env": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"},
+    "path": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$"},
+    "timestamp": {"type": "string", "format": "date-time"}
+  }
+}

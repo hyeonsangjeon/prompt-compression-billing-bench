@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "benchmark": "terminal-bench-2.1",
+  "benchmark_revision": "7131e4375048a0e408a8fb404b5f499d726b695b",
+  "task": "nginx-request-logging",
+  "revision": "nginx-request-logging-verifier-v2",
+  "source_file": "tests/test_outputs.py",
+  "source_sha256": "045cc716c14efde3b0dcff5fc7c85ec5d18bfc6ce66f8b40a418fa2a3a4acda0",
+  "effective_sha256": "20812107bc3bfc541728a2d10e3da0552e907d949e1347a03d33aa26954f8902",
+  "fixtures": {
+    "braced.conf": "0a0624818b05deb61a0fd256dbdeff77b7706b10ecfa537cb149b2d38c61bbcc",
+    "unbraced.conf": "348bfa766187623d694a2fa2828c8582966f63ff162d4cbcc33283a14b91795d",
+    "wrong-variable.conf": "f052b75b148174a155dc58f84148773eb59fb87bb1c6f5005d988d2eea644edd"
+  }
+}

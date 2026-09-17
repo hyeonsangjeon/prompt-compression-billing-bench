@@ -9,7 +9,7 @@ separate from the legacy local-model runner and the frozen static demo.
 `run.py native` runs the existing five purpose-selected Terminal tasks with
 Harbor 0.22.0 / the instrumented Terminus 2 agent. All conditions use the same
 pinned task images, instructions, native tests, model settings, observation
-policy, transport and metrics. The order is **none baseline, then squeez,
+policy, transport and metrics, including the same approved verifier revision. The order is **none baseline, then squeez,
 Headroom and LLMLingua-2 comparisons**. Each comparison uses the baseline's
 complete repetition count. There is no delete-all arm. This runner does not run
 DeepSWE or a substitute benchmark.
@@ -40,29 +40,40 @@ compressor, not a generated summary. Eight offline Python 3.10 workers load one
 model copy each and accept at most one request per worker. All eight workers run
 the three fixed fixtures; a ledger mismatch or cross-worker output mismatch stops
 the run. Pool wait, adapter execution and worker inference time are recorded
-separately. A worker response has a fixed 300-second ceiling, and every worker
-must complete its close handshake.
+separately. The current native path does not impose a worker-response or pool-wait
+timer, and every worker must complete its close handshake or report an explicit
+process error.
 
 The checkpoint loads from a verified local directory while the upstream 0.2.2
 token-boundary branch reads its `model_name` string. After loading, the worker
 binds that discriminator to the pinned public model ID instead of depending on
 the VM directory name. The runtime record verifies the same ID.
 
-LLMLingua receives at most the first 5,000 characters of a candidate in one
-inference call. It does not split or summarize the remainder in additional calls;
-the suffix is discarded. The private artifact retains that exact suffix, while
-the event records source, worker-input, output and discarded-suffix SHA-256 plus
-character, UTF-8 byte and line counts. This is an explicit lossy adapter policy,
-not behavior supplied by LLMLingua. The same policy is applied to every
-LLMLingua arm and cannot be changed through a runtime option.
+LLMLingua receives the complete identified candidate in one inference call. The
+adapter does not truncate it at the former 5,000-character boundary. The event
+records source, worker-input and output SHA-256 plus character, UTF-8 byte and
+line counts; discarded-suffix fields remain empty for schema continuity. This
+is an adapter policy, not behavior supplied by LLMLingua.
 
 The template at `ledgers/native.template.toml` is deliberately unapproved and
 not runnable. Before execution it needs an explicit rule/execution approval
-reference, current rates with a source/check time, remaining budget, deployment
-coordination reference, and an absolute UTC deadline. The ledger already fixes
-the checked deployment limits at 300,000 TPM and 3,000 RPM and fixes eight
-simultaneous native trial processes. These are operational records, not a request
-for per-call cost approval.
+reference, current rates with a source/check time, a deployment coordination
+reference and a reporting target. The reporting target is not a process timer.
+The public schema-v3 template stores only the environment-variable names for
+provider throughput limits; the private runtime supplies positive integer values.
+Historical schema-v2 snapshots with numeric fields remain hash-bound and
+verifiable, but new result records do not republish the runtime values. The
+ledger treats provider limits and service errors as external constraints and
+fixes eight simultaneous native trial processes. These are deployment
+constraints and comparison controls, not a harness cost or time stop.
+
+The current native path does not impose a dollar stop, provider-call count,
+completion-token cap, request-byte cap, phase timer, whole-run timer or deadline
+timer. It omits Terminus 2 `max_turns`; Harbor 0.22.0 then uses its internal
+default of 1,000,000, which remains a product implementation boundary and is not
+described as unlimited. Provider context length, request size, throughput and
+policy rejection remain external constraints. All calls, elapsed time and costs
+are still measured.
 
 Concurrency is a comparison control, not an experiment arm. The validator rejects
 any value other than eight instead of issuing a warning that could be ignored.
@@ -83,8 +94,16 @@ numerically derive this threshold.
 and the committed source inventory. Source, ledger and dependency-lock snapshots
 travel with every run; trial and transport records carry the same SHA. The
 benchmark checkout and every copied task file are compared against its pinned
-Git revision. Only the environment image reference and Dockerfile are replaced
-by the ledger's immutable image digest. Native tests/instructions are unchanged.
+Git revision. The environment image reference and Dockerfile are replaced by
+the ledger's immutable image digest. The nginx verifier alone also receives the
+hash-bound `nginx-request-logging-verifier-v2` revision: source SHA-256
+`045cc716c14efde3b0dcff5fc7c85ec5d18bfc6ce66f8b40a418fa2a3a4acda0`
+must produce effective SHA-256
+`20812107bc3bfc541728a2d10e3da0552e907d949e1347a03d33aa26954f8902`.
+It accepts the equivalent `$name` and `${name}` Nginx variable forms; all other
+native test text and instructions remain unchanged. Any source or effective-hash
+mismatch stops preparation. The ledger, task-source record, summary and execution
+record retain the revision. Native tests for all other tasks are unchanged.
 Critical installed dependencies are checked against `uv.lock`.
 
 ## Transmission boundary
@@ -139,8 +158,8 @@ shutdown gate; the agent has no access to this result-recovery path.
 Docker resource cleanup after a forced interruption is **not validated** by a
 host process-group test. Harbor is configured to delete environments, but an
 operator must check for leftover containers on the execution host. An HTTP
-request already sent cannot be recalled; ambiguous failures retain their budget
-reservation and unknown usage rather than being retried as free calls.
+request already sent cannot be recalled; ambiguous failures retain unknown usage
+and any explicitly labelled estimate rather than being retried as free calls.
 
 ## Units and task metrics
 
@@ -156,7 +175,7 @@ All metrics are collected for **all four** conditions from the same path.
 | `cached_input_tokens` | Observed cache-read usage; missing cache detail is null, not zero. Cache behavior is not controlled |
 | `local_tokens.input_tokens` | `o200k_base` message-content tokens per sent attempt, excluding API role framing; retries count again |
 | `local_tokens.output_tokens` | Visible assistant-content tokens; not hidden reasoning or provider-billed output. Unknown responses leave a subtotal rather than a complete total |
-| `cost` | Usage multiplied by ledger rates, separately from a conservative budget reservation; no invoice reconciliation claim |
+| `cost` | Usage multiplied by ledger rates, with unknown charges and input-only estimates kept separate; no invoice reconciliation claim |
 | `same_command_reexecutions` | Sum of occurrences beyond the first for each byte-identical complete command block actually accepted by the terminal wrapper |
 | `same_subcommand_reexecutions` | Additional conservative lexical count for shell units such as `find` inside `ls && find`; not proof of command completion or the same filesystem/cwd |
 | `post_changed_output_*` | Repetition linked by command text and time to an earlier changed output; retained evidence, **not proof that truncation caused the repetition** |
@@ -165,7 +184,7 @@ All metrics are collected for **all four** conditions from the same path.
 | `timing.transport_seconds` | Client HTTP wall time minus provider-reported service TTLT when both are available; otherwise null with a known subtotal |
 | `timing.model_seconds` | Provider-reported `engine_ttlt_ms`, converted to seconds; otherwise null with a known subtotal |
 | `native_outcome` | Unmodified native binary reward plus failure categories, per-test evidence and integrity warnings |
-| `concurrency`, `deployment_limits` | Fixed outer native-trial concurrency plus the ledger RPM/TPM, check time and source; written to both `summary.json` and `execution.json` and revalidated from the saved ledger |
+| `concurrency`, `deployment_limits` | Fixed outer native-trial concurrency plus the public environment-variable names, check time and source; schema-v3 records do not expose private runtime limit values |
 | `retrieval` | Per-repetition local payload size/SHA, Blob names, attempts, sanitized failure category and ETags; payload-before-manifest ordering is recorded, while collection-host read verification remains an external shutdown gate |
 
 Waits, control keystrokes, undecomposable scripts and uncertain submissions have
@@ -206,8 +225,9 @@ threshold for this small, heterogeneous binary sample.
   safety; unchanged short logs cannot establish that throwing away lines is safe.
 
 Invalid/missing judge evidence, incomplete mandatory metrics, protection errors,
-settings/model-revision changes, budget/deadline limits and ambiguous transport
-failures stop the run. They are not native zeros or grounds for replacing tasks.
+settings/model-revision changes, explicit process errors and ambiguous transport
+failures stop the run. Elapsed time or accumulated cost alone does not. They are
+not native zeros or grounds for replacing tasks.
 Stored decisions and repetitions are reconstructed from per-trial artifacts on
 verification; changing a summary alone cannot change the accepted baseline.
 
@@ -228,7 +248,9 @@ unchecked user fields/conditional conflict checks in the merger, regex matches
 inside nginx comments and no assertion that a new request appears in its log,
 and acceptance of printed verification text by the certificate-script subcheck.
 These do not demonstrate that an invalid solution passes **all** native tests.
-Keep the original scores and disclose those coverage limits.
+The nginx variable-syntax correction does not close these other coverage gaps.
+Keep scores from the original and revised verifier revisions separate and disclose
+the applicable revision.
 
 The actual DeepSWE wrapper resets test-patch files, applies the hidden patch,
 and runs `/app/test.sh base` and `/app/test.sh new`. It rewards only two zero exit
@@ -274,18 +296,21 @@ access. The probes do not guarantee byte equality on another CPU or dependency
 stack; they test it on the execution host instead of assuming it.
 
 The frozen 107-occurrence development corpus contains **10**, not 12, candidates
-over the 5,000-character adapter limit. All 10 belong to
+over the former 5,000-character adapter limit. All 10 belong to
 `log-summary-date-ranges`; they represent three unique inputs repeated across
-historical requests. This recount corrects the planning note without changing
-the live cap. The discarded suffixes contain later file-listing rows, and two
-occurrences also contain all 10 later `find` paths.
+historical requests. This recount describes the removed profile. The discarded
+suffixes in that historical measurement contained later file-listing rows, and
+two occurrences also contained all 10 later `find` paths. It is not evidence for
+the current uncapped adapter.
 
 The earlier static corpus measurement observed a mean **4.13 seconds per candidate
 span** for LLMLingua-2 on an eight-vCPU host with one active compressor. That is
 a planning input, not an intrinsic tool speed or an eight-worker live result.
-The retained plan is **46–48 minutes** for the three 10-repetition tool conditions,
-or **53–56 minutes including a 10-repetition baseline**. Turns, candidate
-occurrences, eight-worker CPU contention and provider waits can change it.
+The earlier plan was **46–48 minutes** for the three 10-repetition tool conditions,
+or **53–56 minutes including a 10-repetition baseline**. It assumed the former
+adapter profile. Current uncapped candidates, turns, candidate occurrences,
+eight-worker CPU contention and provider waits can change it, so those values are
+not a current schedule guarantee.
 
 The eventual result must retain the static risk observations used to select this
 condition: all 107 candidate occurrences kept their line counts, but none of the

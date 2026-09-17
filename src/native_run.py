@@ -20,6 +20,7 @@ from .baseline import baseline_summary, compare_quality, interim_baseline_gate
 from .blob_retrieval import make_blob_spool, retrieval_settings
 from .compressors import check_compressor_artifacts, make_compressor
 from .contracts import safe_child, save_json
+from .harbor_no_time_limits import apply_no_time_limit_policy, command as harbor_command
 from .live_observations import POLICY
 from .live_transport import DeploymentQueue, FoundrySender, LiveRecorder, ManagedIdentity, start_live_proxy
 from .measurement import load_encoder
@@ -27,7 +28,9 @@ from .native_contract import CONDITIONS, TASKS, load_native_ledger, require_oper
 from .native_judge import collect_native_outcome
 from .protection import digest
 from .provenance import ROOT, capture, git, verify_snapshot
+from .runtime_limits import public_queue_record, runtime_queue_limits
 from .task_metrics import aggregate_run_compressor_metrics, aggregate_run_timing_metrics, collect_trial_metrics
+from .verifier_revisions import apply_verifier_revision
 
 
 def runtime_environment(proxy_key: str) -> dict:
@@ -70,7 +73,7 @@ def benchmark_sources(ledger: dict) -> tuple[Path, dict[str, dict[str, bytes]]]:
     return root, tasks
 
 
-def prepare_task(files: dict[str, bytes], target: Path, image: str) -> dict:
+def prepare_task(task: str, files: dict[str, bytes], target: Path, image: str, verifier_specs: dict) -> dict:
     before = tomllib.loads(files["task.toml"].decode())
     text, count = re.subn(r'(?m)^docker_image\s*=\s*"[^"\n]+"\s*$', f'docker_image = "{image}"', files["task.toml"].decode())
     after = tomllib.loads(text)
@@ -78,7 +81,14 @@ def prepare_task(files: dict[str, bytes], target: Path, image: str) -> dict:
     expected["environment"]["docker_image"] = image
     if count != 1 or after != expected:
         raise ValueError("Task image pinning would change another task setting")
-    effective = {**files, "task.toml": text.encode(), "environment/Dockerfile": f"FROM {image}\n".encode()}
+    effective, verifier_revision = apply_verifier_revision(task, files, verifier_specs)
+    effective.update({"task.toml": text.encode(), "environment/Dockerfile": f"FROM {image}\n".encode()})
+    modified_files = sorted(name for name in effective if effective[name] != files.get(name))
+    expected_modified = {"task.toml", "environment/Dockerfile"}
+    if verifier_revision["modified"]:
+        expected_modified.add(verifier_revision["source_path"])
+    if set(modified_files) != expected_modified:
+        raise ValueError("Task preparation changed a file outside the approved image and verifier revisions")
     target.mkdir(parents=True, exist_ok=False)
     for name, content in effective.items():
         path = safe_child(target, name)
@@ -87,7 +97,11 @@ def prepare_task(files: dict[str, bytes], target: Path, image: str) -> dict:
     return {
         "source_files": {name: digest(content) for name, content in files.items()},
         "effective_files": {name: digest(content) for name, content in effective.items()},
-        "only_environment_image_is_overridden": True, "native_judge_modified": False,
+        "only_environment_image_is_overridden": not verifier_revision["modified"],
+        "only_approved_files_modified": True,
+        "approved_modified_files": modified_files,
+        "native_judge_modified": verifier_revision["modified"],
+        "verifier_revision": verifier_revision,
         "pinned_image": image,
     }
 
@@ -98,17 +112,16 @@ def harbor_config(ledger: dict, task_path: Path, jobs: Path, trial_id: str, api_
         "job_name": trial_id, "jobs_dir": str(jobs), "n_attempts": 1, "n_concurrent_trials": 1,
         "retry": {"max_retries": 0}, "quiet": True,
         "environment": {"type": "docker", "force_build": False, "delete": True},
-        "verifier": {"override_timeout_sec": runner["verifier_timeout_seconds"], "disable": False},
+        "verifier": {"disable": False},
         "tasks": [{"path": str(task_path)}],
         "agents": [{
             "import_path": runner["agent_import_path"], "model_name": "openai/" + model["name"],
-            "override_timeout_sec": runner["agent_timeout_seconds"],
-            "override_setup_timeout_sec": runner["setup_timeout_seconds"], "n_concurrent": 1,
+            "n_concurrent": 1,
             "kwargs": {
-                "api_base": api_base, "max_turns": runner["max_turns"], "enable_summarize": False,
+                "api_base": api_base, "enable_summarize": False,
                 "use_responses_api": False, "store_all_messages": True,
                 "temperature": model["temperature"], "reasoning_effort": model["reasoning_effort"],
-                "llm_kwargs": {"max_completion_tokens": model["max_completion_tokens"], "num_retries": 0},
+                "llm_kwargs": {"num_retries": 0},
             },
         }],
     }
@@ -130,20 +143,28 @@ def terminate_group(process, grace_seconds: float = 2) -> None:
     process.wait(timeout=5)
 
 
-def supervise(command: list[str], log: Path, recorder, timeout: float, environment: dict) -> dict:
+def supervise(
+    command: list[str],
+    log: Path,
+    recorder,
+    environment: dict,
+    on_start=None,
+    on_timing_start=None,
+) -> dict:
     recorder.check()
     started, started_at = time.monotonic(), now()
-    timed_out = stopped = False
+    if on_timing_start is not None:
+        on_timing_start(started_at)
+    stopped = False
     with log.open("xb") as output:
         process = subprocess.Popen(command, stdout=output, stderr=subprocess.STDOUT,
                                    env=environment, cwd=ROOT, start_new_session=True, stdin=subprocess.DEVNULL)
         try:
+            if on_start is not None:
+                on_start(process.pid)
             while process.poll() is None:
                 stopped = recorder.stopped.is_set()
-                timed_out = time.monotonic() - started >= timeout or time.time() >= recorder.deadline
-                if stopped or timed_out:
-                    if timed_out:
-                        recorder.stop("NativeProcessDeadline")
+                if stopped:
                     terminate_group(process)
                     break
                 time.sleep(0.05)
@@ -151,7 +172,7 @@ def supervise(command: list[str], log: Path, recorder, timeout: float, environme
             recorder.stop("NativeSupervisorInterrupted")
             terminate_group(process)
             raise
-    return {"returncode": process.returncode, "timed_out": timed_out, "stopped_by_guard": stopped,
+    return {"returncode": process.returncode, "timed_out": False, "stopped_by_guard": stopped,
             "started_at": started_at, "finished_at": now(), "elapsed_seconds": time.monotonic() - started,
             "docker_cleanup_verified": False}
 
@@ -169,19 +190,20 @@ def runtime_versions() -> dict:
 
 
 def preflight(ledger: dict, ledger_path: Path, source_commit: str, condition: str = "none") -> dict:
-    deadline = require_operational_values(ledger)
+    reporting_target = require_operational_values(ledger)
     if condition not in ledger["conditions"]:
         raise ValueError("Condition is not part of the fixed native design")
     provenance, snapshots = capture(ledger_path, source_commit)
     versions = runtime_versions()
     from harbor.models.job.config import JobConfig
 
+    harbor_limit_policy = apply_no_time_limit_policy()
     JobConfig.model_validate(harbor_config(ledger, ROOT / "placeholder", ROOT / "runs", "check", "http://127.0.0.1:1/check/v1"))
     encoder = load_encoder(ledger["measurement"])
     benchmark_root, tasks = benchmark_sources(ledger)
     retrieval = retrieval_settings(ledger, ROOT)
     endpoint = os.environ.get(ledger["model"]["endpoint_env"], "")
-    sender = FoundrySender(endpoint, ledger["limits"]["request_timeout_seconds"], ManagedIdentity(), deadline=deadline)
+    sender = FoundrySender(endpoint, ManagedIdentity())
     queue_value = os.environ.get(ledger["queue"]["state_path_env"])
     if not queue_value or not Path(queue_value).is_absolute():
         raise ValueError("Use the same absolute queue file for every deployment caller")
@@ -191,7 +213,10 @@ def preflight(ledger: dict, ledger_path: Path, source_commit: str, condition: st
         check_compressor_artifacts(ledger["compressor"], compressor_name)
     return {"provenance": provenance, "snapshots": snapshots, "encoder": encoder, "tasks": tasks,
             "benchmark_root": str(benchmark_root), "sender": sender, "queue_path": Path(queue_value).resolve(),
-            "runtime_versions": versions, "retrieval": retrieval}
+            "queue_limits": runtime_queue_limits(ledger["queue"], ledger["schema_version"]),
+            "runtime_versions": versions, "retrieval": retrieval,
+            "reporting_target": reporting_target,
+            "harbor_limit_policy": harbor_limit_policy}
 
 
 def verify_native_run(directory: Path) -> dict:
@@ -203,15 +228,13 @@ def verify_native_run(directory: Path) -> dict:
         raise ValueError("Native result and source provenance differ")
     ledger = load_native_ledger(directory / "ledger.toml")
     execution = json.loads((directory / "execution.json").read_bytes())
-    deployment_limits = {
-        "rpm": ledger["queue"]["rpm"], "tpm": ledger["queue"]["tpm"],
-        "checked_at_utc": ledger["queue"]["limits_checked_at_utc"],
-        "source_reference": ledger["queue"]["limits_source_reference"],
-    }
+    deployment_limits = public_queue_record(ledger["queue"], ledger["schema_version"])
     if summary.get("concurrency") != ledger["runner"]["concurrency"] or summary.get("deployment_limits") != deployment_limits:
         raise ValueError("Native result concurrency or deployment limits differ from the ledger")
     if execution.get("concurrency") != ledger["runner"]["concurrency"] or execution.get("deployment_limits") != deployment_limits:
         raise ValueError("Native execution metadata concurrency or limits differ from the ledger")
+    if summary.get("verifier_revisions") != ledger["benchmark"]["verifiers"] or execution.get("verifier_revisions") != ledger["benchmark"]["verifiers"]:
+        raise ValueError("Native result verifier revisions differ from the ledger")
     manifest_path = directory / "artifacts.json"
     if digest(manifest_path.read_bytes()) != summary["artifact_manifest_sha256"]:
         raise ValueError("Native artifact manifest changed")
@@ -328,9 +351,8 @@ def baseline_for_comparison(directory: Path, ledger: dict, source_commit: str) -
     ):
         if original_ledger[key] != ledger[key]:
             raise ValueError(f"Comparison differs from baseline {key}")
-    for key in ("max_calls_per_trial", "request_timeout_seconds", "max_request_bytes", "max_attempts_per_call", "max_retry_wait_seconds", "protocol_token_allowance"):
-        if original_ledger["limits"][key] != ledger["limits"][key]:
-            raise ValueError(f"Comparison differs from baseline limits.{key}")
+    if original_ledger["limits"] != ledger["limits"]:
+        raise ValueError("Comparison differs from the baseline no-harness-limit policy")
     if summary["condition"] != "none" or summary["source_commit"] != source_commit or summary["status"] != "complete":
         raise ValueError("Use a complete none baseline from the same execution SHA")
     decision = baseline_summary(summary["repetitions"], list(TASKS))
@@ -351,9 +373,8 @@ def run_trial(directory: Path, ledger: dict, recorder, server, key: str, task: s
         config = harbor_config(ledger, directory / "tasks" / task, directory / "jobs", trial_id, api_base)
         config_path = trial_directory / "harbor-config.json"
         save_json(config_path, config)
-        command = [str(Path(sys.executable).with_name("harbor")), "run", "--config", str(config_path)]
-        process = supervise(command, trial_directory / "harbor.log", recorder,
-                            ledger["runner"]["trial_timeout_seconds"], runtime_environment(key))
+        command = harbor_command("run", "--config", str(config_path))
+        process = supervise(command, trial_directory / "harbor.log", recorder, runtime_environment(key))
     except BaseException as error:
         recorder.stop("NativeTrialExecutionError", {"trial_id": trial_id, "error_type": type(error).__name__})
         process.update(stopped_by_guard=True, error_type=type(error).__name__)
@@ -453,32 +474,33 @@ def execute_native(ledger_path: Path, ledger: dict, source_commit: str, conditio
         "source_commit": source_commit, "ledger_sha256": setup["provenance"]["ledger_sha256"],
         "condition": condition, "status": "running", "started_at": now(), "trials": [], "repetitions": [],
         "classification_policy": POLICY, "determinism_controlled": False, "cache_controlled": False,
-        "concurrency": ledger["runner"]["concurrency"], "deployment_limits": {
-            "rpm": ledger["queue"]["rpm"], "tpm": ledger["queue"]["tpm"],
-            "checked_at_utc": ledger["queue"]["limits_checked_at_utc"],
-            "source_reference": ledger["queue"]["limits_source_reference"],
-        },
+        "concurrency": ledger["runner"]["concurrency"],
+        "deployment_limits": public_queue_record(ledger["queue"], ledger["schema_version"]),
         "raw_retrieval": ledger["raw_retrieval"], "baseline": None if baseline is None else {
             "run_id": baseline["run_id"], "summary_sha256": digest((baseline_path / "summary.json").read_bytes())},
+        "verifier_revisions": ledger["benchmark"]["verifiers"],
         "compressor_metrics": aggregate_run_compressor_metrics([]),
         "timing_metrics": aggregate_run_timing_metrics([]),
     }
     queue = recorder = server = compressor = retrieval = None
     try:
-        queue = DeploymentQueue(setup["queue_path"], deployment, ledger["queue"]["rpm"], ledger["queue"]["tpm"])
+        queue = DeploymentQueue(setup["queue_path"], deployment, *setup["queue_limits"])
         compressor_specification = {**ledger["compressor"], "name": condition}
         compressor = make_compressor(compressor_specification, directory / "compressor")
         recorder = LiveRecorder(directory / "transport", ledger, source_commit, compressor, setup["encoder"], queue,
                                 setup["sender"], condition=condition, evidence_kind=summary["kind"])
-        setup["sender"].deadline = recorder.deadline
         key = secrets.token_urlsafe(32)
         server = start_live_proxy(recorder, key)
-        task_sources = {task: prepare_task(files, directory / "tasks" / task, ledger["benchmark"]["images"][task])
+        task_sources = {task: prepare_task(
+            task, files, directory / "tasks" / task, ledger["benchmark"]["images"][task],
+            ledger["benchmark"]["verifiers"],
+        )
                         for task, files in setup["tasks"].items()}
         save_json(directory / "task-sources.json", task_sources)
         save_json(directory / "execution.json", {
             "source_commit": source_commit, "condition": condition, "compressor": compressor.metadata,
             "classification_policy": POLICY, "task_order": list(TASKS),
+            "verifier_revisions": ledger["benchmark"]["verifiers"],
             "concurrency": ledger["runner"]["concurrency"],
             "concurrency_unit": "simultaneous_native_trial_processes",
             "harbor_concurrency_per_process": 1, "agent_concurrency_per_trial": 1,
@@ -496,7 +518,10 @@ def execute_native(ledger_path: Path, ledger: dict, source_commit: str, conditio
                 "credentials": "system_assigned_managed_identity_not_recorded",
                 "nas_read_verification": "external_shutdown_gate",
             },
-            "effective_deadline_utc_epoch": recorder.deadline, "benchmark_root": setup["benchmark_root"],
+            "reporting_target_utc_epoch": setup["reporting_target"],
+            "reporting_target_is_process_timer": False, "benchmark_root": setup["benchmark_root"],
+            "harness_stop_policy": ledger["limits"],
+            "harbor_limit_policy": setup["harbor_limit_policy"],
             "runtime_versions": setup["runtime_versions"], "python": sys.version,
         })
         retrieval = make_blob_spool(
@@ -575,13 +600,11 @@ def execute_native(ledger_path: Path, ledger: dict, source_commit: str, conditio
         if recorder is not None:
             with recorder.lock:
                 summary["stop_reason"] = recorder.failure
-                summary["budget_used_or_reserved_usd"] = recorder.budget_used_usd
+                summary["known_provider_cost_usd"] = recorder.known_provider_cost_usd
         if queue is not None:
             queue.close()
         if retrieval is not None:
             wait_seconds = ledger["retrieval"]["final_flush_seconds"]
-            if recorder is not None:
-                wait_seconds = min(wait_seconds, max(0, recorder.deadline - time.time()))
             try:
                 retrieval_record = retrieval.finish(wait_seconds)
             except BaseException as error:

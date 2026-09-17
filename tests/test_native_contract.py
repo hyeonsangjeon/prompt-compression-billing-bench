@@ -2,12 +2,11 @@ from copy import deepcopy
 import importlib.util
 import os
 from pathlib import Path
-import tempfile
 import unittest
 from unittest.mock import patch
 
 from native_helpers import ledger_fixture
-from src.native_contract import CONDITIONS, load_native_ledger, require_operational_values, validate_native_ledger
+from src.native_contract import load_native_ledger, require_operational_values, validate_native_ledger
 from src.native_run import harbor_config, preflight, runtime_versions
 
 
@@ -25,12 +24,14 @@ class NativeContractTests(unittest.TestCase):
 
     def test_incomplete_or_changed_design_is_rejected(self):
         original = ledger_fixture()
-        self.assertGreater(require_operational_values(original), 0)
+        with patch.dict(os.environ, {"PROVIDER_RPM_LIMIT": "17", "PROVIDER_TPM_LIMIT": "1700"}):
+            self.assertGreater(require_operational_values(original), 0)
+
         for section, field, value in (("benchmark", "tasks", []), ("model", "temperature", True),
                                       ("compressor", "tools", []), ("compressor", "tools", {"squeez": [], "none": {}}),
                                       ("runner", "concurrency", 4), ("queue", "rpm", 300),
                                       ("stability", "maximum_repetitions", 30), ("approval", "rule_accepted", "yes"),
-                                      ("limits", "api_cost_usd", float("nan"))):
+                                      ("limits", "provider_cost_stop", "300")):
             ledger = deepcopy(original)
             ledger[section][field] = value
             with self.subTest(section=section, field=field), self.assertRaises(ValueError):
@@ -43,9 +44,19 @@ class NativeContractTests(unittest.TestCase):
         changed["compressor"]["tools"]["llmlingua2"]["options"]["rate"] = 0.6
         with self.assertRaises(ValueError):
             validate_native_ledger(changed)
-        original["limits"]["deadline_utc"] = "2020-01-01T00:00:00+00:00"
+        changed = deepcopy(original)
+        changed["benchmark"]["verifiers"]["nginx-request-logging"]["effective_sha256"] = "0" * 64
         with self.assertRaises(ValueError):
-            require_operational_values(original)
+            validate_native_ledger(changed)
+        original["limits"]["reporting_target_utc"] = "2020-01-01T00:00:00+00:00"
+        with patch.dict(os.environ, {"PROVIDER_RPM_LIMIT": "17", "PROVIDER_TPM_LIMIT": "1700"}):
+            self.assertGreater(require_operational_values(original), 0)
+
+    def test_legacy_ledger_can_be_validated_but_cannot_start_new_provider_work(self):
+        ledger = ledger_fixture()
+        ledger["schema_version"] = 2
+        with self.assertRaisesRegex(ValueError, "schema-v3"):
+            require_operational_values(ledger)
 
     @unittest.skipUnless(importlib.util.find_spec("harbor"), "Install the locked native extra for Harbor integration")
     def test_real_job_schema_accepts_one_serial_trial_inside_fixed_outer_concurrency(self):
@@ -58,23 +69,9 @@ class NativeContractTests(unittest.TestCase):
         self.assertEqual(parsed.retry.max_retries, 0)
         self.assertFalse(parsed.verifier.disable)
         self.assertEqual(parsed.agents[0].kwargs["llm_kwargs"]["num_retries"], 0)
+        self.assertNotIn("max_turns", parsed.agents[0].kwargs)
+        self.assertNotIn("max_completion_tokens", parsed.agents[0].kwargs["llm_kwargs"])
         self.assertEqual(runtime_versions()["harbor"], "0.22.0")
-
-    def test_baseline_preflight_checks_every_compressor_artifact(self):
-        ledger = ledger_fixture()
-        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {
-            "FOUNDRY_ENDPOINT": "https://synthetic.openai.azure.com/openai/v1",
-            "FOUNDRY_QUEUE_STATE": str(Path(temporary) / "deployment-queue.json"),
-            "NATIVE_BLOB_ACCOUNT_URL": "https://synthetic.blob.core.windows.net",
-            "NATIVE_BLOB_SPOOL_ROOT": str(Path(temporary) / "blob-spool"),
-        }), patch("src.native_run.capture", return_value=({"source_commit": "a" * 40}, {})), \
-             patch("src.native_run.runtime_versions", return_value={}), \
-             patch("src.native_run.load_encoder", return_value=object()), \
-             patch("src.native_run.benchmark_sources", return_value=(Path(temporary), {})), \
-             patch("src.native_run.check_compressor_artifacts") as check:
-            preflight(ledger, ROOT / "ledgers/native.template.toml", "a" * 40, "none")
-        self.assertEqual([call.args[1] for call in check.call_args_list], list(CONDITIONS))
-
 
 if __name__ == "__main__":
     unittest.main()

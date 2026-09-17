@@ -1,5 +1,7 @@
 # prompt-compression-billing-bench
 
+## In three seconds
+
 Measure **candidate share**—code-excluded identified candidate bytes divided by
 each task's request-content UTF-8 bytes—without confusing it with achieved
 compression, tool estimates, local token counts or provider usage.
@@ -16,7 +18,7 @@ Code-reading and mixed-code spans are excluded. This is an **identified candidat
 range, not a validated upper bound**. Actual compression rate, quality and billed
 savings were not measured.
 
-## Results and limits
+## Decide in 30 seconds
 
 The chart is generated from [aggregate bytes and sample counts](data/eda/task-candidate-share.csv),
 not from a new compression or billing experiment. The instruction classifications
@@ -27,10 +29,16 @@ The [two-round EDA review (Korean)](docs/eda/README.md) collects the existing
 benchmark/input figures and tables with sample counts, denominators and measurement
 labels. Its ten figures use relative paths; tool-behavior experiments are separate.
 
-The [experiment record (Korean)](docs/experiment/README.md) separates the fixed
-protocol, the measured none baseline, static compressor measurements and open
-decisions. The none baseline completed 20 repetitions but stopped inconclusive
-under its predeclared rule. No native compressor comparison has run.
+For KT sharing, start with the [plain-language Korean summary](docs/experiment/kt-sharing-20260917.md),
+then use the [one-page Korean briefing](docs/experiment/kt-briefing-20260919.md)
+and [plain-language visualization guide](docs/experiment/visualization-guide-20260919.md),
+then use the [technical evidence report](docs/experiment/preliminary-comparison-20260916.md)
+for condition-level figures, run identifiers and hashes. The broader
+[experiment record (Korean)](docs/experiment/README.md) separates the fixed protocol,
+the measured none baseline, static compressor measurements, preliminary comparison
+and open decisions. The none baseline completed 20 repetitions but stopped
+inconclusive under its predeclared rule; the preliminary comparison is one run per
+condition, not the preregistered repeated evaluation.
 
 Static token reductions do not establish native quality, prompt-cache behavior,
 recovery overhead or cost savings. Setting temperature to zero or reasoning effort
@@ -39,23 +47,46 @@ output elision.
 
 ## Try it in five minutes
 
-Run from a clean committed checkout on Linux with Python 3.12+ and `uv`.
-This small input is explicitly **synthetic**: it demonstrates the actual adapter
-and record path, not benchmark quality or a five-minute native-model result.
-Dependency installation and tokenizer preparation need internet; measurement does not fetch inputs.
+Run from a clean committed checkout with Python 3.12+ and `uv`. The YAML names
+one real Terminal-Bench 2.1 task. The default command validates the task, current
+Git commit, public reference ledger and JSON output contract without calling a model.
 
 ```bash
 uv sync --locked
-export TIKTOKEN_CACHE_DIR="$PWD/.cache/tiktoken"
-uv run --locked python run.py static --prepare-tokenizer "$TIKTOKEN_CACHE_DIR"
-export FROZEN_INPUT_ROOT="$PWD/examples/static"
-SOURCE_COMMIT=$(git rev-parse HEAD)
-uv run --locked python run.py static --source-commit "$SOURCE_COMMIT" ledgers/demo.toml
+uv run --locked python run.py experiment examples/experiment/benchmark.yaml
+uv run --locked python run.py experiment \
+  --verify-result runs/readme-benchmark-result.json
 ```
 
-The command prints its new `runs/static-*/` directory. Inspect `summary.json`;
-`measured_local` counts complete message content, excluding API framing.
-The model and native judge are never called by `run.py static`.
+The user-facing fields are the experiment type, endpoint environment-variable
+name, benchmark name/revision/task, model, condition and JSON output. The wrapper
+selects the committed low-level reference ledger and records its SHA-256, replay
+protection and retry settings. It detects the current clean `HEAD`; no
+`SOURCE_COMMIT` input is needed. `status=checked` with
+`outcome=preflight_passed` means the real task identifier and contracts passed
+without a provider call. It is not a quality result.
+
+Actual execution is opt-in only:
+
+```bash
+uv sync --locked --extra native
+# A deployment operator supplies the named endpoint, approved operational ledger,
+# benchmark checkout, inventory, queue, retrieval and tokenizer environment values.
+uv run --locked python run.py experiment examples/experiment/benchmark.yaml --execute
+```
+
+`--execute` verifies that the approved operational ledger changes only the
+runtime approval and evidence fields allowed by the public reference. It then
+delegates the selected task to the existing `screening_run --diagnose-task`
+path; it does not implement another benchmark engine. The checked path above is
+measured in the [repository validation record](data/experiment/readme-benchmark-validation.json).
+A provider-backed five-minute
+completion is a target, not a verified result: this change made no provider call.
+`status=failed` with `outcome=technical_incomplete` is not a wrong answer.
+
+The earlier synthetic static example remains a wiring fixture, not the default
+five-minute path. Its YAML and result are available in `examples/experiment/`
+for offline contract tests only.
 
 For squeez, supply the executable matching the version and SHA-256 in the ledger
 through `SQUEEZ_BINARY`. Change **only** `compressor.name` in a ledger copy:
@@ -73,10 +104,11 @@ version. Binary distribution is an [open readiness item](STATUS.md).
 ## Implementation
 
 - Two static conditions and four native conditions, one frozen-observation pipeline, pinned execution ledgers and result schemas.
+- A user-facing YAML request binds to one hash-pinned low-level TOML ledger. `run.py experiment` checks by default and delegates execution to the existing runner; it does not implement a second execution path.
 - Separate `tool_reported`, `measured_local` and `measured_billed` fields. No API calls means billing is **not measured**, not a measured zero.
 - A reproducible aggregate EDA chart; raw historical requests are not distributed.
 - An optional [local-model native runner](docs/local-native.md), not yet connected to the compressor pipeline.
-- An opt-in [Harbor/Foundry candidate-compression runner](docs/native-contract.md) for none, squeez, a Headroom paths-only profile and LLMLingua-2, with a shared protected transport, per-task workload metrics, a five-repetition continuation gate and local-first Blob result retrieval. A none baseline is measured; native compressor comparisons remain unexecuted.
+- An opt-in [Harbor/Foundry candidate-compression runner](docs/native-contract.md) for none, squeez, a Headroom paths-only profile and LLMLingua-2, with a shared protected transport, per-task workload metrics, a five-repetition continuation gate and local-first Blob result retrieval. A none baseline is measured; a preliminary native comparison for 26 tasks × four conditions is complete with one run per condition, but the preregistered repeated evaluation remains unexecuted.
 
 ## Protection
 
@@ -109,13 +141,20 @@ an expanding result is recorded as an expansion rather than hidden.
 ## Contracts and next steps
 
 The real accountless Ollama path remains available separately, but its historical
-cached runs exceeded five minutes. The synthetic demo is not a substitute for that gap.
+cached runs exceeded five minutes. The no-call benchmark check is not a substitute
+for measuring provider-backed wall time.
 The native path has one real none baseline with verified result retrieval and
 host deallocation. A compressor comparison and deployment-wide caller isolation
 have not been validated.
 
 | Need | Read |
 |---|---|
+| KT decision briefing and experiment-design gaps | [One-page KT briefing](docs/experiment/kt-briefing-20260919.md) |
+| KT preliminary results in plain Korean | [KT sharing summary](docs/experiment/kt-sharing-20260917.md) |
+| User-facing benchmark YAML and JSON contract | [Single-task YAML](examples/experiment/benchmark.yaml) · [Result schema](schemas/experiment-result.schema.json) |
+| Offline synthetic contract fixture | [Static YAML](examples/experiment/static.yaml) · [Static JSON](examples/experiment/static-result.json) |
+| All EDA and preliminary-result charts | [Plain-language visualization guide](docs/experiment/visualization-guide-20260919.md) |
+| Condition-level KT evidence, run identifiers and hashes | [Preliminary comparison evidence](docs/experiment/preliminary-comparison-20260916.md) |
 | Exact execution, provenance, adapter and measurement contracts | [Static contract](docs/static-contract.md) |
 | Accountless native execution and historical evidence | [Local native runner](docs/local-native.md) |
 | Opt-in Foundry path, workload metrics and proposed baseline rule | [Native contract](docs/native-contract.md) |

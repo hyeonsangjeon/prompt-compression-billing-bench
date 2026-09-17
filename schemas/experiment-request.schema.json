@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "User-facing experiment request bound to one low-level TOML ledger",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "experiment", "low_level_ledger", "source", "provider", "model", "condition", "compressor", "input", "execution", "output"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "experiment": {
+      "type": "object", "additionalProperties": false, "required": ["type"],
+      "properties": {"type": {"enum": ["static", "native"]}}
+    },
+    "low_level_ledger": {
+      "type": "object", "additionalProperties": false, "required": ["path", "sha256"],
+      "properties": {"path": {"$ref": "#/$defs/path"}, "sha256": {"$ref": "#/$defs/sha"}}
+    },
+    "source": {
+      "type": "object", "additionalProperties": false, "required": ["commit_env"],
+      "properties": {"commit_env": {"$ref": "#/$defs/env"}}
+    },
+    "provider": {
+      "type": "object", "additionalProperties": false, "required": ["kind", "endpoint_env"],
+      "properties": {
+        "kind": {"enum": ["none", "foundry"]},
+        "endpoint_env": {"oneOf": [{"$ref": "#/$defs/env"}, {"type": "null"}]}
+      }
+    },
+    "model": {
+      "type": "object", "additionalProperties": false, "required": ["name", "settings"],
+      "properties": {
+        "name": {"type": ["string", "null"], "minLength": 1},
+        "settings": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "reported_model": {"type": "string", "minLength": 1},
+            "temperature": {"type": "number"},
+            "reasoning_effort": {"enum": ["none", "low", "medium", "high"]}
+          }
+        }
+      }
+    },
+    "condition": {"enum": ["none", "squeez", "headroom", "llmlingua2"]},
+    "compressor": {
+      "type": "object", "additionalProperties": false, "required": ["name", "version"],
+      "properties": {
+        "name": {"enum": ["none", "squeez", "headroom", "llmlingua2"]},
+        "version": {"type": "string", "minLength": 1}
+      }
+    },
+    "input": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "manifest_path", "root_env", "manifest_sha256"],
+      "properties": {
+        "kind": {"enum": ["synthetic_fixture", "historical_requests", "terminal_bench_checkout"]},
+        "manifest_path": {"oneOf": [{"$ref": "#/$defs/path"}, {"type": "null"}]},
+        "root_env": {"$ref": "#/$defs/env"},
+        "manifest_sha256": {"oneOf": [{"$ref": "#/$defs/sha"}, {"type": "null"}]}
+      }
+    },
+    "execution": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repetitions", "concurrency", "stop_policy", "provider_calls_approved", "baseline_env"],
+      "properties": {
+        "repetitions": {
+          "oneOf": [
+            {
+              "type": "object", "additionalProperties": false, "required": ["mode", "count"],
+              "properties": {"mode": {"const": "fixed"}, "count": {"type": "integer", "minimum": 1}}
+            },
+            {
+              "type": "object", "additionalProperties": false, "required": ["mode", "minimum", "maximum"],
+              "properties": {
+                "mode": {"const": "low_level_stop_rule"},
+                "minimum": {"type": "integer", "minimum": 1},
+                "maximum": {"type": "integer", "minimum": 1}
+              }
+            }
+          ]
+        },
+        "concurrency": {"type": "integer", "minimum": 1},
+        "stop_policy": {"enum": ["no_provider_calls", "low_level_ledger"]},
+        "provider_calls_approved": {"type": "boolean"},
+        "baseline_env": {"oneOf": [{"$ref": "#/$defs/env"}, {"type": "null"}]}
+      }
+    },
+    "output": {
+      "type": "object", "additionalProperties": false, "required": ["directory", "publication_tier"],
+      "properties": {
+        "directory": {"$ref": "#/$defs/path"},
+        "publication_tier": {"enum": ["public_fixture", "private_evidence", "aggregate_only"]}
+      }
+    }
+  },
+  "$defs": {
+    "sha": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "env": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"},
+    "path": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$"}
+  }
+}

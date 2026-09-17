@@ -1,0 +1,38 @@
+schema_version: 1
+experiment:
+  type: native
+low_level_ledger:
+  path: ledgers/native.template.toml
+  sha256: 0f17cc826b97e084deb76aaf9e328ba5d17cbf0668f49805e2685fe0614bd413
+source:
+  commit_env: SOURCE_COMMIT
+provider:
+  kind: foundry
+  endpoint_env: FOUNDRY_ENDPOINT
+model:
+  name: gpt-5.4
+  settings:
+    reported_model: gpt-5.4-2026-03-05
+    temperature: 0
+    reasoning_effort: none
+condition: none
+compressor:
+  name: none
+  version: unavailable
+input:
+  kind: terminal_bench_checkout
+  manifest_path: null
+  root_env: TERMINAL_BENCH_ROOT
+  manifest_sha256: null
+execution:
+  repetitions:
+    mode: low_level_stop_rule
+    minimum: 10
+    maximum: 20
+  concurrency: 8
+  stop_policy: low_level_ledger
+  provider_calls_approved: false
+  baseline_env: null
+output:
+  directory: runs
+  publication_tier: private_evidence

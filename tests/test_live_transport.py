@@ -1,6 +1,8 @@
 from copy import deepcopy
 import json
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -11,7 +13,14 @@ from unittest.mock import patch
 
 from native_helpers import FixtureEncoder, ImmediateQueue, ledger_fixture, request_fixture, response_fixture
 from src.compressors import NoOpCompressor
-from src.live_transport import DeploymentQueue, FoundrySender, LiveRecorder, provider_timing, start_live_proxy
+from src.live_transport import (
+    DeploymentQueue,
+    FoundrySender,
+    LiveRecorder,
+    TrialRequestBlocked,
+    provider_timing,
+    start_live_proxy,
+)
 from src.protection import FrozenRequestGuard, ProtectionViolation, canonical
 from src.task_metrics import read_events
 
@@ -180,7 +189,7 @@ class LiveTransportTests(unittest.TestCase):
         self.assertEqual(failures, [])
         self.assertEqual(len(self.sent), 2)
 
-    def test_bounded_429_retries_count_every_attempt_and_keep_unknown_budget(self):
+    def test_bounded_429_retries_count_every_attempt_and_record_known_cost(self):
         responses = iter([(429, b'{"error":"synthetic limit"}', {"Retry-After": "0"}),
                           (200, response_fixture(), {})])
         self.recorder.sender = lambda body: (self.sent.append(body), next(responses))[1]
@@ -189,7 +198,7 @@ class LiveTransportTests(unittest.TestCase):
         events = read_events(self.root / "transport/events.jsonl")
         self.assertEqual(sum(event["event"] == "attempt_started" for event in events), 2)
         self.assertEqual(self.queue.cooldowns, [0])
-        self.assertGreater(self.recorder.budget_used_usd, 0.00002)
+        self.assertEqual(self.recorder.known_provider_cost_usd, 0.00002)
 
     def test_unknown_usage_or_ambiguous_network_failure_stops_without_outer_retry(self):
         def failed_sender(body):
@@ -203,6 +212,52 @@ class LiveTransportTests(unittest.TestCase):
         response = next(event for event in read_events(self.root / "transport/events.jsonl") if event["event"] == "http")
         self.assertIsNone(response["status"])
         self.assertTrue(response["billing_unknown"])
+        self.assertTrue(self.recorder.stopped.is_set())
+
+    def test_trial_scoped_network_failure_does_not_stop_other_screening_trial(self):
+        recorder = LiveRecorder(
+            self.root / "screening-transport", self.ledger, "a" * 40,
+            NoOpCompressor({"options": {}}, self.root), FixtureEncoder(), self.queue,
+            lambda _body: (_ for _ in ()).throw(TimeoutError("synthetic network timeout")),
+            evidence_kind="synthetic_validation", request_error_scope="trial",
+        )
+        recorder.register_trial("trial-one", "task-one", 1)
+        recorder.register_trial("trial-two", "task-two", 1)
+        with self.assertRaises(TimeoutError):
+            recorder.complete("trial-one", canonical(request_fixture()))
+        self.assertFalse(recorder.stopped.is_set())
+        with self.assertRaises(TrialRequestBlocked):
+            recorder.complete("trial-one", canonical(request_fixture()))
+        recorder.sender = lambda _body: (200, response_fixture(), {})
+        self.assertEqual(recorder.complete("trial-two", canonical(request_fixture()))[0], 200)
+
+    def test_trial_scoped_delivery_failure_does_not_stop_other_screening_trial(self):
+        recorder = LiveRecorder(
+            self.root / "screening-delivery", self.ledger, "a" * 40,
+            NoOpCompressor({"options": {}}, self.root), FixtureEncoder(), self.queue,
+            lambda _body: (200, response_fixture(), {}),
+            evidence_kind="synthetic_validation", request_error_scope="trial",
+        )
+        recorder.register_trial("trial-one", "task-one", 1)
+        recorder.register_trial("trial-two", "task-two", 1)
+        recorder.record_delivery_failure("trial-one", OSError("synthetic client disconnect"))
+        self.assertFalse(recorder.stopped.is_set())
+        with self.assertRaises(TrialRequestBlocked):
+            recorder.complete("trial-one", canonical(request_fixture()))
+        self.assertEqual(recorder.complete("trial-two", canonical(request_fixture()))[0], 200)
+
+    def test_run_scoped_delivery_failure_stops_subsequent_requests(self):
+        self.recorder.record_delivery_failure("trial-one", OSError("synthetic client disconnect"))
+        self.assertTrue(self.recorder.stopped.is_set())
+        self.assertEqual(self.recorder.failure["reason"], "ClientDisconnectedAfterDispatch")
+        with self.assertRaises(ProtectionViolation):
+            self.recorder.complete("trial-one", canonical(request_fixture()))
+
+    def test_trial_scope_keeps_protection_failure_run_wide(self):
+        self.recorder.request_error_scope = "trial"
+        self.recorder.serialize = lambda payload: canonical({**payload, "temperature": 1})
+        with self.assertRaises(ProtectionViolation):
+            self.recorder.complete("trial-one", canonical(request_fixture()))
         self.assertTrue(self.recorder.stopped.is_set())
 
     def test_loopback_proxy_uses_the_same_guarded_recorder(self):
@@ -229,37 +284,93 @@ class LiveTransportTests(unittest.TestCase):
             self.recorder.complete("trial-one", canonical(request_fixture()))
         self.assertTrue(self.recorder.stopped.is_set())
 
-    def test_budget_and_request_limits_fail_before_provider_dispatch(self):
-        self.ledger["limits"]["api_cost_usd"] = 0
-        with self.assertRaisesRegex(ValueError, "budget"):
-            self.recorder.complete("trial-one", canonical(request_fixture()))
-        self.assertEqual(self.sent, [])
+    def test_sixty_first_call_is_dispatched_without_local_cost_or_call_stop(self):
+        for _ in range(61):
+            status, _body = self.recorder.complete("trial-one", canonical(request_fixture()))
+            self.assertEqual(status, 200)
+        self.assertEqual(len(self.sent), 61)
+        self.assertEqual(self.recorder.trials["trial-one"]["calls"], 61)
+        self.assertIsNone(self.recorder.trials["trial-one"]["failure"])
+        self.assertNotIn("max_completion_tokens", json.loads(self.sent[-1]))
 
 
 class QueueTests(unittest.TestCase):
-    def test_same_deployment_queue_is_exclusive_and_survives_restarts(self):
+    def test_same_deployment_queue_is_shared_and_survives_restarts(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "queue.json"
             queue = DeploymentQueue(path, "deployment", 5, 1000)
-            with self.assertRaises(BlockingIOError):
-                DeploymentQueue(path, "deployment", 5, 1000)
-            queue.reserve(50, threading.Event(), time.time() + 5)
+            second = DeploymentQueue(path, "deployment", 5, 1000)
+            queue.reserve(50, threading.Event())
+            second.reserve(60, threading.Event())
+            self.assertEqual(len(json.loads(path.read_text())["reservations"]), 2)
+            second.close()
             queue.close()
             reopened = DeploymentQueue(path, "deployment", 5, 1000)
-            self.assertEqual(len(reopened.reservations), 1)
+            self.assertEqual(len(reopened.reservations), 2)
             reopened.close()
             with self.assertRaises(ValueError):
                 DeploymentQueue(path, "different-deployment", 5, 1000)
 
-    def test_rate_deadline_and_oversized_reservation_do_not_wait_forever(self):
+    def test_independent_queue_instances_do_not_lose_concurrent_reservations(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "queue.json"
+            queues = [DeploymentQueue(path, "deployment", 8, 1000) for _ in range(8)]
+            self.addCleanup(lambda: [queue.close() for queue in queues])
+            barrier = threading.Barrier(8)
+            failures = []
+
+            def reserve(queue):
+                try:
+                    barrier.wait(timeout=2)
+                    queue.reserve(50, threading.Event())
+                except Exception as error:
+                    failures.append(error)
+
+            threads = [threading.Thread(target=reserve, args=(queue,)) for queue in queues]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(3)
+            self.assertTrue(all(not thread.is_alive() for thread in threads))
+            self.assertEqual(failures, [])
+            self.assertEqual(len(json.loads(path.read_text())["reservations"]), 8)
+
+    def test_separate_processes_share_one_persisted_rate_window(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "queue.json"
+            program = (
+                "from pathlib import Path; import sys,threading; "
+                "from src.live_transport import DeploymentQueue; "
+                "queue=DeploymentQueue(Path(sys.argv[1]),'deployment',8,1000); "
+                "queue.reserve(50,threading.Event()); queue.close()"
+            )
+            processes = [
+                subprocess.Popen(
+                    [sys.executable, "-c", program, str(path)],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                for _ in range(8)
+            ]
+            for process in processes:
+                stdout, stderr = process.communicate(timeout=10)
+                self.assertEqual((process.returncode, stdout, stderr), (0, "", ""))
+            self.assertEqual(len(json.loads(path.read_text())["reservations"]), 8)
+
+    def test_oversized_reservation_fails_and_explicit_stop_interrupts_rate_wait(self):
         with tempfile.TemporaryDirectory() as temporary:
             queue = DeploymentQueue(Path(temporary) / "queue", "deployment", 1, 100)
             self.addCleanup(queue.close)
             with self.assertRaises(ValueError):
-                queue.reserve(101, threading.Event(), time.time() + 5)
-            queue.reserve(50, threading.Event(), time.time() + 5)
-            with self.assertRaisesRegex(ValueError, "deadline"):
-                queue.reserve(50, threading.Event(), time.time() + 0.1)
+                queue.reserve(101, threading.Event())
+            queue.reserve(50, threading.Event())
+            stopped = threading.Event()
+            timer = threading.Timer(0.1, stopped.set)
+            timer.start()
+            self.addCleanup(timer.cancel)
+            with self.assertRaisesRegex(ProtectionViolation, "stopped"):
+                queue.reserve(50, stopped)
 
     def test_concurrent_reservations_are_persisted_without_loss(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -270,7 +381,7 @@ class QueueTests(unittest.TestCase):
 
             def reserve():
                 barrier.wait(timeout=2)
-                queue.reserve(50, threading.Event(), time.time() + 5)
+                queue.reserve(50, threading.Event())
 
             threads = [threading.Thread(target=reserve) for _ in range(8)]
             for thread in threads:
@@ -284,7 +395,7 @@ class QueueTests(unittest.TestCase):
     def test_credentials_cannot_be_forwarded_to_arbitrary_hosts(self):
         for endpoint in ("http://unsafe/openai/v1", "https://example.com/openai/v1", "https://user:secret@service.openai.azure.com/openai/v1"):
             with self.assertRaises(ValueError):
-                FoundrySender(endpoint, 1, lambda: "unused")
+                FoundrySender(endpoint, lambda: "unused")
 
 
 if __name__ == "__main__":

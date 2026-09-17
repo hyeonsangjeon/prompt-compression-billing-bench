@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import threading
@@ -31,7 +30,7 @@ FILE_READ_SUFFIX = "\nProtected file-read suffix: do not alter code, identifiers
 
 
 class ImmediateQueue:
-    def reserve(self, estimate, stopped, deadline):
+    def reserve(self, estimate, stopped):
         return 0.0
 
     def cooldown(self, seconds):
@@ -67,14 +66,14 @@ def request(ledger: dict, messages: list[dict]) -> bytes:
     return canonical({
         "model": model["name"], "temperature": model["temperature"],
         "reasoning_effort": model["reasoning_effort"],
-        "max_completion_tokens": model["max_completion_tokens"], "messages": messages,
+        "messages": messages,
     })
 
 
 def candidate_content() -> str:
     rows = "".join(f"/long/shared/preflight/file-{index:04d}.log\n" for index in range(240))
     if len(rows) <= 5000:
-        raise AssertionError("The fixed preflight candidate must exercise the LLMLingua input cap")
+        raise AssertionError("The fixed preflight candidate must exceed the removed legacy input cap")
     prompt = "root@123456789abc:/app# "
     return f"{FILE_READ_PREFIX}{prompt}{COMMAND}\n{rows}{prompt}{FILE_READ_SUFFIX}"
 
@@ -87,10 +86,6 @@ def run_condition(root: Path, ledger: dict, condition: str, source_commit: str, 
     recorder = None
     try:
         local_ledger = deepcopy(ledger)
-        local_ledger["limits"]["api_cost_usd"] = 1
-        local_ledger["limits"]["deadline_utc"] = (
-            datetime.now(timezone.utc) + timedelta(hours=1)
-        ).isoformat()
         recorder = LiveRecorder(
             directory / "transport", local_ledger, source_commit, compressor, encoder,
             ImmediateQueue(), sender, condition=condition,
@@ -162,11 +157,15 @@ def run_condition(root: Path, ledger: dict, condition: str, source_commit: str, 
         if len(completions) != 8 or any(event["audit"]["source"]["characters"] <= 5000 for event in completions):
             raise ValueError(f"{condition} did not produce eight complete candidate audits")
         worker_ids = sorted({event["worker_id"] for event in completions if event["worker_id"] is not None})
-        overflow_calls = sum(event["audit"]["overflow_applied"] for event in completions)
-        if condition == "llmlingua2" and (worker_ids != list(range(1, 9)) or overflow_calls != 8):
-            raise ValueError("LLMLingua did not exercise all eight workers and the fixed 5000-character cap")
-        if condition != "llmlingua2" and (worker_ids or overflow_calls):
-            raise ValueError(f"{condition} unexpectedly reported LLMLingua worker or cap behavior")
+        capped_calls = sum(
+            event["audit"]["overflow_applied"]
+            or event["audit"]["worker_input"] != event["audit"]["source"]
+            for event in completions
+        )
+        if condition == "llmlingua2" and (worker_ids != list(range(1, 9)) or capped_calls):
+            raise ValueError("LLMLingua did not exercise all eight workers with complete uncapped input")
+        if condition != "llmlingua2" and (worker_ids or capped_calls):
+            raise ValueError(f"{condition} unexpectedly reported LLMLingua worker or input-cap behavior")
 
         calls_before_violation = sender.calls
         original_serializer = recorder.serialize
@@ -200,7 +199,7 @@ def run_condition(root: Path, ledger: dict, condition: str, source_commit: str, 
                 event["worker_inference_seconds"] for event in completions
                 if event["worker_inference_seconds"] is not None
             ),
-            "worker_ids": worker_ids, "overflow_calls": overflow_calls,
+            "worker_ids": worker_ids, "overflow_calls": capped_calls,
             "adapter_path": "LiveRecorder.complete_then_FrozenRequestGuard_then_sender",
             "protected_byte_exact": protected_checks,
             "protected_not_sent_to_compressor": all(protected_exclusion),

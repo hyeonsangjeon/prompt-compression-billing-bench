@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="638" viewBox="0 0 1040 638" role="img" aria-labelledby="title desc">
+<title id="title">Provider-reported token usage by condition</title>
+<desc id="desc">Input, cached-input, and output token totals for the 104 completed conditions. These are whole API usage, not changed-span local tokens.</desc>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<g font-family="Arial, sans-serif" font-variant-numeric="tabular-nums" fill="#17202a">
+<text x="32" y="38" font-size="23" font-weight="600">Provider-reported token usage by condition</text>
+<text x="32" y="65" font-size="13">Unit: provider-reported tokens</text>
+<rect x="32" y="84" width="14" height="12" fill="#2457a6"/>
+<text x="53" y="95" font-size="13">input</text>
+<rect x="242" y="84" width="14" height="12" fill="#d97706"/>
+<text x="263" y="95" font-size="13">cached input</text>
+<rect x="452" y="84" width="14" height="12" fill="#16856b"/>
+<text x="473" y="95" font-size="13">output</text>
+<path d="M260.00,116 V572" stroke="#dce1e6"/>
+<text x="260.00" y="592" text-anchor="middle" font-size="11">0</text>
+<path d="M432.50,116 V572" stroke="#dce1e6"/>
+<text x="432.50" y="592" text-anchor="middle" font-size="11">1,228,261</text>
+<path d="M605.00,116 V572" stroke="#dce1e6"/>
+<text x="605.00" y="592" text-anchor="middle" font-size="11">2,456,522</text>
+<path d="M777.50,116 V572" stroke="#dce1e6"/>
+<text x="777.50" y="592" text-anchor="middle" font-size="11">3,684,783</text>
+<path d="M950.00,116 V572" stroke="#dce1e6"/>
+<text x="950.00" y="592" text-anchor="middle" font-size="11">4,913,044</text>
+<text x="32" y="148" font-size="14" font-weight="600">none</text>
+<rect x="260" y="130" width="495.828" height="15" fill="#2457a6"/>
+<text x="762.828" y="142" font-size="12">3,530,471</text>
+<rect x="260" y="152" width="319.679" height="15" fill="#d97706"/>
+<text x="586.679" y="164" font-size="12">2,276,224</text>
+<rect x="260" y="174" width="17.920" height="15" fill="#16856b"/>
+<text x="284.920" y="186" font-size="12">127,599</text>
+<text x="32" y="250" font-size="14" font-weight="600">squeez</text>
+<rect x="260" y="232" width="690.000" height="15" fill="#2457a6"/>
+<text x="957.000" y="244" font-size="12">4,913,043</text>
+<rect x="260" y="254" width="497.611" height="15" fill="#d97706"/>
+<text x="764.611" y="266" font-size="12">3,543,168</text>
+<rect x="260" y="276" width="22.028" height="15" fill="#16856b"/>
+<text x="289.028" y="288" font-size="12">156,847</text>
+<text x="32" y="352" font-size="14" font-weight="600">Headroom</text>
+<rect x="260" y="334" width="335.992" height="15" fill="#2457a6"/>
+<text x="602.992" y="346" font-size="12">2,392,382</text>
+<rect x="260" y="356" width="156.954" height="15" fill="#d97706"/>
+<text x="423.954" y="368" font-size="12">1,117,568</text>
+<rect x="260" y="378" width="17.749" height="15" fill="#16856b"/>
+<text x="284.749" y="390" font-size="12">126,377</text>
+<text x="32" y="454" font-size="14" font-weight="600">LLMLingua-2</text>
+<rect x="260" y="436" width="516.107" height="15" fill="#2457a6"/>
+<text x="783.107" y="448" font-size="12">3,674,861</text>
+<rect x="260" y="458" width="388.960" height="15" fill="#d97706"/>
+<text x="655.960" y="470" font-size="12">2,769,536</text>
+<rect x="260" y="480" width="16.233" height="15" fill="#16856b"/>
+<text x="283.233" y="492" font-size="12">115,584</text>
+<text x="32" y="618" font-size="11">Aggregate source SHA-256: f9d701bdcf803fb2739ca6f4a700ca106fc4f45db3dc22f19c769b10561ef826</text>
+</g></svg>

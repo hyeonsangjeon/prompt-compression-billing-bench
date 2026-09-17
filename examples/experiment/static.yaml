@@ -1,0 +1,34 @@
+schema_version: 1
+experiment:
+  type: static
+low_level_ledger:
+  path: ledgers/demo.toml
+  sha256: ffcd4779d1ab7588a98bd6d05c28a1b58071aa8d4590bdb0884e5e87f8c1dc6f
+source:
+  commit_env: SOURCE_COMMIT
+provider:
+  kind: none
+  endpoint_env: null
+model:
+  name: null
+  settings: {}
+condition: none
+compressor:
+  name: none
+  version: unavailable
+input:
+  kind: synthetic_fixture
+  manifest_path: examples/static/manifest.json
+  root_env: FROZEN_INPUT_ROOT
+  manifest_sha256: 5a8c238d86543c8bd0d48380c7744cfdb89f0c3ef9f9de759ab082268f0f466a
+execution:
+  repetitions:
+    mode: fixed
+    count: 1
+  concurrency: 1
+  stop_policy: no_provider_calls
+  provider_calls_approved: false
+  baseline_env: null
+output:
+  directory: runs
+  publication_tier: public_fixture

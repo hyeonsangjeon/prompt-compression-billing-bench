@@ -494,6 +494,10 @@ def main() -> int:
         from src.static_run import main as static_main
 
         return static_main(sys.argv[2:])
+    if len(sys.argv) > 1 and sys.argv[1] == "experiment":
+        from src.experiment_run import main as experiment_main
+
+        return experiment_main(sys.argv[2:])
     parser = argparse.ArgumentParser()
     parser.add_argument("ledger", nargs="?", type=Path, default=ROOT / "ledger.toml")
     parser.add_argument("--check", action="store_true")
