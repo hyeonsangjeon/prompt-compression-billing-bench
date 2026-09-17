@@ -32,6 +32,7 @@
 - [평가 규약](evaluation-protocol.md): 네 조건, 품질·비용 문턱, 반복 공식과 신뢰구간
 - [재현 계약](reproducibility-contract.md): 실행 증거, 중단·재개, verifier 재실행과 Blob 회수
 - [예비 비교 관측](preliminary-comparison-20260916.md): 26과제·104조건의 품질, 사용량, 변환, 비용 범위와 원본 해시
+- [KT 공유용 요약](kt-sharing-20260917.md): 26과제의 변경·무변경, 무압축 대비 판정 전이, 요청·usage·비용 재집계
 - [판단 기록](decisions.md): 확정한 선택과 근거
 
 ## 문서 상태 해석
