@@ -27,10 +27,14 @@ The [two-round EDA review (Korean)](docs/eda/README.md) collects the existing
 benchmark/input figures and tables with sample counts, denominators and measurement
 labels. Its ten figures use relative paths; tool-behavior experiments are separate.
 
-The [experiment record (Korean)](docs/experiment/README.md) separates the fixed
-protocol, the measured none baseline, static compressor measurements and open
-decisions. The none baseline completed 20 repetitions but stopped inconclusive
-under its predeclared rule. No native compressor comparison has run.
+For KT sharing, read the [plain-language Korean summary](docs/experiment/kt-sharing-20260917.md)
+first, then use the [technical evidence report](docs/experiment/preliminary-comparison-20260916.md)
+for condition-level figures, run identifiers and hashes. The broader
+[experiment record (Korean)](docs/experiment/README.md) separates the fixed protocol,
+the measured none baseline, static compressor measurements, preliminary comparison
+and open decisions. The none baseline completed 20 repetitions but stopped
+inconclusive under its predeclared rule; the preliminary comparison is one run per
+condition, not the preregistered repeated evaluation.
 
 Static token reductions do not establish native quality, prompt-cache behavior,
 recovery overhead or cost savings. Setting temperature to zero or reasoning effort
@@ -116,6 +120,8 @@ have not been validated.
 
 | Need | Read |
 |---|---|
+| KT preliminary results in plain Korean | [KT sharing summary](docs/experiment/kt-sharing-20260917.md) |
+| Condition-level KT evidence, run identifiers and hashes | [Preliminary comparison evidence](docs/experiment/preliminary-comparison-20260916.md) |
 | Exact execution, provenance, adapter and measurement contracts | [Static contract](docs/static-contract.md) |
 | Accountless native execution and historical evidence | [Local native runner](docs/local-native.md) |
 | Opt-in Foundry path, workload metrics and proposed baseline rule | [Native contract](docs/native-contract.md) |
