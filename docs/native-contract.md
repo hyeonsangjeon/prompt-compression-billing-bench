@@ -59,8 +59,8 @@ The template at `ledgers/native.template.toml` is deliberately unapproved and
 not runnable. Before execution it needs an explicit rule/execution approval
 reference, current rates with a source/check time, a deployment coordination
 reference and a reporting target. The reporting target is not a process timer.
-The ledger already fixes the checked deployment limits at 300,000 TPM and 3,000
-RPM and fixes eight simultaneous native trial processes. These are external
+The ledger records provider throughput limits and service errors as external
+constraints and fixes eight simultaneous native trial processes. These are
 deployment constraints and comparison controls, not a harness cost or time stop.
 
 The current native path does not impose a dollar stop, provider-call count,

@@ -30,7 +30,7 @@
 | 모델 | `gpt-5.4`; provider가 돌려준 revision을 요청마다 확인 |
 | 요청 설정 | temperature `0`, reasoning effort `none`; harness 출력 token 상한 없음 |
 | 실행기 | Harbor `0.22.0`, 계측한 Terminus 2 |
-| 병렬도와 배포 한도 | 8, 300,000 TPM, 3,000 RPM |
+| 병렬도와 provider 제약 | 8, provider 처리량 제한과 서비스 오류만 따른다 |
 | 과제 | 선별에서 통과한 정확한 `K`개 과제 ID 전부 |
 | 위치 | 식별된 로그 성격의 명령 출력 |
 | 로컬 token 계산 | tiktoken `0.14.0`, `o200k_base` |

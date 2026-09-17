@@ -19,7 +19,7 @@ Terminal-Bench 2.1 고정 revision의 89과제 중 어떤 과제가 압축 비�
 | 요청 설정 | temperature `0`, reasoning effort `none`; harness 출력 token 상한 없음 | 설정 기록이며 결정론 보장은 아님 |
 | 실행기 | Harbor `0.22.0`, 계측한 Terminus 2 | 고정 |
 | 병렬도 | 8 | 고정 |
-| 배포 한도 | 300,000 TPM, 3,000 RPM | 실행 전 재확인 |
+| provider 제약 | provider 처리량 제한과 서비스 오류만 따른다 | 실행 전 재확인 |
 | 반복 | 과제당 최대 20개 유효한 품질 결과 | 고정 |
 | 채점 | 벤치마크 verifier와 승인된 nginx 수정본 | hash 고정 |
 | 상태 재생 묶음 | revision 2; 변경 경로 일괄 보존, 마운트 순서 고정 | 고정 |

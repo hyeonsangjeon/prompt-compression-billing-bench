@@ -13,7 +13,7 @@
 | 모델 | `gpt-5.4`, 제공자 보고 revision `gpt-5.4-2026-03-05` | 고정 조건 |
 | 실행기 | Harbor `0.22.0`, instrumented Terminus 2 `2.0.0` | 고정 조건 |
 | 환경 | cloud VM, Linux kernel `6.17.0-1022-azure`, 8 vCPU | 측정 조건 |
-| 병렬도·한도 | 동시 native trial 8개, 300,000 TPM, 3,000 RPM | 비교 통제·운영값 |
+| 병렬도·provider 제약 | 동시 native trial 8개, provider 처리량 제한과 서비스 오류만 따른다 | 비교 통제·운영값 |
 | 생성 설정 | temperature `0`, reasoning effort `none` | 고정 조건·결정론 보장 아님 |
 | 로컬 token | tiktoken `0.14.0`, `o200k_base` | 계산 조건 |
 | 실행 소스 | `2984a3879252d51d1681b9d4f6b3bf4f4871a12e` | 측정 계보 |
@@ -83,4 +83,4 @@
 - 5과제는 목적 선정 표본이며 Terminal-Bench 2.1 전체나 코드 어시스턴트 업무의 대표 표본이 아니다.
 - temperature `0`과 reasoning effort `none`은 출력 결정론을 보장하지 않는다. cached input도 통제된 축이 아니다.
 - `none`은 추가 압축이 없다는 뜻이다. Harbor의 기존 10,000바이트 중간 생략까지 없는 원문 조건은 아니다.
-- squeez, Headroom, LLMLingua-2의 native 품질, token, 비용, 시간은 아직 측정하지 않았다.
+- 이 2026-09-14 기준선 실험 범위에서는 squeez, Headroom, LLMLingua-2의 native 품질, token, 비용, 시간을 측정하지 않았다.
