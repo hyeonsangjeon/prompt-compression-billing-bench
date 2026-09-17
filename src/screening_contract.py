@@ -9,18 +9,17 @@ import re
 import tomllib
 
 from .screening_inventory import REVISION
+from .runtime_limits import queue_fields, runtime_queue_limits, validate_queue_limits
 from .verifier_revisions import VERIFIER_SPECS
 
 
 FIXED_CONCURRENCY = 8
-FIXED_RPM = 3_000
-FIXED_TPM = 300_000
 LEGACY_FIELDS = {
     "benchmark": {"name", "revision", "root_env", "inventory_env", "inventory_sha256", "task_count", "verifiers"},
     "model": {"provider", "name", "reported_model", "endpoint_env", "temperature", "reasoning_effort", "max_completion_tokens"},
     "runner": {"harbor_version", "agent_import_path", "environment_import_path", "concurrency", "max_turns", "agent_timeout_seconds", "verifier_timeout_seconds", "setup_timeout_seconds", "trial_timeout_seconds"},
     "measurement": {"tokenizer", "tiktoken_version", "cache_env", "table_sha256"},
-    "queue": {"state_path_env", "rpm", "tpm", "limits_checked_at_utc", "limits_source_reference", "deployment_isolation_reference"},
+    "queue": queue_fields(1),
     "retrieval": {"account_url_env", "spool_root_env", "container", "prefix", "upload_timeout_seconds", "maximum_attempts", "initial_backoff_seconds", "maximum_backoff_seconds", "final_flush_seconds"},
     "limits": {"api_cost_usd", "deadline_utc", "max_wall_seconds", "max_calls_per_trial", "request_timeout_seconds", "max_request_bytes", "max_attempts_per_call", "max_retry_wait_seconds", "protocol_token_allowance"},
     "prices": {"input_per_million_usd", "cached_input_per_million_usd", "output_per_million_usd", "source_reference", "checked_at_utc"},
@@ -40,7 +39,6 @@ FIELDS = {
     "model": {"provider", "name", "reported_model", "endpoint_env", "temperature", "reasoning_effort"},
     "runner": {"harbor_version", "agent_import_path", "environment_import_path", "concurrency"},
     "measurement": {"tokenizer", "tiktoken_version", "cache_env", "table_sha256"},
-    "queue": {"state_path_env", "rpm", "tpm", "limits_checked_at_utc", "limits_source_reference", "deployment_isolation_reference"},
     "retrieval": {"account_url_env", "spool_root_env", "container", "prefix", "upload_timeout_seconds", "maximum_attempts", "initial_backoff_seconds", "maximum_backoff_seconds", "final_flush_seconds"},
     "limits": {
         "provider_cost_stop", "provider_call_stop", "request_size_stop",
@@ -80,12 +78,14 @@ def validate_screening_ledger(ledger: dict) -> None:
     if ledger.get("schema_version") == 1:
         _validate_legacy_screening_ledger(ledger)
         return
-    if set(ledger) != set(FIELDS) | {"schema_version", "mode", "output_dir", "raw_retrieval"}:
+    schema_version = ledger.get("schema_version")
+    fields = {**FIELDS, "queue": queue_fields(schema_version)}
+    if set(ledger) != set(fields) | {"schema_version", "mode", "output_dir", "raw_retrieval"}:
         raise ValueError("Unexpected or missing screening ledger sections")
-    for section, names in FIELDS.items():
+    for section, names in fields.items():
         if not isinstance(ledger[section], dict) or set(ledger[section]) != names:
             raise ValueError(f"Unexpected or missing [{section}] fields")
-    if ledger["schema_version"] != 2 or ledger["mode"] != "terminal_bench_screening":
+    if schema_version not in (2, 3) or ledger["mode"] != "terminal_bench_screening":
         raise ValueError("Screening ledger schema or mode differs")
     if ledger["output_dir"] != "runs" or ledger["raw_retrieval"] != "not_exposed_to_agent":
         raise ValueError("Raw screening evidence must remain private and unavailable to the agent")
@@ -120,8 +120,7 @@ def validate_screening_ledger(ledger: dict) -> None:
     }:
         raise ValueError("Keep the fixed local token calculation contract")
     queue = ledger["queue"]
-    if (queue["rpm"], queue["tpm"]) != (FIXED_RPM, FIXED_TPM):
-        raise ValueError("Keep the checked 3000 RPM and 300000 TPM limits")
+    validate_queue_limits(queue, schema_version)
     _timestamp(queue["limits_checked_at_utc"], "queue.limits_checked_at_utc")
     retrieval = ledger["retrieval"]
     if retrieval != {
@@ -191,13 +190,14 @@ def validate_screening_ledger(ledger: dict) -> None:
 
 
 def require_operational_screening(ledger: dict) -> float:
-    if ledger["schema_version"] != 2:
-        raise ValueError("Only the no-harness-limit screening ledger may start new provider work")
+    if ledger["schema_version"] != 3:
+        raise ValueError("New provider execution requires the environment-backed schema-v3 ledger")
     if not ledger["approval"]["preregistered"] or not ledger["approval"]["execution_authorized"] or not ledger["approval"]["reference"].strip():
         raise ValueError("Preregistration and delegated execution authorization must be recorded")
     queue = ledger["queue"]
     if not queue["limits_source_reference"].strip() or not queue["deployment_isolation_reference"].strip():
         raise ValueError("Quota and shared-deployment coordination need evidence references")
+    runtime_queue_limits(queue, ledger["schema_version"])
     if ledger["prices"]["input_per_million_usd"] <= 0 or ledger["prices"]["output_per_million_usd"] <= 0:
         raise ValueError("Verified rates are required for measurement even without a cost stop")
     return _timestamp(ledger["limits"]["reporting_target_utc"], "limits.reporting_target_utc").timestamp()
@@ -221,5 +221,4 @@ def _validate_legacy_screening_ledger(ledger: dict) -> None:
         raise ValueError("Legacy screening model contract differs")
     if ledger["runner"]["harbor_version"] != "0.22.0" or ledger["runner"]["concurrency"] != FIXED_CONCURRENCY:
         raise ValueError("Legacy screening runner differs")
-    if (ledger["queue"]["rpm"], ledger["queue"]["tpm"]) != (FIXED_RPM, FIXED_TPM):
-        raise ValueError("Legacy deployment limits differ")
+    validate_queue_limits(ledger["queue"], 1)

@@ -51,6 +51,7 @@ PUBLIC_FILES = {
     "docs/experiment/reproducibility-contract.md",
     "docs/experiment/preliminary-comparison-20260916.md",
     "docs/experiment/kt-sharing-20260917.md",
+    "docs/experiment/kt-briefing-20260919.md",
     "data/experiment/coverage-validation-v1.json",
     "data/experiment/terminal-bench-2.1-task-types.json", "ledgers/screening.template.toml",
     "tests/test_protection.py", "tests/test_static.py", "tests/test_eda.py", "tests/test_compare.py",
@@ -70,6 +71,10 @@ PUBLIC_FILES = {
     "fixtures/verifiers/nginx-request-logging/braced.conf",
     "fixtures/verifiers/nginx-request-logging/wrong-variable.conf",
     "ledgers/native.template.toml", "docs/native-contract.md",
+    "src/experiment_run.py", "src/runtime_limits.py",
+    "schemas/experiment-request.schema.json", "schemas/experiment-result.schema.json",
+    "examples/experiment/static.yaml", "examples/experiment/native.yaml",
+    "examples/experiment/static-result.json", "examples/experiment/native-preflight-result.json",
     "tests/native_helpers.py", "tests/test_baseline.py", "tests/test_live_observations.py",
     "tests/test_live_transport.py", "tests/test_native_judge.py", "tests/test_prompt_intake.py",
     "tests/test_task_metrics.py", "tests/test_native_contract.py", "tests/test_native_run.py",
@@ -83,6 +88,7 @@ PUBLIC_FILES = {
     "tests/test_evaluation_coverage.py", "tests/test_evaluation_statistics.py",
     "tests/test_screening_contract.py", "tests/test_screening_cost.py",
     "tests/test_screening_inventory.py", "tests/test_screening_scheduler.py",
+    "tests/test_experiment_run.py", "tests/test_kt_briefing.py",
 }
 
 TIMING_ROWS = (

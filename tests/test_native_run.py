@@ -50,6 +50,7 @@ class NativeRunTests(unittest.TestCase):
         setup = {"provenance": provenance, "snapshots": {"ledger.toml": self.ledger_bytes}, "encoder": FixtureEncoder(),
                  "tasks": {task: deepcopy(files) for task in TASKS}, "benchmark_root": str(self.root / "benchmark"),
                  "sender": sender, "queue_path": self.root / "shared-queue.json", "runtime_versions": {"kind": "synthetic"},
+                 "queue_limits": (10_000, 1_000_000),
                  "retrieval": {"client": retrieval_client, "container": "runs", "prefix": "runs"},
                  "reporting_target": 1_789_578_340.0,
                  "harbor_limit_policy": {"agent_time_limit_seconds": None},
@@ -147,7 +148,8 @@ class NativeRunTests(unittest.TestCase):
         self.assertEqual(len(self.sent), 50)
         self.assertEqual(summary["baseline_decision"]["suite_pass_counts"], [3] * 10)
         self.assertEqual(summary["concurrency"], 8)
-        self.assertEqual(summary["deployment_limits"]["rpm"], 3000)
+        self.assertEqual(summary["deployment_limits"]["rpm_env"], "PROVIDER_RPM_LIMIT")
+        self.assertFalse(summary["deployment_limits"]["values_recorded"])
         self.assertEqual(summary["compressor_metrics"]["trials"], 50)
         self.assertEqual(summary["compressor_metrics"]["calls"], 0)
         self.assertEqual(summary["timing_metrics"]["trials"], 50)

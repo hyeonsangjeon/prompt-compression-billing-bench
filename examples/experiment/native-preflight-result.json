@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "run_id": "example-native-preflight",
+  "started_at": "2026-09-17T17:20:00+00:00",
+  "finished_at": "2026-09-17T17:20:01+00:00",
+  "status": "checked",
+  "outcome": "preflight_passed",
+  "error": null,
+  "labels": {
+    "measured": false,
+    "synthetic": false,
+    "projected": false
+  },
+  "experiment_type": "native",
+  "provider": {
+    "kind": "foundry",
+    "endpoint": {
+      "source": "environment_variable",
+      "env_name": "FOUNDRY_ENDPOINT"
+    }
+  },
+  "model": {
+    "name": "gpt-5.4",
+    "settings": {
+      "reported_model": "gpt-5.4-2026-03-05",
+      "temperature": 0,
+      "reasoning_effort": "none"
+    }
+  },
+  "condition": "none",
+  "compressor": {
+    "name": "none",
+    "version": "unavailable"
+  },
+  "input": {
+    "kind": "terminal_bench_checkout",
+    "root_env": "TERMINAL_BENCH_ROOT",
+    "manifest_path": null
+  },
+  "output": {
+    "directory": "runs",
+    "publication_tier": "private_evidence"
+  },
+  "lineage": {
+    "source_commit": "63c64f6961a4c015d4110ce1de92a187e07743ee",
+    "source_sha256": null,
+    "config_path": "examples/experiment/native.yaml",
+    "config_sha256": "43b8619f65bfe01c4b66b3b43d523a0fa3b76b2783da82beb654854945efe204",
+    "ledger_sha256": "0f17cc826b97e084deb76aaf9e328ba5d17cbf0668f49805e2685fe0614bd413",
+    "manifest_sha256": null
+  },
+  "provider_usage": {
+    "status": "not_measured",
+    "input_tokens": null,
+    "cached_input_tokens": null,
+    "output_tokens": null
+  },
+  "local_measurement": {
+    "status": "not_measured",
+    "values": []
+  },
+  "cost": {
+    "status": "not_measured",
+    "calculated_usd": null,
+    "invoice_reconciled": null
+  },
+  "quality": {
+    "status": "not_measured",
+    "judge": null
+  },
+  "completion": {
+    "technical_status": "not_run",
+    "operator_status": "not_applicable"
+  },
+  "artifacts": {}
+}

@@ -28,6 +28,7 @@ from .native_contract import CONDITIONS, TASKS, load_native_ledger, require_oper
 from .native_judge import collect_native_outcome
 from .protection import digest
 from .provenance import ROOT, capture, git, verify_snapshot
+from .runtime_limits import public_queue_record, runtime_queue_limits
 from .task_metrics import aggregate_run_compressor_metrics, aggregate_run_timing_metrics, collect_trial_metrics
 from .verifier_revisions import apply_verifier_revision
 
@@ -212,6 +213,7 @@ def preflight(ledger: dict, ledger_path: Path, source_commit: str, condition: st
         check_compressor_artifacts(ledger["compressor"], compressor_name)
     return {"provenance": provenance, "snapshots": snapshots, "encoder": encoder, "tasks": tasks,
             "benchmark_root": str(benchmark_root), "sender": sender, "queue_path": Path(queue_value).resolve(),
+            "queue_limits": runtime_queue_limits(ledger["queue"], ledger["schema_version"]),
             "runtime_versions": versions, "retrieval": retrieval,
             "reporting_target": reporting_target,
             "harbor_limit_policy": harbor_limit_policy}
@@ -226,11 +228,7 @@ def verify_native_run(directory: Path) -> dict:
         raise ValueError("Native result and source provenance differ")
     ledger = load_native_ledger(directory / "ledger.toml")
     execution = json.loads((directory / "execution.json").read_bytes())
-    deployment_limits = {
-        "rpm": ledger["queue"]["rpm"], "tpm": ledger["queue"]["tpm"],
-        "checked_at_utc": ledger["queue"]["limits_checked_at_utc"],
-        "source_reference": ledger["queue"]["limits_source_reference"],
-    }
+    deployment_limits = public_queue_record(ledger["queue"], ledger["schema_version"])
     if summary.get("concurrency") != ledger["runner"]["concurrency"] or summary.get("deployment_limits") != deployment_limits:
         raise ValueError("Native result concurrency or deployment limits differ from the ledger")
     if execution.get("concurrency") != ledger["runner"]["concurrency"] or execution.get("deployment_limits") != deployment_limits:
@@ -476,11 +474,8 @@ def execute_native(ledger_path: Path, ledger: dict, source_commit: str, conditio
         "source_commit": source_commit, "ledger_sha256": setup["provenance"]["ledger_sha256"],
         "condition": condition, "status": "running", "started_at": now(), "trials": [], "repetitions": [],
         "classification_policy": POLICY, "determinism_controlled": False, "cache_controlled": False,
-        "concurrency": ledger["runner"]["concurrency"], "deployment_limits": {
-            "rpm": ledger["queue"]["rpm"], "tpm": ledger["queue"]["tpm"],
-            "checked_at_utc": ledger["queue"]["limits_checked_at_utc"],
-            "source_reference": ledger["queue"]["limits_source_reference"],
-        },
+        "concurrency": ledger["runner"]["concurrency"],
+        "deployment_limits": public_queue_record(ledger["queue"], ledger["schema_version"]),
         "raw_retrieval": ledger["raw_retrieval"], "baseline": None if baseline is None else {
             "run_id": baseline["run_id"], "summary_sha256": digest((baseline_path / "summary.json").read_bytes())},
         "verifier_revisions": ledger["benchmark"]["verifiers"],
@@ -489,7 +484,7 @@ def execute_native(ledger_path: Path, ledger: dict, source_commit: str, conditio
     }
     queue = recorder = server = compressor = retrieval = None
     try:
-        queue = DeploymentQueue(setup["queue_path"], deployment, ledger["queue"]["rpm"], ledger["queue"]["tpm"])
+        queue = DeploymentQueue(setup["queue_path"], deployment, *setup["queue_limits"])
         compressor_specification = {**ledger["compressor"], "name": condition}
         compressor = make_compressor(compressor_specification, directory / "compressor")
         recorder = LiveRecorder(directory / "transport", ledger, source_commit, compressor, setup["encoder"], queue,

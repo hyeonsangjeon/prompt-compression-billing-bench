@@ -27,8 +27,9 @@ The [two-round EDA review (Korean)](docs/eda/README.md) collects the existing
 benchmark/input figures and tables with sample counts, denominators and measurement
 labels. Its ten figures use relative paths; tool-behavior experiments are separate.
 
-For KT sharing, read the [plain-language Korean summary](docs/experiment/kt-sharing-20260917.md)
-first, then use the [technical evidence report](docs/experiment/preliminary-comparison-20260916.md)
+For KT sharing, start with the [one-page Korean briefing](docs/experiment/kt-briefing-20260919.md),
+continue to the [plain-language Korean summary](docs/experiment/kt-sharing-20260917.md),
+then use the [technical evidence report](docs/experiment/preliminary-comparison-20260916.md)
 for condition-level figures, run identifiers and hashes. The broader
 [experiment record (Korean)](docs/experiment/README.md) separates the fixed protocol,
 the measured none baseline, static compressor measurements, preliminary comparison
@@ -52,14 +53,22 @@ Dependency installation and tokenizer preparation need internet; measurement doe
 uv sync --locked
 export TIKTOKEN_CACHE_DIR="$PWD/.cache/tiktoken"
 uv run --locked python run.py static --prepare-tokenizer "$TIKTOKEN_CACHE_DIR"
-export FROZEN_INPUT_ROOT="$PWD/examples/static"
-SOURCE_COMMIT=$(git rev-parse HEAD)
-uv run --locked python run.py static --source-commit "$SOURCE_COMMIT" ledgers/demo.toml
+export SOURCE_COMMIT=$(git rev-parse HEAD)
+uv run --locked python run.py experiment examples/experiment/static.yaml
+uv run --locked python run.py experiment examples/experiment/static.yaml --execute
+uv run --locked python run.py experiment \
+  --verify-result examples/experiment/static-result.json
 ```
 
-The command prints its new `runs/static-*/` directory. Inspect `summary.json`;
-`measured_local` counts complete message content, excluding API framing.
-The model and native judge are never called by `run.py static`.
+The YAML names the low-level TOML ledger and its SHA-256. The first command is
+the default check; `status=checked` and `outcome=preflight_passed` mean the
+inputs and adapter passed without a provider call. `--execute` delegates to the
+existing static runner and writes `runs/<run_id>/experiment-result.json`.
+The result directory also keeps the exact `experiment-request.yaml`, its SHA-256,
+and the verified lower-level `summary.json` hash.
+`status=failed` with `outcome=technical_incomplete` is not a wrong answer.
+The synthetic fixture checks wiring and the JSON contract only; it does not
+establish native-model quality or reproduce the benchmark result.
 
 For squeez, supply the executable matching the version and SHA-256 in the ledger
 through `SQUEEZ_BINARY`. Change **only** `compressor.name` in a ledger copy:
@@ -77,6 +86,7 @@ version. Binary distribution is an [open readiness item](STATUS.md).
 ## Implementation
 
 - Two static conditions and four native conditions, one frozen-observation pipeline, pinned execution ledgers and result schemas.
+- A user-facing YAML request binds to one hash-pinned low-level TOML ledger. `run.py experiment` checks by default and delegates execution to the existing runner; it does not implement a second execution path.
 - Separate `tool_reported`, `measured_local` and `measured_billed` fields. No API calls means billing is **not measured**, not a measured zero.
 - A reproducible aggregate EDA chart; raw historical requests are not distributed.
 - An optional [local-model native runner](docs/local-native.md), not yet connected to the compressor pipeline.
@@ -120,7 +130,9 @@ have not been validated.
 
 | Need | Read |
 |---|---|
+| KT decision briefing and experiment-design gaps | [One-page KT briefing](docs/experiment/kt-briefing-20260919.md) |
 | KT preliminary results in plain Korean | [KT sharing summary](docs/experiment/kt-sharing-20260917.md) |
+| User-facing YAML and common JSON examples | [Static YAML](examples/experiment/static.yaml) · [Static JSON](examples/experiment/static-result.json) |
 | Condition-level KT evidence, run identifiers and hashes | [Preliminary comparison evidence](docs/experiment/preliminary-comparison-20260916.md) |
 | Exact execution, provenance, adapter and measurement contracts | [Static contract](docs/static-contract.md) |
 | Accountless native execution and historical evidence | [Local native runner](docs/local-native.md) |

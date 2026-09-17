@@ -4,8 +4,9 @@
 
 ## KT 공유 시작
 
-1. [KT 공유용 쉬운 설명](kt-sharing-20260917.md)에서 26개 과제·104개 조건의 결과와 한계를 먼저 읽는다.
-2. [예비 비교 기술 증거](preliminary-comparison-20260916.md)에서 조건별 세부 수치, 실행 식별자와 SHA-256 검증값을 확인한다.
+1. [KT 한 장 브리핑](kt-briefing-20260919.md)에서 지금 정할 수 있는 것과 실험 설계의 빈자리를 먼저 읽는다.
+2. [KT 공유용 쉬운 설명](kt-sharing-20260917.md)에서 26개 과제·104개 조건의 결과와 한계를 확인한다.
+3. [예비 비교 기술 증거](preliminary-comparison-20260916.md)에서 조건별 세부 수치, 실행 식별자와 SHA-256 검증값을 확인한다.
 
 ## 현재 상태
 
@@ -44,6 +45,7 @@
 - [선별 규약](screening-protocol.md): 89과제 목록, 18/20 판정, 실패·재시도와 nginx verifier
 - [평가 규약](evaluation-protocol.md): 네 조건, 품질·비용 문턱, 반복 공식과 신뢰구간
 - [재현 계약](reproducibility-contract.md): 실행 증거, 중단·재개, verifier 재실행과 Blob 회수
+- [KT 한 장 브리핑](kt-briefing-20260919.md): 측정 단계, 현재 결론과 실험 설계 10문항
 - [KT 공유용 쉬운 설명](kt-sharing-20260917.md): 26과제·104조건을 비전문가가 먼저 읽을 수 있게 풀어 쓴 결과와 한계
 - [예비 비교 기술 증거](preliminary-comparison-20260916.md): 조건별 품질, 사용량, 변환, 비용 범위, 실행 식별자와 원본 해시
 - [판단 기록](decisions.md): 확정한 선택과 근거

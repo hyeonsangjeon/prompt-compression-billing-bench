@@ -1313,6 +1313,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "jsonschema" },
     { name = "numpy" },
+    { name = "pyyaml" },
     { name = "tiktoken" },
 ]
 
@@ -1326,6 +1327,7 @@ requires-dist = [
     { name = "harbor", marker = "extra == 'native'", specifier = "==0.22.0" },
     { name = "jsonschema", specifier = "==4.23.0" },
     { name = "numpy", specifier = "==2.3.3" },
+    { name = "pyyaml", specifier = "==6.0.3" },
     { name = "tiktoken", specifier = "==0.14.0" },
 ]
 provides-extras = ["native"]

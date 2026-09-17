@@ -1,5 +1,6 @@
 from copy import deepcopy
 import importlib.util
+import os
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -23,7 +24,9 @@ class NativeContractTests(unittest.TestCase):
 
     def test_incomplete_or_changed_design_is_rejected(self):
         original = ledger_fixture()
-        self.assertGreater(require_operational_values(original), 0)
+        with patch.dict(os.environ, {"PROVIDER_RPM_LIMIT": "17", "PROVIDER_TPM_LIMIT": "1700"}):
+            self.assertGreater(require_operational_values(original), 0)
+
         for section, field, value in (("benchmark", "tasks", []), ("model", "temperature", True),
                                       ("compressor", "tools", []), ("compressor", "tools", {"squeez": [], "none": {}}),
                                       ("runner", "concurrency", 4), ("queue", "rpm", 300),
@@ -46,7 +49,14 @@ class NativeContractTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_native_ledger(changed)
         original["limits"]["reporting_target_utc"] = "2020-01-01T00:00:00+00:00"
-        self.assertGreater(require_operational_values(original), 0)
+        with patch.dict(os.environ, {"PROVIDER_RPM_LIMIT": "17", "PROVIDER_TPM_LIMIT": "1700"}):
+            self.assertGreater(require_operational_values(original), 0)
+
+    def test_legacy_ledger_can_be_validated_but_cannot_start_new_provider_work(self):
+        ledger = ledger_fixture()
+        ledger["schema_version"] = 2
+        with self.assertRaisesRegex(ValueError, "schema-v3"):
+            require_operational_values(ledger)
 
     @unittest.skipUnless(importlib.util.find_spec("harbor"), "Install the locked native extra for Harbor integration")
     def test_real_job_schema_accepts_one_serial_trial_inside_fixed_outer_concurrency(self):

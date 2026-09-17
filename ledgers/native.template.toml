@@ -1,4 +1,4 @@
-schema_version = 2
+schema_version = 3
 mode = "native_candidate_compression"
 conditions = ["none", "squeez", "headroom", "llmlingua2"]
 output_dir = "runs"
@@ -151,8 +151,8 @@ output_sha256 = "d6d647b8efdd766ec081da2376d37526db7effffdba1843e2b6e3a1cb69b458
 
 [queue]
 state_path_env = "FOUNDRY_QUEUE_STATE"
-rpm = 3000
-tpm = 300000
+rpm_env = "PROVIDER_RPM_LIMIT"
+tpm_env = "PROVIDER_TPM_LIMIT"
 limits_checked_at_utc = "2026-09-12T09:34:50.299151+00:00"
 limits_source_reference = "Azure deployment properties.rateLimits and one lightweight eight-request check"
 deployment_isolation_reference = ""

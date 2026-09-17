@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "run_id": "example-static-preflight",
+  "started_at": "2026-09-17T17:20:00+00:00",
+  "finished_at": "2026-09-17T17:20:01+00:00",
+  "status": "checked",
+  "outcome": "preflight_passed",
+  "error": null,
+  "labels": {
+    "measured": false,
+    "synthetic": true,
+    "projected": false
+  },
+  "experiment_type": "static",
+  "provider": {
+    "kind": "none",
+    "endpoint": {
+      "source": "not_applicable",
+      "env_name": null
+    }
+  },
+  "model": {
+    "name": null,
+    "settings": {}
+  },
+  "condition": "none",
+  "compressor": {
+    "name": "none",
+    "version": "unavailable"
+  },
+  "input": {
+    "kind": "synthetic_fixture",
+    "root_env": "FROZEN_INPUT_ROOT",
+    "manifest_path": "examples/static/manifest.json"
+  },
+  "output": {
+    "directory": "runs",
+    "publication_tier": "public_fixture"
+  },
+  "lineage": {
+    "source_commit": "63c64f6961a4c015d4110ce1de92a187e07743ee",
+    "source_sha256": null,
+    "config_path": "examples/experiment/static.yaml",
+    "config_sha256": "c9fbf68b07e75e5bfbd6ccea902df8a9d74b32af83f29290c1e9ae23b3abca08",
+    "ledger_sha256": "ffcd4779d1ab7588a98bd6d05c28a1b58071aa8d4590bdb0884e5e87f8c1dc6f",
+    "manifest_sha256": "5a8c238d86543c8bd0d48380c7744cfdb89f0c3ef9f9de759ab082268f0f466a"
+  },
+  "provider_usage": {
+    "status": "not_applicable",
+    "input_tokens": null,
+    "cached_input_tokens": null,
+    "output_tokens": null
+  },
+  "local_measurement": {
+    "status": "not_measured",
+    "values": []
+  },
+  "cost": {
+    "status": "not_applicable",
+    "calculated_usd": null,
+    "invoice_reconciled": null
+  },
+  "quality": {
+    "status": "not_measured",
+    "judge": null
+  },
+  "completion": {
+    "technical_status": "not_run",
+    "operator_status": "not_applicable"
+  },
+  "artifacts": {}
+}

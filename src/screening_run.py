@@ -40,6 +40,7 @@ from .protection import digest
 from .provenance import ROOT, capture, git, verify_snapshot
 from .replay_environment import replay_bundle_manifest
 from .screening_contract import load_screening_ledger, require_operational_screening
+from .runtime_limits import public_queue_record, runtime_queue_limits
 from .screening_cost import allocate_active_vm_cost, blob_operation_cost, combined_direct_cost, provider_cost
 from .screening_inventory import REVISION, _task_files, canonical_json, verify_inventory
 from .screening_scheduler import QUALITY_RESULTS, ScreeningState, make_screening_manifest, verify_screening_manifest
@@ -163,6 +164,7 @@ def screening_preflight(ledger_path: Path, source_commit: str) -> dict:
         "retrieval": retrieval,
         "sender": sender,
         "queue_path": queue_path,
+        "queue_limits": runtime_queue_limits(ledger["queue"], ledger["schema_version"]),
         "harbor_limit_policy": harbor_limit_policy,
     }
 
@@ -252,12 +254,9 @@ def _prepare_inputs(
         "runtime_versions": setup["runtime_versions"],
         "python": sys.version,
         "concurrency": setup["ledger"]["runner"]["concurrency"],
-        "deployment_limits": {
-            "rpm": setup["ledger"]["queue"]["rpm"],
-            "tpm": setup["ledger"]["queue"]["tpm"],
-            "checked_at_utc": setup["ledger"]["queue"]["limits_checked_at_utc"],
-            "source_reference": setup["ledger"]["queue"]["limits_source_reference"],
-        },
+        "deployment_limits": public_queue_record(
+            setup["ledger"]["queue"], setup["ledger"]["schema_version"]
+        ),
         "harness_stop_policy": setup["ledger"]["limits"],
         "harbor_limit_policy": setup["harbor_limit_policy"],
         "verifier_replay": "same_preserved_state_one_additional_verifier_execution_no_model_call",
@@ -2424,7 +2423,7 @@ def execute_screening(
         directory = directory.resolve(strict=True)
         run_id = manifest["run_id"]
     deployment = digest((setup["sender"].endpoint + "/" + ledger["model"]["name"]).encode())
-    queue = DeploymentQueue(setup["queue_path"], deployment, ledger["queue"]["rpm"], ledger["queue"]["tpm"])
+    queue = DeploymentQueue(setup["queue_path"], deployment, *setup["queue_limits"])
     compressor = (
         make_compressor(
             {**compressor_configuration, "name": condition},

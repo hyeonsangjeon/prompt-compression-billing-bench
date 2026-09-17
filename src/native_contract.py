@@ -7,6 +7,7 @@ import re
 import tomllib
 
 from .baseline import INTERIM_MAX_RANGE_WIDTH, INTERIM_REPETITIONS, RULE
+from .runtime_limits import queue_fields, runtime_queue_limits, validate_queue_limits
 from .verifier_revisions import VERIFIER_SPECS
 
 
@@ -14,8 +15,6 @@ TASKS = ("cancel-async-tasks", "log-summary-date-ranges", "multi-source-data-mer
          "nginx-request-logging", "openssl-selfsigned-cert")
 REVISION = "7131e4375048a0e408a8fb404b5f499d726b695b"
 FIXED_CONCURRENCY = 8
-FIXED_RPM = 3_000
-FIXED_TPM = 300_000
 CONDITIONS = ("none", "squeez", "headroom", "llmlingua2")
 LLMLINGUA_MODEL_FILES = {
     "config.json": {"bytes": 752, "sha256": "a3fdcf4e63057797101ecc84412bc654f9adb4e8d4ed3c91c5afb28eda327706"},
@@ -45,7 +44,6 @@ FIELDS = {
     "runner": {"harbor_version", "agent_import_path", "concurrency"},
     "measurement": {"tokenizer", "tiktoken_version", "cache_env", "table_sha256"},
     "compressor": {"name", "target", "tools"},
-    "queue": {"state_path_env", "rpm", "tpm", "limits_checked_at_utc", "limits_source_reference", "deployment_isolation_reference"},
     "retrieval": {"account_url_env", "spool_root_env", "container", "prefix", "upload_timeout_seconds", "maximum_attempts", "initial_backoff_seconds", "maximum_backoff_seconds", "final_flush_seconds"},
     "limits": {
         "provider_cost_stop", "provider_call_stop", "request_size_stop",
@@ -65,12 +63,14 @@ def load_native_ledger(path: Path) -> dict:
 
 
 def validate_native_ledger(ledger: dict) -> None:
-    if not isinstance(ledger, dict) or set(ledger) != set(FIELDS) | {"schema_version", "mode", "conditions", "output_dir", "raw_retrieval"}:
+    schema_version = ledger.get("schema_version") if isinstance(ledger, dict) else None
+    fields = {**FIELDS, "queue": queue_fields(schema_version)}
+    if not isinstance(ledger, dict) or set(ledger) != set(fields) | {"schema_version", "mode", "conditions", "output_dir", "raw_retrieval"}:
         raise ValueError("Unexpected or missing native ledger fields")
-    for section, fields in FIELDS.items():
-        if not isinstance(ledger[section], dict) or set(ledger[section]) != fields:
+    for section, names in fields.items():
+        if not isinstance(ledger[section], dict) or set(ledger[section]) != names:
             raise ValueError(f"Unexpected or missing [{section}] fields")
-    if type(ledger["schema_version"]) is not int or ledger["schema_version"] != 2 or ledger["mode"] != "native_candidate_compression" or ledger["conditions"] != list(CONDITIONS):
+    if type(schema_version) is not int or schema_version not in (2, 3) or ledger["mode"] != "native_candidate_compression" or ledger["conditions"] != list(CONDITIONS):
         raise ValueError("Keep the fixed none, squeez, Headroom and LLMLingua-2 comparison")
     if ledger["output_dir"] != "runs":
         raise ValueError("Native raw artifacts must stay under the private runs directory")
@@ -108,15 +108,12 @@ def validate_native_ledger(ledger: dict) -> None:
     ):
         if not isinstance(value, str) or not re.fullmatch(r"[A-Z][A-Z0-9_]*", value):
             raise ValueError("Store environment variable names, not credentials")
-    for section, fields in {"queue": {"rpm", "tpm"}, "prices": FIELDS["prices"] - {"source_reference", "checked_at_utc"}}.items():
-        for field in fields:
+    for section, names in {"prices": FIELDS["prices"] - {"source_reference", "checked_at_utc"}}.items():
+        for field in names:
             value = ledger[section][field]
             if type(value) not in (int, float) or not math.isfinite(value) or value < 0:
                 raise ValueError(f"{section}.{field} must be nonnegative and finite")
-    if any(type(ledger["queue"][field]) is not int for field in ("rpm", "tpm")):
-        raise ValueError("RPM and TPM must be integers")
-    if (ledger["queue"]["rpm"], ledger["queue"]["tpm"]) != (FIXED_RPM, FIXED_TPM):
-        raise ValueError("Keep the verified deployment limits fixed at 3000 RPM and 300000 TPM")
+    validate_queue_limits(ledger["queue"], schema_version)
     checked_at = datetime.fromisoformat(ledger["queue"]["limits_checked_at_utc"])
     if checked_at.tzinfo is None or checked_at > datetime.now(timezone.utc) or not ledger["queue"]["limits_source_reference"].strip():
         raise ValueError("Deployment limits need a past timezone-aware check and source")
@@ -212,8 +209,11 @@ def validate_native_ledger(ledger: dict) -> None:
 def require_operational_values(ledger: dict) -> float:
     if not all(ledger["approval"][field] for field in ("execution_approved", "rule_accepted")) or not ledger["approval"]["reference"].strip():
         raise ValueError("Baseline execution and the predeclared rule require explicit approval")
+    if ledger["schema_version"] != 3:
+        raise ValueError("New provider execution requires the environment-backed schema-v3 ledger")
     queue, prices = ledger["queue"], ledger["prices"]
-    if not queue["rpm"] or not queue["tpm"] or not queue["deployment_isolation_reference"].strip():
+    runtime_queue_limits(queue, ledger["schema_version"])
+    if not queue["deployment_isolation_reference"].strip():
         raise ValueError("Verify deployment quotas and coordination with other callers")
     if not prices["input_per_million_usd"] or not prices["output_per_million_usd"] or not prices["source_reference"].strip():
         raise ValueError("Provide verified rates for measurement")

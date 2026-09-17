@@ -59,9 +59,13 @@ The template at `ledgers/native.template.toml` is deliberately unapproved and
 not runnable. Before execution it needs an explicit rule/execution approval
 reference, current rates with a source/check time, a deployment coordination
 reference and a reporting target. The reporting target is not a process timer.
-The ledger records provider throughput limits and service errors as external
-constraints and fixes eight simultaneous native trial processes. These are
-deployment constraints and comparison controls, not a harness cost or time stop.
+The public schema-v3 template stores only the environment-variable names for
+provider throughput limits; the private runtime supplies positive integer values.
+Historical schema-v2 snapshots with numeric fields remain hash-bound and
+verifiable, but new result records do not republish the runtime values. The
+ledger treats provider limits and service errors as external constraints and
+fixes eight simultaneous native trial processes. These are deployment
+constraints and comparison controls, not a harness cost or time stop.
 
 The current native path does not impose a dollar stop, provider-call count,
 completion-token cap, request-byte cap, phase timer, whole-run timer or deadline
@@ -180,7 +184,7 @@ All metrics are collected for **all four** conditions from the same path.
 | `timing.transport_seconds` | Client HTTP wall time minus provider-reported service TTLT when both are available; otherwise null with a known subtotal |
 | `timing.model_seconds` | Provider-reported `engine_ttlt_ms`, converted to seconds; otherwise null with a known subtotal |
 | `native_outcome` | Unmodified native binary reward plus failure categories, per-test evidence and integrity warnings |
-| `concurrency`, `deployment_limits` | Fixed outer native-trial concurrency plus the ledger RPM/TPM, check time and source; written to both `summary.json` and `execution.json` and revalidated from the saved ledger |
+| `concurrency`, `deployment_limits` | Fixed outer native-trial concurrency plus the public environment-variable names, check time and source; schema-v3 records do not expose private runtime limit values |
 | `retrieval` | Per-repetition local payload size/SHA, Blob names, attempts, sanitized failure category and ETags; payload-before-manifest ordering is recorded, while collection-host read verification remains an external shutdown gate |
 
 Waits, control keystrokes, undecomposable scripts and uncertain submissions have

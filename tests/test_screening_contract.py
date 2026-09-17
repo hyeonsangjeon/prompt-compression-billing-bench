@@ -1,6 +1,8 @@
 from copy import deepcopy
+import os
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 from src.screening_contract import load_screening_ledger, require_operational_screening, validate_screening_ledger
 
@@ -37,6 +39,23 @@ class ScreeningContractTests(unittest.TestCase):
             changed[section][name] = value
             with self.subTest(section=section, name=name), self.assertRaises(ValueError):
                 validate_screening_ledger(changed)
+
+    def test_runtime_limits_are_required_from_private_environment(self):
+        ledger = load_screening_ledger(self.path)
+        ledger["approval"] = {
+            "preregistered": True,
+            "execution_authorized": True,
+            "reference": "synthetic test approval",
+        }
+        ledger["queue"]["deployment_isolation_reference"] = "synthetic test isolation"
+        with patch.dict(os.environ, {"PROVIDER_RPM_LIMIT": "17", "PROVIDER_TPM_LIMIT": "1700"}):
+            self.assertGreater(require_operational_screening(ledger), 0)
+
+    def test_legacy_ledger_cannot_start_new_provider_work(self):
+        ledger = load_screening_ledger(self.path)
+        ledger["schema_version"] = 2
+        with self.assertRaisesRegex(ValueError, "schema-v3"):
+            require_operational_screening(ledger)
 
 
 if __name__ == "__main__":
