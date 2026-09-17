@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Single-task benchmark request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "experiment", "endpoint_env", "benchmark", "model", "condition", "output"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "experiment": {"const": "native"},
+    "endpoint_env": {"$ref": "#/$defs/env"},
+    "benchmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "revision", "task"],
+      "properties": {
+        "name": {"const": "terminal-bench-2.1"},
+        "revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "task": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"}
+      }
+    },
+    "model": {"const": "gpt-5.4"},
+    "condition": {"const": "none"},
+    "output": {"type": "string", "pattern": "^runs/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*\\.json$"}
+  },
+  "$defs": {
+    "env": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"}
+  }
+}

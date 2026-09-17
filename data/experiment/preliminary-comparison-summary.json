@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "kind": "public_preliminary_comparison_aggregate",
+  "source": {
+    "path": "docs/experiment/kt-sharing-20260917.md",
+    "sha256": "44088277307d122027041c7909ccd3cbb7a2396e6e3babcf97ab5c904bb1bcd5"
+  },
+  "sample": {
+    "tasks": 26,
+    "conditions_per_task": 4,
+    "conditions": 104,
+    "repetitions_per_condition": 1
+  },
+  "conditions": ["none", "squeez", "Headroom", "LLMLingua-2"],
+  "quality": {
+    "unit": "conditions",
+    "denominator": 104,
+    "by_condition": {
+      "none": {"pass": 11, "wrong_answer": 15},
+      "squeez": {"pass": 10, "wrong_answer": 16},
+      "Headroom": {"pass": 9, "wrong_answer": 17},
+      "LLMLingua-2": {"pass": 10, "wrong_answer": 16}
+    }
+  },
+  "changes": {
+    "condition_unit": "conditions",
+    "condition_denominator": 104,
+    "span_unit": "changed spans",
+    "by_condition": {
+      "none": {"changed_conditions": 0, "unchanged_conditions": 26, "changed_spans": 0},
+      "squeez": {"changed_conditions": 1, "unchanged_conditions": 25, "changed_spans": 2},
+      "Headroom": {"changed_conditions": 4, "unchanged_conditions": 22, "changed_spans": 53},
+      "LLMLingua-2": {"changed_conditions": 18, "unchanged_conditions": 8, "changed_spans": 154}
+    },
+    "measurable_pairs": 738,
+    "unchanged_pairs": 529,
+    "missing_pairs": 166,
+    "changed_span_tokens_before": 97723,
+    "changed_span_tokens_after": 50824,
+    "token_unit": "local o200k_base tokens"
+  },
+  "requests": {
+    "unit": "events",
+    "by_condition": {
+      "none": {"logical_model_calls": 253, "provider_http_attempts": 253, "successful_http_responses": 253, "delivered_responses": 253},
+      "squeez": {"logical_model_calls": 277, "provider_http_attempts": 277, "successful_http_responses": 277, "delivered_responses": 277},
+      "Headroom": {"logical_model_calls": 208, "provider_http_attempts": 208, "successful_http_responses": 208, "delivered_responses": 208},
+      "LLMLingua-2": {"logical_model_calls": 289, "provider_http_attempts": 289, "successful_http_responses": 289, "delivered_responses": 289}
+    }
+  },
+  "provider_usage": {
+    "unit": "provider-reported tokens",
+    "by_condition": {
+      "none": {"input_tokens": 3530471, "cached_input_tokens": 2276224, "output_tokens": 127599},
+      "squeez": {"input_tokens": 4913043, "cached_input_tokens": 3543168, "output_tokens": 156847},
+      "Headroom": {"input_tokens": 2392382, "cached_input_tokens": 1117568, "output_tokens": 126377},
+      "LLMLingua-2": {"input_tokens": 3674861, "cached_input_tokens": 2769536, "output_tokens": 115584}
+    }
+  },
+  "calculated_cost": {
+    "unit": "USD",
+    "invoice_reconciled": false,
+    "by_condition": {
+      "none": 5.61866,
+      "squeez": 6.663187,
+      "Headroom": 5.3620835,
+      "LLMLingua-2": 4.689458
+    }
+  }
+}

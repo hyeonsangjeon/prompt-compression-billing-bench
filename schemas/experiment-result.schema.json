@@ -67,7 +67,11 @@
     },
     "output": {
       "type": "object", "additionalProperties": false, "required": ["directory", "publication_tier"],
-      "properties": {"directory": {"$ref": "#/$defs/path"}, "publication_tier": {"enum": ["public_fixture", "private_evidence", "aggregate_only"]}}
+      "properties": {
+        "directory": {"$ref": "#/$defs/path"},
+        "publication_tier": {"enum": ["public_fixture", "private_evidence", "aggregate_only"]},
+        "result_json": {"$ref": "#/$defs/path"}
+      }
     },
     "lineage": {
       "type": "object", "additionalProperties": false,
@@ -116,7 +120,7 @@
     "quality": {
       "type": "object", "additionalProperties": false, "required": ["status", "judge"],
       "properties": {
-        "status": {"enum": ["pass", "wrong_answer", "aggregate_measured", "not_measured", "unknown"]},
+        "status": {"enum": ["pass", "wrong_answer", "wrong_format", "aggregate_measured", "not_measured", "unknown"]},
         "judge": {"type": ["string", "null"]}
       }
     },
@@ -131,6 +135,50 @@
       "type": "object",
       "propertyNames": {"$ref": "#/$defs/path"},
       "additionalProperties": {"$ref": "#/$defs/sha"}
+    },
+    "benchmark": {
+      "type": "object", "additionalProperties": false, "required": ["name", "revision", "task"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "task": {"type": "string", "minLength": 1}
+      }
+    },
+    "resolved_contract": {
+      "type": "object", "additionalProperties": false,
+      "required": ["reference_ledger", "execution_ledger_sha256", "runner", "protection", "retry", "clean_checkout"],
+      "properties": {
+        "reference_ledger": {
+          "type": "object", "additionalProperties": false, "required": ["path", "sha256"],
+          "properties": {"path": {"$ref": "#/$defs/path"}, "sha256": {"$ref": "#/$defs/sha"}}
+        },
+        "execution_ledger_sha256": {"oneOf": [{"$ref": "#/$defs/sha"}, {"type": "null"}]},
+        "runner": {
+          "type": "object", "additionalProperties": false, "required": ["module", "action"],
+          "properties": {
+            "module": {"const": "src.screening_run"},
+            "action": {"const": "diagnose-task"}
+          }
+        },
+        "protection": {
+          "type": "object", "additionalProperties": false,
+          "required": ["replay_required", "complete_capture_required", "bundle_revision"],
+          "properties": {
+            "replay_required": {"type": "boolean"},
+            "complete_capture_required": {"type": "boolean"},
+            "bundle_revision": {"type": "integer", "minimum": 1}
+          }
+        },
+        "retry": {
+          "type": "object", "additionalProperties": false,
+          "required": ["provider_transient_http_attempts", "preparation_retry_maximum"],
+          "properties": {
+            "provider_transient_http_attempts": {"type": "integer", "minimum": 1},
+            "preparation_retry_maximum": {"type": "integer", "minimum": 0}
+          }
+        },
+        "clean_checkout": {"type": "boolean"}
+      }
     }
   },
   "$defs": {

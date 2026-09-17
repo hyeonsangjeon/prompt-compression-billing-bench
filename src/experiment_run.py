@@ -443,10 +443,16 @@ def main(arguments: list[str] | None = None) -> int:
             return 0
         if args.request is None:
             raise ValueError("Choose an experiment YAML request")
-        result, code = run_request(args.request, execute=args.execute)
+        raw_request = yaml.safe_load(args.request.read_bytes())
+        if isinstance(raw_request, dict) and raw_request.get("schema_version") == 2:
+            from .benchmark_run import run_benchmark_request
+
+            result, code = run_benchmark_request(args.request, execute=args.execute)
+        else:
+            result, code = run_request(args.request, execute=args.execute)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return code
-    except (ValueError, OSError, json.JSONDecodeError) as error:
+    except (ValueError, OSError, json.JSONDecodeError, yaml.YAMLError) as error:
         message = (
             "Experiment request file could not be read"
             if isinstance(error, OSError)

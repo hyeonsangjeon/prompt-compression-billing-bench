@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="726" viewBox="0 0 1040 726" role="img" aria-labelledby="title desc">
+<title id="title">Four separately recorded request events</title>
+<desc id="desc">Logical model calls, provider HTTP attempts, successful responses, and delivered responses. Equal observed counts do not make them the same event or a progress percentage.</desc>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<g font-family="Arial, sans-serif" font-variant-numeric="tabular-nums" fill="#17202a">
+<text x="32" y="38" font-size="23" font-weight="600">Four separately recorded request events</text>
+<text x="32" y="65" font-size="13">Unit: events</text>
+<rect x="32" y="84" width="14" height="12" fill="#2457a6"/>
+<text x="53" y="95" font-size="13">logical calls</text>
+<rect x="242" y="84" width="14" height="12" fill="#d97706"/>
+<text x="263" y="95" font-size="13">HTTP attempts</text>
+<rect x="452" y="84" width="14" height="12" fill="#16856b"/>
+<text x="473" y="95" font-size="13">success responses</text>
+<rect x="662" y="84" width="14" height="12" fill="#8b5cf6"/>
+<text x="683" y="95" font-size="13">delivered responses</text>
+<path d="M260.00,116 V660" stroke="#dce1e6"/>
+<text x="260.00" y="680" text-anchor="middle" font-size="11">0</text>
+<path d="M432.50,116 V660" stroke="#dce1e6"/>
+<text x="432.50" y="680" text-anchor="middle" font-size="11">73</text>
+<path d="M605.00,116 V660" stroke="#dce1e6"/>
+<text x="605.00" y="680" text-anchor="middle" font-size="11">146</text>
+<path d="M777.50,116 V660" stroke="#dce1e6"/>
+<text x="777.50" y="680" text-anchor="middle" font-size="11">219</text>
+<path d="M950.00,116 V660" stroke="#dce1e6"/>
+<text x="950.00" y="680" text-anchor="middle" font-size="11">292</text>
+<text x="32" y="148" font-size="14" font-weight="600">none</text>
+<rect x="260" y="130" width="597.842" height="15" fill="#2457a6"/>
+<text x="864.842" y="142" font-size="12">253</text>
+<rect x="260" y="152" width="597.842" height="15" fill="#d97706"/>
+<text x="864.842" y="164" font-size="12">253</text>
+<rect x="260" y="174" width="597.842" height="15" fill="#16856b"/>
+<text x="864.842" y="186" font-size="12">253</text>
+<rect x="260" y="196" width="597.842" height="15" fill="#8b5cf6"/>
+<text x="864.842" y="208" font-size="12">253</text>
+<text x="32" y="272" font-size="14" font-weight="600">squeez</text>
+<rect x="260" y="254" width="654.555" height="15" fill="#2457a6"/>
+<text x="921.555" y="266" font-size="12">277</text>
+<rect x="260" y="276" width="654.555" height="15" fill="#d97706"/>
+<text x="921.555" y="288" font-size="12">277</text>
+<rect x="260" y="298" width="654.555" height="15" fill="#16856b"/>
+<text x="921.555" y="310" font-size="12">277</text>
+<rect x="260" y="320" width="654.555" height="15" fill="#8b5cf6"/>
+<text x="921.555" y="332" font-size="12">277</text>
+<text x="32" y="396" font-size="14" font-weight="600">Headroom</text>
+<rect x="260" y="378" width="491.507" height="15" fill="#2457a6"/>
+<text x="758.507" y="390" font-size="12">208</text>
+<rect x="260" y="400" width="491.507" height="15" fill="#d97706"/>
+<text x="758.507" y="412" font-size="12">208</text>
+<rect x="260" y="422" width="491.507" height="15" fill="#16856b"/>
+<text x="758.507" y="434" font-size="12">208</text>
+<rect x="260" y="444" width="491.507" height="15" fill="#8b5cf6"/>
+<text x="758.507" y="456" font-size="12">208</text>
+<text x="32" y="520" font-size="14" font-weight="600">LLMLingua-2</text>
+<rect x="260" y="502" width="682.911" height="15" fill="#2457a6"/>
+<text x="949.911" y="514" font-size="12">289</text>
+<rect x="260" y="524" width="682.911" height="15" fill="#d97706"/>
+<text x="949.911" y="536" font-size="12">289</text>
+<rect x="260" y="546" width="682.911" height="15" fill="#16856b"/>
+<text x="949.911" y="558" font-size="12">289</text>
+<rect x="260" y="568" width="682.911" height="15" fill="#8b5cf6"/>
+<text x="949.911" y="580" font-size="12">289</text>
+<text x="32" y="706" font-size="11">Aggregate source SHA-256: f9d701bdcf803fb2739ca6f4a700ca106fc4f45db3dc22f19c769b10561ef826</text>
+</g></svg>

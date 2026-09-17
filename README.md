@@ -1,5 +1,7 @@
 # prompt-compression-billing-bench
 
+## In three seconds
+
 Measure **candidate share**—code-excluded identified candidate bytes divided by
 each task's request-content UTF-8 bytes—without confusing it with achieved
 compression, tool estimates, local token counts or provider usage.
@@ -16,7 +18,7 @@ Code-reading and mixed-code spans are excluded. This is an **identified candidat
 range, not a validated upper bound**. Actual compression rate, quality and billed
 savings were not measured.
 
-## Results and limits
+## Decide in 30 seconds
 
 The chart is generated from [aggregate bytes and sample counts](data/eda/task-candidate-share.csv),
 not from a new compression or billing experiment. The instruction classifications
@@ -27,8 +29,9 @@ The [two-round EDA review (Korean)](docs/eda/README.md) collects the existing
 benchmark/input figures and tables with sample counts, denominators and measurement
 labels. Its ten figures use relative paths; tool-behavior experiments are separate.
 
-For KT sharing, start with the [one-page Korean briefing](docs/experiment/kt-briefing-20260919.md),
-continue to the [plain-language Korean summary](docs/experiment/kt-sharing-20260917.md),
+For KT sharing, start with the [plain-language Korean summary](docs/experiment/kt-sharing-20260917.md),
+then use the [one-page Korean briefing](docs/experiment/kt-briefing-20260919.md)
+and [plain-language visualization guide](docs/experiment/visualization-guide-20260919.md),
 then use the [technical evidence report](docs/experiment/preliminary-comparison-20260916.md)
 for condition-level figures, run identifiers and hashes. The broader
 [experiment record (Korean)](docs/experiment/README.md) separates the fixed protocol,
@@ -44,31 +47,46 @@ output elision.
 
 ## Try it in five minutes
 
-Run from a clean committed checkout on Linux with Python 3.12+ and `uv`.
-This small input is explicitly **synthetic**: it demonstrates the actual adapter
-and record path, not benchmark quality or a five-minute native-model result.
-Dependency installation and tokenizer preparation need internet; measurement does not fetch inputs.
+Run from a clean committed checkout with Python 3.12+ and `uv`. The YAML names
+one real Terminal-Bench 2.1 task. The default command validates the task, current
+Git commit, public reference ledger and JSON output contract without calling a model.
 
 ```bash
 uv sync --locked
-export TIKTOKEN_CACHE_DIR="$PWD/.cache/tiktoken"
-uv run --locked python run.py static --prepare-tokenizer "$TIKTOKEN_CACHE_DIR"
-export SOURCE_COMMIT=$(git rev-parse HEAD)
-uv run --locked python run.py experiment examples/experiment/static.yaml
-uv run --locked python run.py experiment examples/experiment/static.yaml --execute
+uv run --locked python run.py experiment examples/experiment/benchmark.yaml
 uv run --locked python run.py experiment \
-  --verify-result examples/experiment/static-result.json
+  --verify-result runs/readme-benchmark-result.json
 ```
 
-The YAML names the low-level TOML ledger and its SHA-256. The first command is
-the default check; `status=checked` and `outcome=preflight_passed` mean the
-inputs and adapter passed without a provider call. `--execute` delegates to the
-existing static runner and writes `runs/<run_id>/experiment-result.json`.
-The result directory also keeps the exact `experiment-request.yaml`, its SHA-256,
-and the verified lower-level `summary.json` hash.
+The user-facing fields are the experiment type, endpoint environment-variable
+name, benchmark name/revision/task, model, condition and JSON output. The wrapper
+selects the committed low-level reference ledger and records its SHA-256, replay
+protection and retry settings. It detects the current clean `HEAD`; no
+`SOURCE_COMMIT` input is needed. `status=checked` with
+`outcome=preflight_passed` means the real task identifier and contracts passed
+without a provider call. It is not a quality result.
+
+Actual execution is opt-in only:
+
+```bash
+uv sync --locked --extra native
+# A deployment operator supplies the named endpoint, approved operational ledger,
+# benchmark checkout, inventory, queue, retrieval and tokenizer environment values.
+uv run --locked python run.py experiment examples/experiment/benchmark.yaml --execute
+```
+
+`--execute` verifies that the approved operational ledger changes only the
+runtime approval and evidence fields allowed by the public reference. It then
+delegates the selected task to the existing `screening_run --diagnose-task`
+path; it does not implement another benchmark engine. The checked path above is
+measured in the [repository validation record](data/experiment/readme-benchmark-validation.json).
+A provider-backed five-minute
+completion is a target, not a verified result: this change made no provider call.
 `status=failed` with `outcome=technical_incomplete` is not a wrong answer.
-The synthetic fixture checks wiring and the JSON contract only; it does not
-establish native-model quality or reproduce the benchmark result.
+
+The earlier synthetic static example remains a wiring fixture, not the default
+five-minute path. Its YAML and result are available in `examples/experiment/`
+for offline contract tests only.
 
 For squeez, supply the executable matching the version and SHA-256 in the ledger
 through `SQUEEZ_BINARY`. Change **only** `compressor.name` in a ledger copy:
@@ -123,7 +141,8 @@ an expanding result is recorded as an expansion rather than hidden.
 ## Contracts and next steps
 
 The real accountless Ollama path remains available separately, but its historical
-cached runs exceeded five minutes. The synthetic demo is not a substitute for that gap.
+cached runs exceeded five minutes. The no-call benchmark check is not a substitute
+for measuring provider-backed wall time.
 The native path has one real none baseline with verified result retrieval and
 host deallocation. A compressor comparison and deployment-wide caller isolation
 have not been validated.
@@ -132,7 +151,9 @@ have not been validated.
 |---|---|
 | KT decision briefing and experiment-design gaps | [One-page KT briefing](docs/experiment/kt-briefing-20260919.md) |
 | KT preliminary results in plain Korean | [KT sharing summary](docs/experiment/kt-sharing-20260917.md) |
-| User-facing YAML and common JSON examples | [Static YAML](examples/experiment/static.yaml) · [Static JSON](examples/experiment/static-result.json) |
+| User-facing benchmark YAML and JSON contract | [Single-task YAML](examples/experiment/benchmark.yaml) · [Result schema](schemas/experiment-result.schema.json) |
+| Offline synthetic contract fixture | [Static YAML](examples/experiment/static.yaml) · [Static JSON](examples/experiment/static-result.json) |
+| All EDA and preliminary-result charts | [Plain-language visualization guide](docs/experiment/visualization-guide-20260919.md) |
 | Condition-level KT evidence, run identifiers and hashes | [Preliminary comparison evidence](docs/experiment/preliminary-comparison-20260916.md) |
 | Exact execution, provenance, adapter and measurement contracts | [Static contract](docs/static-contract.md) |
 | Accountless native execution and historical evidence | [Local native runner](docs/local-native.md) |

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="462" viewBox="0 0 1040 462" role="img" aria-labelledby="title desc">
+<title id="title">API usage multiplied by the fixed price table</title>
+<desc id="desc">Calculated US-dollar costs for the 104 completed conditions. The values are not reconciled invoices and do not establish savings caused by compression.</desc>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<g font-family="Arial, sans-serif" font-variant-numeric="tabular-nums" fill="#17202a">
+<text x="32" y="38" font-size="23" font-weight="600">API usage multiplied by the fixed price table</text>
+<text x="32" y="65" font-size="13">Unit: USD</text>
+<rect x="32" y="84" width="14" height="12" fill="#2457a6"/>
+<text x="53" y="95" font-size="13">calculated cost</text>
+<path d="M260.00,116 V396" stroke="#dce1e6"/>
+<text x="260.00" y="416" text-anchor="middle" font-size="11">$0</text>
+<path d="M432.50,116 V396" stroke="#dce1e6"/>
+<text x="432.50" y="416" text-anchor="middle" font-size="11">$1.6657967</text>
+<path d="M605.00,116 V396" stroke="#dce1e6"/>
+<text x="605.00" y="416" text-anchor="middle" font-size="11">$3.3315935</text>
+<path d="M777.50,116 V396" stroke="#dce1e6"/>
+<text x="777.50" y="416" text-anchor="middle" font-size="11">$4.9973902</text>
+<path d="M950.00,116 V396" stroke="#dce1e6"/>
+<text x="950.00" y="416" text-anchor="middle" font-size="11">$6.663187</text>
+<text x="32" y="148" font-size="14" font-weight="600">none</text>
+<rect x="260" y="130" width="581.835" height="15" fill="#2457a6"/>
+<text x="848.835" y="142" font-size="12">$5.61866</text>
+<text x="32" y="206" font-size="14" font-weight="600">squeez</text>
+<rect x="260" y="188" width="690.000" height="15" fill="#2457a6"/>
+<text x="957.000" y="200" font-size="12">$6.663187</text>
+<text x="32" y="264" font-size="14" font-weight="600">Headroom</text>
+<rect x="260" y="246" width="555.265" height="15" fill="#2457a6"/>
+<text x="822.265" y="258" font-size="12">$5.3620835</text>
+<text x="32" y="322" font-size="14" font-weight="600">LLMLingua-2</text>
+<rect x="260" y="304" width="485.612" height="15" fill="#2457a6"/>
+<text x="752.612" y="316" font-size="12">$4.689458</text>
+<text x="32" y="442" font-size="11">Aggregate source SHA-256: f9d701bdcf803fb2739ca6f4a700ca106fc4f45db3dc22f19c769b10561ef826</text>
+</g></svg>

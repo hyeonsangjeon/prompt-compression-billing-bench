@@ -1,0 +1,10 @@
+schema_version: 2
+experiment: native
+endpoint_env: FOUNDRY_ENDPOINT
+benchmark:
+  name: terminal-bench-2.1
+  revision: 7131e4375048a0e408a8fb404b5f499d726b695b
+  task: cancel-async-tasks
+model: gpt-5.4
+condition: none
+output: runs/readme-benchmark-result.json
