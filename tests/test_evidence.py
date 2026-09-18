@@ -81,7 +81,11 @@ class EvidenceContractTests(unittest.TestCase):
             self.check_data(changed)
 
     def test_raw_and_unclassified_files_are_not_publishable(self):
-        validate_public_files(["ledger.toml", "evidence/local-baseline.json"])
+        validate_public_files([
+            "ledger.toml",
+            "evidence/local-baseline.json",
+            "docs/experiment/kt-data-connection-guide-20260919.md",
+        ])
         for path in ("runs/example/response.json", ".env", "unclassified.json", "server.key"):
             with self.assertRaises(ValueError):
                 validate_public_files([path])

@@ -6,9 +6,11 @@
 
 1. [KT 공유용 쉬운 설명](kt-sharing-20260917.md)에서 26개 과제·104개 조건의 결과와 한계를 먼저 읽는다.
 2. [KT 한 장 브리핑](kt-briefing-20260919.md)에서 지금 정할 수 있는 것과 실험 설계의 빈자리를 확인한다.
-3. [KT 시각화 부록](visualization-guide-20260919.md)에서 EDA 10개와 단위별 예비 비교 차트를 확인한다.
-4. [예비 비교 기술 증거](preliminary-comparison-20260916.md)에서 조건별 세부 수치, 실행 식별자와 SHA-256 검증값을 확인한다.
-5. [실제 1과제 YAML 안내](../../README.md#try-it-in-five-minutes)에서 기본 무호출 확인과 명시적 실제 실행 경계를 확인한다.
+3. [손실·무손실 압축 안내](lossless-lossy-compression-20260919.md)에서 네 조건의 복원 가능성과 품질·비용의 차이를 확인한다.
+4. [KT 시각화 부록](visualization-guide-20260919.md)에서 EDA 10개와 단위별 예비 비교 차트를 확인한다.
+5. [예비 비교 기술 증거](preliminary-comparison-20260916.md)에서 조건별 세부 수치, 실행 식별자와 SHA-256 검증값을 확인한다.
+6. [KT 실데이터 연결 가이드](kt-data-connection-guide-20260919.md)에서 원본을 공개 저장소에 올리지 않고 준비·무호출 확인·명시적 실행·결과 검증까지 잇는 방법을 확인한다.
+7. [실제 1과제 YAML 안내](../../README.md#try-it-in-five-minutes)에서 기본 무호출 확인과 명시적 실제 실행 경계를 확인한다.
 
 ## 현재 상태
 
@@ -48,8 +50,10 @@
 - [평가 규약](evaluation-protocol.md): 네 조건, 품질·비용 문턱, 반복 공식과 신뢰구간
 - [재현 계약](reproducibility-contract.md): 실행 증거, 중단·재개, verifier 재실행과 Blob 회수
 - [KT 한 장 브리핑](kt-briefing-20260919.md): 측정 단계, 현재 결론과 실험 설계 10문항
+- [손실·무손실 압축 안내](lossless-lossy-compression-20260919.md): 전송 압축·캐시·prompt 축약의 차이와 네 조건의 실제 복원 범위
 - [KT 시각화 부록](visualization-guide-20260919.md): EDA 10개, 측정 흐름과 단위별 예비 비교 차트
 - [KT 공유용 쉬운 설명](kt-sharing-20260917.md): 26과제·104조건을 비전문가가 먼저 읽을 수 있게 풀어 쓴 결과와 한계
+- [KT 실데이터 연결 가이드](kt-data-connection-guide-20260919.md): 고객 원본을 공개 저장소에 올리지 않는 실제 1과제 준비, 무호출 확인, 실행과 결과 검증 절차
 - [예비 비교 기술 증거](preliminary-comparison-20260916.md): 조건별 품질, 사용량, 변환, 비용 범위, 실행 식별자와 원본 해시
 - [판단 기록](decisions.md): 확정한 선택과 근거
 
