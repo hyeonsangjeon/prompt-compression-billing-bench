@@ -28,6 +28,8 @@ jobs:
           done
       - name: Verify aggregate EDA figure in both directions
         run: uv run --locked python -m src.eda --check
+      - name: Verify outcome cost accounting in both directions
+        run: uv run --locked python -m src.outcome_cost_accounting --check
       - name: Refuse files without a publication grade
         run: uv run --locked python evidence.py audit-files .
   native-contracts:

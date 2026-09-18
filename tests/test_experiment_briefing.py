@@ -6,11 +6,11 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BRIEFING = ROOT / "docs/experiment/kt-briefing-20260919.md"
-DATA_GUIDE = ROOT / "docs/experiment/kt-data-connection-guide-20260919.md"
+BRIEFING = ROOT / "docs/experiment/experiment-briefing-20260919.md"
+DATA_GUIDE = ROOT / "docs/experiment/data-connection-guide-20260919.md"
 
 
-class KtBriefingTests(unittest.TestCase):
+class ExperimentBriefingTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.text = BRIEFING.read_text()
@@ -82,7 +82,7 @@ class KtBriefingTests(unittest.TestCase):
                     self.assertTrue((document.parent / target).resolve().is_file())
 
 
-class KtDataConnectionGuideTests(unittest.TestCase):
+class DataConnectionGuideTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.text = DATA_GUIDE.read_text()

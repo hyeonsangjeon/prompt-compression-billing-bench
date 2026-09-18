@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "outcome-cost-accounting.schema.json",
+  "title": "Sanitized outcome cost accounting",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "source",
+    "labels",
+    "currency",
+    "price_basis",
+    "measurement_contract",
+    "completed_cohort",
+    "pre_quality",
+    "cancelled_before_start",
+    "included_scope_reconciliation",
+    "known_gaps",
+    "claim_limits"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "kind": {"const": "sanitized_outcome_cost_accounting"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "private_paths_published", "raw_requests_or_responses_published"],
+      "properties": {
+        "path": {"const": "data/experiment/outcome-cost-evidence.json"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "private_paths_published": {"const": false},
+        "raw_requests_or_responses_published": {"const": false}
+      }
+    },
+    "labels": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["measured", "synthetic", "projected"],
+      "properties": {
+        "measured": {"const": true},
+        "synthetic": {"const": false},
+        "projected": {"const": false}
+      }
+    },
+    "currency": {"const": "USD"},
+    "price_basis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "input_per_million_usd",
+        "cached_input_per_million_usd",
+        "output_per_million_usd"
+      ],
+      "properties": {
+        "kind": {"const": "provider_usage_times_fixed_rates_not_invoice_reconciliation"},
+        "input_per_million_usd": {"const": "2.5"},
+        "cached_input_per_million_usd": {"const": "0.25"},
+        "output_per_million_usd": {"const": "15"}
+      }
+    },
+    "measurement_contract": {"type": "object"},
+    "completed_cohort": {
+      "type": "object",
+      "required": [
+        "tasks",
+        "conditions",
+        "repetitions_per_condition",
+        "quality",
+        "api_calculated_cost_usd",
+        "arithmetic_api_cost_per_pass_usd",
+        "program_wide_cost_per_pass_usd",
+        "outcome_attribution"
+      ],
+      "properties": {
+        "tasks": {"const": 26},
+        "conditions": {"const": 104},
+        "repetitions_per_condition": {"const": 1},
+        "quality": {
+          "type": "object",
+          "required": ["pass", "wrong_answer", "wrong_format"],
+          "properties": {
+            "pass": {"const": 40},
+            "wrong_answer": {"const": 64},
+            "wrong_format": {"const": 0}
+          }
+        },
+        "api_calculated_cost_usd": {"const": "22.3333885"},
+        "arithmetic_api_cost_per_pass_usd": {"const": "0.5583347125"},
+        "program_wide_cost_per_pass_usd": {"type": "null"},
+        "outcome_attribution": {
+          "type": "object",
+          "required": ["complete", "joined_conditions", "missing_conditions", "by_quality", "unallocated"],
+          "properties": {
+            "complete": {"const": false},
+            "joined_conditions": {"const": 9},
+            "missing_conditions": {"const": 95},
+            "by_quality": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["pass", "normal_nonpass"],
+              "properties": {
+                "pass": {"$ref": "#/$defs/outcome_bucket"},
+                "normal_nonpass": {"$ref": "#/$defs/outcome_bucket"}
+              }
+            },
+            "unallocated": {"type": "object"}
+          }
+        }
+      }
+    },
+    "pre_quality": {
+      "type": "object",
+      "required": [
+        "quality_results",
+        "started_attempts",
+        "technical_incomplete_attempts",
+        "by_outcome",
+        "api_calculated_cost_known_usd",
+        "api_unknown_attempts",
+        "api_unconfirmed_estimate_usd",
+        "vm_direct_attributable_cost_known_usd",
+        "blob_network_cost_known_usd",
+        "known_direct_cost_subtotal_usd",
+        "final_total_usd",
+        "invoice_reconciled"
+      ],
+      "properties": {
+        "quality_results": {"const": 0},
+        "started_attempts": {"const": 5},
+        "technical_incomplete_attempts": {"const": 5},
+        "by_outcome": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["technical_incomplete", "operator_stopped", "stalled_http_response"],
+          "properties": {
+            "technical_incomplete": {"$ref": "#/$defs/outcome_bucket"},
+            "operator_stopped": {"$ref": "#/$defs/outcome_bucket"},
+            "stalled_http_response": {"$ref": "#/$defs/outcome_bucket"}
+          }
+        },
+        "api_calculated_cost_known_usd": {"const": "87.771254"},
+        "api_unknown_attempts": {"const": 1},
+        "api_unconfirmed_estimate_usd": {"const": "0.1294175"},
+        "vm_direct_attributable_cost_known_usd": {"const": "4.204009802011"},
+        "blob_network_cost_known_usd": {"const": "0.000054"},
+        "known_direct_cost_subtotal_usd": {"const": "91.975317802011"},
+        "final_total_usd": {"type": "null"},
+        "invoice_reconciled": {"const": false}
+      }
+    },
+    "cancelled_before_start": {"$ref": "#/$defs/outcome_bucket"},
+    "included_scope_reconciliation": {
+      "type": "object",
+      "required": [
+        "api_classification_sum_usd",
+        "api_included_known_total_usd",
+        "api_bidirectional_match",
+        "cross_component_total_is_final"
+      ],
+      "properties": {
+        "api_classification_sum_usd": {"const": "110.1046425"},
+        "api_included_known_total_usd": {"const": "110.1046425"},
+        "api_bidirectional_match": {"const": true},
+        "cross_component_total_is_final": {"const": false}
+      }
+    },
+    "known_gaps": {"type": "array", "minItems": 1},
+    "claim_limits": {"type": "array", "minItems": 5}
+  },
+  "$defs": {
+    "outcome_bucket": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "quality_results",
+        "started_attempts",
+        "outcomes",
+        "provider_usage_known",
+        "api_calculated_cost_known_usd",
+        "api_calculated_cost_per_quality_result_usd",
+        "api_unknown_attempts",
+        "api_unconfirmed_estimate_usd",
+        "vm_direct_attributable_cost_known_usd",
+        "vm_direct_unknown_attempts",
+        "vm_observed_non_additive_usd",
+        "blob_network_cost_known_usd",
+        "blob_network_unknown_attempts",
+        "invoice_reconciled"
+      ],
+      "properties": {
+        "quality_results": {"type": "integer", "minimum": 0},
+        "started_attempts": {"type": "integer", "minimum": 0},
+        "outcomes": {
+          "type": "object",
+          "additionalProperties": {"type": "integer", "minimum": 0}
+        },
+        "provider_usage_known": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["attempts", "input_tokens", "cached_input_tokens", "output_tokens"],
+          "properties": {
+            "attempts": {"type": "integer", "minimum": 0},
+            "input_tokens": {"type": "integer", "minimum": 0},
+            "cached_input_tokens": {"type": "integer", "minimum": 0},
+            "output_tokens": {"type": "integer", "minimum": 0}
+          }
+        },
+        "api_calculated_cost_known_usd": {"type": "string", "pattern": "^[0-9]+(?:\\.[0-9]+)?$"},
+        "api_calculated_cost_per_quality_result_usd": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9]+(?:\\.[0-9]+)?$"
+        },
+        "api_unknown_attempts": {"type": "integer", "minimum": 0},
+        "api_unconfirmed_estimate_usd": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9]+(?:\\.[0-9]+)?$"
+        },
+        "vm_direct_attributable_cost_known_usd": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9]+(?:\\.[0-9]+)?$"
+        },
+        "vm_direct_unknown_attempts": {"type": "integer", "minimum": 0},
+        "vm_observed_non_additive_usd": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9]+(?:\\.[0-9]+)?$"
+        },
+        "blob_network_cost_known_usd": {"type": "string", "pattern": "^[0-9]+(?:\\.[0-9]+)?$"},
+        "blob_network_unknown_attempts": {"type": "integer", "minimum": 0},
+        "invoice_reconciled": {"const": false}
+      }
+    }
+  }
+}

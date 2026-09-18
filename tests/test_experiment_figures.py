@@ -108,7 +108,7 @@ class ExperimentFigureTests(unittest.TestCase):
         self.assertEqual(_axis_maximum(6.663187, "USD"), 6.663187)
 
     def test_reading_path_and_citation_rule_are_direct(self):
-        briefing = (ROOT / "docs/experiment/kt-briefing-20260919.md").read_text()
+        briefing = (ROOT / "docs/experiment/experiment-briefing-20260919.md").read_text()
         for target in (
             "visualization-guide-20260919.md",
             "preliminary-comparison-20260916.md",
@@ -125,16 +125,16 @@ class ExperimentFigureTests(unittest.TestCase):
         ):
             content = document.read_text()
             self.assertLess(
-                content.index("kt-sharing-20260917.md"),
+                content.index("plain-language-results-20260917.md"),
                 content.index("preliminary-comparison-20260916.md"),
             )
-        self.assertIn("kt-sharing-20260917.md", self.guide)
+        self.assertIn("plain-language-results-20260917.md", self.guide)
 
     def test_all_direct_relative_links_and_images_resolve(self):
         documents = (
             ROOT / "README.md",
             ROOT / "docs/experiment/README.md",
-            ROOT / "docs/experiment/kt-briefing-20260919.md",
+            ROOT / "docs/experiment/experiment-briefing-20260919.md",
             GUIDE,
         )
         pattern = re.compile(r"(?<!!)\[[^\]]+\]\(([^)#]+)(?:#[^)]+)?\)|!\[[^\]]*\]\(([^)]+)\)")

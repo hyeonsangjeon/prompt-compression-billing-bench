@@ -1,0 +1,390 @@
+{
+  "schema_version": 1,
+  "kind": "sanitized_outcome_cost_evidence",
+  "labels": {
+    "measured": true,
+    "synthetic": false,
+    "projected": false
+  },
+  "currency": "USD",
+  "price_basis": {
+    "kind": "provider_usage_times_fixed_rates_not_invoice_reconciliation",
+    "input_per_million_usd": "2.5",
+    "cached_input_per_million_usd": "0.25",
+    "output_per_million_usd": "15"
+  },
+  "controls": {
+    "completed_cohort": {
+      "tasks": 26,
+      "conditions": 104,
+      "repetitions_per_condition": 1,
+      "pass": 40,
+      "wrong_answer": 64,
+      "wrong_format": 0,
+      "api_calculated_cost_usd": "22.3333885",
+      "arithmetic_api_cost_per_pass_usd": "0.5583347125"
+    },
+    "long_tail": {
+      "started_attempts": 5,
+      "quality_results": 0,
+      "operator_stopped": 4,
+      "stalled_http_response": 1,
+      "api_calculated_cost_known_usd": "87.771254",
+      "api_unknown_attempts": 1,
+      "api_unconfirmed_estimate_usd": "0.1294175"
+    }
+  },
+  "attempts": [
+    {
+      "record_id": "completed-001",
+      "scope": "completed_cohort_joined",
+      "trial_key": "feal-linear-cryptanalysis/squeez",
+      "started": true,
+      "attempt_outcome": "pass",
+      "quality_result": "pass",
+      "provider_usage": {
+        "known_attempts": 11,
+        "input_tokens": 115432,
+        "cached_input_tokens": 45824,
+        "output_tokens": 6431
+      },
+      "cost": {
+        "api_known_usd": "0.281941",
+        "api_unknown_attempts": 0,
+        "api_unconfirmed_estimate_usd": null,
+        "vm_direct_attributable_usd": null,
+        "vm_observed_non_additive_usd": "0.032688328091369734",
+        "blob_network_known_usd": "0.0000432",
+        "invoice_reconciled": false
+      }
+    },
+    {
+      "record_id": "completed-002",
+      "scope": "completed_cohort_joined",
+      "trial_key": "feal-linear-cryptanalysis/LLMLingua-2",
+      "started": true,
+      "attempt_outcome": "pass",
+      "quality_result": "pass",
+      "provider_usage": {
+        "known_attempts": 9,
+        "input_tokens": 93678,
+        "cached_input_tokens": 50432,
+        "output_tokens": 6534
+      },
+      "cost": {
+        "api_known_usd": "0.218733",
+        "api_unknown_attempts": 0,
+        "api_unconfirmed_estimate_usd": null,
+        "vm_direct_attributable_usd": null,
+        "vm_observed_non_additive_usd": "0.032111031144592496",
+        "blob_network_known_usd": "0.0000432",
+        "invoice_reconciled": false
+      }
+    },
+    {
+      "record_id": "completed-003",
+      "scope": "completed_cohort_joined",
+      "trial_key": "feal-linear-cryptanalysis/Headroom",
+      "started": true,
+      "attempt_outcome": "wrong_answer",
+      "quality_result": "wrong_answer",
+      "provider_usage": {
+        "known_attempts": 174,
+        "input_tokens": 6487809,
+        "cached_input_tokens": 4992768,
+        "output_tokens": 38895
+      },
+      "cost": {
+        "api_known_usd": "5.5692195",
+        "api_unknown_attempts": 0,
+        "api_unconfirmed_estimate_usd": null,
+        "vm_direct_attributable_usd": null,
+        "vm_observed_non_additive_usd": "1.265434985456268",
+        "blob_network_known_usd": "0.0000432",
+        "invoice_reconciled": false
+      }
+    },
+    {
+      "record_id": "completed-004",
+      "scope": "completed_cohort_joined",
+      "trial_key": "tune-mjcf/squeez",
+      "started": true,
+      "attempt_outcome": "pass",
+      "quality_result": "pass",
+      "provider_usage": {
+        "known_attempts": 64,
+        "input_tokens": 1942776,
+        "cached_input_tokens": 1585792,
+        "output_tokens": 15763
+      },
+      "cost": {
+        "api_known_usd": "1.525353",
+        "api_unknown_attempts": 0,
+        "api_unconfirmed_estimate_usd": null,
+        "vm_direct_attributable_usd": null,
+        "vm_observed_non_additive_usd": "0.6543534830566909",
+        "blob_network_known_usd": "0.0000432",
+        "invoice_reconciled": false
+      }
+    },
+    {
+      "record_id": "completed-005",
+      "scope": "completed_cohort_joined",
+      "trial_key": "tune-mjcf/LLMLingua-2",
+      "started": true,
+      "attempt_outcome": "pass",
+      "quality_result": "pass",
+      "provider_usage": {
+        "known_attempts": 13,
+        "input_tokens": 135286,
+        "cached_input_tokens": 82816,
+        "output_tokens": 6640
+      },
+      "cost": {
+        "api_known_usd": "0.251479",
+        "api_unknown_attempts": 0,
+        "api_unconfirmed_estimate_usd": null,
+        "vm_direct_attributable_usd": null,
+        "vm_observed_non_additive_usd": "0.052964179303778544",
+        "blob_network_known_usd": "0.0000432",
+        "invoice_reconciled": false
+      }
+    },
+    {
+      "record_id": "completed-006",
+      "scope": "completed_cohort_joined",
+      "trial_key": "dna-insert/none",
+      "started": true,
+      "attempt_outcome": "wrong_answer",
+      "quality_result": "wrong_answer",
+      "provider_usage": {
+        "known_attempts": 12,
+        "input_tokens": 139512,
+        "cached_input_tokens": 42624,
+        "output_tokens": 6426
+      },
+      "cost": {
+        "api_known_usd": "0.349266",
+        "api_unknown_attempts": 0,
+        "api_unconfirmed_estimate_usd": null,
+        "vm_direct_attributable_usd": null,
+        "vm_observed_non_additive_usd": "0.026227209318876267",
+        "blob_network_known_usd": "0.0000432",
+        "invoice_reconciled": false
+      }
+    },
+    {
+      "record_id": "completed-007",
+      "scope": "completed_cohort_joined",
+      "trial_key": "dna-insert/squeez",
+      "started": true,
+      "attempt_outcome": "wrong_answer",
+      "quality_result": "wrong_answer",
+      "provider_usage": {
+        "known_attempts": 4,
+        "input_tokens": 24556,
+        "cached_input_tokens": 0,
+        "output_tokens": 2501
+      },
+      "cost": {
+        "api_known_usd": "0.098905",
+        "api_unknown_attempts": 0,
+        "api_unconfirmed_estimate_usd": null,
+        "vm_direct_attributable_usd": null,
+        "vm_observed_non_additive_usd": "0.013461495329141617",
+        "blob_network_known_usd": "0.0000432",
+        "invoice_reconciled": false
+      }
+    },
+    {
+      "record_id": "completed-008",
+      "scope": "completed_cohort_joined",
+      "trial_key": "dna-insert/Headroom",
+      "started": true,
+      "attempt_outcome": "wrong_answer",
+      "quality_result": "wrong_answer",
+      "provider_usage": {
+        "known_attempts": 9,
+        "input_tokens": 156543,
+        "cached_input_tokens": 67456,
+        "output_tokens": 11321
+      },
+      "cost": {
+        "api_known_usd": "0.4093965",
+        "api_unknown_attempts": 0,
+        "api_unconfirmed_estimate_usd": null,
+        "vm_direct_attributable_usd": null,
+        "vm_observed_non_additive_usd": "0.053021399239765274",
+        "blob_network_known_usd": "0.0000432",
+        "invoice_reconciled": false
+      }
+    },
+    {
+      "record_id": "completed-009",
+      "scope": "completed_cohort_joined",
+      "trial_key": "dna-insert/LLMLingua-2",
+      "started": true,
+      "attempt_outcome": "wrong_answer",
+      "quality_result": "wrong_answer",
+      "provider_usage": {
+        "known_attempts": 93,
+        "input_tokens": 1654248,
+        "cached_input_tokens": 1415552,
+        "output_tokens": 12327
+      },
+      "cost": {
+        "api_known_usd": "1.135533",
+        "api_unknown_attempts": 0,
+        "api_unconfirmed_estimate_usd": null,
+        "vm_direct_attributable_usd": null,
+        "vm_observed_non_additive_usd": "0.17383584123644563",
+        "blob_network_known_usd": "0.0000432",
+        "invoice_reconciled": false
+      }
+    },
+    {
+      "record_id": "long-tail-001",
+      "scope": "long_tail_pre_quality",
+      "trial_key": "circuit-fibsqrt/none",
+      "started": true,
+      "attempt_outcome": "operator_stopped",
+      "quality_result": null,
+      "provider_usage": {
+        "known_attempts": 278,
+        "input_tokens": 24154545,
+        "cached_input_tokens": 21243008,
+        "output_tokens": 40438
+      },
+      "cost": {
+        "api_known_usd": "13.1961645",
+        "api_unknown_attempts": 0,
+        "api_unconfirmed_estimate_usd": null,
+        "vm_direct_attributable_usd": null,
+        "vm_observed_non_additive_usd": null,
+        "blob_network_known_usd": "0.0000108",
+        "invoice_reconciled": false
+      }
+    },
+    {
+      "record_id": "long-tail-002",
+      "scope": "long_tail_pre_quality",
+      "trial_key": "feal-linear-cryptanalysis/none-long-tail",
+      "started": true,
+      "attempt_outcome": "operator_stopped",
+      "quality_result": null,
+      "provider_usage": {
+        "known_attempts": 738,
+        "input_tokens": 37842271,
+        "cached_input_tokens": 31517952,
+        "output_tokens": 60058
+      },
+      "cost": {
+        "api_known_usd": "24.5911555",
+        "api_unknown_attempts": 0,
+        "api_unconfirmed_estimate_usd": null,
+        "vm_direct_attributable_usd": null,
+        "vm_observed_non_additive_usd": null,
+        "blob_network_known_usd": "0.0000108",
+        "invoice_reconciled": false
+      }
+    },
+    {
+      "record_id": "long-tail-003",
+      "scope": "long_tail_pre_quality",
+      "trial_key": "winning-avg-corewars/none",
+      "started": true,
+      "attempt_outcome": "operator_stopped",
+      "quality_result": null,
+      "provider_usage": {
+        "known_attempts": 611,
+        "input_tokens": 36366405,
+        "cached_input_tokens": 31291648,
+        "output_tokens": 45092
+      },
+      "cost": {
+        "api_known_usd": "21.1861845",
+        "api_unknown_attempts": 0,
+        "api_unconfirmed_estimate_usd": null,
+        "vm_direct_attributable_usd": null,
+        "vm_observed_non_additive_usd": null,
+        "blob_network_known_usd": "0.0000108",
+        "invoice_reconciled": false
+      }
+    },
+    {
+      "record_id": "long-tail-004",
+      "scope": "long_tail_pre_quality",
+      "trial_key": "tune-mjcf/Headroom-long-tail",
+      "started": true,
+      "attempt_outcome": "operator_stopped",
+      "quality_result": null,
+      "provider_usage": {
+        "known_attempts": 865,
+        "input_tokens": 36977081,
+        "cached_input_tokens": 31677824,
+        "output_tokens": 49194
+      },
+      "cost": {
+        "api_known_usd": "21.9055085",
+        "api_unknown_attempts": 0,
+        "api_unconfirmed_estimate_usd": null,
+        "vm_direct_attributable_usd": null,
+        "vm_observed_non_additive_usd": null,
+        "blob_network_known_usd": "0.0000108",
+        "invoice_reconciled": false
+      }
+    },
+    {
+      "record_id": "long-tail-005",
+      "scope": "long_tail_pre_quality",
+      "trial_key": "tune-mjcf/none-long-tail",
+      "started": true,
+      "attempt_outcome": "stalled_http_response",
+      "quality_result": null,
+      "provider_usage": {
+        "known_attempts": 290,
+        "input_tokens": 10049216,
+        "cached_input_tokens": 8248064,
+        "output_tokens": 21823
+      },
+      "cost": {
+        "api_known_usd": "6.892241",
+        "api_unknown_attempts": 1,
+        "api_unconfirmed_estimate_usd": "0.1294175",
+        "vm_direct_attributable_usd": null,
+        "vm_observed_non_additive_usd": null,
+        "blob_network_known_usd": "0.0000108",
+        "invoice_reconciled": false
+      }
+    }
+  ],
+  "shared_cost_pools": [
+    {
+      "scope": "long_tail_pre_quality",
+      "component": "vm_direct_attributable",
+      "allocation": "single_vm_task_process_union",
+      "cost_usd": "4.204009802011"
+    }
+  ],
+  "known_gaps": [
+    {
+      "scope": "completed cohort outcome attribution",
+      "known": "9 of 104 conditions have exact local structured attempt-to-trial joins",
+      "missing": "95 exact joins and directly attributable VM and Blob/network fields",
+      "effect": "pass and normal-nonpass costs are confirmed subtotals, not cohort totals"
+    },
+    {
+      "scope": "other historical pre-quality attempts",
+      "known": "the technical report names additional interrupted or transport-failed attempts",
+      "missing": "one complete structured started-attempt inventory with exact component costs",
+      "effect": "these attempts are not added from rounded Markdown and the included total is not program-wide"
+    }
+  ],
+  "claim_limits": [
+    "pass means Terminal-Bench built-in grader pass, not customer acceptance",
+    "calculated costs are not invoice-reconciled charges",
+    "each completed condition was observed once",
+    "cache, request count, execution path, and concurrency were not controlled",
+    "the records do not establish compressor ranking, compression causality, non-inferiority, or population savings"
+  ]
+}

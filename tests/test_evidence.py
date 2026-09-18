@@ -84,7 +84,7 @@ class EvidenceContractTests(unittest.TestCase):
         validate_public_files([
             "ledger.toml",
             "evidence/local-baseline.json",
-            "docs/experiment/kt-data-connection-guide-20260919.md",
+            "docs/experiment/data-connection-guide-20260919.md",
         ])
         for path in ("runs/example/response.json", ".env", "unclassified.json", "server.key"):
             with self.assertRaises(ValueError):

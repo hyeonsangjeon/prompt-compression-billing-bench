@@ -2,8 +2,8 @@
   "schema_version": 1,
   "kind": "public_preliminary_comparison_aggregate",
   "source": {
-    "path": "docs/experiment/kt-sharing-20260917.md",
-    "sha256": "44088277307d122027041c7909ccd3cbb7a2396e6e3babcf97ab5c904bb1bcd5"
+    "path": "docs/experiment/plain-language-results-20260917.md",
+    "sha256": "d07735db90578f2646f97399485d26a8900ff96f93ff775cbcfb8dccb5beaae8"
   },
   "sample": {
     "tasks": 26,

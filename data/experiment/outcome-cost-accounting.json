@@ -1,0 +1,257 @@
+{
+  "schema_version": 1,
+  "kind": "sanitized_outcome_cost_accounting",
+  "source": {
+    "path": "data/experiment/outcome-cost-evidence.json",
+    "sha256": "dcec57e6346bc9c85e14e568d6466d255d4987f39b9d34d5314bc993788d34f1",
+    "private_paths_published": false,
+    "raw_requests_or_responses_published": false
+  },
+  "labels": {
+    "measured": true,
+    "synthetic": false,
+    "projected": false
+  },
+  "currency": "USD",
+  "price_basis": {
+    "kind": "provider_usage_times_fixed_rates_not_invoice_reconciliation",
+    "input_per_million_usd": "2.5",
+    "cached_input_per_million_usd": "0.25",
+    "output_per_million_usd": "15"
+  },
+  "measurement_contract": {
+    "quality_result_unit": "one result per trial",
+    "cost_unit": "one record per started attempt plus nonduplicated shared pools",
+    "provider_cost_kind": "provider usage times fixed rates",
+    "invoice_reconciled": false,
+    "unknown_values_are_zero": false
+  },
+  "completed_cohort": {
+    "tasks": 26,
+    "conditions": 104,
+    "repetitions_per_condition": 1,
+    "quality": {
+      "pass": 40,
+      "wrong_answer": 64,
+      "wrong_format": 0
+    },
+    "api_calculated_cost_usd": "22.3333885",
+    "arithmetic_api_cost_per_pass_usd": "0.5583347125",
+    "arithmetic_ratio_scope": "completed 104-condition API cost divided by 40 pass results",
+    "program_wide_cost_per_pass_usd": null,
+    "program_wide_metric_blocked_by": "exact started-attempt join is incomplete",
+    "outcome_attribution": {
+      "complete": false,
+      "joined_conditions": 9,
+      "missing_conditions": 95,
+      "by_quality": {
+        "pass": {
+          "quality_results": 4,
+          "started_attempts": 4,
+          "outcomes": {
+            "pass": 4
+          },
+          "provider_usage_known": {
+            "attempts": 97,
+            "input_tokens": 2287172,
+            "cached_input_tokens": 1764864,
+            "output_tokens": 35368
+          },
+          "api_calculated_cost_known_usd": "2.277506",
+          "api_calculated_cost_per_quality_result_usd": "0.5693765",
+          "api_unknown_attempts": 0,
+          "api_unconfirmed_estimate_usd": null,
+          "vm_direct_attributable_cost_known_usd": null,
+          "vm_direct_unknown_attempts": 4,
+          "vm_observed_non_additive_usd": "0.772117021596431674",
+          "blob_network_cost_known_usd": "0.0001728",
+          "blob_network_unknown_attempts": 0,
+          "invoice_reconciled": false
+        },
+        "normal_nonpass": {
+          "quality_results": 5,
+          "started_attempts": 5,
+          "outcomes": {
+            "wrong_answer": 5
+          },
+          "provider_usage_known": {
+            "attempts": 292,
+            "input_tokens": 8462668,
+            "cached_input_tokens": 6518400,
+            "output_tokens": 71470
+          },
+          "api_calculated_cost_known_usd": "7.56232",
+          "api_calculated_cost_per_quality_result_usd": "1.512464",
+          "api_unknown_attempts": 0,
+          "api_unconfirmed_estimate_usd": null,
+          "vm_direct_attributable_cost_known_usd": null,
+          "vm_direct_unknown_attempts": 5,
+          "vm_observed_non_additive_usd": "1.531980930580496788",
+          "blob_network_cost_known_usd": "0.000216",
+          "blob_network_unknown_attempts": 0,
+          "invoice_reconciled": false
+        }
+      },
+      "unallocated": {
+        "conditions": 95,
+        "pass": 36,
+        "wrong_answer": 59,
+        "wrong_format": 0,
+        "api_calculated_cost_known_usd": "12.4935625",
+        "vm_direct_attributable_cost_usd": null,
+        "blob_network_cost_usd": null,
+        "missing_fields": [
+          "exact attempt-to-trial join",
+          "direct VM allocation",
+          "Blob/network cost by outcome"
+        ]
+      }
+    }
+  },
+  "pre_quality": {
+    "quality_results": 0,
+    "started_attempts": 5,
+    "technical_incomplete_attempts": 5,
+    "outcomes": {
+      "operator_stopped": 4,
+      "stalled_http_response": 1
+    },
+    "by_outcome": {
+      "technical_incomplete": {
+        "quality_results": 0,
+        "started_attempts": 0,
+        "outcomes": {},
+        "provider_usage_known": {
+          "attempts": 0,
+          "input_tokens": 0,
+          "cached_input_tokens": 0,
+          "output_tokens": 0
+        },
+        "api_calculated_cost_known_usd": "0",
+        "api_calculated_cost_per_quality_result_usd": null,
+        "api_unknown_attempts": 0,
+        "api_unconfirmed_estimate_usd": null,
+        "vm_direct_attributable_cost_known_usd": "0",
+        "vm_direct_unknown_attempts": 0,
+        "vm_observed_non_additive_usd": null,
+        "blob_network_cost_known_usd": "0",
+        "blob_network_unknown_attempts": 0,
+        "invoice_reconciled": false
+      },
+      "operator_stopped": {
+        "quality_results": 0,
+        "started_attempts": 4,
+        "outcomes": {
+          "operator_stopped": 4
+        },
+        "provider_usage_known": {
+          "attempts": 2492,
+          "input_tokens": 135340302,
+          "cached_input_tokens": 115730432,
+          "output_tokens": 194782
+        },
+        "api_calculated_cost_known_usd": "80.879013",
+        "api_calculated_cost_per_quality_result_usd": null,
+        "api_unknown_attempts": 0,
+        "api_unconfirmed_estimate_usd": null,
+        "vm_direct_attributable_cost_known_usd": null,
+        "vm_direct_unknown_attempts": 4,
+        "vm_observed_non_additive_usd": null,
+        "blob_network_cost_known_usd": "0.0000432",
+        "blob_network_unknown_attempts": 0,
+        "invoice_reconciled": false
+      },
+      "stalled_http_response": {
+        "quality_results": 0,
+        "started_attempts": 1,
+        "outcomes": {
+          "stalled_http_response": 1
+        },
+        "provider_usage_known": {
+          "attempts": 290,
+          "input_tokens": 10049216,
+          "cached_input_tokens": 8248064,
+          "output_tokens": 21823
+        },
+        "api_calculated_cost_known_usd": "6.892241",
+        "api_calculated_cost_per_quality_result_usd": null,
+        "api_unknown_attempts": 1,
+        "api_unconfirmed_estimate_usd": "0.1294175",
+        "vm_direct_attributable_cost_known_usd": null,
+        "vm_direct_unknown_attempts": 1,
+        "vm_observed_non_additive_usd": null,
+        "blob_network_cost_known_usd": "0.0000108",
+        "blob_network_unknown_attempts": 0,
+        "invoice_reconciled": false
+      }
+    },
+    "api_calculated_cost_known_usd": "87.771254",
+    "api_unknown_attempts": 1,
+    "api_unconfirmed_estimate_usd": "0.1294175",
+    "vm_direct_attributable_cost_known_usd": "4.204009802011",
+    "vm_allocation": "single VM task-process union; not the sum of per-attempt VM values",
+    "blob_network_cost_known_usd": "0.000054",
+    "known_direct_cost_subtotal_usd": "91.975317802011",
+    "final_total_usd": null,
+    "invoice_reconciled": false
+  },
+  "cancelled_before_start": {
+    "quality_results": 0,
+    "started_attempts": 0,
+    "outcomes": {},
+    "provider_usage_known": {
+      "attempts": 0,
+      "input_tokens": 0,
+      "cached_input_tokens": 0,
+      "output_tokens": 0
+    },
+    "api_calculated_cost_known_usd": "0",
+    "api_calculated_cost_per_quality_result_usd": null,
+    "api_unknown_attempts": 0,
+    "api_unconfirmed_estimate_usd": null,
+    "vm_direct_attributable_cost_known_usd": "0",
+    "vm_direct_unknown_attempts": 0,
+    "vm_observed_non_additive_usd": null,
+    "blob_network_cost_known_usd": "0",
+    "blob_network_unknown_attempts": 0,
+    "invoice_reconciled": false
+  },
+  "included_scope_reconciliation": {
+    "api_by_classification": {
+      "pass_exact_join_usd": "2.277506",
+      "normal_nonpass_exact_join_usd": "7.56232",
+      "completed_quality_unallocated_usd": "12.4935625",
+      "pre_quality_usd": "87.771254",
+      "cancelled_before_start_usd": "0"
+    },
+    "api_classification_sum_usd": "110.1046425",
+    "api_included_known_total_usd": "110.1046425",
+    "api_bidirectional_match": true,
+    "blob_network_known_partial_usd": "0.0004428",
+    "vm_direct_known_partial_usd": "4.204009802011",
+    "cross_component_known_partial_subtotal_usd": "114.309095102011",
+    "cross_component_total_is_final": false,
+    "component_coverage_differs": true
+  },
+  "known_gaps": [
+    {
+      "scope": "completed cohort outcome attribution",
+      "known": "9 of 104 conditions have exact local structured attempt-to-trial joins",
+      "missing": "95 exact joins and directly attributable VM and Blob/network fields",
+      "effect": "pass and normal-nonpass costs are confirmed subtotals, not cohort totals"
+    },
+    {
+      "scope": "other historical pre-quality attempts",
+      "known": "the technical report names additional interrupted or transport-failed attempts",
+      "missing": "one complete structured started-attempt inventory with exact component costs",
+      "effect": "these attempts are not added from rounded Markdown and the included total is not program-wide"
+    }
+  ],
+  "claim_limits": [
+    "pass means Terminal-Bench built-in grader pass, not customer acceptance",
+    "calculated costs are not invoice-reconciled charges",
+    "each completed condition was observed once",
+    "cache, request count, execution path, and concurrency were not controlled",
+    "the records do not establish compressor ranking, compression causality, non-inferiority, or population savings"
+  ]
+}
