@@ -14,7 +14,7 @@
     "schemas/experiment-result.schema.json": "74dfe3ab0356f943c4ee80bbe95b06a1bcfad8ff2b44a1e02fe5b2f272c96ae3",
     "src/benchmark_run.py": "c0d3b6391a2c68c0173b39b52e65e9a6857d5919112c0d44c88832401d9c18fd",
     "src/experiment_run.py": "3499c63dfb355440e2f79e7dc3af9829d2d1e054613e87d9ed6b790a2e4ba665",
-    "uv.lock": "92e2e1e92a31dff1139e3f73977c609834031708447df3845646697e0b71c057"
+    "uv.lock": "6bcae545d7359a22a1468ebf07bd4bb31eebaa15468efa3a4e3d2e00110321d5"
   },
   "readme_execution_section": {
     "heading": "## Try it in five minutes",
