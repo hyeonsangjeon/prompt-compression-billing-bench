@@ -186,12 +186,18 @@ class FirstStudyMetricMatrixTests(unittest.TestCase):
             "`o200k_base`",
             "실제 청구서와 대사한 금액은 아니다",
             "조건당 1회",
+            "비교 기준인 `none`의 판정과 비용이 여러 행에 반복된다",
+            "마지막 두 열은 행별 비교용이며 합계로 더하지 않는다",
             "상관이나 인과가 없다고 일반화하지 않는다",
             "현재 공개 집계로 두 경우를 나누지는 못한다",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.matrix_flat)
         self.assertIn("[과제별 변경 조건 대조표](metrics.md)", SUMMARY.read_text())
+        self.assertIn(
+            "| **합계** | **23조건** | **209** | **97,723** | **50,824** | **48.0%** | **`pass` 9 · `wrong_answer` 14** | **별도 행 합계** | **`none` 값은 합산하지 않음** | **`none` 값은 합산하지 않음** |",
+            self.matrix,
+        )
         self.assertIn(
             "01-preliminary-comparison/metrics.md", INDEX.read_text()
         )

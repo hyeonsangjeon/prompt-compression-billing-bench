@@ -1,4 +1,4 @@
-"""Dispatch offline static measurements or the separate local Ollama native runner."""
+"""Dispatch offline static measurements or explicitly selected native execution paths."""
 
 from __future__ import annotations
 

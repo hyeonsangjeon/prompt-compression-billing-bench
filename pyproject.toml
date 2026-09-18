@@ -1,3 +1,4 @@
+# Static benchmark dependencies are pinned; provider-backed execution is opt-in.
 [project]
 name = "prompt-compression-billing-bench"
 version = "0.0.1"

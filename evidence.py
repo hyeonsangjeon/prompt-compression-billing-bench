@@ -43,6 +43,7 @@ PUBLIC_FILES = {
     "schemas/static-ledger.schema.json", "schemas/static-result.schema.json", "schemas/frozen-input.schema.json",
     "ledgers/static.toml", "ledgers/demo.toml",
     "examples/static/manifest.json", "examples/static/requests/0000.json",
+    "examples/README.md", "ledgers/README.md",
     "data/eda/task-candidate-share.csv", "data/eda/lineage.json", "figures/task-candidate-share.svg",
     "docs/local-native.md", "docs/static-contract.md", "docs/publication.md",
     "docs/experiment/README.md", "docs/experiment/protocol.md", "docs/experiment/baseline.md",
