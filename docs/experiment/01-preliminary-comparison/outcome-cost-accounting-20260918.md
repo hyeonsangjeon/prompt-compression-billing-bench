@@ -132,11 +132,11 @@
 
 ## 공개 근거와 다시 계산하는 법
 
-- [가공 공개 원장](../../data/experiment/outcome-cost-evidence.json): 원문 요청·응답과 비공개 식별자를 뺀 정확한 결과·비용 결합 입력
-- [결과별 집계 JSON](../../data/experiment/outcome-cost-accounting.json): 프로그램이 만든 공개 결과
-- [JSON Schema](../../schemas/outcome-cost-accounting.schema.json): 필수 필드, 고정 수치와 `null` 경계
-- [집계 코드](../../src/outcome_cost_accounting.py): 가격표 재계산, 분류와 양방향 합계 검사
-- [직접 테스트](../../tests/test_outcome_cost_accounting.py): 중복 품질·시도, 가격표 드리프트, 미확정 값과 문서 계약 검사
+- [가공 공개 원장](../../../data/experiment/outcome-cost-evidence.json): 원문 요청·응답과 비공개 식별자를 뺀 정확한 결과·비용 결합 입력
+- [결과별 집계 JSON](../../../data/experiment/outcome-cost-accounting.json): 프로그램이 만든 공개 결과
+- [JSON Schema](../../../schemas/outcome-cost-accounting.schema.json): 필수 필드, 고정 수치와 `null` 경계
+- [집계 코드](../../../src/outcome_cost_accounting.py): 가격표 재계산, 분류와 양방향 합계 검사
+- [직접 테스트](../../../tests/test_outcome_cost_accounting.py): 중복 품질·시도, 가격표 드리프트, 미확정 값과 문서 계약 검사
 - [예비 비교 기술 증거](preliminary-comparison-20260916.md): 26과제·104조건과 장기 실행 5개의 상세 관측
 
 모델이나 provider를 호출하지 않고 다음 명령으로 공개 입력, 생성 결과와 Schema를 확인할 수 있다.

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "kind": "public_preliminary_comparison_aggregate",
   "source": {
-    "path": "docs/experiment/plain-language-results-20260917.md",
+    "path": "docs/experiment/01-preliminary-comparison/plain-language-results-20260917.md",
     "sha256": "d07735db90578f2646f97399485d26a8900ff96f93ff775cbcfb8dccb5beaae8"
   },
   "sample": {

@@ -3,7 +3,7 @@
 > **숫자 읽기**
 >
 > 이 문서의 달러 금액은 읽기 쉽게 소수 둘째 자리까지 반올림했다.
-> 정확한 계산값은 [결과별 비용 집계](../outcome-cost-accounting-20260918.md)와
+> 정확한 계산값은 [결과별 비용 집계](outcome-cost-accounting-20260918.md)와
 > [공개 집계 JSON](../../../data/experiment/outcome-cost-accounting.json)에 남아 있다.
 > 변경 구간의 로컬 토큰, 제공자 API 사용량, API 계산 비용, 직접 귀속 인프라 비용,
 > 실제 청구서는 서로 다른 단위이며 바꾸어 읽지 않는다.
@@ -164,6 +164,6 @@ xychart-beta
   전체 업무의 비용 절감률이나 합의된 업무 결과 1건당 비용을 주장하지 않는다.
 
 상세 근거와 다시 계산하는 방법은 [26과제 설명](tasks.md),
-[예비 비교 기술 증거](../preliminary-comparison-20260916.md),
+[예비 비교 기술 증거](preliminary-comparison-20260916.md),
 [정적 압축기 측정](../compressors.md),
-[결과별 비용 집계](../outcome-cost-accounting-20260918.md)에서 확인할 수 있다.
+[결과별 비용 집계](outcome-cost-accounting-20260918.md)에서 확인할 수 있다.

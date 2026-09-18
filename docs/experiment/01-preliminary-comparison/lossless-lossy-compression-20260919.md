@@ -180,11 +180,11 @@ second.log
 
 ## 공개 근거
 
-- [압축기 정적 측정](compressors.md): 세 도구의 정적 변환 범위, 예시와 단위
+- [압축기 정적 측정](../compressors.md): 세 도구의 정적 변환 범위, 예시와 단위
 - [예비 비교 기술 증거](preliminary-comparison-20260916.md): 26과제·104조건의 품질, 실제 변경, usage와 비용 범위
-- [예비 비교 공개 집계 JSON](../../data/experiment/preliminary-comparison-summary.json): 조건별 변경 조건과 구간 수
-- [native 실행 계약](../native-contract.md): 네 조건의 고정 profile, 보호·복원·계측 경계
-- [압축기 구현](../../src/compressors.py): `NoOpCompressor`, `SqueezCompressor`, `HeadroomPathsCompressor`, `LLMLingua2Compressor`
-- [압축기 합성 테스트](../../tests/test_native_compressors.py): Headroom 왕복 복원과 LLMLingua worker 검증
+- [예비 비교 공개 집계 JSON](../../../data/experiment/preliminary-comparison-summary.json): 조건별 변경 조건과 구간 수
+- [native 실행 계약](../../native-contract.md): 네 조건의 고정 profile, 보호·복원·계측 경계
+- [압축기 구현](../../../src/compressors.py): `NoOpCompressor`, `SqueezCompressor`, `HeadroomPathsCompressor`, `LLMLingua2Compressor`
+- [압축기 합성 테스트](../../../tests/test_native_compressors.py): Headroom 왕복 복원과 LLMLingua worker 검증
 
 이 문서의 예시는 공개 자료와 작은 합성 문자열만 사용한다. 고객 원본, 서비스 연결 주소, 인증 정보, 내부 주소와 개인 경로는 포함하지 않는다.

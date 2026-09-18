@@ -6,7 +6,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BRIEFING = ROOT / "docs/experiment/experiment-briefing-20260919.md"
+BRIEFING = ROOT / "docs/experiment/01-preliminary-comparison/experiment-briefing-20260919.md"
 DATA_GUIDE = ROOT / "docs/experiment/data-connection-guide-20260919.md"
 
 

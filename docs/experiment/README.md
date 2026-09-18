@@ -1,6 +1,9 @@
 # 실험 기록
 
-이 디렉터리는 실험 설계, 판단 기록과 측정 요약의 공개 원본이다. 비공개 원본과 임시 산출물은 공개 문서에 넣지 않는다.
+이 파일은 모든 차수의 실험 설계, 판단 기록과 측정 요약을 찾는 **전체 실험
+인덱스**다. 이번 1차 공유 자료는
+[1차 예비 압축 비교](01-preliminary-comparison/README.md)에서 시작한다.
+비공개 원본과 임시 산출물은 공개 문서에 넣지 않는다.
 
 ## 실험별 기록
 
@@ -11,18 +14,21 @@
 새 실험은 실행 조건과 범위가 정해진 뒤 `02-<실험명>/README.md` 형식으로 추가한다.
 아직 시작하지 않은 2차 실험의 빈 폴더나 결과 문서는 미리 만들지 않는다.
 
-## 공유 시작
+## 1차 공유 자료
 
 1. [1차 실험 한 장 요약](01-preliminary-comparison/README.md)에서 실험 조건, 핵심 결과와 결과별 비용을 한 흐름으로 확인한다.
 2. [1차 실험 26과제 설명](01-preliminary-comparison/tasks.md)에서 과제별 문제, 공개 통과 대상, 시간·요청·비용을 확인한다.
-3. [공유용 쉬운 설명](plain-language-results-20260917.md)에서 26개 과제·104개 조건의 결과와 한계를 읽는다.
-4. [한 장 브리핑](experiment-briefing-20260919.md)에서 지금 정할 수 있는 것과 실험 설계의 빈자리를 확인한다.
-5. [손실·무손실 압축 안내](lossless-lossy-compression-20260919.md)에서 네 조건의 복원 가능성과 품질·비용의 차이를 확인한다.
-6. [시각화 부록](visualization-guide-20260919.md)에서 EDA 10개와 단위별 예비 비교 차트를 확인한다.
-7. [예비 비교 기술 증거](preliminary-comparison-20260916.md)에서 조건별 세부 수치, 실행 식별자와 SHA-256 검증값을 확인한다.
-8. [실데이터 연결 가이드](data-connection-guide-20260919.md)에서 원본을 공개 저장소에 올리지 않고 준비·무호출 확인·명시적 실행·결과 검증까지 잇는 방법을 확인한다.
-9. [결과별 비용 집계](outcome-cost-accounting-20260918.md)에서 통과·정상 미통과·품질 판정 전 비용과 아직 나눌 수 없는 범위를 확인한다.
-10. [실제 1과제 YAML 안내](../../README.md#try-it-in-five-minutes)에서 기본 무호출 확인과 명시적 실제 실행 경계를 확인한다.
+3. [공유용 쉬운 설명](01-preliminary-comparison/plain-language-results-20260917.md)에서 26개 과제·104개 조건의 결과와 한계를 읽는다.
+4. [한 장 브리핑](01-preliminary-comparison/experiment-briefing-20260919.md)에서 지금 정할 수 있는 것과 실험 설계의 빈자리를 확인한다.
+5. [손실·무손실 압축 안내](01-preliminary-comparison/lossless-lossy-compression-20260919.md)에서 네 조건의 복원 가능성과 품질·비용의 차이를 확인한다.
+6. [시각화 부록](01-preliminary-comparison/visualization-guide-20260919.md)에서 EDA 10개와 단위별 예비 비교 차트를 확인한다.
+7. [예비 비교 기술 증거](01-preliminary-comparison/preliminary-comparison-20260916.md)에서 조건별 세부 수치, 실행 식별자와 SHA-256 검증값을 확인한다.
+8. [결과별 비용 집계](01-preliminary-comparison/outcome-cost-accounting-20260918.md)에서 통과·정상 미통과·품질 판정 전 비용과 아직 나눌 수 없는 범위를 확인한다.
+
+## 공통 실행 안내
+
+1. [실데이터 연결 가이드](data-connection-guide-20260919.md)에서 원본을 공개 저장소에 올리지 않고 준비·무호출 확인·명시적 실행·결과 검증까지 잇는 방법을 확인한다.
+2. [실제 1과제 YAML 안내](../../README.md#try-it-in-five-minutes)에서 기본 무호출 확인과 명시적 실제 실행 경계를 확인한다.
 
 ## 현재 상태
 
@@ -56,22 +62,30 @@
 
 ## 문서 색인
 
+### 공통 실험 기록과 계약
+
 - [기존 1차 실험 규약](protocol.md): 목적 선정 5과제 실험의 고정 기록
 - [기존 기준선](baseline.md): 100개 native `trial` 결과와 한계
 - [압축기 정적 측정](compressors.md): 저장 요청 56개의 크기 변화와 변환 표본
 - [선별 규약](screening-protocol.md): 89과제 목록, 18/20 판정, 실패·재시도와 nginx verifier
 - [평가 규약](evaluation-protocol.md): 네 조건, 품질·비용 문턱, 반복 공식과 신뢰구간
 - [재현 계약](reproducibility-contract.md): 실행 증거, 중단·재개, verifier 재실행과 Blob 회수
+
+### 1차 공유 자료
+
 - [1차 실험 한 장 요약](01-preliminary-comparison/README.md): 실험 조건, 핵심 관측과 결과별 비용을 한 장 흐름으로 정리한 공유용 문서
 - [1차 실험 26과제 설명](01-preliminary-comparison/tasks.md): 과제별 쉬운 설명, 공개 통과 대상과 네 조건의 시간·요청·비용
-- [한 장 브리핑](experiment-briefing-20260919.md): 측정 단계, 현재 결론과 실험 설계 10문항
-- [손실·무손실 압축 안내](lossless-lossy-compression-20260919.md): 전송 압축·캐시·prompt 축약의 차이와 네 조건의 실제 복원 범위
-- [시각화 부록](visualization-guide-20260919.md): EDA 10개, 측정 흐름과 단위별 예비 비교 차트
-- [공유용 쉬운 설명](plain-language-results-20260917.md): 26과제·104조건을 비전문가가 먼저 읽을 수 있게 풀어 쓴 결과와 한계
+- [한 장 브리핑](01-preliminary-comparison/experiment-briefing-20260919.md): 측정 단계, 현재 결론과 실험 설계 10문항
+- [손실·무손실 압축 안내](01-preliminary-comparison/lossless-lossy-compression-20260919.md): 전송 압축·캐시·prompt 축약의 차이와 네 조건의 실제 복원 범위
+- [시각화 부록](01-preliminary-comparison/visualization-guide-20260919.md): EDA 10개, 측정 흐름과 단위별 예비 비교 차트
+- [공유용 쉬운 설명](01-preliminary-comparison/plain-language-results-20260917.md): 26과제·104조건을 비전문가가 먼저 읽을 수 있게 풀어 쓴 결과와 한계
+- [결과별 비용 집계](01-preliminary-comparison/outcome-cost-accounting-20260918.md): 통과·정상 미통과·품질 판정 전 비용, 확인 소계와 미확정 범위
+- [결과별 비용 집계 계획](01-preliminary-comparison/outcome-cost-accounting-plan-20260918.md): 통과·정상 채점 후 미통과·품질 판정 전 비용과 통과 조건 1건당 계산 비용의 범위
+- [예비 비교 기술 증거](01-preliminary-comparison/preliminary-comparison-20260916.md): 조건별 품질, 사용량, 변환, 비용 범위, 실행 식별자와 원본 해시
+
+### 공통 적용 안내와 판단 기록
+
 - [실데이터 연결 가이드](data-connection-guide-20260919.md): 고객 원본을 공개 저장소에 올리지 않는 실제 1과제 준비, 무호출 확인, 실행과 결과 검증 절차
-- [결과별 비용 집계](outcome-cost-accounting-20260918.md): 통과·정상 미통과·품질 판정 전 비용, 확인 소계와 미확정 범위
-- [결과별 비용 집계 계획](outcome-cost-accounting-plan-20260918.md): 통과·정상 채점 후 미통과·품질 판정 전 비용과 통과 조건 1건당 계산 비용의 범위
-- [예비 비교 기술 증거](preliminary-comparison-20260916.md): 조건별 품질, 사용량, 변환, 비용 범위, 실행 식별자와 원본 해시
 - [판단 기록](decisions.md): 확정한 선택과 근거
 
 ## 문서 상태 해석

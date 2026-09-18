@@ -5,7 +5,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DOCUMENT = ROOT / "docs/experiment/lossless-lossy-compression-20260919.md"
+DOCUMENT = ROOT / "docs/experiment/01-preliminary-comparison/lossless-lossy-compression-20260919.md"
 INDEX = ROOT / "docs/experiment/README.md"
 SUMMARY = ROOT / "data/experiment/preliminary-comparison-summary.json"
 STATIC_REPORT = ROOT / "docs/experiment/compressors.md"

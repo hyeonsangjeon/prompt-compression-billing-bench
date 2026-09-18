@@ -2,7 +2,7 @@
 
 이 문서는 지금까지의 측정을 한 화면 흐름으로 읽기 위한 기본 자료다. **과제**는 풀어야 할 문제 1개이고, **조건**은 같은 문제를 푸는 방식이다. `none`은 아무 작업도 하지 않았다는 뜻이 아니라 **추가 압축 없이 모델이 문제를 푼 기준 조건**이다.
 
-읽는 순서는 **이 30초 요약 → [전체 그림과 쉬운 해설](visualization-guide-20260919.md) → [기술 증거](preliminary-comparison-20260916.md) → [실제 1과제 YAML 안내](../../README.md#try-it-in-five-minutes)**다.
+읽는 순서는 **이 30초 요약 → [전체 그림과 쉬운 해설](visualization-guide-20260919.md) → [기술 증거](preliminary-comparison-20260916.md) → [실제 1과제 YAML 안내](../../../README.md#try-it-in-five-minutes)**다.
 
 ## 30초 요약
 
@@ -49,7 +49,7 @@ flowchart LR
 
 **그림 2 대체 텍스트.** 과거 Terminal 5과제·15실행·56요청의 종류별 본문 UTF-8 바이트에서 1차와 2차 분류의 후보 비중을 비교한다. 과제가 없는 종류는 미측정이며 API 토큰 비중이 아니다.
 
-![과거 Terminal 5과제·15실행·56요청의 종류별 본문 UTF-8 바이트에서 1차와 2차 후보 비중을 비교한 그림. 과제가 없는 종류는 미측정이며 API 토큰, 달성 압축률, 품질 또는 비용을 나타내지 않는다.](../eda/figures/round2/02-candidate-share-by-type.svg)
+![과거 Terminal 5과제·15실행·56요청의 종류별 본문 UTF-8 바이트에서 1차와 2차 후보 비중을 비교한 그림. 과제가 없는 종류는 미측정이며 API 토큰, 달성 압축률, 품질 또는 비용을 나타내지 않는다.](../../eda/figures/round2/02-candidate-share-by-type.svg)
 
 *그림 2. 목적 선정 5과제·15실행·56요청에서 후보 바이트 비중은 과제별 0.48%~35.29%, 전체 15.42%였다. 분모는 메시지 본문 UTF-8 바이트이며, 후보 전부 삭제 가정 22.83%도 달성 가능한 압축률이나 검증된 상한이 아니다. 공개 SVG SHA-256은 `89cfaf57fc4c59ff8afd5c71fa6f64bf2c5c7fbf044fd799c21d29f0b0d3ff61`이다.*
 
@@ -113,9 +113,9 @@ flowchart LR
 - [쉬운 결과 설명](plain-language-results-20260917.md) — 26과제·104조건의 품질·변경·요청·usage·비용
 - [전체 그림과 쉬운 해설](visualization-guide-20260919.md) — EDA 10개, 측정 흐름, 단위별 예비 비교 차트
 - [예비 비교 기술 증거](preliminary-comparison-20260916.md) — 조건별 실행 식별자, 원격 hash와 상세 표
-- [EDA 원문과 그림 계보](../eda/README.md) · [그림 manifest](../eda/manifest.json) — 5과제·15실행·56요청의 분모와 SVG hash
-- [기준선](baseline.md) · [정적 측정](compressors.md) — 100 native trial과 모델 호출 없는 변환 측정
-- [실험 기록 색인](README.md) — 현재 결정, 과거 규약과 공개 문서 순서
-- [실제 1과제 YAML](../../examples/experiment/benchmark.yaml) · [5분 안내](../../README.md#try-it-in-five-minutes) — 기본 무호출 확인과 명시적 실제 실행 경계
+- [EDA 원문과 그림 계보](../../eda/README.md) · [그림 manifest](../../eda/manifest.json) — 5과제·15실행·56요청의 분모와 SVG hash
+- [기준선](../baseline.md) · [정적 측정](../compressors.md) — 100 native trial과 모델 호출 없는 변환 측정
+- [실험 기록 색인](../README.md) — 현재 결정, 과거 규약과 공개 문서 순서
+- [실제 1과제 YAML](../../../examples/experiment/benchmark.yaml) · [5분 안내](../../../README.md#try-it-in-five-minutes) — 기본 무호출 확인과 명시적 실제 실행 경계
 
 공개 근거는 원문 prompt, credential, endpoint 주소, 비공개 실행 경로를 포함하지 않는다.

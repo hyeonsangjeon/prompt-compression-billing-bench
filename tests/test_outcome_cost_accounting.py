@@ -20,11 +20,11 @@ from src.outcome_cost_accounting import (
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = ROOT / "schemas/outcome-cost-accounting.schema.json"
-DOCUMENT = ROOT / "docs/experiment/outcome-cost-accounting-20260918.md"
+DOCUMENT = ROOT / "docs/experiment/01-preliminary-comparison/outcome-cost-accounting-20260918.md"
 PRELIMINARY_SUMMARY = ROOT / "data/experiment/preliminary-comparison-summary.json"
-RESULTS_GUIDE = ROOT / "docs/experiment/plain-language-results-20260917.md"
-PRELIMINARY_REPORT = ROOT / "docs/experiment/preliminary-comparison-20260916.md"
-BRIEFING = ROOT / "docs/experiment/experiment-briefing-20260919.md"
+RESULTS_GUIDE = ROOT / "docs/experiment/01-preliminary-comparison/plain-language-results-20260917.md"
+PRELIMINARY_REPORT = ROOT / "docs/experiment/01-preliminary-comparison/preliminary-comparison-20260916.md"
+BRIEFING = ROOT / "docs/experiment/01-preliminary-comparison/experiment-briefing-20260919.md"
 ONE_PAGE = ROOT / "docs/experiment/01-preliminary-comparison/README.md"
 TASK_CATALOG = ROOT / "docs/experiment/01-preliminary-comparison/tasks.md"
 

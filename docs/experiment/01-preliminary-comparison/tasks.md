@@ -65,7 +65,7 @@
 - 과제 설명과 공개 통과 대상:
   [Terminal-Bench 2.1 공식 과제](https://github.com/harbor-framework/terminal-bench-2-1/tree/7131e4375048a0e408a8fb404b5f499d726b695b/tasks)
 - 조건별 품질·요청·시간·비용:
-  [예비 비교 기술 증거](../preliminary-comparison-20260916.md)
+  [예비 비교 기술 증거](preliminary-comparison-20260916.md)
 - 이 26과제는 목적·후보 중심으로 선택한 예비 표본이며 전체 89과제를 대표하는
   무작위 표본이 아니다.
 - 공개 지시문을 쉽게 풀어 썼지만, 과제 내장 채점기의 모든 세부 검사를 새 문서에

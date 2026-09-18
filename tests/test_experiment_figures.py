@@ -14,7 +14,7 @@ from src.experiment_figures import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-GUIDE = ROOT / "docs/experiment/visualization-guide-20260919.md"
+GUIDE = ROOT / "docs/experiment/01-preliminary-comparison/visualization-guide-20260919.md"
 
 
 class ExperimentFigureTests(unittest.TestCase):
@@ -70,7 +70,7 @@ class ExperimentFigureTests(unittest.TestCase):
         self.assertEqual(len(manifest["figures"]), 10)
         for entry in manifest["figures"]:
             with self.subTest(figure=entry["id"]):
-                target = "../eda/" + entry["path"]
+                target = "../../eda/" + entry["path"]
                 self.assertIn(f"]({target})", self.guide)
                 self.assertIn(entry["sha256"], self.guide)
                 self.assertTrue((GUIDE.parent / target).resolve().is_file())
@@ -108,7 +108,9 @@ class ExperimentFigureTests(unittest.TestCase):
         self.assertEqual(_axis_maximum(6.663187, "USD"), 6.663187)
 
     def test_reading_path_and_citation_rule_are_direct(self):
-        briefing = (ROOT / "docs/experiment/experiment-briefing-20260919.md").read_text()
+        briefing = (
+            ROOT / "docs/experiment/01-preliminary-comparison/experiment-briefing-20260919.md"
+        ).read_text()
         for target in (
             "visualization-guide-20260919.md",
             "preliminary-comparison-20260916.md",
@@ -134,7 +136,7 @@ class ExperimentFigureTests(unittest.TestCase):
         documents = (
             ROOT / "README.md",
             ROOT / "docs/experiment/README.md",
-            ROOT / "docs/experiment/experiment-briefing-20260919.md",
+            ROOT / "docs/experiment/01-preliminary-comparison/experiment-briefing-20260919.md",
             GUIDE,
         )
         pattern = re.compile(r"(?<!!)\[[^\]]+\]\(([^)#]+)(?:#[^)]+)?\)|!\[[^\]]*\]\(([^)]+)\)")

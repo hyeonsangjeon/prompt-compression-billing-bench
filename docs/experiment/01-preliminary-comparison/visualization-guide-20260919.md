@@ -26,11 +26,11 @@
 
 ## EDA 그림 10개
 
-다음 그림은 [EDA 그림 목록 파일](../eda/manifest.json)에 고정된 순서와 SHA-256을 그대로 따른다.
+다음 그림은 [EDA 그림 목록 파일](../../eda/manifest.json)에 고정된 순서와 SHA-256을 그대로 따른다.
 
 ### EDA 1. 과제 종류 분포
 
-![주 종류 분포. 공식 영어 지시문 DeepSWE n=113, Terminal n=89. 주 종류 하나로 집계하며 리뷰·수정 혼합 한 과제는 보조 라벨에 남긴다.](../eda/figures/round2/01-task-types.svg)
+![주 종류 분포. 공식 영어 지시문 DeepSWE n=113, Terminal n=89. 주 종류 하나로 집계하며 리뷰·수정 혼합 한 과제는 보조 라벨에 남긴다.](../../eda/figures/round2/01-task-types.svg)
 
 *DeepSWE 113과제와 Terminal-Bench 2.1 89과제를 같은 주 종류 기준으로 나눈 그림이다.*
 
@@ -44,7 +44,7 @@
 
 ### EDA 2. 저장소·언어·작성자 분류
 
-![DeepSWE 113과제의 저장소·주 언어와 Terminal 89과제의 종류·난이도 분포. 난이도는 저자 메타데이터이지 이번 모델의 성능 측정이 아니다.](../eda/figures/round1/05-corpus-bias.svg)
+![DeepSWE 113과제의 저장소·주 언어와 Terminal 89과제의 종류·난이도 분포. 난이도는 저자 메타데이터이지 이번 모델의 성능 측정이 아니다.](../../eda/figures/round1/05-corpus-bias.svg)
 
 *과제가 어느 저장소·언어·작성자 분류에 몰려 있는지 보여 주는 메타데이터 집계다.*
 
@@ -58,7 +58,7 @@
 
 ### EDA 3. 공식 지시문 크기
 
-![공식 DeepSWE 113과제와 Terminal 89과제의 지시문 UTF-8 바이트 및 로컬 토큰 분포. API 청구 토큰이 아니다.](../eda/figures/round1/01-input-size.svg)
+![공식 DeepSWE 113과제와 Terminal 89과제의 지시문 UTF-8 바이트 및 로컬 토큰 분포. API 청구 토큰이 아니다.](../../eda/figures/round1/01-input-size.svg)
 
 *공식 지시문의 파일 크기와 로컬 토큰 수 분포를 따로 그렸다.*
 
@@ -72,7 +72,7 @@
 
 ### EDA 4. 과제 종류별 입력 크기
 
-![입력 크기 분포. 정적 DeepSWE n=113과제와 Terminal n=89과제, 과거 Terminal n=56요청을 분리했다. UTF-8 바이트와 로컬 o200k_base 토큰이며 API 토큰이 아니다.](../eda/figures/round2/03-input-size-by-type.svg)
+![입력 크기 분포. 정적 DeepSWE n=113과제와 Terminal n=89과제, 과거 Terminal n=56요청을 분리했다. UTF-8 바이트와 로컬 o200k_base 토큰이며 API 토큰이 아니다.](../../eda/figures/round2/03-input-size-by-type.svg)
 
 *공식 지시문과 과거 실제 요청을 섞지 않고 종류별 크기 분포로 나눴다.*
 
@@ -86,7 +86,7 @@
 
 ### EDA 5. 입력 본문 구성
 
-![정적 지시문 113개·89개와 기존 Terminal 실제 요청 56개의 본문 구간 비중. 각 층의 UTF-8 바이트 합계를 분모로 하며 미분류도 별도 표시한다.](../eda/figures/round1/02-input-composition.svg)
+![정적 지시문 113개·89개와 기존 Terminal 실제 요청 56개의 본문 구간 비중. 각 층의 UTF-8 바이트 합계를 분모로 하며 미분류도 별도 표시한다.](../../eda/figures/round1/02-input-composition.svg)
 
 *지시문과 요청 본문을 구간 종류로 분류해 UTF-8 바이트 비중을 비교했다.*
 
@@ -100,7 +100,7 @@
 
 ### EDA 6. 과제별 1차 후보 비중
 
-![Terminal 5과제, 각 3실행에서 기록된 요청 56개의 과제별 로그 후보·미분류·보호 구간 비중. 압축 결과가 아니라 본문 바이트 구성이다.](../eda/figures/round1/03-compressible-share.svg)
+![Terminal 5과제, 각 3실행에서 기록된 요청 56개의 과제별 로그 후보·미분류·보호 구간 비중. 압축 결과가 아니라 본문 바이트 구성이다.](../../eda/figures/round1/03-compressible-share.svg)
 
 *목적에 맞춰 고른 5과제에서 1차로 식별한 후보·미분류·보호 구간을 나눴다.*
 
@@ -114,7 +114,7 @@
 
 ### EDA 7. 미분류 구간 재검토
 
-![미분류 분해. 서로 다른 58종, 재전송 포함 168회·158,258바이트를 전수 검토했다. 기존 과거 요청 n=56, 과제 n=5이며 API 토큰이나 실제 절감률이 아니다.](../eda/figures/round2/04-unknown-decomposition.svg)
+![미분류 분해. 서로 다른 58종, 재전송 포함 168회·158,258바이트를 전수 검토했다. 기존 과거 요청 n=56, 과제 n=5이며 API 토큰이나 실제 절감률이 아니다.](../../eda/figures/round2/04-unknown-decomposition.svg)
 
 *처음에 미분류였던 158,258바이트를 7개 범주로 다시 나눈 기록이다.*
 
@@ -128,7 +128,7 @@
 
 ### EDA 8. 과제 종류별 후보 비중
 
-![종류별 후보와 본문 구성. 과거 Terminal n=5과제, 15실행, 56요청. UTF-8 바이트 기준이며 디버깅·리뷰 등 무표본 종류는 미측정이다.](../eda/figures/round2/02-candidate-share-by-type.svg)
+![종류별 후보와 본문 구성. 과거 Terminal n=5과제, 15실행, 56요청. UTF-8 바이트 기준이며 디버깅·리뷰 등 무표본 종류는 미측정이다.](../../eda/figures/round2/02-candidate-share-by-type.svg)
 
 *1차와 2차 분류의 후보 비중을 과제 종류별로 비교하되 코드가 섞인 구간은 보호했다.*
 
@@ -142,7 +142,7 @@
 
 ### EDA 9. 로컬 토큰과 API 입력 토큰
 
-![기존 Terminal 5과제·15실행·56요청의 로컬 메시지 본문 토큰과 실제 API 입력 토큰 대조. 점선은 계산상 y=x이며 오른쪽은 차이 분포다.](../eda/figures/round1/06-api-token-calibration.svg)
+![기존 Terminal 5과제·15실행·56요청의 로컬 메시지 본문 토큰과 실제 API 입력 토큰 대조. 점선은 계산상 y=x이며 오른쪽은 차이 분포다.](../../eda/figures/round1/06-api-token-calibration.svg)
 
 *같은 과거 요청의 로컬 본문 토큰과 provider가 보고한 API 입력 토큰을 대조했다.*
 
@@ -156,7 +156,7 @@
 
 ### EDA 10. 공통 선두 토큰 길이
 
-![공식 지시문 과제 쌍과 실제 Terminal 요청 쌍의 공통 선두 로컬 token ID 길이 분포. 1,024 점선은 당시 GPT-5.4 서비스의 캐시 최소 길이 참고선이며 서비스 캐시 접두부 실측이 아니다.](../eda/figures/round1/04-shared-prefix.svg)
+![공식 지시문 과제 쌍과 실제 Terminal 요청 쌍의 공통 선두 로컬 token ID 길이 분포. 1,024 점선은 당시 GPT-5.4 서비스의 캐시 최소 길이 참고선이며 서비스 캐시 접두부 실측이 아니다.](../../eda/figures/round1/04-shared-prefix.svg)
 
 *지시문 쌍과 요청 쌍이 앞에서부터 몇 개의 로컬 토큰 ID를 공유하는지 계산했다.*
 
@@ -170,11 +170,11 @@
 
 ## 예비 비교 결과 차트 6개
 
-모든 차트는 [공개 집계 JSON](../../data/experiment/preliminary-comparison-summary.json)을 [생성 코드](../../src/experiment_figures.py)로 그렸다. 집계 JSON SHA-256은 `385d0925aba2b1f968d574a6c85a70c666304e68218e7e2ef047d6ace93d5830`이며, 원문은 [쉬운 결과 설명](plain-language-results-20260917.md)의 표다.
+모든 차트는 [공개 집계 JSON](../../../data/experiment/preliminary-comparison-summary.json)을 [생성 코드](../../../src/experiment_figures.py)로 그렸다. 집계 JSON SHA-256은 `28805f13df16c734e4e65aa4f6c323d885e605222754366cf4d3eea361d171c7`이며, 원문은 [쉬운 결과 설명](plain-language-results-20260917.md)의 표다.
 
 ### 결과 1. 품질 판정
 
-![26과제의 네 조건을 각 1회 실행한 104조건에서 조건별 pass와 wrong_answer 개수. 기술 미완료 5개는 제외하며 압축기 순위를 뜻하지 않는다.](../../figures/preliminary-quality.svg)
+![26과제의 네 조건을 각 1회 실행한 104조건에서 조건별 pass와 wrong_answer 개수. 기술 미완료 5개는 제외하며 압축기 순위를 뜻하지 않는다.](../../../figures/preliminary-quality.svg)
 
 *증거가 완결된 104조건에서 `pass` 40개와 `wrong_answer` 64개를 조건별로 나눴다.*
 
@@ -184,11 +184,11 @@
 | 분모·단위 | 완결 조건 104개·조건 수 |
 | 관측 | 조건별 통과 수는 none 11, squeez 10, Headroom 9, LLMLingua-2 10 |
 | 증명하지 않는 것 | 압축기 순위, 품질 비열등성, 압축이 판정을 바꾼 원인 |
-| SVG SHA-256 | `be8ee40f7c0c4b07a51f2f1a97ae27ae1830e811ec6e878db80bba792cd90848` |
+| SVG SHA-256 | `783a322fd547a80088e84c7b2aba4e56b042838d0347b0a8a2460a045274fc56` |
 
 ### 결과 2. 문자열 변경이 있었던 조건
 
-![104개 완결 조건에서 조건별 문자열 변경 있음과 변경 없음의 조건 수. 변경 여부는 품질이나 비용의 원인을 뜻하지 않는다.](../../figures/preliminary-changed-conditions.svg)
+![104개 완결 조건에서 조건별 문자열 변경 있음과 변경 없음의 조건 수. 변경 여부는 품질이나 비용의 원인을 뜻하지 않는다.](../../../figures/preliminary-changed-conditions.svg)
 
 *104조건 중 23조건에서 실제 문자열이 달라졌고 81조건에서는 달라지지 않았다.*
 
@@ -198,11 +198,11 @@
 | 분모·단위 | 완결 조건 104개·조건 수 |
 | 관측 | 변경 조건은 none 0, squeez 1, Headroom 4, LLMLingua-2 18 |
 | 증명하지 않는 것 | 변경 크기, 품질 영향, API 사용량 감소 |
-| SVG SHA-256 | `6fcb54537e1767c07d6c3822807bba1b55ffa2f8e2f10da1e5b6164e889ecf58` |
+| SVG SHA-256 | `16d5032ed5efff1437eaf8a415e97e4830bf88b7a46e93161fba1ec0266d527f` |
 
 ### 결과 3. 실제 변경 구간 수
 
-![보존 원문에서 확인한 조건별 실제 변경 구간 수. 조건 수와 다른 단위이며 원문이 없는 166건은 0으로 넣지 않았다.](../../figures/preliminary-changed-spans.svg)
+![보존 원문에서 확인한 조건별 실제 변경 구간 수. 조건 수와 다른 단위이며 원문이 없는 166건은 0으로 넣지 않았다.](../../../figures/preliminary-changed-spans.svg)
 
 *실제로 달라진 구간 209건을 조건별로 나눴다. 계산 가능한 738쌍 중 529쌍은 같았고 원문이 없는 166건은 미측정이다.*
 
@@ -212,13 +212,13 @@
 | 분모·단위 | 조건별 확인된 변경 구간·구간 수 |
 | 관측 | 변경 구간은 none 0, squeez 2, Headroom 53, LLMLingua-2 154 |
 | 증명하지 않는 것 | 누락 166건의 값, 전체 요청 토큰 감소, 안전성 |
-| SVG SHA-256 | `18fd761c1d2fc8632350d9be2913f2236a4d94bed21617992fc354cd72a7f421` |
+| SVG SHA-256 | `3b5c6c1ffeb1311beefd7f7ce53feb5fee70bfa41dbcee555a7289969e90cc45` |
 
 변경된 209구간만 로컬 `o200k_base`로 다시 세면 `97,723 → 50,824`토큰이다. 이 값은 다음 API 사용량 차트의 분모가 아니다.
 
 ### 결과 4. 요청과 응답 사건
 
-![104개 완결 조건의 논리 모델 요청, provider HTTP 시도, 성공 응답, 작업 전달 응답을 조건별로 따로 센 차트. 네 총합은 각각 1,027이지만 같은 사건이나 완료율이 아니다.](../../figures/preliminary-request-events.svg)
+![104개 완결 조건의 논리 모델 요청, provider HTTP 시도, 성공 응답, 작업 전달 응답을 조건별로 따로 센 차트. 네 총합은 각각 1,027이지만 같은 사건이나 완료율이 아니다.](../../../figures/preliminary-request-events.svg)
 
 *네 카운터는 관측상 조건별 값과 총합이 같았지만, 요청 수신·외부 전송·성공 수신·작업 전달이라는 서로 다른 사건이다.*
 
@@ -228,11 +228,11 @@
 | 분모·단위 | 각 사건을 기록한 횟수·사건 수 |
 | 관측 | 네 카운터의 총합이 관측상 각각 1,027회였음 |
 | 증명하지 않는 것 | 작업 완료율, 답에 가까워진 정도, 네 사건이 같은 개념임 |
-| SVG SHA-256 | `bf3e78cb5bcc5fccd12daed2e97e2c4d4547de0f51db8dfaa717cbed6c8cb186` |
+| SVG SHA-256 | `be8d2738f784cf7fb6581f20c9f8f0da799242cda56e9fd619cf4771f4e81e06` |
 
 ### 결과 5. 전체 API 사용량
 
-![104개 완결 조건의 조건별 provider 보고 입력 토큰, 캐시 입력 토큰, 출력 토큰. 변경 구간 로컬 토큰과 다른 범위다.](../../figures/preliminary-provider-usage.svg)
+![104개 완결 조건의 조건별 provider 보고 입력 토큰, 캐시 입력 토큰, 출력 토큰. 변경 구간 로컬 토큰과 다른 범위다.](../../../figures/preliminary-provider-usage.svg)
 
 *전체 API 사용량은 입력 14,510,757토큰, 그중 캐시 입력 9,706,496토큰, 출력 526,407토큰이었다.*
 
@@ -242,11 +242,11 @@
 | 분모·단위 | 조건별 전체 provider 보고 사용량·토큰 |
 | 관측 | 조건별 요청 수와 입력·캐시·출력 토큰이 달랐음 |
 | 증명하지 않는 것 | 변경 구간만의 토큰, 캐시 통제, 청구서 대사 |
-| SVG SHA-256 | `a557392060f31e2d6a485eaaa8622fe247914331b716e5f800d5a746b1074ba9` |
+| SVG SHA-256 | `8e814c4e7605b25e6dc8c2ad1e64285f3bdfb2652e79a5e47aad2b3ba2e4e5e8` |
 
 ### 결과 6. API 계산 비용
 
-![104개 완결 조건의 API 사용량에 고정 가격표를 곱한 조건별 미국 달러 계산 비용. 청구서 대사액이나 압축 절감률이 아니다.](../../figures/preliminary-calculated-cost.svg)
+![104개 완결 조건의 API 사용량에 고정 가격표를 곱한 조건별 미국 달러 계산 비용. 청구서 대사액이나 압축 절감률이 아니다.](../../../figures/preliminary-calculated-cost.svg)
 
 *API 사용량에 고정 가격표를 곱한 합은 `$22.3333885`였다. 실제 청구서와 대사하지 않았다.*
 
@@ -256,7 +256,7 @@
 | 분모·단위 | 조건별 API 사용량×가격표·USD |
 | 관측 | none `$5.6186600`, squeez `$6.6631870`, Headroom `$5.3620835`, LLMLingua-2 `$4.6894580` |
 | 증명하지 않는 것 | 청구서 금액, 압축이 만든 절감, 제품 도입 순위 |
-| SVG SHA-256 | `f5cef03393e88ca3f3f88f1716069c1f3b20deab97f55306ff0ff6df7fab8852` |
+| SVG SHA-256 | `949a24e9c4072f8fe21cefbdef2c7fa827a1734c0291ba06ba1f9329a6867725` |
 
 ## 이 그림으로 말할 수 있는 범위
 
@@ -270,5 +270,5 @@
 ## 다음 읽기 순서
 
 1. [예비 비교 기술 증거](preliminary-comparison-20260916.md)에서 조건별 실행 식별자·복원 재채점·원격 hash를 확인한다.
-2. [실제 1과제 YAML 실행 안내](../../README.md#try-it-in-five-minutes)에서 기본 무호출 확인과 명시적 `--execute` 경계를 확인한다.
-3. 실행 전에는 [공개·비공개 등급](../publication.md)과 [현재 미지원 범위](../../STATUS.md)를 함께 확인한다.
+2. [실제 1과제 YAML 실행 안내](../../../README.md#try-it-in-five-minutes)에서 기본 무호출 확인과 명시적 `--execute` 경계를 확인한다.
+3. 실행 전에는 [공개·비공개 등급](../../publication.md)과 [현재 미지원 범위](../../../STATUS.md)를 함께 확인한다.

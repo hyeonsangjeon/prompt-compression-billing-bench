@@ -8,7 +8,7 @@ from evidence import PUBLIC_FILES
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PLAN = ROOT / "docs/experiment/outcome-cost-accounting-plan-20260918.md"
+PLAN = ROOT / "docs/experiment/01-preliminary-comparison/outcome-cost-accounting-plan-20260918.md"
 SUMMARY = ROOT / "data/experiment/preliminary-comparison-summary.json"
 
 
@@ -74,7 +74,7 @@ class OutcomeCostPlanTests(unittest.TestCase):
     def test_plan_is_linked_and_publicly_allowlisted(self):
         index = (ROOT / "docs/experiment/README.md").read_text(encoding="utf-8")
         publication = (ROOT / "docs/publication.md").read_text(encoding="utf-8")
-        relative = "docs/experiment/outcome-cost-accounting-plan-20260918.md"
+        relative = "docs/experiment/01-preliminary-comparison/outcome-cost-accounting-plan-20260918.md"
 
         self.assertIn("outcome-cost-accounting-plan-20260918.md", index)
         self.assertIn(relative, publication)

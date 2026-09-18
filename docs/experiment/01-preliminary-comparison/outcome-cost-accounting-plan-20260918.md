@@ -51,7 +51,7 @@
 | API 계산 비용 | `$22.3333885` | provider 사용량 × 고정 가격표, 청구서 대사 아님 |
 | 통과 조건 1건당 총 계산 비용 | `$0.5583347125` | `$22.3333885 ÷ 40` |
 
-조건별 API 계산 비용 `$5.61866`, `$6.663187`, `$5.3620835`, `$4.689458`의 합이 `$22.3333885`인지 다시 확인한다. 이 합계와 40개 통과는 [공개 집계 JSON](../../data/experiment/preliminary-comparison-summary.json)에 고정돼 있다.
+조건별 API 계산 비용 `$5.61866`, `$6.663187`, `$5.3620835`, `$4.689458`의 합이 `$22.3333885`인지 다시 확인한다. 이 합계와 40개 통과는 [공개 집계 JSON](../../../data/experiment/preliminary-comparison-summary.json)에 고정돼 있다.
 
 ### 품질 판정 전 장기 attempt
 
@@ -198,6 +198,6 @@ Markdown 표를 데이터 원본으로 파싱하지 않는다. 검증된 구조�
 
 - [한 장 브리핑](experiment-briefing-20260919.md)
 - [예비 비교 기술 증거](preliminary-comparison-20260916.md)
-- [공개 집계 JSON](../../data/experiment/preliminary-comparison-summary.json)
-- [평가 규약](evaluation-protocol.md)
-- [재현 계약](reproducibility-contract.md)
+- [공개 집계 JSON](../../../data/experiment/preliminary-comparison-summary.json)
+- [평가 규약](../evaluation-protocol.md)
+- [재현 계약](../reproducibility-contract.md)
