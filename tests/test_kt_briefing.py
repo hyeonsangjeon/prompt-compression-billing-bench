@@ -7,6 +7,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 BRIEFING = ROOT / "docs/experiment/kt-briefing-20260919.md"
+DATA_GUIDE = ROOT / "docs/experiment/kt-data-connection-guide-20260919.md"
 
 
 class KtBriefingTests(unittest.TestCase):
@@ -68,7 +69,7 @@ class KtBriefingTests(unittest.TestCase):
         self.assertIn("NOT API token share", figure.read_text())
 
     def test_direct_relative_links_resolve(self):
-        documents = (ROOT / "README.md", ROOT / "docs/experiment/README.md", BRIEFING)
+        documents = (ROOT / "README.md", ROOT / "docs/experiment/README.md", BRIEFING, DATA_GUIDE)
         for document in documents:
             text = document.read_text()
             for target in re.findall(r"(?<!!)\[[^\]]+\]\(([^)#]+)(?:#[^)]+)?\)", text):
@@ -79,6 +80,77 @@ class KtBriefingTests(unittest.TestCase):
             for target in re.findall(r"!\[[^\]]*\]\(([^)]+)\)", text):
                 with self.subTest(document=document.name, target=target):
                     self.assertTrue((document.parent / target).resolve().is_file())
+
+
+class KtDataConnectionGuideTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.text = DATA_GUIDE.read_text()
+
+    def test_sha256_is_defined_before_first_use(self):
+        definition = "**파일 지문(SHA-256 해시)**"
+        self.assertIn(definition, self.text)
+        self.assertEqual(
+            self.text.index("SHA-256"),
+            self.text.index(definition) + definition.index("SHA-256"),
+        )
+
+    def test_existing_single_task_contract_is_reused(self):
+        for phrase in (
+            "examples/experiment/benchmark.yaml",
+            "src/benchmark_run.py",
+            "src/screening_run.py",
+            "schemas/experiment-result.schema.json",
+            "screening_run --diagnose-task",
+            "새 실행기나 우회 경로를 만들지 않는다",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.text)
+
+    def test_no_call_and_quality_boundaries_are_explicit(self):
+        for phrase in (
+            "무호출 확인(preflight)",
+            "status = checked",
+            "outcome = preflight_passed",
+            "technical_incomplete",
+            "오답으로 바꾸지 않음",
+            "quality.status=wrong_answer",
+            "quality.status=wrong_format",
+            "--execute",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.text)
+
+    def test_private_values_and_measurement_units_stay_separate(self):
+        for phrase in (
+            "고객 데이터 반출 금지",
+            "실제 변경 구간 토큰",
+            "전체 API usage",
+            "계산 비용",
+            "실제 청구서",
+            "cost.invoice_reconciled=false",
+            "관측되지 않은 usage를 0으로 바꾸지 않는다",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.text)
+        for environment_name in (
+            "FOUNDRY_ENDPOINT",
+            "SCREENING_OPERATIONAL_LEDGER",
+            "TERMINAL_BENCH_ROOT",
+            "SCREENING_INVENTORY",
+        ):
+            self.assertIn(environment_name, self.text)
+        self.assertNotRegex(self.text, r"https?://|/Users/|/home/|/ai-work/|/tmp/")
+
+    def test_fixed_benchmark_scope_is_not_presented_as_arbitrary_customer_data(self):
+        for phrase in (
+            "임의의 고객 데이터 형식을 받는 범용 실행기가 아니다",
+            "공개 과제 색인에 없는 과제는 무호출 확인에서 거부된다",
+            "별도 검토 필요",
+            "반복 없이 조건 간 순위나 비열등성을 말할 수 없다",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.text)
 
 
 if __name__ == "__main__":
