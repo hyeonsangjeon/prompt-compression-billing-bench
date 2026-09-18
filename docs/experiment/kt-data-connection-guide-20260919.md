@@ -54,7 +54,7 @@ KT가 공개 YAML에서 고를 수 있는 것은 공개 색인에 있는 과제 
 | 보호 계약 | 재현 묶음(replay bundle), 완전한 증거 보존, 재시도(retry) 설정 | 공개 참조 원장과 결과 JSON |
 | 결과 모양 | 상태, 사용량, 비용, 품질, 완료와 산출물 해시 | [결과 Schema](../../schemas/experiment-result.schema.json) |
 
-실행 연결 코드(wrapper)는 비공개 실행 원장을 공개 참조 원장과 비교한다. 비공개 원장에서 바꿀 수 있는 것은 inventory SHA-256, provider 제한 근거, deployment 분리 근거와 세 승인 필드뿐이다. 모델, 조건, 실행기(runner), 판정 규칙이나 retry를 함께 바꾸면 실행 전에 거부한다.
+실행 연결 코드(wrapper)는 비공개 실행 원장을 공개 참조 원장과 비교한다. 비공개 원장에서 바꿀 수 있는 것은 inventory 파일 지문, provider 제한 근거, deployment 분리 근거와 세 승인 필드뿐이다. 모델, 조건, 실행기(runner), 판정 규칙이나 retry를 함께 바꾸면 실행 전에 거부한다.
 
 ## 1. 원본 데이터를 저장소 밖에서 준비한다
 

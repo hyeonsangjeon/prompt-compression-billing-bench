@@ -87,6 +87,14 @@ class KtDataConnectionGuideTests(unittest.TestCase):
     def setUpClass(cls):
         cls.text = DATA_GUIDE.read_text()
 
+    def test_sha256_is_defined_before_first_use(self):
+        definition = "**파일 지문(SHA-256 해시)**"
+        self.assertIn(definition, self.text)
+        self.assertEqual(
+            self.text.index("SHA-256"),
+            self.text.index(definition) + definition.index("SHA-256"),
+        )
+
     def test_existing_single_task_contract_is_reused(self):
         for phrase in (
             "examples/experiment/benchmark.yaml",
