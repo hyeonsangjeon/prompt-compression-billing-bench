@@ -6,14 +6,14 @@
 
 | 차수 | 상태 | 시작 문서 | 범위 |
 |---|---|---|---|
-| 1차 예비 압축 비교 | 완료된 예비 관측 | [1차 실험 한 장 요약](01-preliminary-comparison/) | 26과제 × 4조건, 조건당 1회 |
+| 1차 예비 압축 비교 | 완료된 예비 관측 | [1차 실험 한 장 요약](01-preliminary-comparison/README.md) | 26과제 × 4조건, 조건당 1회 |
 
 새 실험은 실행 조건과 범위가 정해진 뒤 `02-<실험명>/README.md` 형식으로 추가한다.
 아직 시작하지 않은 2차 실험의 빈 폴더나 결과 문서는 미리 만들지 않는다.
 
 ## 공유 시작
 
-1. [1차 실험 한 장 요약](01-preliminary-comparison/)에서 실험 조건, 핵심 결과와 결과별 비용을 한 흐름으로 확인한다.
+1. [1차 실험 한 장 요약](01-preliminary-comparison/README.md)에서 실험 조건, 핵심 결과와 결과별 비용을 한 흐름으로 확인한다.
 2. [1차 실험 26과제 설명](01-preliminary-comparison/tasks.md)에서 과제별 문제, 공개 통과 대상, 시간·요청·비용을 확인한다.
 3. [공유용 쉬운 설명](plain-language-results-20260917.md)에서 26개 과제·104개 조건의 결과와 한계를 읽는다.
 4. [한 장 브리핑](experiment-briefing-20260919.md)에서 지금 정할 수 있는 것과 실험 설계의 빈자리를 확인한다.
@@ -62,7 +62,7 @@
 - [선별 규약](screening-protocol.md): 89과제 목록, 18/20 판정, 실패·재시도와 nginx verifier
 - [평가 규약](evaluation-protocol.md): 네 조건, 품질·비용 문턱, 반복 공식과 신뢰구간
 - [재현 계약](reproducibility-contract.md): 실행 증거, 중단·재개, verifier 재실행과 Blob 회수
-- [1차 실험 한 장 요약](01-preliminary-comparison/): 실험 조건, 핵심 관측과 결과별 비용을 한 장 흐름으로 정리한 공유용 문서
+- [1차 실험 한 장 요약](01-preliminary-comparison/README.md): 실험 조건, 핵심 관측과 결과별 비용을 한 장 흐름으로 정리한 공유용 문서
 - [1차 실험 26과제 설명](01-preliminary-comparison/tasks.md): 과제별 쉬운 설명, 공개 통과 대상과 네 조건의 시간·요청·비용
 - [한 장 브리핑](experiment-briefing-20260919.md): 측정 단계, 현재 결론과 실험 설계 10문항
 - [손실·무손실 압축 안내](lossless-lossy-compression-20260919.md): 전송 압축·캐시·prompt 축약의 차이와 네 조건의 실제 복원 범위
