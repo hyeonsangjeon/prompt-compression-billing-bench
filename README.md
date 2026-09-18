@@ -29,8 +29,9 @@ The [two-round EDA review (Korean)](docs/eda/README.md) collects the existing
 benchmark/input figures and tables with sample counts, denominators and measurement
 labels. Its ten figures use relative paths; tool-behavior experiments are separate.
 
-For external sharing, start with the [plain-language Korean summary](docs/experiment/plain-language-results-20260917.md),
-then use the [one-page Korean briefing](docs/experiment/experiment-briefing-20260919.md)
+For external sharing, start with the [first-study one-page summary](docs/experiment/01-preliminary-comparison/),
+then use the [plain-language Korean summary](docs/experiment/plain-language-results-20260917.md),
+the [one-page Korean briefing](docs/experiment/experiment-briefing-20260919.md)
 and [plain-language visualization guide](docs/experiment/visualization-guide-20260919.md),
 then use the [technical evidence report](docs/experiment/preliminary-comparison-20260916.md)
 for condition-level figures, run identifiers and hashes. The broader
@@ -149,6 +150,7 @@ have not been validated.
 
 | Need | Read |
 |---|---|
+| First preliminary comparison in one page | [First-study summary](docs/experiment/01-preliminary-comparison/) |
 | Decision briefing and experiment-design gaps | [One-page briefing](docs/experiment/experiment-briefing-20260919.md) |
 | Preliminary results in plain Korean | [Plain-language sharing summary](docs/experiment/plain-language-results-20260917.md) |
 | User-facing benchmark YAML and JSON contract | [Single-task YAML](examples/experiment/benchmark.yaml) · [Result schema](schemas/experiment-result.schema.json) |

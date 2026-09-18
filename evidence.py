@@ -54,6 +54,8 @@ PUBLIC_FILES = {
     "docs/experiment/experiment-briefing-20260919.md",
     "docs/experiment/data-connection-guide-20260919.md",
     "docs/experiment/lossless-lossy-compression-20260919.md",
+    "docs/experiment/01-preliminary-comparison/README.md",
+    "docs/experiment/01-preliminary-comparison/tasks.md",
     "docs/experiment/outcome-cost-accounting-20260918.md",
     "docs/experiment/outcome-cost-accounting-plan-20260918.md",
     "docs/experiment/visualization-guide-20260919.md",

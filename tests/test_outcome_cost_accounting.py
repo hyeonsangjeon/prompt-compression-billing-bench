@@ -25,6 +25,8 @@ PRELIMINARY_SUMMARY = ROOT / "data/experiment/preliminary-comparison-summary.jso
 RESULTS_GUIDE = ROOT / "docs/experiment/plain-language-results-20260917.md"
 PRELIMINARY_REPORT = ROOT / "docs/experiment/preliminary-comparison-20260916.md"
 BRIEFING = ROOT / "docs/experiment/experiment-briefing-20260919.md"
+ONE_PAGE = ROOT / "docs/experiment/01-preliminary-comparison/README.md"
+TASK_CATALOG = ROOT / "docs/experiment/01-preliminary-comparison/tasks.md"
 
 
 def attempt(
@@ -326,6 +328,10 @@ class OutcomeCostPresentationNarrativeTests(unittest.TestCase):
         cls.sharing = RESULTS_GUIDE.read_text()
         cls.preliminary = PRELIMINARY_REPORT.read_text()
         cls.briefing = BRIEFING.read_text()
+        cls.one_page = ONE_PAGE.read_text()
+        cls.one_page_flat = " ".join(cls.one_page.split())
+        cls.task_catalog = TASK_CATALOG.read_text()
+        cls.task_catalog_flat = " ".join(cls.task_catalog.split())
 
     def test_easy_narrative_keeps_result_and_cost_together(self):
         for phrase in (
@@ -364,8 +370,161 @@ class OutcomeCostPresentationNarrativeTests(unittest.TestCase):
         self.assertIn("`$0.5583347125`", self.briefing)
         self.assertIn("`pass`는 고객 수락 대리 지표로 검증되지 않았다", self.briefing)
 
+    def test_one_page_preserves_result_cost_scope_and_missing_join(self):
+        for phrase in (
+            "압축 적용에서 관측한 문자열 변화와 결과별 비용",
+            "소수 둘째 자리까지 반올림",
+            "1차 실험에서 확인한 것",
+            "이 기록으로 열어 둔 결정",
+            "1차로 끝낸다면",
+            "2차 검증을 한다면",
+            "어느 쪽으로 갈지는 아직 정하지 않았다",
+            "[26과제](tasks.md)",
+            "2026-09-16~17 UTC",
+            "모두 104조건",
+            "`temperature=0`, `reasoning_effort=none`",
+            "같은 답을 보장하지 않음",
+            "채점기 거짓 실패",
+            "목적 선정 5과제·15실행에서 수집한 56개 요청의 메시지 본문 UTF-8바이트",
+            "15.42%",
+            "0.48%~35.29%",
+            "후보 범위",
+            "78조건 중 23조건",
+            "55조건에서는 달라지지 않았다",
+            "현재 공개 집계로 두 경우를 나누지는 못한다",
+            "`tiktoken 0.14.0`의 `o200k_base`",
+            "48%의 분모는 문자열이 달라진 209구간만",
+            "설치 출력에서는 30번째 내용 줄 뒤의 진단·완료 신호가 사라졌다",
+            "별도 복합 명령에서는 앞선 목록이 30줄을 채워",
+            "공개 전후 사례(정적)",
+            "`[ERROR]`·`[WARNING]`",
+            "`1.22.1`은 `. 22. 1`로 갈렸으며",
+            "설계 제안",
+            "모든 제품과 설정에 같은 보호 방식이 필요하다고 일반화하지 않는다",
+            "실제 변경은 시스템의 보호 규칙을 통과한 로그 후보에서 일어났다",
+            "209구간을 파일 목록·설치 기록·명령 실행 결과 같은 종류별로 다시 나누지 않으므로",
+            "도구 동작을 보여 주는 정적 표본으로만 읽는다",
+            "기록된 변환 문자열 변경이 0건인데도",
+            "무압축 기준과 판정이 달라진 짝이 7개",
+            "동일한 무압축 조건을 반복한 결과가 아니며",
+            "전체 요청 이력·요청 수·캐시·실행 경로가 같았다는 증거도 아니다",
+            "반복 실행은 2차를 선택할 때 필요한 설계 조건",
+            "`$22.33`",
+            "`$0.56`",
+            "64조건의 비용도 들어 있다",
+            "논리 요청 2,783회",
+            "성공 응답 2,782회",
+            "작업 전달 2,778회",
+            "`$2.28`",
+            "`$7.56`",
+            "95조건",
+            "`$12.49`",
+            "`$87.77`",
+            "약 3.9배",
+            "상한 부재만이 비용 차이를 만들었다고 분리 측정한 것은 아니다",
+            "정확히 연결된 9조건의 조건당 API 계산 비용",
+            "bar [0.57, 1.51]",
+            "통과 40조건 중 4조건",
+            "정상 미통과 64조건 중 5조건",
+            "대표 표본이 아니다",
+            "프로그램 전체 통과 1건당 비용은 계산하지 않았다",
+            "실제 청구서와 대사하지 않음",
+            "양사가 합의한 업무 수락 기준",
+            "공동으로 선정한 대표 업무 표본",
+            "API 계산 비용, 직접 귀속 인프라 비용, 청구서 대사액",
+            "실제로 시작한 미통과·재시도·품질 판정 전 시도의 비용을 각각 한 번 포함",
+            "핵심 한계",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.one_page_flat)
+        for exact_value in (
+            "$22.3333885",
+            "$0.5583347125",
+            "$2.277506",
+            "$7.56232",
+            "$12.4935625",
+            "$87.771254",
+            "$110.1046425",
+        ):
+            with self.subTest(exact_value=exact_value):
+                self.assertNotIn(exact_value, self.one_page)
+        for internal_sales_phrase in (
+            "프리세일즈",
+            "고정가 견적",
+            "제안서",
+            "실제 계약 마진",
+            "고객이 받아들인 결과",
+        ):
+            with self.subTest(internal_sales_phrase=internal_sales_phrase):
+                self.assertNotIn(internal_sales_phrase, self.one_page)
+        for unsupported_claim in (
+            "토큰 압축 효과와 결과별 비용",
+            "같은 과제를, 같은 설정으로, 압축을 걸지 않은 채 여러 번",
+            "보낸 글자가 한 글자도 다르지 않았다",
+            "55조건은 압축할 만한 글이 없었기 때문",
+            "상한을 없앤 결과",
+        ):
+            with self.subTest(unsupported_claim=unsupported_claim):
+                self.assertNotIn(unsupported_claim, self.one_page)
+
+    def test_task_catalog_reconciles_public_task_metrics(self):
+        rows = re.findall(
+            r"^\| \[(\d+)\. `([^`]+)`\]\((https://[^)]+)\) \|.*"
+            r"\| (\d)/4 \| ([^|]+) \| (\d+)회 \| "
+            r"`\$(\d+\.\d{3})` \|$",
+            self.task_catalog,
+            re.MULTILINE,
+        )
+        self.assertEqual(len(rows), 26)
+        self.assertEqual([int(row[0]) for row in rows], list(range(1, 27)))
+        self.assertEqual(sum(int(row[3]) for row in rows), 40)
+        self.assertEqual(sum(int(row[5]) for row in rows), 1027)
+        self.assertEqual(sum(Decimal(row[6]) for row in rows), Decimal("22.333"))
+        task_ids = {row[1] for row in rows}
+        report_task_ids = set(
+            re.findall(
+                r"^## (?:별도 집단: )?`([^`]+)`$", self.preliminary, re.MULTILINE
+            )
+        )
+        self.assertEqual(task_ids, report_task_ids)
+        for _, task, url, _, duration, _, _ in rows:
+            with self.subTest(task=task):
+                self.assertIn(
+                    "7131e4375048a0e408a8fb404b5f499d726b695b", url
+                )
+                self.assertRegex(duration, r"\d+분 \d+초~\d+분 \d+초")
+        for phrase in (
+            "네 비교 조건",
+            "과제당 4조건, 모두 104조건",
+            "`none`",
+            "squeez `1.48.4`",
+            "Headroom `0.36.5` paths-only",
+            "LLMLingua-2 `0.2.2`",
+            "논리 요청 합",
+            "API 계산 비용 합",
+            "실제 `pass`와 `wrong_answer`는 과제 내장 채점기의 판정",
+            "반복 통과율이 아니다",
+            "압축기 속도 비교로 읽지 않는다",
+            "HTTP 시도, 성공 응답, 작업에 전달한 응답과 같은 사건으로 취급하지 않는다",
+            "정밀 원본 합은 `$22.3333885`",
+            "실제 청구서와 대사한 금액은 아니다",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.task_catalog_flat)
+
+    def test_one_page_relative_links_resolve_after_study_grouping(self):
+        for target in re.findall(
+            r"(?<!!)\[[^\]]+\]\(([^)#]+)(?:#[^)]+)?\)", self.one_page
+        ):
+            if re.match(r"[a-z]+://", target):
+                continue
+            with self.subTest(target=target):
+                self.assertTrue((ONE_PAGE.parent / target).resolve().exists())
+
     def test_narrative_avoids_unvalidated_acceptance_claims(self):
-        combined = "\n".join((self.sharing, self.preliminary, self.briefing))
+        combined = "\n".join(
+            (self.sharing, self.preliminary, self.briefing, self.one_page)
+        )
         self.assertNotIn("쓸모 있었던 결과물", combined)
         self.assertNotIn("받아들여진 결과물", combined)
         self.assertNotIn("고객이 수락한 결과", combined)
