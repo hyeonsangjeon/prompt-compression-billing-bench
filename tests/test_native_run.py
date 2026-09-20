@@ -13,7 +13,15 @@ from unittest.mock import patch
 from native_helpers import FixtureEncoder, ledger_fixture, request_fixture, response_fixture
 from src.cache_reuse import summarize_native_bundle
 from src.native_contract import TASKS
-from src.native_run import execute_native, main, runtime_environment, supervise, verify_cache_bundle_run, verify_native_run
+from src.native_run import (
+    _cache_bundle_context,
+    execute_native,
+    main,
+    runtime_environment,
+    supervise,
+    verify_cache_bundle_run,
+    verify_native_run,
+)
 from src.protection import canonical, digest
 
 
@@ -150,7 +158,8 @@ class NativeRunTests(unittest.TestCase):
                 context = {
                     "cycle_id": "cycle-01", "bundle_id": "cycle-01-none-reuse-0",
                     "condition": "none", "reuse_level": 0, "eligible_predecessor_count": 0,
-                    "cache_ledger_sha256": "b" * 64, "runtime_facts_sha256": "c" * 64,
+                    "cache_ledger_sha256": "b" * 64, "native_ledger_sha256": "a" * 64,
+                    "runtime_facts_sha256": "c" * 64,
                     "isolation_evidence_sha256": "d" * 64,
                 }
 
@@ -252,6 +261,30 @@ class NativeRunTests(unittest.TestCase):
         self.assertTrue(all(row["flags"]["measured"] for row in bundle["observations"]))
         self.assertTrue(all(row["invoice"]["status"] == "not_measured" for row in bundle["observations"]))
         self.assertTrue(all(row["runtime_facts_sha256"] == "d" * 64 for row in bundle["observations"]))
+
+    def test_cache_bundle_context_requires_every_ledger_hash(self):
+        context = {
+            "cycle_id": "cycle-01",
+            "bundle_id": "cycle-01-none-reuse-0",
+            "condition": "none",
+            "reuse_level": 0,
+            "eligible_predecessor_count": 0,
+            "cache_ledger_sha256": "a" * 64,
+            "native_ledger_sha256": "b" * 64,
+            "runtime_facts_sha256": "c" * 64,
+            "isolation_evidence_sha256": "d" * 64,
+        }
+        ledger = deepcopy(self.ledger)
+        ledger["runner"]["concurrency"] = 1
+        self.assertEqual(_cache_bundle_context(context, "none", ledger), context)
+        changed = deepcopy(context)
+        del changed["native_ledger_sha256"]
+        with self.assertRaisesRegex(ValueError, "fields differ"):
+            _cache_bundle_context(changed, "none", ledger)
+        changed = deepcopy(context)
+        changed["native_ledger_sha256"] = "not-a-hash"
+        with self.assertRaisesRegex(ValueError, "SHA-256"):
+            _cache_bundle_context(changed, "none", ledger)
 
     def test_startup_failure_still_records_one_invalid_task_and_stops(self):
         directory, _provenance = self.run_fixture(broken=True)

@@ -539,7 +539,8 @@ def _cache_bundle_context(value: dict | None, condition: str, ledger: dict) -> d
         return None
     required = {
         "cycle_id", "bundle_id", "condition", "reuse_level", "eligible_predecessor_count",
-        "cache_ledger_sha256", "runtime_facts_sha256", "isolation_evidence_sha256",
+        "cache_ledger_sha256", "native_ledger_sha256", "runtime_facts_sha256",
+        "isolation_evidence_sha256",
     }
     if not isinstance(value, dict) or set(value) != required:
         raise ValueError("Cache bundle context fields differ from the execution contract")
@@ -550,7 +551,10 @@ def _cache_bundle_context(value: dict | None, condition: str, ledger: dict) -> d
     for name in ("cycle_id", "bundle_id"):
         if not isinstance(value[name], str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,127}", value[name]):
             raise ValueError("Cache bundle identifiers must be safe and bounded")
-    for name in ("cache_ledger_sha256", "runtime_facts_sha256", "isolation_evidence_sha256"):
+    for name in (
+        "cache_ledger_sha256", "native_ledger_sha256",
+        "runtime_facts_sha256", "isolation_evidence_sha256",
+    ):
         if not isinstance(value[name], str) or not re.fullmatch(r"[0-9a-f]{64}", value[name]):
             raise ValueError("Cache bundle evidence bindings require SHA-256")
     if ledger["runner"]["concurrency"] != 1:
