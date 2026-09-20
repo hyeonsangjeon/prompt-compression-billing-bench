@@ -10,6 +10,10 @@ and a separate-process local capability boundary have model-free coverage. Remot
 or multi-user exposure remains a separate operational scope rather than an open
 condition of this local contract.
 
+The static first-page renderer, independent Markdown comparison, repository-prefix
+HTTP simulation and configured Chromium viewport checks are implemented. The
+repository still does not enable or deploy GitHub Pages.
+
 ## Nine checks
 
 | Check | State | Present contract and remaining gap |
@@ -19,7 +23,7 @@ condition of this local contract.
 | 3. Record provenance | **Implemented for static runs and the none baseline** | Each row separates provider usage, local counts, calculated deltas, classification and invoice-unreconciled cost. The measured baseline records source SHA and exact snapshots. Old sanitized native evidence has no source SHA and is not retroactively upgraded. |
 | 4. Drift safeguards | **Rule executed; baseline inconclusive** | The five-repetition gate allowed collection to continue, the 10-repetition halves differed, and the total-20 halves still differed. The rule stopped comparison as inconclusive. These operational rules are not proof of statistical stability or equivalence. Private raw measurements cannot be rerun by public CI. |
 | 5. Unsupported cases | **Explicit, not solved** | A narrow source-bound live log classifier and Terminal adapter exist. A disabled same-host squeez recovery contract now verifies source bytes and local lifecycle controls, but it is not an agent-visible service. No general benchmark adapter, DeepSWE execution, semantic log-preservation proof or recovery-cost result exists. Native judge subcheck gaps remain disclosed, not regraded away. |
-| 6. Layered README | **Implemented** | Scope first, chart/method limits next, synthetic static commands next, native execution and detailed contracts behind links. This does not make the five-minute native path pass. |
+| 6. Layered README | **Implemented** | Scope first, chart/method limits next, synthetic static commands next, native execution and detailed contracts behind links. The local static first page preserves that source hierarchy without adding a result summary. This does not make the five-minute native path pass or deploy GitHub Pages. |
 | 7. Terminology | **Implemented** | Candidate range, message-content denominator, tool display, local tokenizer and unavailable billing are defined at use. No tool display is named a billed-token result. |
 | 8. Failure paths | **Partial** | Missing dependencies/resources, dirty/wrong source, cross-worker verification-input drift, malformed partitions, explicit process/tool exits and invalid UTF-8 stop explicitly. The disabled squeez recovery path also distinguishes exit-zero not-found, rejects identity, expiry, replay and quota failures before supplier execution, and refuses unsafe cleanup. Normal elapsed time and measured cost do not stop the current native path. Blob collection-host verification and VM cleanup remain external conditions for each future run. |
 | 9. Publication grades | **Implemented for the tracked candidate** | The exact allowlist grades every tracked file, including the reviewed Terminal-Bench verifier notice and byte-exact Apache-2.0 copy. The squeez executable remains bring-your-own and excluded. This technical boundary does not select a root source license, establish DeepSWE redistribution rights or change repository visibility. |
@@ -41,6 +45,7 @@ condition of this local contract.
 - Choose a root license for this repository's own source.
 - Resolve whether any DeepSWE-derived material may be redistributed beyond the aggregate-only files already graded here.
 - Decide repository visibility separately. This work does not change it.
+- Approve and enable any GitHub Pages deployment separately. The committed workflow only builds and checks.
 
 ## Checks without model calls
 
@@ -51,6 +56,9 @@ uv run --locked python -m unittest discover -s tests -v
 uv run --locked python -m src.eda --check
 uv run --locked python evidence.py audit-files .
 for file in evidence/*.json; do uv run --locked python evidence.py check "$file"; done
+# Install requirements/pages-static.txt in the isolated environment documented
+# in docs/pages-static.md, then run its Python directly:
+"$PAGES_RUN/venv/bin/python" -B -m unittest tests.test_pages_static -v
 ```
 
 The optional real-squeez integration test uses `TEST_SQUEEZ_BINARY` and verifies
@@ -61,6 +69,9 @@ The separate native-contract CI job installs the locked `native` extra and
 exercises actual Harbor/SDK code with fake responses and dummy processes only.
 See [Native contract](docs/native-contract.md) for units, fail-closed behavior,
 judge gaps and model-free validation. No real native comparison is a CI fixture.
+See [Static Pages candidate](docs/pages-static.md) for deterministic build,
+independent-parser, project-prefix HTTP and browser-check commands. Those checks
+do not deploy the generated site.
 
 ## Data grades
 

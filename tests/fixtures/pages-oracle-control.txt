@@ -1,0 +1,37 @@
+# Control — \*literal\*
+
+Backslash \*literal\* and `` code ` delimiter ``.
+Soft
+wrap with [Guide](guide.md#target) and ![Diagram](../figures/example.svg).
+
+| Field | Value |
+| --- | --- |
+| escaped pipe | left \| right |
+
+- parent
+  continuation
+  - child
+- [ ] pending
+- [x] complete
+
+```text
+fenced **literal**
+```
+
+**강조 문구**는 CommonMark strong이다.
+
+**강조 문구(예시)**는 project extension이다.
+
+2 ** 3
+
+2**3
+
+**/*.py
+
+path/**/file
+
+\*\*literal\*\*
+
+`inline **literal**`
+
+unmatched **marker

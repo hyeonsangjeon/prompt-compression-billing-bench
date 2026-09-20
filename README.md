@@ -46,6 +46,11 @@ recovery overhead or cost savings. Setting temperature to zero or reasoning effo
 to none does not make a model deterministic or undo the native harness's existing
 output elision.
 
+A [deterministic local static-site candidate](docs/pages-static.md) renders the
+public allowlist as a navigable first page and evidence documents. Its workflow
+builds and checks only; GitHub Pages deployment and repository visibility changes
+remain disabled.
+
 ## Try it in five minutes
 
 Run from a clean committed checkout with Python 3.12+ and `uv`. The YAML names
@@ -116,6 +121,8 @@ not part of this repository's public file set.
 - A user-facing YAML request binds to one hash-pinned low-level TOML ledger. `run.py experiment` checks by default and delegates execution to the existing runner; it does not implement a second execution path.
 - Separate `tool_reported`, `measured_local` and `measured_billed` fields. No API calls means billing is **not measured**, not a measured zero.
 - A reproducible aggregate EDA chart; raw historical requests are not distributed.
+- A deterministic static-document renderer with independent Markdown comparison,
+  repository-prefix HTTP checks and narrow/wide Chromium checks; it does not deploy.
 - An optional [local-model native runner](docs/local-native.md), not yet connected to the compressor pipeline.
 - An opt-in [Harbor/Foundry candidate-compression runner](docs/native-contract.md) for none, squeez, a Headroom paths-only profile and LLMLingua-2, with a shared protected transport, per-task workload metrics, a five-repetition continuation gate and local-first Blob result retrieval. A none baseline is measured; a preliminary native comparison for 26 tasks × four conditions is complete with one run per condition, but the preregistered repeated evaluation remains unexecuted.
 - A disabled [local squeez recovery contract](docs/squeez-recovery.md) with byte-exact source verification, run-scoped stores, exact-file cleanup and an owner-only UNIX-socket capability boundary. It is not wired into an agent or the native runner.
@@ -174,5 +181,6 @@ have not been validated.
 | Unsupported paths and readiness gaps | [Status](STATUS.md) |
 | What may be shared and what stays private | [Publication grades](docs/publication.md) |
 | Third-party provenance and exact license copies | [Third-party notices](THIRD_PARTY_NOTICES.md) |
+| Local static first page, checks and non-deployment boundary | [Static Pages candidate](docs/pages-static.md) |
 
 No raw run, prompt, recovery stash, imported tree or private work note is published automatically.
