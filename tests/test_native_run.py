@@ -10,8 +10,9 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from native_helpers import FixtureEncoder, ledger_fixture, request_fixture, response_fixture
+from native_helpers import FixtureEncoder, ledger_fixture_document, request_fixture, response_fixture
 from src.cache_reuse import summarize_native_bundle
+from src.execution_safety import safety_policy_record
 from src.native_contract import TASKS
 from src.native_run import (
     _cache_bundle_context,
@@ -33,8 +34,7 @@ class NativeRunTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
-        self.ledger = ledger_fixture()
-        self.ledger_bytes = (ROOT / "ledgers/native.template.toml").read_bytes()
+        self.ledger, self.ledger_bytes = ledger_fixture_document()
         self.ledger_path = self.root / "ledger.toml"
         self.ledger_path.write_bytes(self.ledger_bytes)
         self.sent = []
@@ -71,6 +71,7 @@ class NativeRunTests(unittest.TestCase):
                  "retrieval": {"client": retrieval_client, "container": "runs", "prefix": "runs"},
                  "reporting_target": 1_789_578_340.0,
                  "harbor_limit_policy": {"agent_time_limit_seconds": None},
+                 "safety_policy": safety_policy_record(self.ledger, applied=True),
                  "evidence_kind": evidence_kind}
 
         class SyntheticRetrieval:
@@ -103,8 +104,9 @@ class NativeRunTests(unittest.TestCase):
 
         synthetic_retrieval = SyntheticRetrieval()
 
-        def synthetic_supervisor(command, log, recorder, environment):
+        def synthetic_supervisor(command, log, recorder, environment, *, trial_id=None):
             self.supervised.append(command)
+            self.assertIsNotNone(trial_id)
             with self.activity_lock:
                 self.active_supervisors += 1
                 self.maximum_active_supervisors = max(self.maximum_active_supervisors, self.active_supervisors)
@@ -130,7 +132,12 @@ class NativeRunTests(unittest.TestCase):
                 ]}}))
                 (native / "agent/trajectory.json").write_text(json.dumps({"steps": [{"step_id": 1, "source": "agent"}]}))
                 (native / "agent/command-trace/events.jsonl").write_text("")
-                return {"returncode": 0, "timed_out": False, "stopped_by_guard": False}
+                return {
+                    "returncode": 0,
+                    "timed_out": False,
+                    "stopped_by_guard": False,
+                    "safety_stop": None,
+                }
             finally:
                 with self.activity_lock:
                     self.active_supervisors -= 1
@@ -338,7 +345,7 @@ class NativeRunTests(unittest.TestCase):
         self.assertNotIn("AZURE_API_KEY", environment)
         self.assertNotIn("FOUNDRY_ENDPOINT", environment)
 
-    def test_supervisor_has_no_deadline_and_still_honors_an_explicit_run_stop(self):
+    def test_supervisor_without_trial_scope_still_honors_an_explicit_run_stop(self):
         completed = SimpleNamespace(
             stopped=threading.Event(), check=lambda: None, stop=lambda _reason: None,
         )

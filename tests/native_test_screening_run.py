@@ -63,6 +63,8 @@ class ScreeningRunTests(unittest.TestCase):
         self.recorder = SimpleNamespace(
             lock=nullcontext(),
             trials={self.attempt_id: {"failure": None}},
+            failure=None,
+            safety_snapshot=lambda _attempt_id: None,
         )
         self.process = {
             "returncode": 0,
@@ -101,6 +103,10 @@ class ScreeningRunTests(unittest.TestCase):
         self.assertEqual(config["n_concurrent_trials"], 2)
         self.assertEqual(config["retry"]["max_retries"], 0)
         self.assertEqual(config["agents"][0]["kwargs"]["llm_kwargs"]["num_retries"], 0)
+        self.assertEqual(
+            config["agents"][0]["kwargs"]["llm_kwargs"]["max_completion_tokens"],
+            2048,
+        )
         self.assertEqual(
             config["environment"]["import_path"],
             "src.replay_environment:PreservingDockerEnvironment",
@@ -179,6 +185,70 @@ class ScreeningRunTests(unittest.TestCase):
             replay=({"manifest_sha256": "b" * 64}, "replay_mismatch_or_incomplete"),
         )
         self.assertEqual(classified["result"], "replay_mismatch")
+
+    def test_safety_stop_stays_technical_incomplete_with_unknown_quality(self):
+        self.recorder.trials[self.attempt_id]["failure"] = {
+            "reason": "SafetyLimitReached",
+            "details": {
+                "classification": "technical_incomplete",
+                "quality_status": "unknown",
+                "stop_kind": "censored",
+                "censoring": "right_censored",
+                "limit_name": "max_wall_seconds_per_attempt",
+                "scope": "attempt",
+                "applied_limit": 2400,
+                "observed": 2400.1,
+                "trial_id": self.attempt_id,
+            },
+        }
+        replay = {
+            "status": "complete",
+            "capture_phase": "teardown_without_verifier",
+            "capture_wall_seconds": 1.25,
+            "manifest_sha256": "b" * 64,
+        }
+        classified = self.classify(
+            quality_outcome(),
+            replay=(replay, "replay_capture_phase_invalid"),
+            complete=False,
+        )
+        self.assertEqual(classified["result"], "censored")
+        self.assertEqual(classified["termination"]["classification"], "technical_incomplete")
+        self.assertEqual(classified["termination"]["quality_status"], "unknown")
+        self.assertEqual(
+            classified["technical_exclusion_basis"]["kind"],
+            "safety_stop_before_first_verifier",
+        )
+
+    def test_run_wide_safety_stop_marks_every_affected_attempt_incomplete(self):
+        self.recorder.failure = {
+            "reason": "SafetyLimitReached",
+            "details": {
+                "classification": "technical_incomplete",
+                "quality_status": "unknown",
+                "stop_kind": "budget_stopped",
+                "censoring": "right_censored",
+                "limit_name": "max_api_cost_usd_per_run",
+                "scope": "run",
+                "applied_limit": 10,
+                "observed": 10.1,
+                "trial_id": "triggering-attempt",
+            },
+        }
+        replay = {
+            "status": "complete",
+            "capture_phase": "teardown_without_verifier",
+            "capture_wall_seconds": 1.25,
+            "manifest_sha256": "b" * 64,
+        }
+        classified = self.classify(
+            quality_outcome(),
+            replay=(replay, "replay_capture_phase_invalid"),
+            complete=False,
+        )
+        self.assertEqual(classified["result"], "budget_stopped")
+        self.assertEqual(classified["termination"]["scope"], "run")
+        self.assertEqual(classified["termination"]["quality_status"], "unknown")
 
     def test_explicit_provider_rejection_preserves_unexecuted_verifier_stages_as_not_applicable(self):
         events = [
@@ -914,13 +984,23 @@ class ScreeningRunTests(unittest.TestCase):
         schema_two = deepcopy(current)
         schema_two["schema_version"] = 2
         schema_two["queue"] = deepcopy(legacy["queue"])
+        schema_two["limits"] = {
+            "provider_cost_stop": "none",
+            "provider_call_stop": "none",
+            "request_size_stop": "provider_enforced_only",
+            "provider_http_timeout": "none",
+            "run_deadline_stop": "none",
+            "transient_http_attempts": 3,
+            "reporting_target_utc": "2026-09-16T14:59:00+00:00",
+        }
+        schema_two["approval"].pop("cost_limits_approved")
         with patch.dict(os.environ, {
             "PROVIDER_RPM_LIMIT": "17",
             "PROVIDER_TPM_LIMIT": "1700",
         }):
             self.assertEqual(_legacy_policy_transition(schema_two, current), {
-                "max_completion_tokens": None,
-                "max_calls_per_trial": None,
+                "max_completion_tokens": 2048,
+                "max_calls_per_trial": 60,
             })
         with patch.dict(os.environ, {
             "PROVIDER_RPM_LIMIT": "17",

@@ -119,7 +119,10 @@ uv run --locked python run.py experiment examples/experiment/benchmark.yaml --ex
 ```
 
 `--execute` verifies that the approved operational ledger changes only the
-runtime approval and evidence fields allowed by the public reference. It then
+runtime evidence, approval, calculated-cost ceilings and UTC deadline fields
+allowed by the public reference. The fixed call, wall-time, request-size and
+output-token boundaries are documented in the
+[provider execution safety policy](docs/experiment/execution-safety-policy.md). It then
 delegates the selected task to the existing `screening_run --diagnose-task`
 path; it does not implement another benchmark engine. The checked path above is
 measured in the [current repository validation record](data/experiment/readme-benchmark-validation-20260920.json).

@@ -7,6 +7,7 @@ import re
 import tomllib
 
 from .baseline import INTERIM_MAX_RANGE_WIDTH, INTERIM_REPETITIONS, RULE
+from .execution_safety import LIMIT_FIELDS, require_operational_safety, validate_safety_limits
 from .runtime_limits import queue_fields, runtime_queue_limits, validate_queue_limits
 from .verifier_revisions import VERIFIER_SPECS
 
@@ -46,14 +47,15 @@ FIELDS = {
     "measurement": {"tokenizer", "tiktoken_version", "cache_env", "table_sha256"},
     "compressor": {"name", "target", "tools"},
     "retrieval": {"account_url_env", "spool_root_env", "container", "prefix", "upload_timeout_seconds", "maximum_attempts", "initial_backoff_seconds", "maximum_backoff_seconds", "final_flush_seconds"},
-    "limits": {
-        "provider_cost_stop", "provider_call_stop", "request_size_stop",
-        "provider_http_timeout", "run_deadline_stop", "transient_http_attempts",
-        "reporting_target_utc",
-    },
+    "limits": set(),
     "prices": {"input_per_million_usd", "cached_input_per_million_usd", "output_per_million_usd", "source_reference", "checked_at_utc"},
     "stability": {"rule", "interim_repetitions", "interim_max_range_width", "minimum_repetitions", "maximum_repetitions", "comparison_repetitions"},
     "approval": {"execution_approved", "rule_accepted", "reference"},
+}
+LEGACY_UNBOUNDED_LIMIT_FIELDS = {
+    "provider_cost_stop", "provider_call_stop", "request_size_stop",
+    "provider_http_timeout", "run_deadline_stop", "transient_http_attempts",
+    "reporting_target_utc",
 }
 
 
@@ -69,20 +71,22 @@ def parse_native_ledger(content: bytes) -> dict:
 
 def validate_native_ledger(ledger: dict) -> None:
     schema_version = ledger.get("schema_version") if isinstance(ledger, dict) else None
-    fields = {**FIELDS, "queue": queue_fields(schema_version)}
+    limit_fields = LIMIT_FIELDS if schema_version == 4 else LEGACY_UNBOUNDED_LIMIT_FIELDS
+    approval_fields = FIELDS["approval"] | ({"cost_limits_approved"} if schema_version == 4 else set())
+    fields = {**FIELDS, "limits": limit_fields, "approval": approval_fields, "queue": queue_fields(schema_version)}
     if not isinstance(ledger, dict) or set(ledger) != set(fields) | {"schema_version", "mode", "conditions", "output_dir", "raw_retrieval"}:
         raise ValueError("Unexpected or missing native ledger fields")
     for section, names in fields.items():
         if not isinstance(ledger[section], dict) or set(ledger[section]) != names:
             raise ValueError(f"Unexpected or missing [{section}] fields")
-    if type(schema_version) is not int or schema_version not in (2, 3) or ledger["mode"] != "native_candidate_compression" or ledger["conditions"] != list(CONDITIONS):
+    if type(schema_version) is not int or schema_version not in (2, 3, 4) or ledger["mode"] != "native_candidate_compression" or ledger["conditions"] != list(CONDITIONS):
         raise ValueError("Keep the fixed none, squeez, Headroom and LLMLingua-2 comparison")
     if ledger["output_dir"] != "runs":
         raise ValueError("Native raw artifacts must stay under the private runs directory")
     for section, fields in {
         "model": {"reported_model"}, "queue": {"limits_checked_at_utc", "limits_source_reference", "deployment_isolation_reference"},
         "prices": {"source_reference", "checked_at_utc"}, "approval": {"reference"},
-        "limits": {"reporting_target_utc"},
+        "limits": {"run_deadline_utc"} if schema_version == 4 else {"reporting_target_utc"},
     }.items():
         if any(not isinstance(ledger[section][field], str) for field in fields):
             raise ValueError(f"[{section}] reference and timestamp fields must be text")
@@ -139,7 +143,8 @@ def validate_native_ledger(ledger: dict) -> None:
         "comparison_repetitions": "match_baseline",
     }:
         raise ValueError("Baseline stopping and comparison rules must be fixed before collection")
-    if any(type(ledger["approval"][field]) is not bool for field in ("execution_approved", "rule_accepted")):
+    approval_booleans = ("execution_approved", "rule_accepted") + (("cost_limits_approved",) if schema_version == 4 else ())
+    if any(type(ledger["approval"][field]) is not bool for field in approval_booleans):
         raise ValueError("Approval fields must be explicit booleans")
     compressor = ledger["compressor"]
     if compressor["name"] != "selected_by_condition" or compressor["target"] != "identified_log_spans" or not isinstance(compressor["tools"], dict) or set(compressor["tools"]) != set(CONDITIONS):
@@ -199,33 +204,32 @@ def validate_native_ledger(ledger: dict) -> None:
         "deterministic_algorithms": True, "worker_processes_per_run": 8, "parallel_inference": True,
     }:
         raise ValueError("Keep the reviewed LLMLingua-2 rate and eight-worker CPU profile")
-    if ledger["limits"] != {
-        "provider_cost_stop": "none",
-        "provider_call_stop": "none",
-        "request_size_stop": "provider_enforced_only",
-        "provider_http_timeout": "none",
-        "run_deadline_stop": "none",
-        "transient_http_attempts": 3,
+    if schema_version == 4:
+        validate_safety_limits(ledger["limits"])
+    elif ledger["limits"] != {
+        "provider_cost_stop": "none", "provider_call_stop": "none",
+        "request_size_stop": "provider_enforced_only", "provider_http_timeout": "none",
+        "run_deadline_stop": "none", "transient_http_attempts": 3,
         "reporting_target_utc": "2026-09-16T14:59:00+00:00",
     }:
-        raise ValueError("Keep the delegated no-cost, no-call-count, no-size, no-time-stop policy")
+        raise ValueError("Keep the historical schema-v2/v3 no-harness-stop policy")
 
 
-def require_operational_values(ledger: dict) -> float:
-    if not all(ledger["approval"][field] for field in ("execution_approved", "rule_accepted")) or not ledger["approval"]["reference"].strip():
+def require_operational_values(ledger: dict) -> dict:
+    if ledger.get("schema_version") != 4:
+        raise ValueError("New provider execution requires the safety-capped schema-v4 ledger")
+    if not all(ledger["approval"].get(field) for field in ("execution_approved", "rule_accepted", "cost_limits_approved")) or not ledger["approval"]["reference"].strip():
         raise ValueError("Baseline execution and the predeclared rule require explicit approval")
-    if ledger["schema_version"] != 3:
-        raise ValueError("New provider execution requires the environment-backed schema-v3 ledger")
+    policy = require_operational_safety(ledger)
     queue, prices = ledger["queue"], ledger["prices"]
     runtime_queue_limits(queue, ledger["schema_version"])
     if not queue["deployment_isolation_reference"].strip():
         raise ValueError("Verify deployment quotas and coordination with other callers")
     if not prices["input_per_million_usd"] or not prices["output_per_million_usd"] or not prices["source_reference"].strip():
         raise ValueError("Provide verified rates for measurement")
-    reporting_target = datetime.fromisoformat(ledger["limits"]["reporting_target_utc"])
     checked_at = datetime.fromisoformat(prices["checked_at_utc"])
-    if reporting_target.utcoffset() is None or reporting_target.utcoffset().total_seconds() != 0 or checked_at.tzinfo is None:
-        raise ValueError("Use an explicit UTC reporting target and timezone-aware rate-check timestamp")
+    if checked_at.tzinfo is None:
+        raise ValueError("Use a timezone-aware rate-check timestamp")
     if checked_at > datetime.now(timezone.utc):
         raise ValueError("Rate-check timestamp is in the future")
-    return reporting_target.timestamp()
+    return policy

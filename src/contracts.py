@@ -7,6 +7,7 @@ from pathlib import Path
 import tomllib
 
 from jsonschema import Draft202012Validator
+from referencing import Registry, Resource
 
 
 SCHEMAS = Path(__file__).resolve().parents[1] / "schemas"
@@ -14,7 +15,11 @@ SCHEMAS = Path(__file__).resolve().parents[1] / "schemas"
 
 def validate(value: dict, schema_name: str) -> None:
     schema = json.loads((SCHEMAS / schema_name).read_bytes())
-    errors = list(Draft202012Validator(schema).iter_errors(value))
+    registry = Registry()
+    for path in SCHEMAS.glob("*.json"):
+        resource = Resource.from_contents(json.loads(path.read_bytes()))
+        registry = registry.with_resource(path.name, resource)
+    errors = list(Draft202012Validator(schema, registry=registry).iter_errors(value))
     if errors:
         location = ".".join(str(part) for part in errors[0].absolute_path) or "root"
         raise ValueError(f"{schema_name}: invalid contract at {location}: {errors[0].validator}")

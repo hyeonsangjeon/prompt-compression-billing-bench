@@ -131,6 +131,33 @@
         "operator_status": {"enum": ["not_stopped", "stopped", "not_applicable", "not_recorded"]}
       }
     },
+    "execution_safety": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "execution-safety-policy.schema.json"}
+      ]
+    },
+    "termination": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["classification", "quality_status", "stop_kind", "censoring", "limit_name", "scope", "applied_limit", "observed", "trial_id"],
+          "properties": {
+            "classification": {"const": "technical_incomplete"},
+            "quality_status": {"const": "unknown"},
+            "stop_kind": {"enum": ["budget_stopped", "censored"]},
+            "censoring": {"const": "right_censored"},
+            "limit_name": {"type": "string", "minLength": 1},
+            "scope": {"enum": ["attempt", "run"]},
+            "applied_limit": {"type": ["number", "string"]},
+            "observed": {"type": ["number", "string"]},
+            "trial_id": {"type": ["string", "null"]}
+          }
+        }
+      ]
+    },
     "artifacts": {
       "type": "object",
       "propertyNames": {"$ref": "#/$defs/path"},
@@ -181,6 +208,33 @@
       }
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "required": ["termination"],
+        "properties": {"termination": {"type": "object"}}
+      },
+      "then": {
+        "required": ["execution_safety"],
+        "properties": {
+          "status": {"const": "failed"},
+          "outcome": {"const": "technical_incomplete"},
+          "quality": {
+            "properties": {"status": {"const": "unknown"}}
+          },
+          "completion": {
+            "properties": {"technical_status": {"const": "incomplete"}}
+          },
+          "execution_safety": {
+            "allOf": [
+              {"$ref": "execution-safety-policy.schema.json"},
+              {"properties": {"status": {"const": "applied"}}}
+            ]
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "sha": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "env": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"},

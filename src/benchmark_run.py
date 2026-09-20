@@ -17,6 +17,7 @@ import subprocess
 import yaml
 
 from .contracts import validate
+from .execution_safety import safety_policy_record
 from .protection import digest
 from .provenance import ROOT
 from .screening_contract import load_screening_ledger, require_operational_screening
@@ -32,7 +33,11 @@ RUNTIME_FIELDS = (
     ("queue", "deployment_isolation_reference"),
     ("approval", "preregistered"),
     ("approval", "execution_authorized"),
+    ("approval", "cost_limits_approved"),
     ("approval", "reference"),
+    ("limits", "max_api_cost_usd_per_attempt"),
+    ("limits", "max_api_cost_usd_per_run"),
+    ("limits", "run_deadline_utc"),
 )
 
 
@@ -200,6 +205,8 @@ def _base_result(resolved: BenchmarkRequest, source_commit: str | None, started_
         "cost": {"status": "not_measured", "calculated_usd": None, "invoice_reconciled": None},
         "quality": {"status": "not_measured", "judge": None},
         "completion": {"technical_status": "not_run", "operator_status": "not_applicable"},
+        "execution_safety": safety_policy_record(ledger, applied=False),
+        "termination": None,
         "artifacts": {
             REFERENCE_LEDGER: resolved.reference_ledger_sha256,
             TASK_INDEX: resolved.task_index_sha256,
@@ -274,6 +281,11 @@ def _attempt_result(result: dict, directory: Path) -> None:
     metrics = classification.get("metrics") or {}
     quality = classification.get("result")
     complete = quality in QUALITY_RESULTS and attempt.get("evidence_disposition") == "quality_result_complete"
+    termination = classification.get("termination")
+    safety = classification.get("execution_safety") or {}
+    if isinstance(safety, dict) and isinstance(safety.get("policy"), dict):
+        result["execution_safety"] = safety["policy"]
+    result["termination"] = termination
 
     provider_tokens = metrics.get("provider_tokens") or {}
     unknown_usage = provider_tokens.get("unknown_usage_attempts")
@@ -312,7 +324,11 @@ def _attempt_result(result: dict, directory: Path) -> None:
         },
         completion={
             "technical_status": "complete" if complete else "incomplete",
-            "operator_status": "stopped" if summary.get("status") == "stopped" else "not_stopped",
+            "operator_status": (
+                "not_stopped" if termination is not None
+                else "stopped" if summary.get("status") == "stopped"
+                else "not_stopped"
+            ),
         },
         artifacts={
             **result["artifacts"],
@@ -326,7 +342,10 @@ def _attempt_result(result: dict, directory: Path) -> None:
         result["artifacts"]["provenance.json"] = digest(provenance_path.read_bytes())
     if not complete:
         result["error"] = {
-            "category": "single_task_incomplete",
+            "category": (
+                termination["stop_kind"] if isinstance(termination, dict)
+                else "single_task_incomplete"
+            ),
             "message": "The delegated run did not reach a verified quality result",
         }
 
@@ -383,6 +402,7 @@ def run_benchmark_request(request_path: Path, *, execute: bool = False) -> tuple
             if not os.environ.get(endpoint_env):
                 raise BenchmarkRunError(f"Set {endpoint_env} before --execute")
             ledger_path, ledger, ledger_sha256 = _operational_ledger(resolved)
+            result["execution_safety"] = safety_policy_record(ledger, applied=True)
             result["resolved_contract"]["execution_ledger_sha256"] = ledger_sha256
             payload = _invoke_screening([
                 str(ledger_path),

@@ -17,6 +17,13 @@ import urllib.parse
 import urllib.request
 
 from accounting import now, provider_tokens
+from .execution_safety import (
+    SafetyLimitReached,
+    effective_deadline_epoch,
+    progress_signal,
+    safety_failure,
+    safety_policy_record,
+)
 from .live_observations import POLICY, partition
 from .measurement import counts, token_count
 from .protection import FrozenRequestGuard, ProtectionViolation, canonical, digest, parse_request
@@ -210,13 +217,31 @@ class DeploymentQueue:
         self.file.flush()
         os.fsync(self.file.fileno())
 
-    def reserve(self, estimated_tokens: int, stopped: threading.Event) -> float:
+    def reserve(
+        self,
+        estimated_tokens: int,
+        stopped: threading.Event,
+        *,
+        deadline: float | None = None,
+        attempt_deadline: float | None = None,
+        trial_id: str | None = None,
+    ) -> float:
         if type(estimated_tokens) is not int or estimated_tokens < 1 or estimated_tokens > self.tpm:
             raise ValueError("Request token reservation exceeds the configured TPM; do not wait forever")
         started = self.clock()
         while True:
+            current = self.clock()
             if stopped.is_set():
                 raise ProtectionViolation("Run stopped while waiting")
+            if deadline is not None and current >= deadline:
+                raise SafetyLimitReached(
+                    "run_deadline_utc", "run", deadline, current, stop_kind="censored"
+                )
+            if attempt_deadline is not None and current >= attempt_deadline:
+                raise SafetyLimitReached(
+                    "max_wall_seconds_per_attempt", "attempt", attempt_deadline, current,
+                    trial_id=trial_id, stop_kind="censored",
+                )
             with self.lock:
                 fcntl.flock(self.file, fcntl.LOCK_EX)
                 try:
@@ -232,6 +257,15 @@ class DeploymentQueue:
                         return current - started
                 finally:
                     fcntl.flock(self.file, fcntl.LOCK_UN)
+            if deadline is not None and ready >= deadline:
+                raise SafetyLimitReached(
+                    "run_deadline_utc", "run", deadline, ready, stop_kind="censored"
+                )
+            if attempt_deadline is not None and ready >= attempt_deadline:
+                raise SafetyLimitReached(
+                    "max_wall_seconds_per_attempt", "attempt", attempt_deadline, ready,
+                    trial_id=trial_id, stop_kind="censored",
+                )
             stopped.wait(min(ready - current, 1.0))
 
     def cooldown(self, seconds: float):
@@ -251,7 +285,7 @@ class DeploymentQueue:
 
 
 class FoundrySender:
-    def __init__(self, endpoint: str, bearer):
+    def __init__(self, endpoint: str, bearer, *, timeout_seconds: int | None = None):
         parsed = urllib.parse.urlsplit(endpoint)
         if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
             raise ValueError("Foundry requires an explicit HTTPS base URL without credentials or query")
@@ -259,9 +293,13 @@ class FoundrySender:
             raise ValueError("Only the inspected Foundry OpenAI v1 base URL is supported")
         if not parsed.hostname.endswith((".openai.azure.com", ".services.ai.azure.com", ".cognitiveservices.azure.com")):
             raise ValueError("Credentials may only be sent to an explicit Azure Foundry host")
+        if timeout_seconds is not None and (type(timeout_seconds) is not int or timeout_seconds < 1):
+            raise ValueError("Provider HTTP timeout must be a positive integer")
         self.endpoint, self.bearer = endpoint.rstrip("/"), bearer
+        self.timeout_seconds = timeout_seconds
+        self.deadline = None
 
-    def __call__(self, body: bytes) -> tuple[int, bytes, dict]:
+    def __call__(self, body: bytes, *, deadline: float | None = None) -> tuple[int, bytes, dict]:
         class NoRedirect(urllib.request.HTTPRedirectHandler):
             def redirect_request(self, *arguments, **keywords):
                 raise ValueError("Provider redirects are not allowed")
@@ -270,11 +308,50 @@ class FoundrySender:
             "Authorization": "Bearer " + self.bearer(), "Content-Type": "application/json",
         })
         opener = urllib.request.build_opener(NoRedirect())
+        timeout = self.timeout_seconds
+        timeout_limit = (
+            None if timeout is None else
+            ("provider_http_timeout_seconds", "attempt", timeout)
+        )
+        effective_deadline = min(
+            value for value in (self.deadline, deadline) if value is not None
+        ) if self.deadline is not None or deadline is not None else None
+        if effective_deadline is not None:
+            remaining = effective_deadline - time.time()
+            if remaining <= 0:
+                run_wide = self.deadline is not None and effective_deadline == self.deadline
+                raise SafetyLimitReached(
+                    "run_deadline_utc" if run_wide else "max_wall_seconds_per_attempt",
+                    "run" if run_wide else "attempt", effective_deadline, time.time(),
+                    stop_kind="censored",
+                )
+            if timeout is None or remaining <= timeout:
+                timeout = remaining
+                run_wide = self.deadline is not None and effective_deadline == self.deadline
+                timeout_limit = (
+                    "run_deadline_utc" if run_wide else "max_wall_seconds_per_attempt",
+                    "run" if run_wide else "attempt",
+                    effective_deadline,
+                )
+        started = time.monotonic()
         try:
-            with opener.open(request) as response:
+            with opener.open(request, timeout=timeout) as response:
                 return response.status, response.read(), dict(response.headers)
         except urllib.error.HTTPError as error:
             return error.code, error.read(), dict(error.headers)
+        except (TimeoutError, urllib.error.URLError) as error:
+            timed_out = isinstance(error, TimeoutError) or isinstance(error.reason, TimeoutError)
+            if not timed_out or timeout_limit is None:
+                raise
+            limit_name, scope, applied_limit = timeout_limit
+            observed = time.time() if limit_name == "run_deadline_utc" else time.monotonic() - started
+            raise SafetyLimitReached(
+                limit_name,
+                scope,
+                applied_limit,
+                observed,
+                stop_kind="censored",
+            ) from error
 
 
 class ManagedIdentity:
@@ -289,7 +366,7 @@ class ManagedIdentity:
                 request = urllib.request.Request("http://169.254.169.254/metadata/identity/oauth2/token?" + query,
                                                  headers={"Metadata": "true"})
                 opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-                with opener.open(request) as response:
+                with opener.open(request, timeout=15) as response:
                     token = json.load(response)
                 self.token, self.expires = token["access_token"], int(token["expires_on"])
         return self.token
@@ -314,6 +391,22 @@ class LiveRecorder:
         self.trials = {}
         self.sequence = 0
         self.known_provider_cost_usd = 0.0
+        self.unconfirmed_provider_exposure_usd = 0.0
+        self.pending_provider_exposure_usd = 0.0
+        self.safety_policy = None
+        self.safety_applied = False
+        self.deadline = None
+        if ledger.get("schema_version") == 4:
+            self.safety_applied = (
+                ledger["limits"]["max_api_cost_usd_per_attempt"] > 0
+                and ledger["limits"]["max_api_cost_usd_per_run"] > 0
+                and bool(ledger["limits"]["run_deadline_utc"])
+            )
+            self.safety_policy = safety_policy_record(ledger, applied=self.safety_applied)
+            if self.safety_applied:
+                self.deadline = effective_deadline_epoch(self.safety_policy)
+                if hasattr(self.sender, "deadline"):
+                    self.sender.deadline = self.deadline
         self.serialize = canonical
 
     def event(self, payload):
@@ -332,7 +425,53 @@ class LiveRecorder:
             self.trials[trial_id] = {
                 "task": task, "repetition": repetition, "calls": 0,
                 "assistant_hashes": set(), "closed": False, "failure": None,
+                "provider_http_attempts": 0, "pending_http_attempts": 0,
+                "known_provider_cost_usd": 0.0,
+                "unconfirmed_provider_exposure_usd": 0.0,
+                "pending_provider_exposure_usd": 0.0,
+                "pending_dispatches": {},
+                "progress_signals": deque(),
+                "last_request": None, "last_response": None,
+                "started_at": now(), "started_monotonic": time.monotonic(),
             }
+
+    def initialize_run_cost_exposure(
+        self,
+        *,
+        known_cost_usd: float,
+        unconfirmed_exposure_usd: float,
+        unknown_without_estimate: int = 0,
+    ) -> None:
+        if not self.safety_applied:
+            return
+        values = (known_cost_usd, unconfirmed_exposure_usd)
+        if any(
+            type(value) not in (int, float)
+            or isinstance(value, bool)
+            or not math.isfinite(value)
+            or value < 0
+            for value in values
+        ):
+            raise ValueError("Prior provider cost exposure must be finite and nonnegative")
+        if type(unknown_without_estimate) is not int or unknown_without_estimate < 0:
+            raise ValueError("Prior unknown provider request count is invalid")
+        if unknown_without_estimate:
+            raise ValueError("Cannot resume paid execution with unbounded prior provider exposure")
+        with self.lock:
+            if self.trials or any((
+                self.known_provider_cost_usd,
+                self.unconfirmed_provider_exposure_usd,
+                self.pending_provider_exposure_usd,
+            )):
+                raise ValueError("Run cost exposure must be initialized before registering attempts")
+            self.known_provider_cost_usd = float(known_cost_usd)
+            self.unconfirmed_provider_exposure_usd = float(unconfirmed_exposure_usd)
+            total = self.known_provider_cost_usd + self.unconfirmed_provider_exposure_usd
+            if total > self.ledger["limits"]["max_api_cost_usd_per_run"]:
+                raise SafetyLimitReached(
+                    "max_api_cost_usd_per_run", "run",
+                    self.ledger["limits"]["max_api_cost_usd_per_run"], total,
+                )
 
     def close_trial(self, trial_id: str):
         with self.lock:
@@ -345,6 +484,50 @@ class LiveRecorder:
             if self.failure is None:
                 self.failure = {"reason": reason, "details": details or {}}
                 self.event({"event": "run_stopped", **self.failure})
+
+    def stop_trial(self, trial_id: str, reason: str, details=None) -> None:
+        with self.lock:
+            trial = self.trials.get(trial_id)
+            if trial is not None and trial["failure"] is None:
+                trial["failure"] = {"reason": reason, "details": details or {}}
+                self.event({"event": "trial_stopped", "trial_id": trial_id, **trial["failure"]})
+
+    def record_safety_stop(self, trial_id: str, error: SafetyLimitReached) -> None:
+        self._bind_safety_error(trial_id, error)
+        self.stop_trial(trial_id, type(error).__name__, error.details)
+        if error.run_wide:
+            self.stop(type(error).__name__, error.details)
+
+    def _bind_safety_error(self, trial_id: str, error: SafetyLimitReached) -> None:
+        if error.details["trial_id"] is None:
+            error.details["trial_id"] = trial_id
+        if error.details["limit_name"] == "max_wall_seconds_per_attempt":
+            with self.lock:
+                elapsed = time.monotonic() - self.trials[trial_id]["started_monotonic"]
+            error.details["applied_limit"] = self.ledger["limits"]["max_wall_seconds_per_attempt"]
+            error.details["observed"] = elapsed
+
+    def safety_snapshot(self, trial_id: str) -> dict | None:
+        if self.safety_policy is None:
+            return None
+        with self.lock:
+            trial = self.trials[trial_id]
+            termination = trial["failure"]
+            if termination is None and safety_failure(self.failure) is not None:
+                termination = self.failure
+            return {
+                "policy": self.safety_policy,
+                "provider_http_attempts": trial["provider_http_attempts"],
+                "confirmed_api_calculated_cost_usd": trial["known_provider_cost_usd"],
+                "unconfirmed_api_cost_exposure_usd": trial["unconfirmed_provider_exposure_usd"],
+                "pending_api_cost_exposure_usd": trial["pending_provider_exposure_usd"],
+                "run_confirmed_api_calculated_cost_usd": self.known_provider_cost_usd,
+                "run_unconfirmed_api_cost_exposure_usd": self.unconfirmed_provider_exposure_usd,
+                "run_pending_api_cost_exposure_usd": self.pending_provider_exposure_usd,
+                "last_request": trial["last_request"],
+                "last_response": trial["last_response"],
+                "termination": termination,
+            }
 
     def record_delivery_failure(self, trial_id: str, error: OSError) -> None:
         failure = {
@@ -366,9 +549,44 @@ class LiveRecorder:
     def check(self):
         if self.stopped.is_set():
             raise ProtectionViolation("All subsequent requests are blocked", self.failure)
+        if self.safety_applied and self.deadline is not None and time.time() >= self.deadline:
+            raise SafetyLimitReached(
+                "run_deadline_utc", "run", self.deadline, time.time(), stop_kind="censored"
+            )
+
+    def check_trial(self, trial_id: str) -> None:
+        try:
+            self.check()
+        except SafetyLimitReached as error:
+            self._bind_safety_error(trial_id, error)
+            raise
+        if not self.safety_applied:
+            return
+        with self.lock:
+            trial = self.trials[trial_id]
+            if trial["failure"] is not None:
+                raise TrialRequestBlocked(trial_id, trial["failure"])
+            elapsed = time.monotonic() - trial["started_monotonic"]
+            limit = self.ledger["limits"]["max_wall_seconds_per_attempt"]
+            if elapsed >= limit:
+                raise SafetyLimitReached(
+                    "max_wall_seconds_per_attempt", "attempt", limit, elapsed,
+                    trial_id=trial_id, stop_kind="censored",
+                )
+
+    def attempt_deadline_epoch(self, trial_id: str) -> float | None:
+        if not self.safety_applied:
+            return None
+        with self.lock:
+            trial = self.trials[trial_id]
+            elapsed = time.monotonic() - trial["started_monotonic"]
+            remaining = self.ledger["limits"]["max_wall_seconds_per_attempt"] - elapsed
+        return time.time() + max(0.0, remaining)
 
     def request_contract(self, payload):
         required = {"model", "temperature", "reasoning_effort", "messages"}
+        if self.safety_applied:
+            required.add("max_completion_tokens")
         if not required <= payload.keys() or payload.keys() - required - {"stream"}:
             raise ProtectionViolation("Unexpected or missing live request fields")
         expected = self.ledger["model"]
@@ -376,6 +594,8 @@ class LiveRecorder:
             value = expected["name"] if key == "model" else expected[key]
             if type(payload[key]) is bool or payload[key] != value:
                 raise ProtectionViolation("Actual model settings differ from the ledger", {"field": key})
+        if self.safety_applied and payload["max_completion_tokens"] != self.ledger["limits"]["max_output_tokens"]:
+            raise ProtectionViolation("Actual output token cap differs from the ledger", {"field": "max_completion_tokens"})
         if payload.get("stream", False) is not False:
             raise ProtectionViolation("Only nonstreaming completions are supported")
         if not isinstance(payload["messages"], list) or not payload["messages"]:
@@ -384,27 +604,216 @@ class LiveRecorder:
             if not isinstance(message, dict) or set(message) != {"role", "content"} or message["role"] not in ("user", "assistant", "system") or not isinstance(message["content"], str):
                 raise ProtectionViolation("Unexpected live message structure")
 
+    def _record_progress(self, trial_id: str, payload: dict) -> None:
+        if not self.safety_applied:
+            return
+        signal = progress_signal(payload)
+        limits = self.ledger["limits"]
+        with self.lock:
+            trial = self.trials[trial_id]
+            signals = trial["progress_signals"]
+            signals.append(signal)
+            while len(signals) > limits["no_progress_window_calls"]:
+                signals.popleft()
+            distinct = len(set(signals))
+            self.event({
+                "event": "progress_window_observed", "trial_id": trial_id,
+                "window_size": len(signals), "distinct_signals": distinct,
+                "latest_signal_sha256": signal,
+            })
+            if (
+                len(signals) == limits["no_progress_window_calls"]
+                and distinct < limits["no_progress_minimum_distinct_signals"]
+            ):
+                raise SafetyLimitReached(
+                    "no_progress_window",
+                    "attempt",
+                    limits["no_progress_minimum_distinct_signals"],
+                    distinct,
+                    trial_id=trial_id,
+                    stop_kind="censored",
+                )
+
+    def _reserve_dispatch(
+        self,
+        trial_id: str,
+        request_number: int,
+        http_attempt: int,
+        reservation_usd: float,
+        request_sha256: str,
+        request_bytes: int,
+    ) -> tuple[int, int]:
+        if not self.safety_applied:
+            return request_number, http_attempt
+        self.check_trial(trial_id)
+        limits = self.ledger["limits"]
+        with self.lock:
+            self.check()
+            trial = self.trials[trial_id]
+            attempted = trial["provider_http_attempts"] + trial["pending_http_attempts"]
+            if attempted >= limits["max_provider_calls_per_attempt"]:
+                raise SafetyLimitReached(
+                    "max_provider_calls_per_attempt", "attempt",
+                    limits["max_provider_calls_per_attempt"], attempted + 1,
+                    trial_id=trial_id,
+                )
+            attempt_exposure = (
+                trial["known_provider_cost_usd"]
+                + trial["unconfirmed_provider_exposure_usd"]
+                + trial["pending_provider_exposure_usd"]
+            )
+            run_exposure = (
+                self.known_provider_cost_usd
+                + self.unconfirmed_provider_exposure_usd
+                + self.pending_provider_exposure_usd
+            )
+            if attempt_exposure + reservation_usd > limits["max_api_cost_usd_per_attempt"]:
+                raise SafetyLimitReached(
+                    "max_api_cost_usd_per_attempt", "attempt",
+                    limits["max_api_cost_usd_per_attempt"], attempt_exposure + reservation_usd,
+                    trial_id=trial_id,
+                )
+            if run_exposure + reservation_usd > limits["max_api_cost_usd_per_run"]:
+                raise SafetyLimitReached(
+                    "max_api_cost_usd_per_run", "run",
+                    limits["max_api_cost_usd_per_run"], run_exposure + reservation_usd,
+                    trial_id=trial_id,
+                )
+            key = (request_number, http_attempt)
+            trial["pending_dispatches"][key] = reservation_usd
+            trial["pending_http_attempts"] += 1
+            trial["pending_provider_exposure_usd"] += reservation_usd
+            self.pending_provider_exposure_usd += reservation_usd
+            trial["last_request"] = {
+                "logical_request": request_number,
+                "http_attempt": http_attempt,
+                "request_sha256": request_sha256,
+                "request_bytes": request_bytes,
+                "usage_status": "not_returned",
+            }
+            return key
+
+    def _cancel_dispatch_reservation(self, trial_id: str, key: tuple[int, int]) -> None:
+        if not self.safety_applied:
+            return
+        with self.lock:
+            trial = self.trials[trial_id]
+            reservation = trial["pending_dispatches"].pop(key)
+            trial["pending_http_attempts"] -= 1
+            trial["pending_provider_exposure_usd"] -= reservation
+            self.pending_provider_exposure_usd -= reservation
+
+    def _mark_dispatch_started(self, trial_id: str, key: tuple[int, int]) -> None:
+        if not self.safety_applied:
+            return
+        with self.lock:
+            trial = self.trials[trial_id]
+            trial["pending_http_attempts"] -= 1
+            trial["provider_http_attempts"] += 1
+
+    def _settle_dispatch(
+        self,
+        trial_id: str,
+        key: tuple[int, int],
+        *,
+        known_cost_usd: float | None,
+        unconfirmed_exposure_usd: float | None,
+        response: dict,
+    ) -> None:
+        if not self.safety_applied:
+            if known_cost_usd is not None:
+                with self.lock:
+                    self.known_provider_cost_usd += known_cost_usd
+            return
+        with self.lock:
+            trial = self.trials[trial_id]
+            reservation = trial["pending_dispatches"].pop(key)
+            trial["pending_provider_exposure_usd"] -= reservation
+            self.pending_provider_exposure_usd -= reservation
+            if known_cost_usd is not None:
+                trial["known_provider_cost_usd"] += known_cost_usd
+                self.known_provider_cost_usd += known_cost_usd
+            else:
+                exposure = reservation if unconfirmed_exposure_usd is None else unconfirmed_exposure_usd
+                trial["unconfirmed_provider_exposure_usd"] += exposure
+                self.unconfirmed_provider_exposure_usd += exposure
+            trial["last_response"] = response
+            if trial["last_request"] is not None:
+                trial["last_request"]["usage_status"] = response.get("usage_status", "unknown")
+
+    def _check_settled_cost_limits(self, trial_id: str) -> None:
+        if not self.safety_applied:
+            return
+        limits = self.ledger["limits"]
+        with self.lock:
+            trial = self.trials[trial_id]
+            attempt_exposure = (
+                trial["known_provider_cost_usd"]
+                + trial["unconfirmed_provider_exposure_usd"]
+                + trial["pending_provider_exposure_usd"]
+            )
+            run_exposure = (
+                self.known_provider_cost_usd
+                + self.unconfirmed_provider_exposure_usd
+                + self.pending_provider_exposure_usd
+            )
+        if attempt_exposure > limits["max_api_cost_usd_per_attempt"]:
+            raise SafetyLimitReached(
+                "max_api_cost_usd_per_attempt", "attempt",
+                limits["max_api_cost_usd_per_attempt"], attempt_exposure,
+                trial_id=trial_id,
+            )
+        if run_exposure > limits["max_api_cost_usd_per_run"]:
+            raise SafetyLimitReached(
+                "max_api_cost_usd_per_run", "run",
+                limits["max_api_cost_usd_per_run"], run_exposure,
+                trial_id=trial_id,
+            )
+
+    def reject_request_size(self, trial_id: str, observed: int) -> SafetyLimitReached:
+        with self.lock:
+            trial = self.trials[trial_id]
+            trial["last_request"] = {
+                "logical_request": None,
+                "http_attempt": None,
+                "request_sha256": None,
+                "request_bytes": observed,
+                "usage_status": "not_dispatched",
+            }
+        error = SafetyLimitReached(
+            "max_request_bytes", "attempt", self.ledger["limits"]["max_request_bytes"], observed,
+            trial_id=trial_id, stop_kind="censored",
+        )
+        self.record_safety_stop(trial_id, error)
+        return error
+
     def complete(self, trial_id: str, source: bytes) -> tuple[int, bytes]:
         try:
             self.check()
             return self._complete(trial_id, source)
         except Exception as error:
+            if isinstance(error, SafetyLimitReached):
+                self.record_safety_stop(trial_id, error)
             details = getattr(error, "details", {"message": str(error)})
-            run_wide = self.request_error_scope == "run" or isinstance(error, ProtectionViolation) or str(error) in {
+            run_wide = (
+                error.run_wide if isinstance(error, SafetyLimitReached)
+                else self.request_error_scope == "run" or isinstance(error, ProtectionViolation) or str(error) in {
                 "Provider total tokens disagree with input plus output",
                 "Provider-reported model revision differs from the ledger",
-            }
-            if run_wide:
-                self.stop(type(error).__name__, details)
-            else:
-                with self.lock:
-                    trial = self.trials.get(trial_id)
-                    if trial is not None and trial["failure"] is None:
-                        trial["failure"] = {"reason": type(error).__name__, "details": details}
-                        self.event({
-                            "event": "trial_request_failed", "trial_id": trial_id,
-                            **trial["failure"],
-                        })
+                }
+            )
+            if not isinstance(error, SafetyLimitReached):
+                if run_wide:
+                    self.stop(type(error).__name__, details)
+                else:
+                    with self.lock:
+                        trial = self.trials.get(trial_id)
+                        if trial is not None and trial["failure"] is None:
+                            trial["failure"] = {"reason": type(error).__name__, "details": details}
+                            self.event({
+                                "event": "trial_request_failed", "trial_id": trial_id,
+                                **trial["failure"],
+                            })
             raise
 
     def _complete(self, trial_id: str, source: bytes) -> tuple[int, bytes]:
@@ -416,12 +825,32 @@ class LiveRecorder:
                 raise ProtectionViolation("A finished trial cannot issue another request")
             if trial["failure"] is not None:
                 raise TrialRequestBlocked(trial_id, trial["failure"])
+            if self.safety_applied and len(source) > limits["max_request_bytes"]:
+                trial["last_request"] = {
+                    "logical_request": None,
+                    "http_attempt": None,
+                    "request_sha256": digest(source),
+                    "request_bytes": len(source),
+                    "usage_status": "not_dispatched",
+                }
+                raise SafetyLimitReached(
+                    "max_request_bytes", "attempt", limits["max_request_bytes"], len(source),
+                    trial_id=trial_id, stop_kind="censored",
+                )
             self.sequence += 1
             request_number = self.sequence
             trial["calls"] += 1
             task = trial["task"]
             repetition = trial["repetition"]
             assistant_hashes = set(trial["assistant_hashes"])
+            if self.safety_applied:
+                trial["last_request"] = {
+                    "logical_request": request_number,
+                    "http_attempt": None,
+                    "request_sha256": digest(source),
+                    "request_bytes": len(source),
+                    "usage_status": "not_dispatched",
+                }
         self.event({"event": "call_received", "trial_id": trial_id, "request": request_number,
                     "task": task, "repetition": repetition, "request_sha256": digest(source)})
         directory = self.directory / f"request-{request_number:05d}"
@@ -429,6 +858,7 @@ class LiveRecorder:
         (directory / "before.json").write_bytes(source)
         payload = parse_request(source)
         self.request_contract(payload)
+        self._record_progress(trial_id, payload)
         segments = partition(payload, assistant_hashes)
         write_json(directory / "manifest.json", {"source_sha256": digest(source), "segments": segments,
                                                 "classification_policy": POLICY, "trial_id": trial_id})
@@ -479,6 +909,19 @@ class LiveRecorder:
         observation_fields = {} if request_observation is None else {"cache_reuse": request_observation}
         (directory / "after.json").write_bytes(outgoing)
         proof = guard.verify_serialized(outgoing)
+        if self.safety_applied and len(outgoing) > limits["max_request_bytes"]:
+            with self.lock:
+                trial["last_request"] = {
+                    "logical_request": request_number,
+                    "http_attempt": None,
+                    "request_sha256": digest(outgoing),
+                    "request_bytes": len(outgoing),
+                    "usage_status": "not_dispatched",
+                }
+            raise SafetyLimitReached(
+                "max_request_bytes", "attempt", limits["max_request_bytes"], len(outgoing),
+                trial_id=trial_id, stop_kind="censored",
+            )
         input_measurement = {
             "kind": "calculated", "before": counts(payload, originals, self.encoder),
             "after": counts(transformed, [result.text for result in compressed], self.encoder),
@@ -502,24 +945,55 @@ class LiveRecorder:
                 })
         local_input_tokens = token_count(outgoing.decode(), self.encoder)
         input_cost_estimate = local_input_tokens * prices["input_per_million_usd"] / 1_000_000
-        rate_estimate = max(1, local_input_tokens)
+        if self.safety_applied:
+            output_cap = limits["max_output_tokens"]
+            reserved_input_tokens = local_input_tokens + limits["protocol_token_allowance"]
+            reservation = (
+                reserved_input_tokens * prices["input_per_million_usd"]
+                + output_cap * prices["output_per_million_usd"]
+            ) / 1_000_000
+            rate_estimate = max(1, reserved_input_tokens + output_cap)
+        else:
+            reservation = None
+            rate_estimate = max(1, local_input_tokens)
         for attempt in range(1, limits["transient_http_attempts"] + 1):
+            request_sha256 = digest(outgoing)
+            dispatch_key = self._reserve_dispatch(
+                trial_id, request_number, attempt, reservation or 0.0, request_sha256,
+                len(outgoing),
+            )
             try:
-                waited = self.queue.reserve(rate_estimate, self.stopped)
+                waited = self.queue.reserve(
+                    rate_estimate,
+                    self.stopped,
+                    deadline=self.deadline,
+                    attempt_deadline=self.attempt_deadline_epoch(trial_id),
+                    trial_id=trial_id,
+                )
                 guard.verify_serialized(outgoing)
-                self.check()
+                self.check_trial(trial_id)
             except Exception:
+                self._cancel_dispatch_reservation(trial_id, dispatch_key)
                 raise
+            self._mark_dispatch_started(trial_id, dispatch_key)
             self.event({"event": "attempt_started", "trial_id": trial_id, "request": request_number,
-                        "attempt": attempt, "request_sha256": digest(outgoing),
+                        "attempt": attempt, "request_sha256": request_sha256,
                         "local_input_tokens": input_measurement["after"]["message_content_tokens"],
                         "queue_wait_seconds": waited, "rate_reservation_tokens": rate_estimate,
                         "input_cost_estimate_usd": input_cost_estimate,
                         "input_cost_estimate_is_total_cost_bound": False,
+                        **({"budget_reservation_usd": reservation,
+                            "reservation_is_provider_guarantee": False}
+                           if reservation is not None else {}),
                         **observation_fields})
             started = time.monotonic()
             try:
-                status, raw, headers = self.sender(outgoing)
+                if isinstance(self.sender, FoundrySender):
+                    status, raw, headers = self.sender(
+                        outgoing, deadline=self.attempt_deadline_epoch(trial_id)
+                    )
+                else:
+                    status, raw, headers = self.sender(outgoing)
             except Exception as error:
                 elapsed = time.monotonic() - started
                 self.event({"event": "http", "trial_id": trial_id, "request": request_number,
@@ -527,6 +1001,11 @@ class LiveRecorder:
                             "calculated_cost_usd": None, "error_type": type(error).__name__,
                             "elapsed_seconds": elapsed, **provider_timing(None, elapsed),
                             "billing_unknown": True, **observation_fields})
+                self._settle_dispatch(
+                    trial_id, dispatch_key, known_cost_usd=None,
+                    unconfirmed_exposure_usd=reservation,
+                    response={"http_status": None, "response_sha256": None, "usage_status": "unknown"},
+                )
                 raise
             elapsed = time.monotonic() - started
             (directory / f"response-{attempt:02d}.json").write_bytes(raw)
@@ -540,38 +1019,71 @@ class LiveRecorder:
                 try:
                     response = parse_request(raw)
                 except (ValueError, UnicodeError, TypeError):
-                    self.event({**record, "error_type": "MalformedProviderResponse"})
+                    self.event({**record, "error_type": "MalformedProviderResponse", "billing_unknown": True})
+                    self._settle_dispatch(
+                        trial_id, dispatch_key, known_cost_usd=None,
+                        unconfirmed_exposure_usd=reservation,
+                        response={
+                            "http_status": status, "response_sha256": digest(raw),
+                            "usage_status": "unknown",
+                        },
+                    )
                     raise ValueError("Provider response is not unambiguous JSON") from None
                 tokens = provider_tokens(response)
                 record.update(provider_timing(response, elapsed))
                 if tokens is None:
                     self.event(record)
+                    self._settle_dispatch(
+                        trial_id, dispatch_key, known_cost_usd=None,
+                        unconfirmed_exposure_usd=reservation,
+                        response={"http_status": status, "response_sha256": digest(raw), "usage_status": "unknown"},
+                    )
                     raise ValueError("Successful response lacks valid provider usage; actual cost remains unknown")
-                choices = response.get("choices")
-                if not isinstance(choices, list) or len(choices) != 1:
-                    self.event({**record, "provider_usage": response.get("usage"), "tokens": tokens})
-                    raise ValueError("Expected one textual assistant response")
-                choice = choices[0]
-                message = choice.get("message") if isinstance(choice, dict) else None
-                content = message.get("content") if isinstance(message, dict) else None
-                if not isinstance(content, str) or message.get("role") != "assistant":
-                    self.event({**record, "provider_usage": response.get("usage"), "tokens": tokens})
-                    raise ValueError("Unexpected nontext assistant output")
                 cached = tokens["cached_input_tokens"]
                 upper_cost = (tokens["input_tokens"] * prices["input_per_million_usd"] + tokens["output_tokens"] * prices["output_per_million_usd"]) / 1_000_000
                 exact_cost = None if cached is None else upper_cost - cached * (prices["input_per_million_usd"] - prices["cached_input_per_million_usd"]) / 1_000_000
+                choices = response.get("choices")
+                choice = choices[0] if isinstance(choices, list) and len(choices) == 1 else None
+                message = choice.get("message") if isinstance(choice, dict) else None
+                content = message.get("content") if isinstance(message, dict) else None
+                valid_content = isinstance(content, str) and message.get("role") == "assistant"
                 record.update(provider_usage=response["usage"], provider_reported_model=response.get("model"),
                               provider_response_id=response.get("id"), tokens=tokens,
                               provider_fingerprint=response.get("system_fingerprint"),
-                              finish_reason=choices[0].get("finish_reason"), calculated_cost_usd=exact_cost,
+                              finish_reason=None if choice is None else choice.get("finish_reason"),
+                              calculated_cost_usd=exact_cost,
                               uncached_cost_ceiling_usd=upper_cost,
-                              cost_basis="provider_usage_times_ledger_rates_not_invoice",
-                              local_output={"content_utf8_bytes": len(content.encode()),
-                                            "content_tokens": token_count(content, self.encoder), "tokenizer": "o200k_base"})
+                              cost_basis="provider_usage_times_ledger_rates_not_invoice")
+                if valid_content:
+                    record["local_output"] = {
+                        "content_utf8_bytes": len(content.encode()),
+                        "content_tokens": token_count(content, self.encoder),
+                        "tokenizer": "o200k_base",
+                    }
+                elif choice is None:
+                    record["error_type"] = "UnexpectedChoiceCount"
+                else:
+                    record["error_type"] = "UnexpectedAssistantOutput"
                 self.event(record)
-                with self.lock:
-                    if exact_cost is not None:
-                        self.known_provider_cost_usd += exact_cost
+                self._settle_dispatch(
+                    trial_id, dispatch_key, known_cost_usd=exact_cost,
+                    unconfirmed_exposure_usd=upper_cost if exact_cost is None else None,
+                    response={
+                        "http_status": status, "response_sha256": digest(raw),
+                        "usage_status": "measured" if exact_cost is not None else "requires_review",
+                        "provider_usage_present": True,
+                    },
+                )
+                if self.safety_applied and tokens["output_tokens"] > limits["max_output_tokens"]:
+                    raise SafetyLimitReached(
+                        "max_output_tokens", "attempt", limits["max_output_tokens"],
+                        tokens["output_tokens"], trial_id=trial_id, stop_kind="censored",
+                    )
+                self._check_settled_cost_limits(trial_id)
+                if choice is None:
+                    raise ValueError("Expected one textual assistant response")
+                if not valid_content:
+                    raise ValueError("Unexpected nontext assistant output")
                 if response["usage"].get("total_tokens", tokens["input_tokens"] + tokens["output_tokens"]) != tokens["input_tokens"] + tokens["output_tokens"]:
                     raise ValueError("Provider total tokens disagree with input plus output")
                 expected_model = self.ledger["model"]["reported_model"]
@@ -581,13 +1093,24 @@ class LiveRecorder:
                     self.check()
                     trial["assistant_hashes"].add(digest(content.encode()))
                 return status, raw
-            self.event(record)
+            self.event({**record, "billing_unknown": True})
+            self._settle_dispatch(
+                trial_id, dispatch_key, known_cost_usd=None,
+                unconfirmed_exposure_usd=reservation,
+                response={"http_status": status, "response_sha256": digest(raw), "usage_status": "unknown"},
+            )
             if status == 429:
                 if attempt < limits["transient_http_attempts"]:
                     normalized = {key.lower(): value for key, value in headers.items()}
                     wait = float(normalized.get("retry-after", "60"))
                     if not math.isfinite(wait) or wait < 0:
                         raise ValueError("Retry-After is invalid")
+                    if self.safety_applied and wait > limits["max_retry_wait_seconds"]:
+                        raise SafetyLimitReached(
+                            "max_retry_wait_seconds", "attempt",
+                            limits["max_retry_wait_seconds"], wait,
+                            trial_id=trial_id, stop_kind="censored",
+                        )
                     self.queue.cooldown(wait)
                     continue
             raise ValueError(f"Provider HTTP {status}; no outer retry budget restart")
@@ -596,6 +1119,11 @@ class LiveRecorder:
 
 def start_live_proxy(recorder: LiveRecorder, key: str) -> ThreadingHTTPServer:
     class Handler(BaseHTTPRequestHandler):
+        def setup(self):
+            super().setup()
+            if recorder.safety_applied:
+                self.connection.settimeout(min(30, recorder.ledger["limits"]["provider_http_timeout_seconds"]))
+
         def log_message(self, *arguments):
             return
 
@@ -613,17 +1141,27 @@ def start_live_proxy(recorder: LiveRecorder, key: str) -> ThreadingHTTPServer:
                 length = int(self.headers.get("Content-Length", "0"))
                 if length < 1:
                     raise ValueError("Invalid request length")
+                if recorder.safety_applied and length > recorder.ledger["limits"]["max_request_bytes"]:
+                    raise recorder.reject_request_size(match[1], length)
                 source = self.rfile.read(length)
                 if len(source) != length:
                     raise ValueError("Incomplete request")
             except Exception as error:
-                with recorder.lock:
-                    recorder.stop(type(error).__name__, getattr(error, "details", {"message": str(error)}))
+                if not isinstance(error, SafetyLimitReached):
+                    with recorder.lock:
+                        recorder.stop(type(error).__name__, getattr(error, "details", {"message": str(error)}))
                 source = b""
             try:
                 status, body = recorder.complete(match[1], source)
             except Exception:
-                status, body = 503, b'{"error":{"type":"run_stopped","message":"See private run diagnostics; later requests are blocked"}}'
+                with recorder.lock:
+                    trial = recorder.trials.get(match[1])
+                    failure = None if trial is None else trial.get("failure")
+                if failure is not None and failure.get("reason") == "SafetyLimitReached":
+                    status = 409
+                    body = b'{"error":{"type":"safety_limit_reached","message":"See private run diagnostics; this attempt is technically incomplete"}}'
+                else:
+                    status, body = 503, b'{"error":{"type":"run_stopped","message":"See private run diagnostics; later requests are blocked"}}'
             try:
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")

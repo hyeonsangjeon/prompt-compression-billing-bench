@@ -3,9 +3,10 @@
 - [`static.toml`](static.toml)은 고정 입력 정적 측정의 원장이다.
 - [`demo.toml`](demo.toml)은 합성 자료로 계약을 확인하는 예제 원장이다.
 - [`native.template.toml`](native.template.toml)은 실제 모델 실행 전 채워야 하는
-  native 원장 템플릿이다.
+  native 원장 템플릿이다. schema version 4의 고정 안전 상한과 비어 있는 비용
+  승인·UTC deadline을 분리한다.
 - [`screening.template.toml`](screening.template.toml)은 Terminal-Bench 2.1
-  선별 규칙과 중단·비용 기록 필드를 고정한다.
+  선별 규칙과 schema version 4의 종료·비용 기록 필드를 고정한다.
 - [`recovery.template.toml`](recovery.template.toml)은 외부 노출을 끈 상태로
   로컬 squeez 원문 회수·수명·인증 경계를 고정한 비운영 템플릿이다.
 - [`accountless-native.json`](accountless-native.json)은 공개 GSM8K 한 항목,

@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Provider execution safety policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "policy_revision", "status", "limits", "no_progress", "cost_accounting", "natural_termination", "stop_classification"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "kind": {"const": "provider_execution_safety_policy"},
+    "policy_revision": {"const": 1},
+    "status": {"enum": ["template_unapproved", "applied"]},
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider_http_attempts_per_attempt", "api_calculated_cost_usd_per_attempt", "api_calculated_cost_usd_per_run", "attempt_wall_seconds", "run_deadline_utc", "request_bytes", "output_tokens", "protocol_token_allowance", "provider_http_timeout_seconds", "maximum_retry_wait_seconds", "transient_http_attempts"],
+      "properties": {
+        "provider_http_attempts_per_attempt": {"type": "integer", "minimum": 1},
+        "api_calculated_cost_usd_per_attempt": {"type": ["number", "null"], "exclusiveMinimum": 0},
+        "api_calculated_cost_usd_per_run": {"type": ["number", "null"], "exclusiveMinimum": 0},
+        "attempt_wall_seconds": {"type": "integer", "minimum": 1},
+        "run_deadline_utc": {"type": ["string", "null"], "format": "date-time"},
+        "request_bytes": {"type": "integer", "minimum": 1},
+        "output_tokens": {"type": "integer", "minimum": 1},
+        "protocol_token_allowance": {"type": "integer", "minimum": 0},
+        "provider_http_timeout_seconds": {"type": "integer", "minimum": 1},
+        "maximum_retry_wait_seconds": {"type": "integer", "minimum": 0},
+        "transient_http_attempts": {"type": "integer", "minimum": 1}
+      }
+    },
+    "no_progress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["window_logical_requests", "minimum_distinct_signals", "signal", "missing_signal"],
+      "properties": {
+        "window_logical_requests": {"type": "integer", "minimum": 2},
+        "minimum_distinct_signals": {"type": "integer", "minimum": 2},
+        "signal": {"const": "latest_assistant_command_plan_and_following_user_observation_sha256"},
+        "missing_signal": {"const": "fixed_missing_signal_marker"}
+      }
+    },
+    "cost_accounting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["basis", "pre_dispatch_reservation", "unknown_cost"],
+      "properties": {
+        "basis": {"const": "provider_usage_times_ledger_rates_not_invoice"},
+        "pre_dispatch_reservation": {"const": "uncached_input_plus_output_cap"},
+        "unknown_cost": {"const": "retained_as_unconfirmed_exposure_not_zero"}
+      }
+    },
+    "natural_termination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["comparison_setting", "requires_separate_pilot", "pilot_requires_preapproved_cost", "pilot_requires_maximum_exposure", "pilot_requires_manual_kill_condition", "pilot_execution_available"],
+      "properties": {
+        "comparison_setting": {"const": "separate_pilot_only"},
+        "requires_separate_pilot": {"const": true},
+        "pilot_requires_preapproved_cost": {"const": true},
+        "pilot_requires_maximum_exposure": {"const": true},
+        "pilot_requires_manual_kill_condition": {"const": true},
+        "pilot_execution_available": {"const": false}
+      }
+    },
+    "stop_classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "quality_status", "allowed_stop_kinds", "wrong_answer_allowed"],
+      "properties": {
+        "outcome": {"const": "technical_incomplete"},
+        "quality_status": {"const": "unknown"},
+        "allowed_stop_kinds": {"const": ["budget_stopped", "censored"]},
+        "wrong_answer_allowed": {"const": false}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "applied"}}},
+      "then": {
+        "properties": {
+          "limits": {
+            "properties": {
+              "api_calculated_cost_usd_per_attempt": {"type": "number", "exclusiveMinimum": 0},
+              "api_calculated_cost_usd_per_run": {"type": "number", "exclusiveMinimum": 0},
+              "run_deadline_utc": {"type": "string", "format": "date-time"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"status": {"const": "template_unapproved"}}},
+      "then": {
+        "properties": {
+          "limits": {
+            "properties": {
+              "api_calculated_cost_usd_per_attempt": {"type": "null"},
+              "api_calculated_cost_usd_per_run": {"type": "null"},
+              "run_deadline_utc": {"type": "null"}
+            }
+          }
+        }
+      }
+    }
+  ]
+}

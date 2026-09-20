@@ -21,6 +21,7 @@ from src.live_transport import (
     provider_timing,
     start_live_proxy,
 )
+from src.execution_safety import SafetyLimitReached
 from src.protection import FrozenRequestGuard, ProtectionViolation, canonical
 from src.task_metrics import read_events
 
@@ -295,14 +296,29 @@ class LiveTransportTests(unittest.TestCase):
             self.recorder.complete("trial-one", canonical(request_fixture()))
         self.assertTrue(self.recorder.stopped.is_set())
 
-    def test_sixty_first_call_is_dispatched_without_local_cost_or_call_stop(self):
-        for _ in range(61):
-            status, _body = self.recorder.complete("trial-one", canonical(request_fixture()))
+    def test_sixty_first_call_is_blocked_by_the_predeclared_attempt_cap(self):
+        for index in range(60):
+            request = request_fixture()
+            request["messages"].extend([
+                {
+                    "role": "assistant",
+                    "content": json.dumps({
+                        "commands": [{"keystrokes": f"printf {index}\\n"}],
+                        "task_complete": False,
+                    }),
+                },
+                {"role": "user", "content": f"synthetic observation {index}"},
+            ])
+            status, _body = self.recorder.complete("trial-one", canonical(request))
             self.assertEqual(status, 200)
-        self.assertEqual(len(self.sent), 61)
+        with self.assertRaises(SafetyLimitReached):
+            self.recorder.complete("trial-one", canonical(request_fixture()))
+        self.assertEqual(len(self.sent), 60)
         self.assertEqual(self.recorder.trials["trial-one"]["calls"], 61)
-        self.assertIsNone(self.recorder.trials["trial-one"]["failure"])
-        self.assertNotIn("max_completion_tokens", json.loads(self.sent[-1]))
+        failure = self.recorder.trials["trial-one"]["failure"]
+        self.assertEqual(failure["details"]["classification"], "technical_incomplete")
+        self.assertEqual(failure["details"]["stop_kind"], "budget_stopped")
+        self.assertEqual(json.loads(self.sent[-1])["max_completion_tokens"], 2048)
 
 
 class QueueTests(unittest.TestCase):

@@ -30,7 +30,7 @@ FILE_READ_SUFFIX = "\nProtected file-read suffix: do not alter code, identifiers
 
 
 class ImmediateQueue:
-    def reserve(self, estimate, stopped):
+    def reserve(self, estimate, stopped, **_limits):
         return 0.0
 
     def cooldown(self, seconds):
@@ -63,11 +63,14 @@ class SyntheticSender:
 
 def request(ledger: dict, messages: list[dict]) -> bytes:
     model = ledger["model"]
-    return canonical({
+    payload = {
         "model": model["name"], "temperature": model["temperature"],
         "reasoning_effort": model["reasoning_effort"],
         "messages": messages,
-    })
+    }
+    if ledger.get("schema_version") == 4:
+        payload["max_completion_tokens"] = ledger["limits"]["max_output_tokens"]
+    return canonical(payload)
 
 
 def candidate_content() -> str:
