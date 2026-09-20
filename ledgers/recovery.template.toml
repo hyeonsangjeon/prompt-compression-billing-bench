@@ -1,0 +1,46 @@
+schema_version = 1
+mode = "squeez_local_recovery"
+
+[recovery]
+scope = "local_software_control_not_operational"
+enabled = false
+external_agent_or_mcp_enabled = false
+multi_user_authentication_implemented = false
+required_permission = "recovery:read"
+ttl_seconds = 300
+retention_seconds = 600
+max_response_bytes = 65536
+max_total_bytes_per_handle = 65536
+max_calls_per_handle = 4
+max_supplier_calls_per_trial = 4
+max_recovered_bytes_per_trial = 131072
+
+[supplier]
+binary_env = "SQUEEZ_BINARY"
+version = "1.48.4"
+bytes = 2056992
+sha256 = "ef956365ace3aa5f362847afc000aa008d5b4a26db4ee2c5bcc0d2718d043773"
+transport = "stdio_mcp"
+timeout_seconds = 10.0
+stdout_limit_bytes = 262144
+stderr_limit_bytes = 65536
+
+[local_bridge]
+scope = "local_software_control_not_operational"
+transport = "unix_domain_socket"
+peer_credentials = "linux_so_peercred"
+external_tcp_enabled = false
+capability_ttl_seconds = 2
+capability_max_supplier_calls = 1
+capability_max_recovered_bytes = 65536
+max_request_bytes = 16384
+max_response_bytes = 131072
+
+[cleanup]
+exact_vendor_blob_and_index_only = true
+requires_stopped_supplier = true
+recursive_delete = false
+follow_symlinks = false
+vendor_delete_api_verified = false
+secure_erase_verified = false
+all_copies_deleted_verified = false

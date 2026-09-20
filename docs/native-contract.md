@@ -28,6 +28,11 @@ those actions must be counted, not assumed free. All conditions keep Harbor's ex
 10,000-byte middle-elision behavior. Pre-Harbor terminal output is recorded
 separately so that loss by Harbor is not attributed to squeez.
 
+A separate [local recovery contract](squeez-recovery.md) now implements a
+disabled, same-host byte-recovery and lifecycle boundary. It is not connected to
+this runner, does not make recovery agent-visible and adds no result or cost claim
+to the fixed native comparison.
+
 Headroom 0.36.5 uses only the audited `compact_lossless(text, "paths")` helper.
 It factors repeated directory prefixes, accepts a change only when UTF-8 bytes
 decrease without fewer displayed lines, and checks `path_unheading` against the
