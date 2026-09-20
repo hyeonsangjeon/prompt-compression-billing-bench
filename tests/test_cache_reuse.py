@@ -297,6 +297,31 @@ class RuntimeDoctorTests(unittest.TestCase):
             self.assertEqual(main([str(LEDGER_PATH), "--runtime-facts", str(FACTS_PATH), "--doctor"]), 3)
             doctor_call.assert_called_once()
 
+    def test_cli_execution_reads_each_admission_input_once(self):
+        native_path = ROOT / "ledgers/native.template.toml"
+        targets = {path.resolve(): 0 for path in (LEDGER_PATH, FACTS_PATH, native_path)}
+        original_read_bytes = Path.read_bytes
+
+        def counted_read_bytes(path):
+            resolved = path.resolve()
+            if resolved in targets:
+                targets[resolved] += 1
+            return original_read_bytes(path)
+
+        with patch.object(Path, "read_bytes", new=counted_read_bytes), \
+             patch("sys.stdout", new_callable=io.StringIO), \
+             patch("sys.stderr", new_callable=io.StringIO):
+            exit_code = main([
+                str(LEDGER_PATH),
+                "--runtime-facts", str(FACTS_PATH),
+                "--native-ledger", str(native_path),
+                "--source-commit", "a" * 40,
+                "--run-id", "read-once",
+                "--execute-cycle", "1",
+            ])
+        self.assertEqual(exit_code, 2)
+        self.assertEqual(targets, {path: 1 for path in targets})
+
 
 class PrefixTrackerTests(unittest.TestCase):
     def setUp(self):
@@ -548,6 +573,38 @@ class ExecutionOrchestrationTests(unittest.TestCase):
             self.assertEqual((output / "runtime-facts.json").read_bytes(), facts_path.read_bytes())
             self.assertEqual((output / "native-ledger.toml").read_bytes(), native_content)
             self.assertTrue(all(bundle_id.startswith(cycle["cycle_id"] + "-") for _condition, _level, bundle_id in calls))
+            calls.clear()
+            derived_run_id = "derived-run"
+            derived_cycle_id = f"cycle-02-{digest(derived_run_id.encode())}"
+            derived_output = root / "runs/cache-reuse" / derived_run_id / derived_cycle_id
+            with patch.dict(
+                os.environ, {"FOUNDRY_ENDPOINT": "synthetic-not-read"}, clear=False
+            ), patch(
+                "src.cache_reuse.importlib.util.find_spec", return_value=object()
+            ), patch("src.cache_reuse.ROOT", root), patch(
+                "src.cache_reuse.verify_source_commit"
+            ), patch(
+                "src.cache_reuse.summarize_native_bundle", side_effect=fake_summary
+            ), patch(
+                "src.native_run.execute_native", side_effect=fake_execute
+            ), patch("sys.stdout", new_callable=io.StringIO) as stdout:
+                exit_code = main([
+                    str(cache_path),
+                    "--runtime-facts", str(facts_path),
+                    "--native-ledger", str(native_path),
+                    "--source-commit", "a" * 40,
+                    "--run-id", derived_run_id,
+                    "--execute-cycle", "2",
+                ])
+            self.assertEqual(exit_code, 0)
+            derived = json.loads(stdout.getvalue())
+            self.assertEqual(derived["cycle_id"], derived_cycle_id)
+            self.assertEqual(
+                derived["output_relative"],
+                f"runs/cache-reuse/{derived_run_id}/{derived_cycle_id}",
+            )
+            self.assertTrue((derived_output / "cycle.json").is_file())
+            self.assertEqual(len(calls), 6)
             before = {path.relative_to(output).as_posix(): path.read_bytes() for path in output.rglob("*") if path.is_file()}
             with patch.dict(
                 os.environ, {"FOUNDRY_ENDPOINT": "synthetic-not-read"}, clear=False

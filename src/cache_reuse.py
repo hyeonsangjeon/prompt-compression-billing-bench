@@ -925,7 +925,7 @@ def _cycle_contrasts(bundles: list[dict]) -> dict:
 def execute_cycle(
     cache_ledger_path: Path,
     runtime_facts_path: Path,
-    native_ledger_path: Path,
+    native_ledger_path: Path | None,
     source_commit: str,
     cycle_number: int,
     run_id: str,
@@ -935,9 +935,10 @@ def execute_cycle(
 ) -> dict:
     ledger_bytes = cache_ledger_path.read_bytes()
     facts_bytes = runtime_facts_path.read_bytes()
-    native_ledger_bytes = native_ledger_path.read_bytes()
     ledger = parse_json_object(ledger_bytes, cache_ledger_path.name)
     validate_cache_ledger(ledger)
+    native_ledger_path = (native_ledger_path or ROOT / ledger["native_ledger"]).resolve()
+    native_ledger_bytes = native_ledger_path.read_bytes()
     facts = parse_json_object(facts_bytes, runtime_facts_path.name)
     native = parse_native_ledger(native_ledger_bytes)
     cache_ledger_sha256 = sha256_bytes(ledger_bytes)
@@ -949,8 +950,6 @@ def execute_cycle(
     verify_source_commit(source_commit)
     if not SAFE_ID.fullmatch(run_id):
         raise ValueError("Run ID must be a safe no-clobber identifier")
-    if output.exists():
-        raise FileExistsError("Cache-reuse run output already exists")
     rows = _cycle_rows(ledger, cycle_number)
     execution_cycle_id = f"{rows[0]['cycle_id']}-{digest(run_id.encode())}"
     rows = [
@@ -967,6 +966,8 @@ def execute_cycle(
     if output is not None and output.resolve() != expected_output:
         raise ValueError("Cycle output must use the fixed ledger root and derived run/cycle identity")
     output = expected_output
+    if output.exists():
+        raise FileExistsError("Cache-reuse run output already exists")
     by_check = validate_runtime_facts(facts, ledger)
     isolation_hash = by_check["R02_NAMESPACE_ISOLATION"].get("evidence_sha256")
     if isolation_hash is None:
@@ -1134,27 +1135,28 @@ def main(arguments=None) -> int:
     args = parser.parse_args(arguments)
     try:
         ledger_path = args.ledger.resolve()
-        ledger = load_cache_ledger(ledger_path)
-        _native_path, native = _load_native_for_cache(ledger, args.native_ledger)
-        if args.source_commit is not None:
-            verify_source_commit(args.source_commit)
         if args.execute_cycle is not None:
             if args.source_commit is None or args.run_id is None:
                 raise ValueError("Cycle execution requires --source-commit and a new --run-id")
             result = execute_cycle(
                 ledger_path,
                 args.runtime_facts.resolve(),
-                _native_path.resolve(),
+                args.native_ledger.resolve() if args.native_ledger is not None else None,
                 args.source_commit,
                 args.execute_cycle,
                 args.run_id,
                 args.output.resolve() if args.output is not None else None,
             )
-        elif args.plan:
-            result = make_plan(ledger, args.cycles)
         else:
-            facts = load_json(args.runtime_facts)
-            result = doctor(ledger, facts, native)
+            ledger = load_cache_ledger(ledger_path)
+            if args.source_commit is not None:
+                verify_source_commit(args.source_commit)
+            if args.plan:
+                result = make_plan(ledger, args.cycles)
+            else:
+                _native_path, native = _load_native_for_cache(ledger, args.native_ledger)
+                facts = load_json(args.runtime_facts)
+                result = doctor(ledger, facts, native)
         if args.output is not None and args.execute_cycle is None:
             write_no_clobber(args.output, result)
         print(json.dumps(result, ensure_ascii=False, sort_keys=True))
