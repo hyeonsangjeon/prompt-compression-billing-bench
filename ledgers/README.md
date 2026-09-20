@@ -12,5 +12,9 @@
   로컬 전용 Qwen2.5 0.5B 자산·런타임 지문, 생성 설정, 300초 attempt,
   120초 no-progress, retry 0을 고정한 cached quickstart 원장이다. 기존
   Ollama 원장과 별개이며 모델 다운로드나 패키지 설치를 승인하지 않는다.
+- [`cache-reuse.template.json`](cache-reuse.template.json)은 고정 5과제 bundle의
+  `{none,squeez} × {0,1,2}` cache reuse 축, concurrency 1, 10→20 안정 규칙,
+  provider/local/computed/invoice 단위와 14개 runtime 관문을 고정한 비운영
+  템플릿이다. 모든 관문과 별도 리더 승인이 확인되기 전에는 `no_go`다.
 
 템플릿에는 자격 증명 값 대신 환경 변수 이름만 기록한다.

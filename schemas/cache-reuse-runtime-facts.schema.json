@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cache-reuse-runtime-facts.schema.json",
+  "title": "Presence-only cache reuse runtime facts",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "checks", "environment_presence", "values_stored", "provider_model_api_calls"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "kind": {"const": "cache_reuse_runtime_facts"},
+    "checks": {
+      "type": "array",
+      "minItems": 14,
+      "maxItems": 14,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "owner"],
+        "allOf": [
+          {
+            "if": {"properties": {"status": {"const": "verified"}}},
+            "then": {"required": ["evidence_sha256", "observed_at_utc", "method", "predicate"]}
+          }
+        ],
+        "properties": {
+          "id": {"type": "string"},
+          "status": {"enum": ["verified", "partially_verified", "not_verified"]},
+          "owner": {"enum": ["source", "runtime_owner", "source_and_runtime", "leader"]},
+          "evidence_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "observed_at_utc": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$"},
+          "method": {"type": "string", "minLength": 1},
+          "predicate": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "environment_presence": {
+      "type": "object",
+      "additionalProperties": {"type": "boolean"}
+    },
+    "values_stored": {"const": false},
+    "provider_model_api_calls": {"const": 0},
+    "prefix_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message_count", "namespace_message_index", "namespace_content_sha256"],
+      "properties": {
+        "message_count": {"type": "integer", "minimum": 1},
+        "namespace_message_index": {"type": "integer", "minimum": 0},
+        "namespace_content_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

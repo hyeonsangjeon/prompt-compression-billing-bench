@@ -60,6 +60,17 @@ class LiveTransportTests(unittest.TestCase):
         self.assertGreaterEqual(response["client_http_seconds"], 0)
         self.assertTrue(self.queue.calls)
 
+    def test_cache_prefix_observer_fails_before_provider_dispatch(self):
+        def reject_prefix(**_arguments):
+            raise ValueError("synthetic prefix drift")
+
+        self.recorder.request_observer = reject_prefix
+        with self.assertRaisesRegex(ValueError, "prefix drift"):
+            self.recorder.complete("trial-one", canonical(request_fixture()))
+        self.assertEqual(self.sent, [])
+        self.assertEqual(self.queue.calls, [])
+        self.assertTrue(self.recorder.stopped.is_set())
+
     def test_candidate_compression_records_hashes_and_timing_before_dispatch(self):
         assistant = json.dumps({"commands": [{"keystrokes": "ls -la /logs\n", "duration": 1}]})
         self.recorder.sender = lambda body: (self.sent.append(body), (200, response_fixture(assistant), {}))[1]

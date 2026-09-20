@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "kind": "cache_reuse_execution_ledger",
+  "status": "template_live_no_go",
+  "live_execution_authorized": false,
+  "design_source_commit": "ea65da41185278f2f9aa3a63155a0fe3c8830432",
+  "design_ledger_sha256": "9175ae55254a237482a960cf5d6fbe524ff2ddda91037e9f43bd7dd68ec79060",
+  "native_ledger": "ledgers/native.template.toml",
+  "output_dir": "runs/cache-reuse",
+  "execution_unit": {
+    "kind": "fixed_five_task_native_bundle",
+    "task_ids": [
+      "cancel-async-tasks",
+      "log-summary-date-ranges",
+      "multi-source-data-merger",
+      "nginx-request-logging",
+      "openssl-selfsigned-cert"
+    ],
+    "native_judging_included": true
+  },
+  "conditions": ["none", "squeez"],
+  "reuse_levels": [0, 1, 2],
+  "runner": {
+    "concurrency": 1,
+    "condition_order_odd_cycle": ["none", "squeez"],
+    "condition_order_even_cycle": ["squeez", "none"],
+    "discarded_warmup_bundles": 0
+  },
+  "model": {
+    "provider": "foundry",
+    "name": "gpt-5.4",
+    "reported_revision": "gpt-5.4-2026-03-05",
+    "endpoint_env": "FOUNDRY_ENDPOINT",
+    "deployment_binding": "required_private_runtime_fact",
+    "api_surface": "openai_v1_chat_completions"
+  },
+  "generation": {
+    "temperature": 0,
+    "reasoning_effort": "none",
+    "determinism_claimed": false
+  },
+  "cache": {
+    "provider_input_field": "usage.prompt_tokens",
+    "provider_cached_input_field": "usage.prompt_tokens_details.cached_tokens",
+    "cache_write_field": "not_measured_until_exact_native_support_verified",
+    "prefix_extractor": "canonical_message_prefix_v1",
+    "prefix_message_count": "required_private_runtime_fact",
+    "namespace_or_isolation": "required_private_runtime_fact",
+    "external_matching_traffic": "must_be_excluded"
+  },
+  "measurement": {
+    "primary_cache_metric": "sum_provider_cached_input_tokens_divided_by_sum_provider_input_tokens_per_useful_bundle",
+    "primary_input_cost": "provider_usage_times_fixed_ledger_input_prices_per_useful_bundle",
+    "provider_usage": "measured_provider_native",
+    "local_tokens": "calculated_diagnostic_only",
+    "computed_price": "calculated_not_invoice",
+    "invoice": "not_measured",
+    "missing_native_usage": "missing_never_zero_or_miss",
+    "explicit_numeric_zero": "zero",
+    "zero_eligible_opportunity": "not_applicable"
+  },
+  "pricing": {
+    "status": "not_verified",
+    "input_per_million_usd": 0,
+    "cached_input_per_million_usd": 0,
+    "output_per_million_usd": 0,
+    "source_reference_sha256": null,
+    "checked_at_utc": null
+  },
+  "contrasts": {
+    "reuse": ["none:1-0", "none:2-0", "squeez:1-0", "squeez:2-0"],
+    "compression": ["reuse0:squeez-none", "reuse1:squeez-none", "reuse2:squeez-none"],
+    "forbidden": ["diagonal_or_two_axis"]
+  },
+  "stability": {
+    "target_valid_cycles": 10,
+    "maximum_valid_cycles": 20,
+    "first_blocks": [[1, 5], [6, 10]],
+    "extension_blocks": [[1, 10], [11, 20]],
+    "rule": "observed_ranges_overlap_and_median_sign_matches_for_every_paired_series",
+    "final_unstable_verdict": "same_condition_width_excess"
+  },
+  "quality": {
+    "rule": "D3_native_quality_10_to_20_separate",
+    "cache_rule_reuse": false,
+    "inconclusive_effect": "quality_inconclusive_cache_descriptive_only"
+  },
+  "transport": {
+    "http_429_is_cache_miss": false,
+    "retry_contract": "existing_transport_only",
+    "outer_retry_restart": false,
+    "no_progress_signal": "required_private_runtime_fact"
+  },
+  "runtime_required_checks": [
+    "R01_ENDPOINT_PRESENT",
+    "R01_MANAGED_IDENTITY_PERMISSION",
+    "R01_DEPLOYMENT_MODEL_API_ACCESS",
+    "R01_EFFECTIVE_RETENTION",
+    "R02_NATIVE_CACHE_FIELD_SUPPORT",
+    "R02_NAMESPACE_ISOLATION",
+    "R02_EXTERNAL_MATCHING_TRAFFIC_EXCLUDED",
+    "R02_QUEUE_RPM_TPM_FACTS",
+    "R02_SERIALIZED_PREFIX_CONTRACT",
+    "R02_FIXED_PRICE_SOURCE",
+    "R02_TASK_AND_SQUEEZ_ASSETS",
+    "R02_NO_PROGRESS_BINDING",
+    "R02_RUNNER_CONCURRENCY_ONE",
+    "APPROVAL_CURRENT_LEADER"
+  ],
+  "output": {
+    "no_clobber": true,
+    "invalid_cycles_preserved": true,
+    "run_id_unique": true,
+    "attempt_id_unique": true,
+    "cycle_id_unique": true,
+    "raw_content_public": false
+  },
+  "record": {
+    "denominators": ["task", "run", "request", "cache_cycle"],
+    "lineage": [
+      "source_commit", "ledger_sha256", "native_ledger_sha256",
+      "runtime_facts_sha256", "run_id", "cycle_id", "bundle_id", "attempt_id"
+    ],
+    "pins": ["model", "deployment", "reported_revision", "source", "input", "tool", "schema"],
+    "provenance": ["measured", "synthetic", "projected", "provider", "local", "computed", "invoice"]
+  }
+}

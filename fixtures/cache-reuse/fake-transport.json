@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "kind": "synthetic_cache_reuse_transport_fixture",
+  "network_calls": 0,
+  "cases": {
+    "missing": {
+      "http_status": 200,
+      "usage": {"prompt_tokens": 100, "completion_tokens": 10}
+    },
+    "explicit_zero": {
+      "http_status": 200,
+      "usage": {
+        "prompt_tokens": 100,
+        "completion_tokens": 10,
+        "prompt_tokens_details": {"cached_tokens": 0}
+      }
+    },
+    "positive": {
+      "http_status": 200,
+      "usage": {
+        "prompt_tokens": 100,
+        "completion_tokens": 10,
+        "prompt_tokens_details": {"cached_tokens": 64}
+      }
+    },
+    "invalid_denominator": {
+      "http_status": 200,
+      "usage": {
+        "prompt_tokens": 0,
+        "completion_tokens": 10,
+        "prompt_tokens_details": {"cached_tokens": 0}
+      }
+    },
+    "rate_limited": {
+      "http_status": 429,
+      "usage": null
+    },
+    "no_progress": {
+      "http_status": null,
+      "usage": null,
+      "stop_reason": "synthetic_no_progress"
+    }
+  }
+}

@@ -11,8 +11,9 @@ import unittest
 from unittest.mock import patch
 
 from native_helpers import FixtureEncoder, ledger_fixture, request_fixture, response_fixture
+from src.cache_reuse import summarize_native_bundle
 from src.native_contract import TASKS
-from src.native_run import execute_native, main, runtime_environment, supervise, verify_native_run
+from src.native_run import execute_native, main, runtime_environment, supervise, verify_cache_bundle_run, verify_native_run
 from src.protection import canonical, digest
 
 
@@ -34,8 +35,12 @@ class NativeRunTests(unittest.TestCase):
         self.maximum_active_supervisors = 0
         self.activity_lock = threading.Lock()
 
-    def run_fixture(self, *, evidence_kind="synthetic_validation", broken=False, pass_counts=None):
+    def run_fixture(self, *, evidence_kind="synthetic_validation", broken=False, pass_counts=None, cache_bundle=False):
         """Mock all execution dependencies; temporary native-shaped records are never evidence."""
+        if cache_bundle:
+            self.ledger["runner"]["concurrency"] = 1
+            self.ledger_bytes = self.ledger_bytes.replace(b"concurrency = 8", b"concurrency = 1")
+            self.ledger_path.write_bytes(self.ledger_bytes)
         def sender(body):
             self.sent.append(body)
             return 200, response_fixture(), {}
@@ -43,7 +48,11 @@ class NativeRunTests(unittest.TestCase):
         sender.endpoint = "https://synthetic.openai.azure.com/openai/v1"
         files = {"task.toml": b'[environment]\ndocker_image = "synthetic:unused"\n', "instruction.md": b"Synthetic fixture",
                  "tests/test.sh": b"synthetic, never executed", "tests/test_outputs.py": b"synthetic, never imported"}
-        provenance = {"source_commit": "a" * 40, "ledger_sha256": digest(self.ledger_bytes)}
+        provenance = {
+            "source_commit": "a" * 40,
+            "ledger_sha256": digest(self.ledger_bytes),
+            "source_files": {"schemas/synthetic.json": "f" * 64},
+        }
         retrieval_client = SimpleNamespace(
             account_url="https://synthetic.blob.core.windows.net", container="runs", timeout_seconds=1,
         )
@@ -136,7 +145,25 @@ class NativeRunTests(unittest.TestCase):
              patch("src.native_run.supervise", synthetic_supervisor), \
              patch("src.native_run.apply_verifier_revision", side_effect=lambda _task, source, _specs: (deepcopy(source), {"revision": "synthetic", "modified": False})), \
              patch("src.native_run.make_blob_spool", side_effect=make_retrieval):
-            directory = execute_native(self.ledger_path, self.ledger, "a" * 40, "none")
+            keywords = {}
+            if cache_bundle:
+                context = {
+                    "cycle_id": "cycle-01", "bundle_id": "cycle-01-none-reuse-0",
+                    "condition": "none", "reuse_level": 0, "eligible_predecessor_count": 0,
+                    "cache_ledger_sha256": "b" * 64, "runtime_facts_sha256": "c" * 64,
+                    "isolation_evidence_sha256": "d" * 64,
+                }
+
+                def observe(**arguments):
+                    return {
+                        "cycle_id": context["cycle_id"], "condition": context["condition"],
+                        "reuse_level": context["reuse_level"], "eligible_predecessor_count": 0,
+                        "serialized_prefix_sha256": digest(arguments["serialized"]),
+                        "request_sha256": digest(arguments["serialized"]),
+                    }
+
+                keywords = {"cache_context": context, "request_observer": observe}
+            directory = execute_native(self.ledger_path, self.ledger, "a" * 40, "none", **keywords)
         return directory, provenance
 
     def test_shared_transport_full_driver_collects_ten_five_task_repetitions(self):
@@ -188,6 +215,43 @@ class NativeRunTests(unittest.TestCase):
             record.write_text("{}")
             with self.assertRaisesRegex(ValueError, "artifact changed"):
                 verify_native_run(directory)
+
+    def test_cache_bundle_profile_is_serial_and_preserves_request_context(self):
+        directory, provenance = self.run_fixture(evidence_kind="native_measurement", cache_bundle=True)
+        summary = json.loads((directory / "summary.json").read_bytes())
+        self.assertEqual(summary["execution_profile"], "cache_reuse_bundle")
+        self.assertEqual(summary["status"], "complete")
+        self.assertEqual(summary["concurrency"], 1)
+        self.assertEqual(len(summary["trials"]), 5)
+        self.assertEqual(len(self.sent), 5)
+        self.assertEqual(self.maximum_active_supervisors, 1)
+        with patch("src.native_run.verify_snapshot", return_value=provenance):
+            checked = verify_cache_bundle_run(directory)
+            bundle = summarize_native_bundle(
+                directory,
+                {
+                    "cycle_id": "cycle-01", "bundle_id": "cycle-01-none-reuse-0",
+                    "condition": "none", "reuse_level": 0,
+                    "eligible_predecessor_count_required": 0,
+                },
+                {
+                    "status": "verified",
+                    "input_per_million_usd": 1,
+                    "cached_input_per_million_usd": 0.1,
+                    "output_per_million_usd": 2,
+                    "source_reference_sha256": "f" * 64,
+                    "checked_at_utc": "2026-09-20T00:00:00Z",
+                },
+                cache_ledger_sha256="e" * 64,
+                runtime_facts_sha256="d" * 64,
+                parent_run_id="parent-run",
+            )
+        self.assertEqual(checked["cache_reuse"]["eligible_predecessor_count"], 0)
+        self.assertEqual(bundle["task_denominator"], 5)
+        self.assertEqual(len(bundle["observations"]), 5)
+        self.assertTrue(all(row["flags"]["measured"] for row in bundle["observations"]))
+        self.assertTrue(all(row["invoice"]["status"] == "not_measured" for row in bundle["observations"]))
+        self.assertTrue(all(row["runtime_facts_sha256"] == "d" * 64 for row in bundle["observations"]))
 
     def test_startup_failure_still_records_one_invalid_task_and_stops(self):
         directory, _provenance = self.run_fixture(broken=True)

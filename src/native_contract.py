@@ -14,7 +14,8 @@ from .verifier_revisions import VERIFIER_SPECS
 TASKS = ("cancel-async-tasks", "log-summary-date-ranges", "multi-source-data-merger",
          "nginx-request-logging", "openssl-selfsigned-cert")
 REVISION = "7131e4375048a0e408a8fb404b5f499d726b695b"
-FIXED_CONCURRENCY = 8
+DEFAULT_CONCURRENCY = 8
+ALLOWED_CONCURRENCY = (1, DEFAULT_CONCURRENCY)
 CONDITIONS = ("none", "squeez", "headroom", "llmlingua2")
 LLMLINGUA_MODEL_FILES = {
     "config.json": {"bytes": 752, "sha256": "a3fdcf4e63057797101ecc84412bc654f9adb4e8d4ed3c91c5afb28eda327706"},
@@ -57,7 +58,11 @@ FIELDS = {
 
 
 def load_native_ledger(path: Path) -> dict:
-    ledger = tomllib.loads(path.read_text())
+    return parse_native_ledger(path.read_bytes())
+
+
+def parse_native_ledger(content: bytes) -> dict:
+    ledger = tomllib.loads(content.decode("utf-8"))
     validate_native_ledger(ledger)
     return ledger
 
@@ -99,8 +104,8 @@ def validate_native_ledger(ledger: dict) -> None:
         raise ValueError("Record temperature 0 and effort none; neither implies determinism")
     if runner["harbor_version"] != "0.22.0" or runner["agent_import_path"] != "src.harbor_agent:ObservedTerminus2":
         raise ValueError("Use the pinned, instrumented Terminus 2 adapter")
-    if runner["concurrency"] != FIXED_CONCURRENCY:
-        raise ValueError("Native trial concurrency is fixed at eight for every comparison arm")
+    if runner["concurrency"] not in ALLOWED_CONCURRENCY:
+        raise ValueError("Native trial concurrency must be the default eight or serial cache-reuse value one")
     for value in (
         benchmark["root_env"], model["endpoint_env"], ledger["queue"]["state_path_env"],
         ledger["measurement"]["cache_env"], ledger["retrieval"]["account_url_env"],

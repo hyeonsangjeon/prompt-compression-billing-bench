@@ -58,6 +58,12 @@ class NativeContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "schema-v3"):
             require_operational_values(ledger)
 
+    def test_serial_concurrency_is_explicitly_available_without_changing_the_default(self):
+        ledger = ledger_fixture()
+        self.assertEqual(ledger["runner"]["concurrency"], 8)
+        ledger["runner"]["concurrency"] = 1
+        validate_native_ledger(ledger)
+
     @unittest.skipUnless(importlib.util.find_spec("harbor"), "Install the locked native extra for Harbor integration")
     def test_real_job_schema_accepts_one_serial_trial_inside_fixed_outer_concurrency(self):
         from harbor.models.job.config import JobConfig

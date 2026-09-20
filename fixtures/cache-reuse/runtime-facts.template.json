@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "kind": "cache_reuse_runtime_facts",
+  "checks": [
+    {"id": "R01_ENDPOINT_PRESENT", "status": "not_verified", "owner": "runtime_owner"},
+    {"id": "R01_MANAGED_IDENTITY_PERMISSION", "status": "not_verified", "owner": "runtime_owner"},
+    {"id": "R01_DEPLOYMENT_MODEL_API_ACCESS", "status": "not_verified", "owner": "runtime_owner"},
+    {"id": "R01_EFFECTIVE_RETENTION", "status": "not_verified", "owner": "runtime_owner"},
+    {"id": "R02_NATIVE_CACHE_FIELD_SUPPORT", "status": "not_verified", "owner": "runtime_owner"},
+    {"id": "R02_NAMESPACE_ISOLATION", "status": "not_verified", "owner": "runtime_owner"},
+    {"id": "R02_EXTERNAL_MATCHING_TRAFFIC_EXCLUDED", "status": "not_verified", "owner": "runtime_owner"},
+    {"id": "R02_QUEUE_RPM_TPM_FACTS", "status": "not_verified", "owner": "runtime_owner"},
+    {"id": "R02_SERIALIZED_PREFIX_CONTRACT", "status": "not_verified", "owner": "runtime_owner"},
+    {"id": "R02_FIXED_PRICE_SOURCE", "status": "not_verified", "owner": "runtime_owner"},
+    {"id": "R02_TASK_AND_SQUEEZ_ASSETS", "status": "not_verified", "owner": "runtime_owner"},
+    {"id": "R02_NO_PROGRESS_BINDING", "status": "not_verified", "owner": "runtime_owner"},
+    {"id": "R02_RUNNER_CONCURRENCY_ONE", "status": "not_verified", "owner": "source_and_runtime"},
+    {"id": "APPROVAL_CURRENT_LEADER", "status": "not_verified", "owner": "leader"}
+  ],
+  "environment_presence": {
+    "FOUNDRY_ENDPOINT": false
+  },
+  "values_stored": false,
+  "provider_model_api_calls": 0
+}

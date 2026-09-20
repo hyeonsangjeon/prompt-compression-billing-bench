@@ -29,7 +29,7 @@ from .native_judge import collect_native_outcome
 from .protection import digest
 from .provenance import ROOT, capture, git, verify_snapshot
 from .runtime_limits import public_queue_record, runtime_queue_limits
-from .task_metrics import aggregate_run_compressor_metrics, aggregate_run_timing_metrics, collect_trial_metrics
+from .task_metrics import aggregate_run_compressor_metrics, aggregate_run_timing_metrics, collect_trial_metrics, read_events
 from .verifier_revisions import apply_verifier_revision
 
 
@@ -189,7 +189,14 @@ def runtime_versions() -> dict:
     return versions
 
 
-def preflight(ledger: dict, ledger_path: Path, source_commit: str, condition: str = "none") -> dict:
+def preflight(
+    ledger: dict,
+    ledger_path: Path,
+    source_commit: str,
+    condition: str = "none",
+    *,
+    required_conditions=CONDITIONS,
+) -> dict:
     reporting_target = require_operational_values(ledger)
     if condition not in ledger["conditions"]:
         raise ValueError("Condition is not part of the fixed native design")
@@ -209,7 +216,9 @@ def preflight(ledger: dict, ledger_path: Path, source_commit: str, condition: st
         raise ValueError("Use the same absolute queue file for every deployment caller")
     if Path(queue_value).resolve().is_relative_to(ROOT / "runs"):
         raise ValueError("A per-run queue cannot coordinate the deployment")
-    for compressor_name in CONDITIONS:
+    if not required_conditions or any(name not in CONDITIONS for name in required_conditions):
+        raise ValueError("Preflight compressor conditions differ from the native design")
+    for compressor_name in required_conditions:
         check_compressor_artifacts(ledger["compressor"], compressor_name)
     return {"provenance": provenance, "snapshots": snapshots, "encoder": encoder, "tasks": tasks,
             "benchmark_root": str(benchmark_root), "sender": sender, "queue_path": Path(queue_value).resolve(),
@@ -342,6 +351,84 @@ def verify_native_run(directory: Path) -> dict:
     return summary
 
 
+def verify_cache_bundle_run(directory: Path) -> dict:
+    summary = json.loads((directory / "summary.json").read_bytes())
+    if summary.get("kind") != "native_measurement" or summary.get("execution_profile") != "cache_reuse_bundle":
+        raise ValueError("Only a measured cache-reuse native bundle is admissible")
+    ledger = load_native_ledger(directory / "ledger.toml")
+    context = _cache_bundle_context(summary.get("cache_reuse"), summary.get("condition"), ledger)
+    source = verify_snapshot(directory)
+    if source["source_commit"] != summary.get("source_commit") or source["ledger_sha256"] != summary.get("ledger_sha256"):
+        raise ValueError("Cache bundle source or native ledger lineage differs")
+    if summary.get("concurrency") != 1 or len(summary.get("trials", [])) != len(TASKS):
+        raise ValueError("Cache bundle must contain one serial five-task repetition")
+    execution = json.loads((directory / "execution.json").read_bytes())
+    if execution.get("cache_reuse") != context or execution.get("concurrency") != 1:
+        raise ValueError("Cache bundle execution metadata differs from its context")
+    manifest_path = directory / "artifacts.json"
+    if digest(manifest_path.read_bytes()) != summary.get("artifact_manifest_sha256"):
+        raise ValueError("Cache bundle artifact manifest changed")
+    files = json.loads(manifest_path.read_bytes()).get("files")
+    actual = {
+        path.relative_to(directory).as_posix()
+        for path in directory.rglob("*") if path.is_file() or path.is_symlink()
+    }
+    if not isinstance(files, dict) or set(files) != actual - {"artifacts.json", "summary.json"}:
+        raise ValueError("Cache bundle artifact inventory is incomplete or has extra files")
+    for name, expected in files.items():
+        path = safe_child(directory, name)
+        if path.is_symlink() or digest(path.read_bytes()) != expected:
+            raise ValueError(f"Cache bundle artifact changed: {name}")
+    repetitions = {}
+    for task, trial in zip(TASKS, summary["trials"], strict=True):
+        trial_id = f"r01-{task}"
+        if (
+            trial.get("task"), trial.get("repetition"), trial.get("trial_id"),
+            trial.get("condition"), trial.get("source_commit"), trial.get("kind"),
+        ) != (task, 1, trial_id, summary["condition"], summary["source_commit"], summary["kind"]):
+            raise ValueError("Cache bundle trial order or lineage differs")
+        record_path = trial.get("record_path")
+        if record_path != f"trials/{trial_id}/trial.json":
+            raise ValueError("Cache bundle trial record path differs")
+        stored = json.loads(safe_child(directory, record_path).read_bytes())
+        if stored != {key: value for key, value in trial.items() if key != "record_path"}:
+            raise ValueError("Cache bundle summary differs from its trial record")
+        process = trial["process"]
+        job = directory / "jobs" / trial_id
+        outcome = collect_native_outcome(job, process=process, transport_failure=trial["transport_failure"])
+        completed = not process["timed_out"] and not process["stopped_by_guard"] and process["returncode"] == 0
+        metrics = collect_trial_metrics(job, directory / "transport", trial_id, process_complete=completed)
+        if outcome != trial["native_outcome"] or metrics != trial["metrics"] or not trial_is_complete(trial):
+            raise ValueError("Cache bundle native outcome or mandatory metrics differ")
+        repetitions[task] = int(outcome["native_reward"])
+    if summary.get("repetitions") != [repetitions]:
+        raise ValueError("Cache bundle native repetition denominator differs")
+    measurement_status = summary.get("completion_status_before_retrieval", summary.get("status"))
+    if measurement_status != "complete":
+        raise ValueError("Cache bundle did not complete its useful native repetition")
+    events = read_events(directory / "transport/events.jsonl")
+    attempts = [event for event in events if event.get("event") == "attempt_started"]
+    responses = [event for event in events if event.get("event") == "http"]
+    if not attempts or not responses:
+        raise ValueError("Cache bundle has no provider request evidence")
+    for event in attempts + responses:
+        observation = event.get("cache_reuse")
+        if not isinstance(observation, dict) or (
+            observation.get("cycle_id"), observation.get("condition"), observation.get("reuse_level"),
+            observation.get("eligible_predecessor_count"),
+        ) != (
+            context["cycle_id"], context["condition"], context["reuse_level"],
+            context["eligible_predecessor_count"],
+        ):
+            raise ValueError("Cache request observation differs from the bundle context")
+        if not re.fullmatch(r"[0-9a-f]{64}", observation.get("serialized_prefix_sha256", "")):
+            raise ValueError("Cache request lacks its serialized-prefix hash")
+    retrieval = json.loads((directory / "retrieval.json").read_bytes())
+    if summary.get("retrieval") != retrieval or len(retrieval.get("items", [])) != 1:
+        raise ValueError("Cache bundle retrieval must preserve its one completed repetition")
+    return summary
+
+
 def baseline_for_comparison(directory: Path, ledger: dict, source_commit: str) -> dict:
     summary = verify_native_run(directory)
     original_ledger = load_native_ledger(directory / "ledger.toml")
@@ -447,18 +534,62 @@ def run_repetition_block(directory: Path, ledger: dict, recorder, server, key: s
     return trials, repetitions, complete
 
 
-def execute_native(ledger_path: Path, ledger: dict, source_commit: str, condition: str,
-                   baseline_path: Path | None = None) -> Path:
-    if condition not in ledger["conditions"] or (condition != "none") != (baseline_path is not None):
+def _cache_bundle_context(value: dict | None, condition: str, ledger: dict) -> dict | None:
+    if value is None:
+        return None
+    required = {
+        "cycle_id", "bundle_id", "condition", "reuse_level", "eligible_predecessor_count",
+        "cache_ledger_sha256", "runtime_facts_sha256", "isolation_evidence_sha256",
+    }
+    if not isinstance(value, dict) or set(value) != required:
+        raise ValueError("Cache bundle context fields differ from the execution contract")
+    if value["condition"] != condition or condition not in ("none", "squeez"):
+        raise ValueError("Cache bundle condition differs from the native condition")
+    if value["reuse_level"] not in (0, 1, 2) or value["eligible_predecessor_count"] != value["reuse_level"]:
+        raise ValueError("Cache bundle predecessor count differs from its reuse level")
+    for name in ("cycle_id", "bundle_id"):
+        if not isinstance(value[name], str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,127}", value[name]):
+            raise ValueError("Cache bundle identifiers must be safe and bounded")
+    for name in ("cache_ledger_sha256", "runtime_facts_sha256", "isolation_evidence_sha256"):
+        if not isinstance(value[name], str) or not re.fullmatch(r"[0-9a-f]{64}", value[name]):
+            raise ValueError("Cache bundle evidence bindings require SHA-256")
+    if ledger["runner"]["concurrency"] != 1:
+        raise ValueError("Cache-reuse mode requires native concurrency 1 before provider dispatch")
+    return value
+
+
+def execute_native(
+    ledger_path: Path,
+    ledger: dict,
+    source_commit: str,
+    condition: str,
+    baseline_path: Path | None = None,
+    *,
+    cache_context: dict | None = None,
+    request_observer=None,
+) -> Path:
+    cache_context = _cache_bundle_context(cache_context, condition, ledger)
+    cache_mode = cache_context is not None
+    if condition not in ledger["conditions"]:
+        raise ValueError("Condition is not part of the native ledger")
+    if cache_mode:
+        if baseline_path is not None or request_observer is None:
+            raise ValueError("Cache bundle execution needs an observer and cannot use a comparison baseline")
+    elif (condition != "none") != (baseline_path is not None):
         raise ValueError("Run none first; every compression condition requires its verified native baseline")
     baseline = baseline_for_comparison(baseline_path, ledger, source_commit) if baseline_path else None
-    setup = preflight(ledger, ledger_path, source_commit, condition)
+    required_conditions = ("none", "squeez") if cache_mode else CONDITIONS
+    setup = preflight(
+        ledger, ledger_path, source_commit, condition,
+        required_conditions=required_conditions,
+    )
     deployment = digest((setup["sender"].endpoint + "/" + ledger["model"]["name"]).encode())
     if baseline:
         original_execution = json.loads((baseline_path / "execution.json").read_bytes())
         if original_execution["deployment_sha256"] != deployment or original_execution["queue_path"] != str(setup["queue_path"]):
             raise ValueError("Comparison must share the baseline deployment and queue")
-    run_id = f"native-{condition}-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}-{secrets.token_hex(4)}"
+    run_prefix = f"native-cache-{cache_context['bundle_id']}" if cache_mode else f"native-{condition}"
+    run_id = f"{run_prefix}-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}-{secrets.token_hex(4)}"
     directory = ROOT / ledger["output_dir"] / run_id
     directory.mkdir(parents=True, exist_ok=False)
     os.chmod(directory, 0o700)
@@ -471,6 +602,7 @@ def execute_native(ledger_path: Path, ledger: dict, source_commit: str, conditio
         (directory / "baseline-summary.json").write_bytes((baseline_path / "summary.json").read_bytes())
     summary = {
         "schema_version": 1, "kind": setup.get("evidence_kind", "native_measurement"), "mode": ledger["mode"], "run_id": run_id,
+        "execution_profile": "cache_reuse_bundle" if cache_mode else "standard_native_comparison",
         "source_commit": source_commit, "ledger_sha256": setup["provenance"]["ledger_sha256"],
         "condition": condition, "status": "running", "started_at": now(), "trials": [], "repetitions": [],
         "classification_policy": POLICY, "determinism_controlled": False, "cache_controlled": False,
@@ -482,13 +614,18 @@ def execute_native(ledger_path: Path, ledger: dict, source_commit: str, conditio
         "compressor_metrics": aggregate_run_compressor_metrics([]),
         "timing_metrics": aggregate_run_timing_metrics([]),
     }
+    if cache_mode:
+        summary["cache_reuse"] = cache_context
     queue = recorder = server = compressor = retrieval = None
     try:
         queue = DeploymentQueue(setup["queue_path"], deployment, *setup["queue_limits"])
         compressor_specification = {**ledger["compressor"], "name": condition}
         compressor = make_compressor(compressor_specification, directory / "compressor")
-        recorder = LiveRecorder(directory / "transport", ledger, source_commit, compressor, setup["encoder"], queue,
-                                setup["sender"], condition=condition, evidence_kind=summary["kind"])
+        recorder = LiveRecorder(
+            directory / "transport", ledger, source_commit, compressor, setup["encoder"], queue,
+            setup["sender"], condition=condition, evidence_kind=summary["kind"],
+            request_observer=request_observer,
+        )
         key = secrets.token_urlsafe(32)
         server = start_live_proxy(recorder, key)
         task_sources = {task: prepare_task(
@@ -497,7 +634,7 @@ def execute_native(ledger_path: Path, ledger: dict, source_commit: str, conditio
         )
                         for task, files in setup["tasks"].items()}
         save_json(directory / "task-sources.json", task_sources)
-        save_json(directory / "execution.json", {
+        execution_record = {
             "source_commit": source_commit, "condition": condition, "compressor": compressor.metadata,
             "classification_policy": POLICY, "task_order": list(TASKS),
             "verifier_revisions": ledger["benchmark"]["verifiers"],
@@ -523,7 +660,10 @@ def execute_native(ledger_path: Path, ledger: dict, source_commit: str, conditio
             "harness_stop_policy": ledger["limits"],
             "harbor_limit_policy": setup["harbor_limit_policy"],
             "runtime_versions": setup["runtime_versions"], "python": sys.version,
-        })
+        }
+        if cache_mode:
+            execution_record["cache_reuse"] = cache_context
+        save_json(directory / "execution.json", execution_record)
         retrieval = make_blob_spool(
             setup["retrieval"], run_id, source_commit, setup["provenance"]["ledger_sha256"], condition
         )
@@ -534,13 +674,23 @@ def execute_native(ledger_path: Path, ledger: dict, source_commit: str, conditio
         minimum = ledger["stability"]["minimum_repetitions"]
         maximum = len(baseline["repetitions"]) if baseline else ledger["stability"]["maximum_repetitions"]
         first_block_end = ledger["stability"]["interim_repetitions"] if baseline is None else maximum
-        trials, repetitions, complete = run_repetition_block(
-            directory, ledger, recorder, server, key, 1, first_block_end, stage_repetition)
-        summary["trials"].extend(trials)
-        summary["repetitions"].extend(repetitions)
-        if not complete:
-            raise ValueError("Native outcome or required metrics are incomplete; no task replacement")
-        if condition == "none":
+        if cache_mode:
+            trials, repetitions, complete = run_repetition_block(
+                directory, ledger, recorder, server, key, 1, 1, stage_repetition,
+            )
+            summary["trials"].extend(trials)
+            summary["repetitions"].extend(repetitions)
+            if not complete or len(repetitions) != 1:
+                raise ValueError("Cache-reuse bundle requires one complete five-task native repetition")
+            summary["status"] = "complete"
+        else:
+            trials, repetitions, complete = run_repetition_block(
+                directory, ledger, recorder, server, key, 1, first_block_end, stage_repetition)
+            summary["trials"].extend(trials)
+            summary["repetitions"].extend(repetitions)
+            if not complete:
+                raise ValueError("Native outcome or required metrics are incomplete; no task replacement")
+        if not cache_mode and condition == "none":
             interim = interim_baseline_gate(summary["repetitions"], list(TASKS))
             summary["interim_decision"] = interim
             if interim["decision"] == "stop_for_design_audit":
@@ -568,14 +718,14 @@ def execute_native(ledger_path: Path, ledger: dict, source_commit: str, conditio
                     decision = baseline_summary(summary["repetitions"], list(TASKS))
                 decision["rule_status"] = "accepted_in_execution_ledger"
                 summary["baseline_decision"] = decision
-        if summary["status"] != "stopped":
+        if not cache_mode and summary["status"] != "stopped":
             summary["status"] = "complete"
-        if condition == "none" and summary["status"] == "complete" and (
+        if not cache_mode and condition == "none" and summary["status"] == "complete" and (
             summary["baseline_decision"]["status"] != "observed_range_stabilized"
             or not summary["baseline_decision"]["comparison_informative"]
         ):
             summary["status"] = "inconclusive"
-        if baseline and summary["status"] == "complete":
+        if not cache_mode and baseline and summary["status"] == "complete":
             changed = sum(trial["metrics"]["changed_candidate_occurrences"] for trial in summary["trials"])
             summary["quality_comparison"] = compare_quality(baseline["repetitions"], summary["repetitions"], list(TASKS), changed)
             summary["quality_comparison"]["rule_status"] = "accepted_in_execution_ledger"

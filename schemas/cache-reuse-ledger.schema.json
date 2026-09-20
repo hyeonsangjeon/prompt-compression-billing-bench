@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cache-reuse-ledger.schema.json",
+  "title": "Cache reuse count execution ledger",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "kind", "status", "live_execution_authorized",
+    "design_source_commit", "design_ledger_sha256", "native_ledger", "output_dir",
+    "execution_unit", "conditions", "reuse_levels", "runner", "model", "generation",
+    "cache", "measurement", "pricing", "contrasts", "stability", "quality",
+    "transport", "runtime_required_checks", "output", "record"
+  ],
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "runtime_bound_approved"}}},
+      "then": {"properties": {"live_execution_authorized": {"const": true}}},
+      "else": {"properties": {"live_execution_authorized": {"const": false}}}
+    }
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "kind": {"const": "cache_reuse_execution_ledger"},
+    "status": {"enum": ["template_live_no_go", "runtime_bound_live_no_go", "runtime_bound_approved"]},
+    "live_execution_authorized": {"type": "boolean"},
+    "design_source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "design_ledger_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "native_ledger": {"type": "string", "pattern": "^[A-Za-z0-9._/-]+$"},
+    "output_dir": {"const": "runs/cache-reuse"},
+    "execution_unit": {"type": "object"},
+    "conditions": {"const": ["none", "squeez"]},
+    "reuse_levels": {"const": [0, 1, 2]},
+    "runner": {"type": "object"},
+    "model": {"type": "object"},
+    "generation": {"type": "object"},
+    "cache": {"type": "object"},
+    "measurement": {"type": "object"},
+    "pricing": {"type": "object"},
+    "contrasts": {"type": "object"},
+    "stability": {"type": "object"},
+    "quality": {"type": "object"},
+    "transport": {"type": "object"},
+    "runtime_required_checks": {
+      "type": "array",
+      "minItems": 14,
+      "maxItems": 14,
+      "uniqueItems": true,
+      "items": {"type": "string"}
+    },
+    "output": {"type": "object"},
+    "record": {"type": "object"}
+  }
+}
