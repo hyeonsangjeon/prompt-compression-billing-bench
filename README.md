@@ -178,6 +178,7 @@ have not been validated.
 | Accountless native execution and historical evidence | [Local native runner](docs/local-native.md) |
 | Opt-in Foundry path, workload metrics and proposed baseline rule | [Native contract](docs/native-contract.md) |
 | Current protocol, baseline, static compressors and open decisions | [Experiment record](docs/experiment/README.md) |
+| Deferred SWE-Lancer candidate evaluation and no-trace boundary | [SWE-Lancer candidate evaluation](docs/experiment/swe-lancer-candidate-evaluation-20260920.md) |
 | Unsupported paths and readiness gaps | [Status](STATUS.md) |
 | What may be shared and what stays private | [Publication grades](docs/publication.md) |
 | Third-party provenance and exact license copies | [Third-party notices](THIRD_PARTY_NOTICES.md) |

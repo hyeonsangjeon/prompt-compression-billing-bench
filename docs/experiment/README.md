@@ -10,6 +10,7 @@
 | 차수 | 상태 | 시작 문서 | 범위 |
 |---|---|---|---|
 | 1차 예비 압축 비교 | 완료된 예비 관측 | [1차 실험 한 장 요약](01-preliminary-comparison/README.md) | 26과제 × 4조건, 조건당 1회 |
+| SWE-Lancer 3차 후보 평가 | 보류로 평가 완료 | [후보 평가](swe-lancer-candidate-evaluation-20260920.md) | 고정 1과제의 실행 전 관문 1회, 실제 trace 0건 |
 
 새 실험은 실행 조건과 범위가 정해진 뒤 `02-<실험명>/README.md` 형식으로 추가한다.
 아직 시작하지 않은 2차 실험의 빈 폴더나 결과 문서는 미리 만들지 않는다.
@@ -30,6 +31,10 @@
 
 1. [실데이터 연결 가이드](data-connection-guide-20260919.md)에서 원본을 공개 저장소에 올리지 않고 준비·무호출 확인·명시적 실행·결과 검증까지 잇는 방법을 확인한다.
 2. [실제 1과제 YAML 안내](../../README.md#try-it-in-five-minutes)에서 기본 무호출 확인과 명시적 실제 실행 경계를 확인한다.
+
+## 별도 후보 평가
+
+- [SWE-Lancer 3차 벤치마크 후보 평가](swe-lancer-candidate-evaluation-20260920.md): 공식 README의 고정 1과제를 실행 전 관문까지 확인한 보류 결론. worker·model·provider가 시작되지 않아 실제 trace나 grader 결과는 없다.
 
 ## 현재 상태
 

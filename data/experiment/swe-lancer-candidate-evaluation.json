@@ -1,0 +1,89 @@
+{
+  "attempt": {
+    "attempt_wall_limit_seconds": 4920,
+    "cleanup_reserve_seconds": 120,
+    "elapsed_seconds": 4.41742351,
+    "exit_code": 2,
+    "finished_at_utc": "2026-09-20T03:28:23.409942658Z",
+    "grader_outcome": null,
+    "grader_status": "not_started",
+    "outcome": "technical_preflight_failure",
+    "started_at_utc": "2026-09-20T03:28:18.991196619Z",
+    "status": "not_ready"
+  },
+  "candidate_conclusion": "defer",
+  "claim_boundary": "One fixed task reached the private execution admission gate. No SWE-Lancer trace, quality, representativeness, benchmark pass rate, population cost, or invoice was measured.",
+  "cost": {
+    "attempt_cap_usd": "20.00",
+    "calculated_provider_cost_usd": "0.00",
+    "calculation_basis": "zero provider requests started",
+    "host_compute_cost_measured": false,
+    "input_unit_price_usd_per_million_tokens": null,
+    "invoice_observed": false,
+    "output_unit_price_usd_per_million_tokens": null,
+    "price_source": null,
+    "run_cap_usd": "20.00"
+  },
+  "counts": {
+    "http_attempts": 0,
+    "logical_model_requests": 0,
+    "model_visible_message_snapshots": 0,
+    "provider_usage_records": 0,
+    "retries": 0,
+    "tool_calls": 0,
+    "tool_results": 0,
+    "trace_events": 0
+  },
+  "direct_observations": {
+    "container_or_vm_started": false,
+    "image_body_downloaded": false,
+    "image_manifest_head_http_status": 200,
+    "provider_called": false,
+    "result_no_clobber_verified": true,
+    "sandbox_started": false,
+    "source_catalog_task_and_runtime_pins_matched": true,
+    "worker_or_model_started": false
+  },
+  "kind": "swe_lancer_third_benchmark_candidate_evaluation",
+  "pins": {
+    "catalog_sha256": "5c3a6d4570b49be0d9fced98f5b32487420b16f25c98d6658830e31fa03f049a",
+    "image_manifest_digest": "sha256:b6ee529bbc589b251d2e287aa28068ea4f7e69b3eac2927b393091ac968e7587",
+    "provider": "openai",
+    "reported_model_revision": null,
+    "runtime_python": "Python 3.12.13",
+    "solver_model_setting": "openai/gpt-4o",
+    "solver_sha256": "860c8bf2e65d02de9d768ff36fee6d80bb8d3dfa9955e6b83ad983ea49c62012",
+    "upstream_commit": "51052cede8cc608f95bb00346635e03759013e5a"
+  },
+  "privacy": {
+    "container_identifier_included": false,
+    "credential_value_included": false,
+    "private_endpoint_included": false,
+    "private_path_included": false,
+    "raw_messages_included": false,
+    "reference_answer_included": false,
+    "task_body_included": false
+  },
+  "provider_usage": {
+    "input_tokens": null,
+    "output_tokens": null,
+    "status": "not_observed",
+    "usage_is_invoice": false
+  },
+  "schema_version": 1,
+  "selection": {
+    "selected_row_canonical_sha256": "ff7ea7f9d37739a30adff1d26f51eb3baee87a1cad421d4e1cc17c26adb19702",
+    "selected_row_canonical_utf8_bytes": 2761,
+    "selection_fixed_before_task_content": true,
+    "split": "diamond",
+    "task_body_public": false,
+    "task_id": "28565_1001",
+    "task_type": "ic_swe"
+  },
+  "stop_rule": {
+    "additional_attempt_allowed_in_this_work": false,
+    "retry_performed": false,
+    "triggered": "runtime_admission_failed_before_worker_or_provider_start"
+  },
+  "trace_obtained": false
+}
