@@ -6,5 +6,7 @@
   native 원장 템플릿이다.
 - [`screening.template.toml`](screening.template.toml)은 Terminal-Bench 2.1
   선별 규칙과 중단·비용 기록 필드를 고정한다.
+- [`recovery.template.toml`](recovery.template.toml)은 외부 노출을 끈 상태로
+  로컬 squeez 원문 회수·수명·인증 경계를 고정한 비운영 템플릿이다.
 
 템플릿에는 자격 증명 값 대신 환경 변수 이름만 기록한다.

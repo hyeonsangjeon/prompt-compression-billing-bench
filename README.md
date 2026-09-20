@@ -110,6 +110,7 @@ version. Binary distribution is an [open readiness item](STATUS.md).
 - A reproducible aggregate EDA chart; raw historical requests are not distributed.
 - An optional [local-model native runner](docs/local-native.md), not yet connected to the compressor pipeline.
 - An opt-in [Harbor/Foundry candidate-compression runner](docs/native-contract.md) for none, squeez, a Headroom paths-only profile and LLMLingua-2, with a shared protected transport, per-task workload metrics, a five-repetition continuation gate and local-first Blob result retrieval. A none baseline is measured; a preliminary native comparison for 26 tasks × four conditions is complete with one run per condition, but the preregistered repeated evaluation remains unexecuted.
+- A disabled [local squeez recovery contract](docs/squeez-recovery.md) with byte-exact source verification, run-scoped stores, exact-file cleanup and an owner-only UNIX-socket capability boundary. It is not wired into an agent or the native runner.
 
 ## Protection
 
@@ -158,6 +159,7 @@ have not been validated.
 | All EDA and preliminary-result charts | [Plain-language visualization guide](docs/experiment/01-preliminary-comparison/visualization-guide-20260919.md) |
 | Condition-level evidence, run identifiers and hashes | [Preliminary comparison evidence](docs/experiment/01-preliminary-comparison/preliminary-comparison-20260916.md) |
 | Exact execution, provenance, adapter and measurement contracts | [Static contract](docs/static-contract.md) |
+| Disabled local squeez source recovery and lifecycle boundary | [Local recovery contract](docs/squeez-recovery.md) |
 | Accountless native execution and historical evidence | [Local native runner](docs/local-native.md) |
 | Opt-in Foundry path, workload metrics and proposed baseline rule | [Native contract](docs/native-contract.md) |
 | Current protocol, baseline, static compressors and open decisions | [Experiment record](docs/experiment/README.md) |

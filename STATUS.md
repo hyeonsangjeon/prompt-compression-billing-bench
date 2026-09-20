@@ -4,6 +4,12 @@ This public-source layout includes a measured none baseline, but not a completed
 native compression comparison. The baseline stopped inconclusive under its
 predeclared rule. Static compressor measurements remain separate from native quality.
 
+The disabled same-host squeez recovery scope is implemented: source identity,
+exit-zero not-found handling, run-store isolation, exact-file lifecycle cleanup
+and a separate-process local capability boundary have model-free coverage. Remote
+or multi-user exposure remains a separate operational scope rather than an open
+condition of this local contract.
+
 ## Nine checks
 
 | Check | State | Present contract and remaining gap |
@@ -12,10 +18,10 @@ predeclared rule. Static compressor measurements remain separate from native qua
 | 2. One execution ledger | **Implemented; compressor execution pending** | Static and opt-in native ledgers fix their distinct paths. The native path checks committed source, benchmark files, image/dependency pins, four condition profiles, the eight-worker LLMLingua pool with complete candidate input, wire settings, one persistent cooperative deployment queue and managed-identity result retrieval. The current native schema records no harness dollar, call-count, output, request-size or phase/run-time stop. The none baseline used an approved historical ledger; the public template remains deliberately unapproved. External-caller isolation is not automatically verified. |
 | 3. Record provenance | **Implemented for static runs and the none baseline** | Each row separates provider usage, local counts, calculated deltas, classification and invoice-unreconciled cost. The measured baseline records source SHA and exact snapshots. Old sanitized native evidence has no source SHA and is not retroactively upgraded. |
 | 4. Drift safeguards | **Rule executed; baseline inconclusive** | The five-repetition gate allowed collection to continue, the 10-repetition halves differed, and the total-20 halves still differed. The rule stopped comparison as inconclusive. These operational rules are not proof of statistical stability or equivalence. Private raw measurements cannot be rerun by public CI. |
-| 5. Unsupported cases | **Explicit, not solved** | A narrow source-bound live log classifier and Terminal adapter exist. No general benchmark adapter, DeepSWE execution, measured cloud comparison, semantic log-preservation proof, agent-visible recovery tool or recovery-cost result. Native judge subcheck gaps remain disclosed, not regraded away. |
+| 5. Unsupported cases | **Explicit, not solved** | A narrow source-bound live log classifier and Terminal adapter exist. A disabled same-host squeez recovery contract now verifies source bytes and local lifecycle controls, but it is not an agent-visible service. No general benchmark adapter, DeepSWE execution, semantic log-preservation proof or recovery-cost result exists. Native judge subcheck gaps remain disclosed, not regraded away. |
 | 6. Layered README | **Implemented** | Scope first, chart/method limits next, synthetic static commands next, native execution and detailed contracts behind links. This does not make the five-minute native path pass. |
 | 7. Terminology | **Implemented** | Candidate range, message-content denominator, tool display, local tokenizer and unavailable billing are defined at use. No tool display is named a billed-token result. |
-| 8. Failure paths | **Partial** | Missing dependencies/resources, dirty/wrong source, cross-worker verification-input drift, malformed partitions, explicit process/tool exits and invalid UTF-8 stop explicitly. Normal elapsed time and measured cost do not stop the current native path. Historical LLMLingua suffix loss remains a prior-profile observation. Blob failures preserve an atomic local payload for retry/resume and block a complete status; collection-host checksum verification and VM cleanup passed for the none baseline but remain external conditions for each future run. |
+| 8. Failure paths | **Partial** | Missing dependencies/resources, dirty/wrong source, cross-worker verification-input drift, malformed partitions, explicit process/tool exits and invalid UTF-8 stop explicitly. The disabled squeez recovery path also distinguishes exit-zero not-found, rejects identity, expiry, replay and quota failures before supplier execution, and refuses unsafe cleanup. Normal elapsed time and measured cost do not stop the current native path. Blob collection-host verification and VM cleanup remain external conditions for each future run. |
 | 9. Publication grades | **Partial** | Exact file allowlist, private attachment/import/work ignores, aggregate-only EDA and sanitized experiment discussion records exist. Every staged file still requires review; licensing and binary redistribution remain separate unresolved decisions. |
 
 ## Remaining work
@@ -27,6 +33,7 @@ predeclared rule. Static compressor measurements remain separate from native qua
 - Execute the fixed squeez, Headroom paths-only and LLMLingua-2 conditions only after resolving the baseline decision; adapter software tests and static reductions are not native quality evidence.
 - Run the all-adapter execution-host preflight at every designated SHA; it performs no provider call and does not replace a native comparison.
 - Validate tool-specific semantic anchors during the comparison; result retrieval is separate from an agent-visible recovery experiment and has no recovery-token claim.
+- Keep the local recovery template disabled unless an operator supplies a transactional authorization and quota store. Multi-user or remote exposure is a separate operational scope, not a claim of the completed same-host contract.
 - Port the remaining EDA/classification pipelines away from private layouts and review their figure/table data. Only the reviewed candidate-share aggregate renderer is in this source layout.
 - Decide licensing and reuse terms. A local documentation commit is not a push.
 
