@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "kind": "readme_benchmark_no_call_documentation_bridge",
+  "created_at_utc": "2026-09-20T06:00:09Z",
+  "base_record": {
+    "path": "data/experiment/readme-benchmark-validation-20260920.json",
+    "bytes": 4685,
+    "sha256": "e32f242ce0148d9fdbb274c15d7039e45a5ecf73768641dea388fcb478a43e77"
+  },
+  "current_readme": {
+    "full_file_sha256": "03fdd1da45d98f53cfc4f765f46faaa19d965e0fa3397357e276ef65c8190180",
+    "section_heading": "### Provider-backed benchmark contract check",
+    "section_bytes": 3302,
+    "section_sha256": "1013fe55b4fad6db1330c46c2664c5a6fdbc058dad2261f9071b90aaf97202bf"
+  },
+  "commands_reexecuted": false,
+  "provider_execution_performed": false,
+  "reason": "The accountless native quickstart was inserted before the unchanged provider-backed subsection. This record binds the current subsection to the preserved no-call command record without relabeling those historical commands as a new execution.",
+  "claim_limit": "This bridge proves documentation and historical-record continuity only. The separate accountless record carries the actual local-model measurement."
+}

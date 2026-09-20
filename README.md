@@ -53,6 +53,43 @@ remain disabled.
 
 ## Try it in five minutes
 
+### Cached accountless native run
+
+The repository now has a measured accountless path that makes a real local
+model call and applies a native exact-answer judge. One corrected execution with
+the pinned Qwen2.5 0.5B snapshot completed in **7.761 seconds** and returned
+`wrong_format`. That non-passing verdict is preserved; the proof is about path
+completion, not model quality.
+
+Use Python 3.10.12 with the exact versions in
+[`requirements/accountless-native.txt`](requirements/accountless-native.txt)
+and an already-present model snapshot matching
+[`ledgers/accountless-native.json`](ledgers/accountless-native.json). Then choose
+a new output root and run ID:
+
+```bash
+export ACCOUNTLESS_MODEL_ROOT=/path/to/the/pinned/local/snapshot
+export ACCOUNTLESS_NATIVE_OUTPUT_ROOT="$PWD/_work/accountless-native-runs"
+
+python3 -B -m src.accountless_native check ledgers/accountless-native.json
+python3 -B -m src.accountless_native run ledgers/accountless-native.json \
+  --run-id accountless-native-001
+python3 -B -m src.accountless_native verify \
+  "$ACCOUNTLESS_NATIVE_OUTPUT_ROOT/accountless-native-001"
+```
+
+Exit 0 is a native pass; exit 1 is a completed `wrong_answer` or `wrong_format`.
+The cached measurement includes asset preflight, a fresh Python process, runtime
+import, model load, inference, judging, and result write. Dependency installation,
+model download, and repository clone time are excluded. The proof used no service,
+credential, VM, container, paid call, or external provider. It does not establish
+cold setup time, representative GSM8K performance, rank, non-inferiority,
+determinism, or cost savings. See the [accountless native contract and measured
+record](docs/accountless-native.md) for source rights, hashes, timings, the
+preserved recorder red, and failure diagnostics.
+
+### Provider-backed benchmark contract check
+
 Run from a clean committed checkout with Python 3.12+ and `uv`. The YAML names
 one real Terminal-Bench 2.1 task. The default command validates the task, current
 Git commit, public reference ledger and JSON output contract without calling a model.
@@ -123,7 +160,10 @@ not part of this repository's public file set.
 - A reproducible aggregate EDA chart; raw historical requests are not distributed.
 - A deterministic static-document renderer with independent Markdown comparison,
   repository-prefix HTTP checks and narrow/wide Chromium checks; it does not deploy.
-- An optional [local-model native runner](docs/local-native.md), not yet connected to the compressor pipeline.
+- A measured [accountless cached local-model path](docs/accountless-native.md)
+  for one rights-cleared GSM8K item, separate from the historical
+  [Ollama native runner](docs/local-native.md) and not connected to the
+  compressor pipeline.
 - An opt-in [Harbor/Foundry candidate-compression runner](docs/native-contract.md) for none, squeez, a Headroom paths-only profile and LLMLingua-2, with a shared protected transport, per-task workload metrics, a five-repetition continuation gate and local-first Blob result retrieval. A none baseline is measured; a preliminary native comparison for 26 tasks × four conditions is complete with one run per condition, but the preregistered repeated evaluation remains unexecuted.
 - A disabled [local squeez recovery contract](docs/squeez-recovery.md) with byte-exact source verification, run-scoped stores, exact-file cleanup and an owner-only UNIX-socket capability boundary. It is not wired into an agent or the native runner.
 

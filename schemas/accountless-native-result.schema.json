@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/accountless-native-result.schema.json",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "record_type",
+    "run_id",
+    "attempt_id",
+    "started_at",
+    "finished_at",
+    "status",
+    "exit_code",
+    "native_verdict",
+    "task",
+    "model",
+    "generation",
+    "limits",
+    "flags",
+    "counts",
+    "timings_seconds",
+    "provider_usage",
+    "calculated_cost_usd",
+    "claim_limit"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "record_type": {"const": "accountless_native_attempt"},
+    "run_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"},
+    "attempt_id": {"type": "string"},
+    "status": {"enum": ["running", "completed", "preflight_failed", "execution_failed"]},
+    "exit_code": {"type": ["integer", "null"], "minimum": 0, "maximum": 4},
+    "native_verdict": {"type": ["object", "null"]},
+    "flags": {
+      "const": {"measured": true, "synthetic": false, "projected": false}
+    },
+    "counts": {
+      "type": "object",
+      "required": ["model_invocations", "retries", "native_verdicts"],
+      "properties": {
+        "model_invocations": {"type": "integer", "minimum": 0, "maximum": 1},
+        "retries": {"const": 0},
+        "native_verdicts": {"type": "integer", "minimum": 0, "maximum": 1}
+      },
+      "additionalProperties": false
+    },
+    "timings_seconds": {"type": "object"},
+    "provider_usage": {"type": "null"},
+    "calculated_cost_usd": {"type": "null"}
+  },
+  "additionalProperties": true
+}

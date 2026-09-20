@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "benchmark": "GSM8K",
+  "split": "test",
+  "record_index": 0,
+  "local_id": "gsm8k-test-record-0000",
+  "source_repository": "https://github.com/openai/grade-school-math",
+  "source_revision": "3101c7d5072418e28b9008a6636bde82a006892c",
+  "source_path": "grade_school_math/data/test.jsonl",
+  "source_file_sha256": "3730d312f6e3440559ace48831e51066acaca737f6eabec99bccb9e4b3c39d14",
+  "source_line_sha256": "0eab733099856c87989785764a3523592926fb6c14d4eddd17308c4078515b6a",
+  "question": "Janet’s ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with four. She sells the remainder at the farmers' market daily for $2 per fresh duck egg. How much in dollars does she make every day at the farmers' market?",
+  "answer": "Janet sells 16 - 3 - 4 = <<16-3-4=9>>9 duck eggs a day.\nShe makes 9 * 2 = $<<9*2=18>>18 every day at the farmer’s market.\n#### 18"
+}
