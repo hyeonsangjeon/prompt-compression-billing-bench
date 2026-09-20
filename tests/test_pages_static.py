@@ -545,6 +545,7 @@ class PagesStaticSourceTests(unittest.TestCase):
         self.assertIn("https://pypi.org/simple", workflow)
         self.assertIn("requirements/pages-static.txt", workflow)
         self.assertNotIn("--extra pages", workflow)
+        self.assertNotIn('run: "$RUNNER_TEMP', workflow)
 
         direct = (ROOT / "requirements/pages-static.in").read_text(encoding="utf-8").splitlines()
         self.assertEqual(

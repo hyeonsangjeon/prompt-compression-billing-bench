@@ -25,7 +25,8 @@ jobs:
             --requirement requirements/pages-static.txt
           "$RUNNER_TEMP/pages-venv/bin/python" -B -m playwright install --with-deps chromium
       - name: Exercise renderer contracts and negative controls
-        run: "$RUNNER_TEMP/pages-venv/bin/python" -B -m unittest tests.test_pages_static -v
+        run: |
+          "$RUNNER_TEMP/pages-venv/bin/python" -B -m unittest tests.test_pages_static -v
       - name: Build twice and verify without deploying
         shell: bash
         run: |
