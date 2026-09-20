@@ -129,7 +129,7 @@ completion.technical_status = not_run
 
 `checked`는 “실행 전에 확인할 연결이 맞다”는 뜻이다. 모델 답변, 품질과 비용은 아직 측정하지 않았다. Schema 통과도 JSON 모양을 확인할 뿐, 값의 진실성이나 청구서를 보증하지 않는다.
 
-무호출 경로의 기존 clean-checkout 검증 범위는 [검증 기록](../../data/experiment/readme-benchmark-validation.json)에 있다. 그 기록에도 실제 provider 실행은 포함되지 않았다.
+무호출 경로의 현재 clean-checkout 검증 범위는 [검증 기록](../../data/experiment/readme-benchmark-validation-20260920.json)에 있다. 그 기록에도 실제 provider 실행은 포함되지 않았다.
 
 ## 4. 승인 뒤에만 실제 실행한다
 

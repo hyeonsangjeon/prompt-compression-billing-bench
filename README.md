@@ -31,7 +31,7 @@ labels. Its ten figures use relative paths; tool-behavior experiments are separa
 
 For external sharing, start with the [first-study one-page summary](docs/experiment/01-preliminary-comparison/README.md),
 then use the [plain-language Korean summary](docs/experiment/01-preliminary-comparison/plain-language-results-20260917.md),
-the [one-page Korean briefing](docs/experiment/01-preliminary-comparison/experiment-briefing-20260919.md)
+the [Korean experiment-design appendix](docs/experiment/01-preliminary-comparison/experiment-briefing-20260919.md)
 and [plain-language visualization guide](docs/experiment/01-preliminary-comparison/visualization-guide-20260919.md),
 then use the [technical evidence report](docs/experiment/01-preliminary-comparison/preliminary-comparison-20260916.md)
 for condition-level figures, run identifiers and hashes. The broader
@@ -80,7 +80,7 @@ uv run --locked python run.py experiment examples/experiment/benchmark.yaml --ex
 runtime approval and evidence fields allowed by the public reference. It then
 delegates the selected task to the existing `screening_run --diagnose-task`
 path; it does not implement another benchmark engine. The checked path above is
-measured in the [repository validation record](data/experiment/readme-benchmark-validation.json).
+measured in the [current repository validation record](data/experiment/readme-benchmark-validation-20260920.json).
 A provider-backed five-minute
 completion is a target, not a verified result: this change made no provider call.
 `status=failed` with `outcome=technical_incomplete` is not a wrong answer.
@@ -98,9 +98,17 @@ sed 's/^name = "none"$/name = "squeez"/' ledgers/demo.toml > _work/demo-squeez.t
 uv run --locked python run.py static --source-commit "$SOURCE_COMMIT" _work/demo-squeez.toml
 ```
 
-The pinned Linux x86-64 binary is version 1.48.4. Its upstream release/tag was
-unavailable at inspection; there is no automatic download or fallback to a newer
-version. Binary distribution is an [open readiness item](STATUS.md).
+The pinned Linux x86-64 binary is version 1.48.4, 2,056,992 bytes, with SHA-256
+`ef956365ace3aa5f362847afc000aa008d5b4a26db4ee2c5bcc0d2718d043773`. On
+2026-09-19, its versioned release and tag URLs returned `404`. An authenticated
+GitHub Actions artifact linked to source commit
+`6d7be4e633f04f2276f5384175d435b29141562e` matched the pinned binary, but the
+artifact is scheduled to expire on 2026-12-02 and is not a permanent anonymous
+download. Keep `SQUEEZ_BINARY` bring-your-own: the npm package's 1.48.4 installer
+points to `releases/latest`, so the package version does not pin the downloaded
+binary. Verify the final executable's version and SHA-256 before use. There is no
+automatic download or fallback to a newer version, and the binary and archive are
+not part of this repository's public file set.
 
 ## Implementation
 
@@ -152,7 +160,7 @@ have not been validated.
 | Need | Read |
 |---|---|
 | First preliminary comparison in one page | [First-study summary](docs/experiment/01-preliminary-comparison/README.md) |
-| Decision briefing and experiment-design gaps | [One-page briefing](docs/experiment/01-preliminary-comparison/experiment-briefing-20260919.md) |
+| Experiment-design review and remaining gaps | [Experiment-design appendix](docs/experiment/01-preliminary-comparison/experiment-briefing-20260919.md) |
 | Preliminary results in plain Korean | [Plain-language sharing summary](docs/experiment/01-preliminary-comparison/plain-language-results-20260917.md) |
 | User-facing benchmark YAML and JSON contract | [Single-task YAML](examples/experiment/benchmark.yaml) · [Result schema](schemas/experiment-result.schema.json) |
 | Offline synthetic contract fixture | [Static YAML](examples/experiment/static.yaml) · [Static JSON](examples/experiment/static-result.json) |
@@ -165,5 +173,6 @@ have not been validated.
 | Current protocol, baseline, static compressors and open decisions | [Experiment record](docs/experiment/README.md) |
 | Unsupported paths and readiness gaps | [Status](STATUS.md) |
 | What may be shared and what stays private | [Publication grades](docs/publication.md) |
+| Third-party provenance and exact license copies | [Third-party notices](THIRD_PARTY_NOTICES.md) |
 
 No raw run, prompt, recovery stash, imported tree or private work note is published automatically.

@@ -20,7 +20,7 @@
 2. [1차 실험 26과제 설명](01-preliminary-comparison/tasks.md)에서 과제별 문제, 공개 통과 대상, 시간·요청·비용을 확인한다.
 3. [과제별 변경 조건 대조표](01-preliminary-comparison/metrics.md)에서 문자열이 달라진 23조건과 같은 과제의 `none`, 변경 0인 압축 조건 55개를 확인한다.
 4. [공유용 쉬운 설명](01-preliminary-comparison/plain-language-results-20260917.md)에서 26개 과제·104개 조건의 결과와 한계를 읽는다.
-5. [한 장 브리핑](01-preliminary-comparison/experiment-briefing-20260919.md)에서 지금 정할 수 있는 것과 실험 설계의 빈자리를 확인한다.
+5. [실험 설계 검토 부록](01-preliminary-comparison/experiment-briefing-20260919.md)에서 지금 정할 수 있는 것과 실험 설계의 빈자리를 확인한다.
 6. [손실·무손실 압축 안내](01-preliminary-comparison/lossless-lossy-compression-20260919.md)에서 네 조건의 복원 가능성과 품질·비용의 차이를 확인한다.
 7. [시각화 부록](01-preliminary-comparison/visualization-guide-20260919.md)에서 EDA 10개와 단위별 예비 비교 차트를 확인한다.
 8. [예비 비교 기술 증거](01-preliminary-comparison/preliminary-comparison-20260916.md)에서 조건별 세부 수치, 실행 식별자와 SHA-256 검증값을 확인한다.
@@ -77,7 +77,7 @@
 - [1차 실험 한 장 요약](01-preliminary-comparison/README.md): 실험 조건, 핵심 관측과 결과별 비용을 한 장 흐름으로 정리한 공유용 문서
 - [1차 실험 26과제 설명](01-preliminary-comparison/tasks.md): 과제별 쉬운 설명, 공개 통과 대상과 네 조건의 시간·요청·비용
 - [과제별 변경 조건 대조표](01-preliminary-comparison/metrics.md): 변경 23조건의 로컬 토큰·판정·비용과 같은 과제 `none`, 변경 0인 압축 조건 55개
-- [한 장 브리핑](01-preliminary-comparison/experiment-briefing-20260919.md): 측정 단계, 현재 결론과 실험 설계 10문항
+- [실험 설계 검토 부록](01-preliminary-comparison/experiment-briefing-20260919.md): 측정 단계, 현재 결론과 실험 설계 10문항
 - [손실·무손실 압축 안내](01-preliminary-comparison/lossless-lossy-compression-20260919.md): 전송 압축·캐시·prompt 축약의 차이와 네 조건의 실제 복원 범위
 - [시각화 부록](01-preliminary-comparison/visualization-guide-20260919.md): EDA 10개, 측정 흐름과 단위별 예비 비교 차트
 - [공유용 쉬운 설명](01-preliminary-comparison/plain-language-results-20260917.md): 26과제·104조건을 비전문가가 먼저 읽을 수 있게 풀어 쓴 결과와 한계

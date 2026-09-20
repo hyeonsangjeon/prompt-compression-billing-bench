@@ -22,20 +22,25 @@ condition of this local contract.
 | 6. Layered README | **Implemented** | Scope first, chart/method limits next, synthetic static commands next, native execution and detailed contracts behind links. This does not make the five-minute native path pass. |
 | 7. Terminology | **Implemented** | Candidate range, message-content denominator, tool display, local tokenizer and unavailable billing are defined at use. No tool display is named a billed-token result. |
 | 8. Failure paths | **Partial** | Missing dependencies/resources, dirty/wrong source, cross-worker verification-input drift, malformed partitions, explicit process/tool exits and invalid UTF-8 stop explicitly. The disabled squeez recovery path also distinguishes exit-zero not-found, rejects identity, expiry, replay and quota failures before supplier execution, and refuses unsafe cleanup. Normal elapsed time and measured cost do not stop the current native path. Blob collection-host verification and VM cleanup remain external conditions for each future run. |
-| 9. Publication grades | **Partial** | Exact file allowlist, private attachment/import/work ignores, aggregate-only EDA and sanitized experiment discussion records exist. Every staged file still requires review; licensing and binary redistribution remain separate unresolved decisions. |
+| 9. Publication grades | **Implemented for the tracked candidate** | The exact allowlist grades every tracked file, including the reviewed Terminal-Bench verifier notice and byte-exact Apache-2.0 copy. The squeez executable remains bring-your-own and excluded. This technical boundary does not select a root source license, establish DeepSWE redistribution rights or change repository visibility. |
 
 ## Remaining work
 
 - Establish a genuinely measured five-minute accountless native path, including an explicit setup boundary.
 - Decide whether an inconclusive 20-repetition none baseline should block the three compressor conditions or trigger a redesigned baseline. The current runner blocks automatic comparison.
 - Repeat the verified baseline host-cleanup and retrieval gates for every comparison, and validate deployment-wide caller isolation. Settings alone do not control external drift.
-- Resolve squeez 1.48.4 distribution: the retained executable matches its checksum, but its upstream versioned release/tag is unavailable. No binary is vendored or silently upgraded.
+- Keep squeez 1.48.4 bring-your-own: the authenticated official Actions artifact confirms the pinned binary's bytes but expires on 2026-12-02, while versioned release and tag URLs returned `404` during inspection. No binary is vendored, downloaded automatically or silently upgraded.
 - Execute the fixed squeez, Headroom paths-only and LLMLingua-2 conditions only after resolving the baseline decision; adapter software tests and static reductions are not native quality evidence.
 - Run the all-adapter execution-host preflight at every designated SHA; it performs no provider call and does not replace a native comparison.
 - Validate tool-specific semantic anchors during the comparison; result retrieval is separate from an agent-visible recovery experiment and has no recovery-token claim.
 - Keep the local recovery template disabled unless an operator supplies a transactional authorization and quota store. Multi-user or remote exposure is a separate operational scope, not a claim of the completed same-host contract.
 - Port the remaining EDA/classification pipelines away from private layouts and review their figure/table data. Only the reviewed candidate-share aggregate renderer is in this source layout.
-- Decide licensing and reuse terms. A local documentation commit is not a push.
+
+## Owner decisions outside this technical release
+
+- Choose a root license for this repository's own source.
+- Resolve whether any DeepSWE-derived material may be redistributed beyond the aggregate-only files already graded here.
+- Decide repository visibility separately. This work does not change it.
 
 ## Checks without model calls
 

@@ -45,7 +45,7 @@ class BenchmarkRunTests(unittest.TestCase):
         self.assertEqual(resolved.reference_ledger["replay"]["require_complete_capture"], True)
 
     def test_readme_no_call_validation_record_matches_sources_and_boundaries(self):
-        record = json.loads((ROOT / "data/experiment/readme-benchmark-validation.json").read_bytes())
+        record = json.loads((ROOT / "data/experiment/readme-benchmark-validation-20260920.json").read_bytes())
         self.assertEqual(record["kind"], "readme_benchmark_no_call_validation")
         for relative, expected in record["source_files"].items():
             with self.subTest(relative=relative):
@@ -71,6 +71,13 @@ class BenchmarkRunTests(unittest.TestCase):
         self.assertEqual(record["outputs"]["missing_endpoint"]["outcome"], "technical_incomplete")
         self.assertFalse(record["provider_execution"]["performed"])
         self.assertIsNone(record["provider_execution"]["wall_time_seconds"])
+
+    def test_previous_readme_validation_record_is_preserved(self):
+        historical = ROOT / "data/experiment/readme-benchmark-validation.json"
+        self.assertEqual(
+            hashlib.sha256(historical.read_bytes()).hexdigest(),
+            "7c41509855045881ea37e04d42d839d1fe42f080d44054310845f6da1b4f08cb",
+        )
 
     def test_missing_wrong_type_url_and_unknown_task_are_rejected(self):
         missing = deepcopy(self.request)

@@ -32,7 +32,8 @@ SUMMARY_FIELDS = {
 }
 PUBLIC_FILES = {
     ".gitignore", ".python-version", "pyproject.toml", "uv.lock", "ledger.toml",
-    "run.py", "accounting.py", "evidence.py", "README.md", "STATUS.md",
+    "run.py", "accounting.py", "evidence.py", "README.md", "STATUS.md", "THIRD_PARTY_NOTICES.md",
+    "third_party/licenses/terminal-bench-2.1-Apache-2.0.txt",
     "tests/test_accounting.py", "tests/test_evidence.py", "tests/test_run.py", ".github/workflows/check.yml",
     "evidence/local-baseline.json", "evidence/development-3b-failure.json",
     "evidence/development-7b-timeout.json", "evidence/development-reasoning-timeout.json",
@@ -65,6 +66,7 @@ PUBLIC_FILES = {
     "data/experiment/terminal-bench-2.1-task-types.json", "ledgers/screening.template.toml",
     "data/experiment/preliminary-comparison-summary.json",
     "data/experiment/readme-benchmark-validation.json",
+    "data/experiment/readme-benchmark-validation-20260920.json",
     "data/experiment/outcome-cost-evidence.json",
     "data/experiment/outcome-cost-accounting.json",
     "tests/test_protection.py", "tests/test_static.py", "tests/test_eda.py", "tests/test_compare.py",

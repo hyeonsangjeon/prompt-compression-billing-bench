@@ -22,6 +22,7 @@ the audit, including force-added ignored material.
 | Source/configuration | `tests/native_helpers.py`, `tests/test_baseline.py`, `tests/test_native_contract.py`, `tests/native_test_harbor_preflight.py`, `tests/test_native_compressors.py`, `tests/test_adapter_preflight.py`, `tests/test_blob_retrieval.py`, `tests/test_native_judge.py`, `tests/test_native_run.py`, `tests/test_task_metrics.py`, `tests/test_live_transport.py`, `tests/test_live_observations.py`, `tests/test_harbor_transport.py`, `tests/test_prompt_intake.py`, `tests/test_squeez_recovery.py`, `tests/test_local_recovery.py` | Synthetic/fake-upstream validation, worker-pool and complete-input checks, native-only Harbor preflight, model-free guarded adapter preflight, local spool/retry/resume checks, real SDK serialization without models, local recovery and lifecycle controls, removed-limit regressions, malformed/failure/provenance tests and private prompt intake |
 | Source/configuration | `requirements/llmlingua2-cpu.txt`, `fixtures/llmlingua2/path-listing.txt`, `fixtures/llmlingua2/severity-log.txt`, `fixtures/llmlingua2/package-install.txt` | Exact observed LLMLingua CPU environment pins and small public-benchmark-shaped determinism probes; no model weights or private requests |
 | Source/configuration | `verifiers/terminal-bench-2.1/nginx-request-logging/revision.json`, `fixtures/verifiers/nginx-request-logging/unbraced.conf`, `fixtures/verifiers/nginx-request-logging/braced.conf`, `fixtures/verifiers/nginx-request-logging/wrong-variable.conf`, `tests/test_verifier_revisions.py` | Public benchmark verifier source/effective hashes and three model-free syntax fixtures; no benchmark responses or private paths |
+| Third-party provenance | `THIRD_PARTY_NOTICES.md`, `third_party/licenses/terminal-bench-2.1-Apache-2.0.txt` | Reviewed provenance and local-change notice for the nginx verifier excerpt, plus the byte-exact upstream Apache-2.0 text; neither file licenses the rest of this repository or resolves DeepSWE and LLMLingua2 rights |
 | Implementation documentation | `docs/native-contract.md` | Fixed native design, units, proposed range rule, known judge/transport limits and execution gates; not an experiment results report |
 | Source/configuration | `schemas/frozen-input.schema.json`, `schemas/static-ledger.schema.json`, `schemas/static-result.schema.json` | Frozen input partitions, one selected ledger and typed per-record provenance |
 | Source/configuration | `ledgers/demo.toml`, `ledgers/static.toml` | Synthetic and private historical input profiles; no resource address or credential value |
@@ -39,7 +40,7 @@ the audit, including force-added ignored material.
 | Plain-language outcome-cost report | `docs/experiment/01-preliminary-comparison/outcome-cost-accounting-20260918.md` | Pass, normally graded nonpass and pre-quality cost scopes, arithmetic controls and blocked program-wide metric in easy Korean; calculated costs are not invoices |
 | Public execution template | `ledgers/screening.template.toml` | Non-operational values and public rates; execution authorization and private runtime references remain unset, while the no-harness-stop policy and reporting target are explicit |
 | Public single-task request | `examples/experiment/benchmark.yaml`, `schemas/benchmark-request.schema.json`, `src/benchmark_run.py`, `tests/test_benchmark_run.py` | Simple real-benchmark YAML, clean-HEAD no-call check, approved-ledger comparison and delegation to the existing single-task screening runner; no endpoint value or credential |
-| Public no-call validation | `data/experiment/readme-benchmark-validation.json` | Clean-checkout command timings, exit codes, source and output hashes for the README path; no provider-backed timing or model result |
+| Public no-call validation | `data/experiment/readme-benchmark-validation.json`, `data/experiment/readme-benchmark-validation-20260920.json` | Preserved historical record and the current clean-checkout command timings, exit codes, source and output hashes for the README path; neither contains provider-backed timing or a model result |
 | Aggregate result charts | `data/experiment/preliminary-comparison-summary.json`, `src/experiment_figures.py`, `figures/preliminary-*.svg`, `tests/test_experiment_figures.py` | Six unit-separated charts generated from the hash-bound public 26-task·104-condition tables; no new model run or raw request |
 | Plain-language visualization guide | `docs/experiment/01-preliminary-comparison/visualization-guide-20260919.md` | EDA 10 figures, the evidence-flow Mermaid and six preliminary-result charts with samples, denominators, units, claim limits and source hashes |
 | Sanitized measurement plan | `docs/experiment/01-preliminary-comparison/outcome-cost-accounting-plan-20260918.md`, `tests/test_outcome_cost_plan.py` | Defines pass, judged non-pass and unjudged spend without treating benchmark pass as customer acceptance or calculated API cost as an invoice |
@@ -69,6 +70,16 @@ Local-provider tokens are not billed cloud tokens.
 | System metadata | `@eaDir/` directories at any depth, `.DS_Store` | Synology/Finder metadata, ignored while untracked and forbidden if force-added |
 | Private EDA originals | Original EDA scripts, figures and row-level catalogs under `_work/` | Only the exact reviewed copies listed above are graded. Raw sources, classification records and the standalone review HTML stay private; the aggregate renderer does not reproduce all EDA |
 | Unresolved distribution/reuse | Third-party binaries, models and unapproved assets | No vendored squeez executable, Headroom package, LLMLingua model, imported dependency tree or silently assumed redistribution/license grant |
+
+The pinned squeez binary remains bring-your-own and outside the public allowlist.
+Private evidence links its exact bytes to official GitHub Actions artifact
+`9904766312`, but that authenticated artifact is scheduled to expire on
+2026-12-02 and is not a permanent anonymous distribution path. The fixed upstream
+source provides an Apache-2.0 `LICENSE` and `NOTICE`; any binary redistribution
+still needs separate decisions on carrying those materials, the third-party
+allowlist, the project's own source license and publication approval. This evidence
+does not authorize vendoring the binary or ZIP, adding an automatic downloader, or
+using npm or `releases/latest` as a pin fallback.
 
 Raw and transformed hashes are retained in private run snapshots. Public aggregate
 lineage retains the original table hashes without private host paths. Independent
@@ -100,5 +111,6 @@ with `python -m src.eda_report`; it does not reconstruct private source data.
 This is not a general secret scanner or a license/legal review. Inspect staged blobs
 for customer identifiers, internal paths, resource addresses, credentials, fixture
 specificity and internal commentary separately. A zero-match pattern scan is not
-a proof that arbitrary material is safe. Keep licensing and public release as
-explicit decisions; a first local commit does not resolve them.
+a proof that arbitrary material is safe. The tracked candidate's file grades and
+third-party notice checks do not choose a root source license, establish DeepSWE
+redistribution rights or change repository visibility.
