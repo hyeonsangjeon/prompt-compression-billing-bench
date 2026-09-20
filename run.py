@@ -498,6 +498,10 @@ def main() -> int:
         from src.experiment_run import main as experiment_main
 
         return experiment_main(sys.argv[2:])
+    if len(sys.argv) > 1 and sys.argv[1] == "cache-reuse":
+        from src.cache_reuse import main as cache_reuse_main
+
+        return cache_reuse_main(sys.argv[2:])
     parser = argparse.ArgumentParser()
     parser.add_argument("ledger", nargs="?", type=Path, default=ROOT / "ledger.toml")
     parser.add_argument("--check", action="store_true")

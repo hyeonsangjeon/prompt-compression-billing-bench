@@ -267,8 +267,11 @@ executed DeepSWE, nor count a SWE-bench surrogate as DeepSWE validation.
 
 ## Resource and control boundaries
 
-The runner schedules contiguous waves of at most eight native trials, including
-across repetition boundaries. The queue holds an exclusive process lock on a
+The standard comparison template schedules contiguous waves of at most eight
+native trials, including across repetition boundaries. The ledger supplies that
+value and keeps eight as its default. The separate cache-reuse profile accepts
+only an explicit value of one and stops before provider dispatch otherwise; it
+does not change historical or default comparison runs. The queue holds an exclusive process lock on a
 persistent, deployment-bound file and uses an internal thread lock for rolling
 RPM/TPM reservations and provider cooldown. Every participating deployment caller
 on that host must use the **same absolute queue path**, not a new file per run.

@@ -21,6 +21,7 @@ def source_files(root: Path) -> tuple[str, ...]:
         *sorted(path.relative_to(root).as_posix() for path in (root / "schemas").glob("*.json")),
         *sorted(path.relative_to(root).as_posix() for path in (root / "requirements").glob("*.txt")),
         *sorted(path.relative_to(root).as_posix() for path in (root / "fixtures/llmlingua2").glob("*.txt")),
+        *sorted(path.relative_to(root).as_posix() for path in (root / "fixtures/cache-reuse").glob("*.json")),
     )
 
 
@@ -42,7 +43,10 @@ def require_sha(commit: str | None) -> str:
 
 
 def committed_source_files(root: Path, commit: str) -> set[str]:
-    names = git(root, "ls-tree", "-r", "--name-only", commit, "--", "src", "schemas", "requirements", "fixtures/llmlingua2").decode().splitlines()
+    names = git(
+        root, "ls-tree", "-r", "--name-only", commit, "--",
+        "src", "schemas", "requirements", "fixtures/llmlingua2", "fixtures/cache-reuse",
+    ).decode().splitlines()
     return {
         "run.py", "accounting.py", "pyproject.toml", "uv.lock",
         *(name for name in names if name.endswith((".py", ".json", ".txt"))),

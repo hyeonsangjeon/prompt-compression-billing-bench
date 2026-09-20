@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cache-reuse-result.schema.json",
+  "title": "Cache reuse request observation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "kind", "run_id", "cycle_id", "bundle_id", "attempt_id",
+    "source_commit", "ledger_sha256", "native_ledger_sha256", "runtime_facts_sha256",
+    "condition", "reuse_level", "task_id",
+    "denominators", "pins", "serialized_prefix_sha256", "request_sha256",
+    "provider_usage", "local_tokens", "computed_price", "invoice", "native_verdict", "flags"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "kind": {"const": "cache_reuse_request_observation"},
+    "run_id": {"type": "string"},
+    "cycle_id": {"type": "string"},
+    "bundle_id": {"type": "string"},
+    "attempt_id": {"type": "string"},
+    "source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "ledger_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "native_ledger_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "runtime_facts_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "condition": {"enum": ["none", "squeez"]},
+    "reuse_level": {"enum": [0, 1, 2]},
+    "task_id": {"type": "string"},
+    "denominators": {"type": "object"},
+    "pins": {"type": "object"},
+    "serialized_prefix_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "request_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "provider_usage": {"type": ["object", "null"]},
+    "local_tokens": {"type": ["object", "null"]},
+    "computed_price": {"type": ["object", "null"]},
+    "invoice": {"type": ["object", "null"]},
+    "native_verdict": {"type": ["string", "null"]},
+    "flags": {"type": "object"}
+  }
+}

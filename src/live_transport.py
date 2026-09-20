@@ -297,13 +297,15 @@ class ManagedIdentity:
 
 class LiveRecorder:
     def __init__(self, directory: Path, ledger: dict, source_commit: str, compressor, encoder, queue, sender,
-                 *, condition="none", evidence_kind="native_measurement", request_error_scope="run"):
+                 *, condition="none", evidence_kind="native_measurement", request_error_scope="run",
+                 request_observer=None):
         self.directory, self.ledger, self.source_commit = directory, ledger, source_commit
         self.compressor, self.encoder, self.queue, self.sender = compressor, encoder, queue, sender
         self.condition, self.evidence_kind = condition, evidence_kind
         if request_error_scope not in ("run", "trial"):
             raise ValueError("Request error scope must be run or trial")
         self.request_error_scope = request_error_scope
+        self.request_observer = request_observer
         directory.mkdir(parents=True, exist_ok=False)
         self.lock = threading.RLock()
         self.event_lock = threading.Lock()
@@ -462,6 +464,19 @@ class LiveRecorder:
             compressed.append(result)
         transformed = guard.prepare([result.text for result in compressed])
         outgoing = self.serialize(transformed)
+        request_observation = None
+        if self.request_observer is not None:
+            request_observation = self.request_observer(
+                trial_id=trial_id,
+                task=task,
+                repetition=repetition,
+                request=request_number,
+                payload=transformed,
+                serialized=outgoing,
+            )
+            if not isinstance(request_observation, dict):
+                raise ProtectionViolation("Cache request observer must return a metadata object")
+        observation_fields = {} if request_observation is None else {"cache_reuse": request_observation}
         (directory / "after.json").write_bytes(outgoing)
         proof = guard.verify_serialized(outgoing)
         input_measurement = {
@@ -500,7 +515,8 @@ class LiveRecorder:
                         "local_input_tokens": input_measurement["after"]["message_content_tokens"],
                         "queue_wait_seconds": waited, "rate_reservation_tokens": rate_estimate,
                         "input_cost_estimate_usd": input_cost_estimate,
-                        "input_cost_estimate_is_total_cost_bound": False})
+                        "input_cost_estimate_is_total_cost_bound": False,
+                        **observation_fields})
             started = time.monotonic()
             try:
                 status, raw, headers = self.sender(outgoing)
@@ -510,7 +526,7 @@ class LiveRecorder:
                             "attempt": attempt, "status": None, "provider_usage": None, "tokens": None,
                             "calculated_cost_usd": None, "error_type": type(error).__name__,
                             "elapsed_seconds": elapsed, **provider_timing(None, elapsed),
-                            "billing_unknown": True})
+                            "billing_unknown": True, **observation_fields})
                 raise
             elapsed = time.monotonic() - started
             (directory / f"response-{attempt:02d}.json").write_bytes(raw)
@@ -518,6 +534,7 @@ class LiveRecorder:
                       "status": status, "response_sha256": digest(raw), "elapsed_seconds": elapsed,
                       "provider_usage": None, "calculated_cost_usd": None,
                       "invoice_reconciled": False, "source_commit": self.source_commit,
+                      **observation_fields,
                       **provider_timing(None, elapsed)}
             if status == 200:
                 try:
