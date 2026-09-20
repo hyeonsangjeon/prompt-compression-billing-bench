@@ -1,0 +1,79 @@
+{
+  "approval": {
+    "approval_record": null,
+    "cost_approved": true,
+    "execution_approved": false
+  },
+  "kind": "swe_lancer_one_trace_admission_template",
+  "limits": {
+    "attempt_cost_cap_usd": "20.00",
+    "attempt_wall_seconds": 4920,
+    "cleanup_reserve_seconds": 120,
+    "http_attempt_limit": 40,
+    "logical_request_timeout_seconds": 1200,
+    "run_cost_cap_usd": "20.00",
+    "sdk_retry_count": 0
+  },
+  "provider": {
+    "credential_env": "OPENAI_API_KEY",
+    "input_usd_per_million_tokens": null,
+    "model_setting": "openai/gpt-4o",
+    "name": "openai",
+    "output_usd_per_million_tokens": null,
+    "price_source_revision_or_retrieved_at": null,
+    "price_source_url": null,
+    "reported_model_revision": null
+  },
+  "sandbox": {
+    "endpoint_env": "SWE_LANCER_DOCKER_HOST",
+    "environment": "alcatraz.clusters.local:LocalConfig",
+    "evidence_pins": [
+      {
+        "bytes": null,
+        "name": "credential_permission_review",
+        "path_env": "SWE_LANCER_CREDENTIAL_REVIEW_PATH",
+        "sha256": null
+      },
+      {
+        "bytes": null,
+        "name": "network_isolation_review",
+        "path_env": "SWE_LANCER_NETWORK_REVIEW_PATH",
+        "sha256": null
+      },
+      {
+        "bytes": null,
+        "name": "cleanup_review",
+        "path_env": "SWE_LANCER_CLEANUP_REVIEW_PATH",
+        "sha256": null
+      }
+    ],
+    "image_manifest_digest": "sha256:b6ee529bbc589b251d2e287aa28068ea4f7e69b3eac2927b393091ac968e7587",
+    "image_reference": "swelancer/swelancer_x86_28565_1001:releasev1",
+    "runtime": "nanoeval_alcatraz.alcatraz_computer_interface:AlcatrazComputerRuntime"
+  },
+  "schema_version": 1,
+  "selection": {
+    "split": "diamond",
+    "task_count": 1,
+    "task_id": "28565_1001",
+    "task_type": "ic_swe"
+  },
+  "source": {
+    "commit": "51052cede8cc608f95bb00346635e03759013e5a",
+    "pins": [
+      {
+        "bytes": 15177,
+        "name": "solver",
+        "path_env": "SWE_LANCER_SOLVER_PATH",
+        "sha256": "860c8bf2e65d02de9d768ff36fee6d80bb8d3dfa9955e6b83ad983ea49c62012"
+      },
+      {
+        "bytes": 8403631,
+        "name": "catalog",
+        "path_env": "SWE_LANCER_CATALOG_PATH",
+        "sha256": "5c3a6d4570b49be0d9fced98f5b32487420b16f25c98d6658830e31fa03f049a"
+      }
+    ],
+    "repository": "https://github.com/openai/frontier-evals"
+  }
+}

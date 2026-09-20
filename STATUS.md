@@ -14,6 +14,11 @@ The static first-page renderer, independent Markdown comparison, repository-pref
 HTTP simulation and configured Chromium viewport checks are implemented. The
 repository still does not enable or deploy GitHub Pages.
 
+The fixed one-task SWE-Lancer candidate reached its bounded execution gate once
+and was deferred. Source, catalog, task-row, runtime and image-manifest pins
+matched, but credential, provider-price/revision and isolated-sandbox admission
+did not. No worker, model, provider request, trace or grader started.
+
 ## Nine checks
 
 | Check | State | Present contract and remaining gap |
@@ -22,7 +27,7 @@ repository still does not enable or deploy GitHub Pages.
 | 2. One execution ledger | **Implemented; compressor execution pending** | Static and opt-in native ledgers fix their distinct paths. The native path checks committed source, benchmark files, image/dependency pins, four condition profiles, the eight-worker LLMLingua pool with complete candidate input, wire settings, one persistent cooperative deployment queue and managed-identity result retrieval. The current native schema records no harness dollar, call-count, output, request-size or phase/run-time stop. The none baseline used an approved historical ledger; the public template remains deliberately unapproved. External-caller isolation is not automatically verified. |
 | 3. Record provenance | **Implemented for static runs and the none baseline** | Each row separates provider usage, local counts, calculated deltas, classification and invoice-unreconciled cost. The measured baseline records source SHA and exact snapshots. Old sanitized native evidence has no source SHA and is not retroactively upgraded. |
 | 4. Drift safeguards | **Rule executed; baseline inconclusive** | The five-repetition gate allowed collection to continue, the 10-repetition halves differed, and the total-20 halves still differed. The rule stopped comparison as inconclusive. These operational rules are not proof of statistical stability or equivalence. Private raw measurements cannot be rerun by public CI. |
-| 5. Unsupported cases | **Explicit, not solved** | A narrow source-bound live log classifier and Terminal adapter exist. A disabled same-host squeez recovery contract now verifies source bytes and local lifecycle controls, but it is not an agent-visible service. No general benchmark adapter, DeepSWE execution, semantic log-preservation proof or recovery-cost result exists. Native judge subcheck gaps remain disclosed, not regraded away. |
+| 5. Unsupported cases | **Explicit, not solved** | A narrow source-bound live log classifier and Terminal adapter exist. A disabled same-host squeez recovery contract now verifies source bytes and local lifecycle controls, but it is not an agent-visible service. The one-task SWE-Lancer candidate evaluation closed as deferred after a fail-closed preflight; it produced no trace or grader result. No general benchmark adapter, DeepSWE execution, semantic log-preservation proof or recovery-cost result exists. Native judge subcheck gaps remain disclosed, not regraded away. |
 | 6. Layered README | **Implemented** | Scope first, chart/method limits next, synthetic static commands next, native execution and detailed contracts behind links. The local static first page preserves that source hierarchy without adding a result summary. This does not make the five-minute native path pass or deploy GitHub Pages. |
 | 7. Terminology | **Implemented** | Candidate range, message-content denominator, tool display, local tokenizer and unavailable billing are defined at use. No tool display is named a billed-token result. |
 | 8. Failure paths | **Partial** | Missing dependencies/resources, dirty/wrong source, cross-worker verification-input drift, malformed partitions, explicit process/tool exits and invalid UTF-8 stop explicitly. The disabled squeez recovery path also distinguishes exit-zero not-found, rejects identity, expiry, replay and quota failures before supplier execution, and refuses unsafe cleanup. Normal elapsed time and measured cost do not stop the current native path. Blob collection-host verification and VM cleanup remain external conditions for each future run. |
@@ -39,6 +44,7 @@ repository still does not enable or deploy GitHub Pages.
 - Validate tool-specific semantic anchors during the comparison; result retrieval is separate from an agent-visible recovery experiment and has no recovery-token claim.
 - Keep the local recovery template disabled unless an operator supplies a transactional authorization and quota store. Multi-user or remote exposure is a separate operational scope, not a claim of the completed same-host contract.
 - Port the remaining EDA/classification pipelines away from private layouts and review their figure/table data. Only the reviewed candidate-share aggregate renderer is in this source layout.
+- If SWE-Lancer is revisited, provide a task-owned Docker/Alcatraz endpoint, verify credential permission without recording its value, pin the official model revision and prices, and rerun the same task with a fresh deadline. This is a separate follow-up, not an unrecorded success condition for the completed candidate evaluation.
 
 ## Owner decisions outside this technical release
 
@@ -72,6 +78,9 @@ judge gaps and model-free validation. No real native comparison is a CI fixture.
 See [Static Pages candidate](docs/pages-static.md) for deterministic build,
 independent-parser, project-prefix HTTP and browser-check commands. Those checks
 do not deploy the generated site.
+See [SWE-Lancer candidate evaluation](docs/experiment/swe-lancer-candidate-evaluation-20260920.md)
+for the one-task fail-closed observation, the zero-request boundary and the
+conditions required before any future trace attempt.
 
 ## Data grades
 
