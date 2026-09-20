@@ -1,0 +1,72 @@
+name: Check static Pages candidate
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  pages-static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+      - name: Install hash-locked renderer and browser-check dependencies
+        run: |
+          uv venv --python 3.12 "$RUNNER_TEMP/pages-venv"
+          uv pip install \
+            --python "$RUNNER_TEMP/pages-venv/bin/python" \
+            --require-hashes \
+            --no-config \
+            --default-index https://pypi.org/simple \
+            --keyring-provider disabled \
+            --requirement requirements/pages-static.txt
+          "$RUNNER_TEMP/pages-venv/bin/python" -B -m playwright install --with-deps chromium
+      - name: Exercise renderer contracts and negative controls
+        run: "$RUNNER_TEMP/pages-venv/bin/python" -B -m unittest tests.test_pages_static -v
+      - name: Build twice and verify without deploying
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_root="$RUNNER_TEMP/pages-static"
+          for build in first second; do
+            "$RUNNER_TEMP/pages-venv/bin/python" -B src/pages_build.py \
+              --source-root . \
+              --contract config/pages-static.json \
+              --stylesheet pages/assets/site.css \
+              --output "$run_root/$build/site" \
+              --record-dir "$run_root/$build/record"
+          done
+          diff -qr "$run_root/first/site" "$run_root/second/site"
+          "$RUNNER_TEMP/pages-venv/bin/python" -B src/pages_verify.py \
+            --source-root . \
+            --site-root "$run_root/first/site" \
+            --source-manifest "$run_root/first/record/source-manifest.json" \
+            --build-record "$run_root/first/record/build-record.json" \
+            --stylesheet pages/assets/site.css \
+            --contract config/pages-static.json \
+            --result "$run_root/static-verification.json"
+          "$RUNNER_TEMP/pages-venv/bin/python" -B src/pages_oracle.py \
+            --source-root . \
+            --site-root "$run_root/first/site" \
+            --source-manifest "$run_root/first/record/source-manifest.json" \
+            --build-record "$run_root/first/record/build-record.json" \
+            --contract config/pages-static.json \
+            --result "$run_root/markdown-oracle.json"
+          mkdir -p "$run_root/server/prompt-compression-billing-bench"
+          cp -a "$run_root/first/site/." \
+            "$run_root/server/prompt-compression-billing-bench/"
+          "$RUNNER_TEMP/pages-venv/bin/python" -B src/pages_http_check.py \
+            --server-root "$run_root/server" \
+            --project-prefix /prompt-compression-billing-bench/ \
+            --source-site "$run_root/first/site" \
+            --contract config/pages-static.json \
+            --result "$run_root/project-prefix-http.json"
+          "$RUNNER_TEMP/pages-venv/bin/python" -B src/pages_browser_check.py \
+            --server-root "$run_root/server" \
+            --project-prefix /prompt-compression-billing-bench/ \
+            --contract config/pages-static.json \
+            --result "$run_root/browser.json"
+          "$RUNNER_TEMP/pages-venv/bin/python" -B evidence.py audit-files .

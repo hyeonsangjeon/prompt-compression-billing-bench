@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<body>
+<article class="source-document" data-source-path="docs/control.md">
+<div class="source-body">
+<h1 id="control-literal" data-source-block-kind="heading">Control — *literal*</h1>
+<p data-source-block-kind="paragraph">Backslash *literal* and <code>code ` delimiter</code>. Soft wrap with <a href="../guide/index.html#target">Guide</a> and <img src="../../../files/figures/example.svg" alt="Diagram">.</p>
+<table>
+<thead><tr><th data-source-block-kind="table_header_cell">Field</th><th data-source-block-kind="table_header_cell">Value</th></tr></thead>
+<tbody><tr><td data-source-block-kind="table_body_cell">escaped pipe</td><td data-source-block-kind="table_body_cell">left | right</td></tr></tbody>
+</table>
+<ul>
+<li data-source-block-kind="list_item">parent continuation<ul><li data-source-block-kind="list_item">child</li></ul></li>
+<li data-source-block-kind="list_item"><input class="task-marker" type="checkbox" disabled aria-label="Checklist item"> pending</li>
+<li data-source-block-kind="list_item"><input class="task-marker" type="checkbox" disabled checked aria-label="Checklist item"> complete</li>
+</ul>
+<pre data-source-block-kind="code"><code>fenced **literal**
+</code></pre>
+<p data-source-block-kind="paragraph"><strong>강조 문구</strong>는 CommonMark strong이다.</p>
+<p data-source-block-kind="paragraph"><strong>강조 문구(예시)</strong>는 project extension이다.</p>
+<p data-source-block-kind="paragraph">2 ** 3</p>
+<p data-source-block-kind="paragraph">2**3</p>
+<p data-source-block-kind="paragraph">**/*.py</p>
+<p data-source-block-kind="paragraph">path/**/file</p>
+<p data-source-block-kind="paragraph">**literal**</p>
+<p data-source-block-kind="paragraph"><code>inline **literal**</code></p>
+<p data-source-block-kind="paragraph">unmatched **marker</p>
+</div>
+</article>
+</body>
+</html>

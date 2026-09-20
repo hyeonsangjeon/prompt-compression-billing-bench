@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "kind": "pages_static_site_contract",
+  "project_prefix": "/prompt-compression-billing-bench/",
+  "labels": {
+    "source": "repository-public-files",
+    "visibility": "local-static-preview",
+    "deployment": "deployment-disabled"
+  },
+  "routes": {
+    "primary": {
+      "README.md": "/",
+      "docs/eda/README.md": "/eda/",
+      "docs/experiment/01-preliminary-comparison/README.md": "/first-study/",
+      "docs/experiment/01-preliminary-comparison/visualization-guide-20260919.md": "/figures/",
+      "STATUS.md": "/readiness/",
+      "docs/publication.md": "/readiness/"
+    },
+    "other_markdown_prefix": "/documents/",
+    "copied_file_prefix": "/files/"
+  },
+  "compatibility_anchors": [
+    {
+      "source_path": "docs/experiment/screening-protocol.md",
+      "fragment": "기존-기준선에-미치는-영향",
+      "before_line": 105,
+      "line_sha256": "dae9bdf8d43e3618a70e9d45c1a9477bc00d22ed5477c7f37e61d995b1bde46f",
+      "reason": "Preserve the existing fragment link without changing the source measurement text."
+    }
+  ],
+  "renderer_policy": {
+    "source_code_execution": false,
+    "active_html_execution": false,
+    "raw_html": "Exact static anchors and expanded details/summary only; every other form is escaped.",
+    "svg": "Copy exact bytes only after rejecting active content and external references.",
+    "homepage_new_result_summary": false,
+    "homepage_new_chart": false
+  },
+  "verification_policy": {
+    "shared_parser_is_independent_oracle": false,
+    "protected_content_cross_check": true,
+    "generated_html_reference_check": true,
+    "loopback_project_prefix_check": true
+  },
+  "oracle": {
+    "packages": {
+      "markdown-it-py": "3.0.0",
+      "mdurl": "0.1.2"
+    },
+    "project_dialect": {
+      "strong_extension": {
+        "enabled": true,
+        "marker": "**",
+        "rule": "unescaped_boundary_pair_outside_code_or_raw_html",
+        "uncertain_case": "blocking_difference",
+        "excluded_shapes": [
+          "whitespace-adjacent operator",
+          "alphanumeric-adjacent exponent or multiplication",
+          "path glob",
+          "escaped marker",
+          "inline or fenced code",
+          "unmatched marker"
+        ]
+      }
+    }
+  },
+  "browser_check": {
+    "routes": [
+      "/",
+      "/eda/",
+      "/first-study/",
+      "/figures/",
+      "/readiness/"
+    ],
+    "viewports": [
+      {
+        "name": "wide",
+        "width": 1365,
+        "height": 900
+      },
+      {
+        "name": "narrow",
+        "width": 390,
+        "height": 844
+      }
+    ]
+  },
+  "probes": {
+    "routes": [
+      {
+        "id": "project-root",
+        "url_path": "/prompt-compression-billing-bench/",
+        "expected_file": "index.html"
+      },
+      {
+        "id": "nested-first-study",
+        "url_path": "/prompt-compression-billing-bench/first-study/",
+        "expected_file": "first-study/index.html"
+      },
+      {
+        "id": "directory-index",
+        "url_path": "/prompt-compression-billing-bench/files/examples/static/",
+        "expected_file": "files/examples/static/index.html"
+      },
+      {
+        "id": "query-does-not-change-file",
+        "url_path": "/prompt-compression-billing-bench/first-study/?view=local",
+        "expected_file": "first-study/index.html"
+      }
+    ],
+    "trailing_slash_redirect": {
+      "request_path": "/prompt-compression-billing-bench/first-study",
+      "expected_status": 301,
+      "expected_location": "/prompt-compression-billing-bench/first-study/",
+      "expected_file": "first-study/index.html"
+    },
+    "no_root_fallback": [
+      {
+        "id": "root-assets",
+        "url_path": "/assets/site.css",
+        "expected_status": 404
+      },
+      {
+        "id": "root-route",
+        "url_path": "/first-study/",
+        "expected_status": 404
+      }
+    ],
+    "encoded_hangul_fragment": {
+      "source_file": "documents/docs/experiment/baseline/index.html",
+      "href": "../screening-protocol/index.html#%EA%B8%B0%EC%A1%B4-%EA%B8%B0%EC%A4%80%EC%84%A0%EC%97%90-%EB%AF%B8%EC%B9%98%EB%8A%94-%EC%98%81%ED%96%A5",
+      "decoded_fragment": "기존-기준선에-미치는-영향",
+      "expected_occurrences": 1,
+      "expected_target_file": "documents/docs/experiment/screening-protocol/index.html"
+    }
+  },
+  "preserved_red": {
+    "kind": "historical_project_prefix_record_unrecoverable",
+    "path": "artifacts/project-prefix-http.json",
+    "known_original_bytes": 6802,
+    "known_original_sha256": "c50d7f8cb418f1e8857171ec672e5c398f55b6c5c431881226ca89dfc3a34ce6",
+    "body_recovered": false,
+    "new_execution_is_recovery": false
+  }
+}
