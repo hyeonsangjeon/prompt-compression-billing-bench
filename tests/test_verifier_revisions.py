@@ -39,11 +39,13 @@ class VerifierRevisionTests(unittest.TestCase):
 
     def test_notice_and_license_bind_the_reviewed_verifier_bytes(self):
         notice_bytes = THIRD_PARTY_NOTICE.read_bytes()
-        notice = notice_bytes.decode("utf-8")
+        marker = b"## Terminal-Bench 2.1 \xe2\x80\x94 `nginx-request-logging` verifier excerpt"
+        terminal_notice_bytes = b"# Third-Party Notices\n\n" + marker + notice_bytes.split(marker, 1)[1]
+        notice = terminal_notice_bytes.decode("utf-8")
         license_bytes = TERMINAL_BENCH_LICENSE.read_bytes()
-        self.assertEqual(len(notice_bytes), 1675)
+        self.assertEqual(len(terminal_notice_bytes), 1675)
         self.assertEqual(
-            file_sha256(notice_bytes),
+            file_sha256(terminal_notice_bytes),
             "1422233058b45ab6a8a1e0b8799ef3892614868fec2de89af92f70fc1e43aefc",
         )
         self.assertEqual(len(license_bytes), 11357)

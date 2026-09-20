@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "record_type": "accountless_native_attempt",
+  "run_id": "accountless-native-actual-002",
+  "attempt_id": "accountless-native-actual-002",
+  "started_at": "2026-09-20T05:53:49.556431+00:00",
+  "finished_at": "2026-09-20T05:53:57.317720+00:00",
+  "status": "completed",
+  "exit_code": 1,
+  "native_verdict": {
+    "kind": "official_gsm8k_exact_answer",
+    "source": "pinned_grade_school_math_dataset_py_equivalent",
+    "verdict": "wrong_format",
+    "expected": "18",
+    "observed": null
+  },
+  "task": {
+    "benchmark": "GSM8K",
+    "id": "gsm8k-test-record-0000",
+    "split": "test",
+    "record_index": 0,
+    "input_sha256": "2b2e3f9639f6fa282a0b0c1d622e0c75cc03797b43268945f32b134da4fee344",
+    "source_line_sha256": "0eab733099856c87989785764a3523592926fb6c14d4eddd17308c4078515b6a"
+  },
+  "model": {
+    "provider": "local_transformers",
+    "id": "Qwen/Qwen2.5-0.5B-Instruct",
+    "revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+    "local_files_only": true,
+    "device": "cpu",
+    "dtype": "float32"
+  },
+  "generation": {
+    "max_new_tokens": 128,
+    "do_sample": false,
+    "seed": 0,
+    "retries": 0,
+    "determinism_claimed": false
+  },
+  "limits": {
+    "attempt_wall_seconds": 300,
+    "no_progress_seconds": 120
+  },
+  "flags": {
+    "measured": true,
+    "synthetic": false,
+    "projected": false
+  },
+  "counts": {
+    "model_invocations": 1,
+    "retries": 0,
+    "native_verdicts": 1
+  },
+  "timings_seconds": {
+    "prerequisite": 0.6453824457712471,
+    "runtime_import": 3.913220160175115,
+    "model_load": 0.9340456752106547,
+    "inference": 1.3599966680631042,
+    "judge": 0.00018766475841403008,
+    "end_to_end": 7.761298146098852
+  },
+  "local_token_counts": {
+    "input": 102,
+    "output": 6,
+    "kind": "local_tokenizer_count"
+  },
+  "provider_usage": null,
+  "calculated_cost_usd": null,
+  "raw_output": {
+    "bytes": 11,
+    "sha256": "51f78b27d5e04b98b27ad5fc6abe37aead6e94bca6fccf6bd170977e2911f244",
+    "published": false
+  },
+  "preflight": {
+    "ledger_sha256": "b32bb6b3d9419c02eecdafc2f77e7957fa93c7d5902da1c36d7117ca42ba28a7",
+    "fixture_sha256": "b852a1c0b634f06188e4651eb30fc4cfa56ba30e501a8505824398f8410367db",
+    "task_input_sha256": "2b2e3f9639f6fa282a0b0c1d622e0c75cc03797b43268945f32b134da4fee344",
+    "message_sha256": "f85dd7ad3ee2b7f62cce0c56681155d2d9402992412ff4d103133f0336a90572",
+    "model_asset_manifest_sha256": "9b54e1ff84127de01ba2b7f2ba86c0cec4bdc3e1c1edbd2d75566168ab5bfdc5",
+    "model_weight": {
+      "name": "model.safetensors",
+      "bytes": 988097824,
+      "sha256": "fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe"
+    },
+    "runtime": {
+      "python": "3.10.12",
+      "transformers": "5.14.1",
+      "torch": "2.13.0",
+      "tokenizers": "0.22.2",
+      "safetensors": "0.8.0",
+      "huggingface-hub": "1.23.0",
+      "numpy": "2.2.6"
+    },
+    "source": {
+      "git_commit": "609bf72bcff080552995d4831219e5ffb6d97464",
+      "git_clean": false,
+      "files": [
+        {
+          "path": "src/accountless_native.py",
+          "bytes": 25155,
+          "sha256": "e92f776d113927800c85bc98478df51fb9c1a7a88fbc885d9edd45c001c76c09"
+        },
+        {
+          "path": "ledgers/accountless-native.json",
+          "bytes": 3679,
+          "sha256": "b32bb6b3d9419c02eecdafc2f77e7957fa93c7d5902da1c36d7117ca42ba28a7"
+        },
+        {
+          "path": "schemas/accountless-native-result.schema.json",
+          "bytes": 1593,
+          "sha256": "41a9fe74b31bdb59fcf1c25e82c31026f48f9a7bbfc1da7ae28bf7d16bd3e551"
+        },
+        {
+          "path": "fixtures/accountless-native/gsm8k-test-record-0000.json",
+          "bytes": 952,
+          "sha256": "b852a1c0b634f06188e4651eb30fc4cfa56ba30e501a8505824398f8410367db"
+        }
+      ],
+      "aggregate_sha256": "ec35859c0003d1cbf6e0326d76f74548daf6a661d346e3340da50410afe28712"
+    },
+    "checked_at": "2026-09-20T05:53:50.201904+00:00"
+  },
+  "error": null,
+  "claim_limit": "One selected task and one or two executions establish only cached-path completion, not model quality, representative GSM8K performance, rank, non-inferiority, determinism, or cold installation/download time.",
+  "model_visible_prompt_sha256": "e80056625892af25fde1b22a028b17f3432da3bfb91d8a644d40b262304e16c4",
+  "disclosure": "sanitized_measurement",
+  "proof_summary": {
+    "actual_model_invocations_in_bounded_proof": 2,
+    "integrated_completed_attempts": 1,
+    "integrated_native_verdicts": 1,
+    "completed_attempts_within_300_seconds": 1,
+    "model_or_runtime_downloads": 0,
+    "package_installs": 0,
+    "credentials": 0
+  },
+  "prior_red": {
+    "run_id": "accountless-native-actual-001",
+    "started_at": "2026-09-20T05:52:29.962760+00:00",
+    "last_worker_event_at": "2026-09-20T05:52:39.052602+00:00",
+    "status": "recorder_finalization_failed",
+    "cli_exit_code": 2,
+    "failure": {
+      "type": "KeyError",
+      "missing_field": "input_tokens"
+    },
+    "source_before_fix": {
+      "bytes": 23683,
+      "sha256": "0b0add2a14e4bbc5ab11aea770b9c109af2ea80f9a71b388ea4d051155106521"
+    },
+    "counts": {
+      "model_invocations": 1,
+      "native_verdicts_recovered_model_free": 1,
+      "retries": 0
+    },
+    "native_verdict": "wrong_format",
+    "timings_seconds": {
+      "runtime_import": 4.9978392999619246,
+      "model_load": 1.383598882239312,
+      "inference": 1.9920094558037817,
+      "end_to_end": null
+    },
+    "raw_output": {
+      "bytes": 11,
+      "sha256": "51f78b27d5e04b98b27ad5fc6abe37aead6e94bca6fccf6bd170977e2911f244",
+      "published": false
+    },
+    "preserved_as_pass": false
+  }
+}

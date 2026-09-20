@@ -4,6 +4,12 @@ This public-source layout includes a measured none baseline, but not a completed
 native compression comparison. The baseline stopped inconclusive under its
 predeclared rule. Static compressor measurements remain separate from native quality.
 
+The cached accountless quickstart now has a real offline local-model invocation
+and exact-answer native verdict. Its corrected integrated run completed in 7.761
+seconds with `wrong_format`; that result establishes path completion, not model
+quality. Dependency installation, model download, and clone time remain outside
+the measured boundary.
+
 The disabled same-host squeez recovery scope is implemented: source identity,
 exit-zero not-found handling, run-store isolation, exact-file lifecycle cleanup
 and a separate-process local capability boundary have model-free coverage. Remote
@@ -23,19 +29,19 @@ did not. No worker, model, provider request, trace or grader started.
 
 | Check | State | Present contract and remaining gap |
 |---|---|---|
-| 1. Real five-minute run | **Open** | A real accountless Ollama path exists separately, but historical cached executions exceeded five minutes. Cold installation and downloads are not covered. The synthetic static demo does not satisfy this check. |
+| 1. Real five-minute run | **Implemented for the cached boundary** | The pinned offline Qwen2.5 0.5B path completed a real model invocation and native GSM8K verdict in 7.761 seconds. One earlier invocation is preserved as a recorder-finalization red. The measurement includes fresh-process import, model load, inference and judging; clone time, package installation and model download are explicitly excluded. The synthetic static demo is not this evidence. |
 | 2. One execution ledger | **Implemented; compressor execution pending** | Static and opt-in native ledgers fix their distinct paths. The native path checks committed source, benchmark files, image/dependency pins, four condition profiles, the eight-worker LLMLingua pool with complete candidate input, wire settings, one persistent cooperative deployment queue and managed-identity result retrieval. The current native schema records no harness dollar, call-count, output, request-size or phase/run-time stop. The none baseline used an approved historical ledger; the public template remains deliberately unapproved. External-caller isolation is not automatically verified. |
-| 3. Record provenance | **Implemented for static runs and the none baseline** | Each row separates provider usage, local counts, calculated deltas, classification and invoice-unreconciled cost. The measured baseline records source SHA and exact snapshots. Old sanitized native evidence has no source SHA and is not retroactively upgraded. |
+| 3. Record provenance | **Implemented for static runs, the none baseline and the accountless proof** | Each row separates provider usage, local counts, calculated deltas, classification and invoice-unreconciled cost. The accountless record binds task, source, config, model assets and runtime hashes and labels measured/synthetic/projected status. The measured baseline records source SHA and exact snapshots. Old sanitized native evidence has no source SHA and is not retroactively upgraded. |
 | 4. Drift safeguards | **Rule executed; baseline inconclusive** | The five-repetition gate allowed collection to continue, the 10-repetition halves differed, and the total-20 halves still differed. The rule stopped comparison as inconclusive. These operational rules are not proof of statistical stability or equivalence. Private raw measurements cannot be rerun by public CI. |
 | 5. Unsupported cases | **Explicit, not solved** | A narrow source-bound live log classifier and Terminal adapter exist. A disabled same-host squeez recovery contract now verifies source bytes and local lifecycle controls, but it is not an agent-visible service. The one-task SWE-Lancer candidate evaluation closed as deferred after a fail-closed preflight; it produced no trace or grader result. No general benchmark adapter, DeepSWE execution, semantic log-preservation proof or recovery-cost result exists. Native judge subcheck gaps remain disclosed, not regraded away. |
-| 6. Layered README | **Implemented** | Scope first, chart/method limits next, synthetic static commands next, native execution and detailed contracts behind links. The local static first page preserves that source hierarchy without adding a result summary. This does not make the five-minute native path pass or deploy GitHub Pages. |
+| 6. Layered README | **Implemented** | Scope first, chart/method limits next, the cached accountless command and boundary, then provider/native details behind links. The local static first page preserves its source hierarchy without adding an independent result summary. The static renderer does not itself prove the accountless result or deploy GitHub Pages. |
 | 7. Terminology | **Implemented** | Candidate range, message-content denominator, tool display, local tokenizer and unavailable billing are defined at use. No tool display is named a billed-token result. |
-| 8. Failure paths | **Partial** | Missing dependencies/resources, dirty/wrong source, cross-worker verification-input drift, malformed partitions, explicit process/tool exits and invalid UTF-8 stop explicitly. The disabled squeez recovery path also distinguishes exit-zero not-found, rejects identity, expiry, replay and quota failures before supplier execution, and refuses unsafe cleanup. Normal elapsed time and measured cost do not stop the current native path. Blob collection-host verification and VM cleanup remain external conditions for each future run. |
+| 8. Failure paths | **Partial** | The accountless path distinguishes preflight, native non-pass, execution failure and run-ID collision; it enforces 300-second attempt, 120-second no-progress and zero-retry limits. Missing dependencies/resources, dirty/wrong source, cross-worker verification-input drift, malformed partitions, explicit process/tool exits and invalid UTF-8 stop explicitly elsewhere. The disabled squeez recovery path also distinguishes exit-zero not-found, rejects identity, expiry, replay and quota failures before supplier execution, and refuses unsafe cleanup. Normal elapsed time and measured cost do not stop the comparison native path. Blob collection-host verification and VM cleanup remain external conditions for each future run. |
 | 9. Publication grades | **Implemented for the tracked candidate** | The exact allowlist grades every tracked file, including the reviewed Terminal-Bench verifier notice and byte-exact Apache-2.0 copy. The squeez executable remains bring-your-own and excluded. This technical boundary does not select a root source license, establish DeepSWE redistribution rights or change repository visibility. |
 
 ## Remaining work
 
-- Establish a genuinely measured five-minute accountless native path, including an explicit setup boundary.
+- Measure cold clone, dependency installation and model acquisition only if a separate onboarding claim is needed; they are not part of the completed cached-path proof.
 - Decide whether an inconclusive 20-repetition none baseline should block the three compressor conditions or trigger a redesigned baseline. The current runner blocks automatic comparison.
 - Repeat the verified baseline host-cleanup and retrieval gates for every comparison, and validate deployment-wide caller isolation. Settings alone do not control external drift.
 - Keep squeez 1.48.4 bring-your-own: the authenticated official Actions artifact confirms the pinned binary's bytes but expires on 2026-12-02, while versioned release and tag URLs returned `404` during inspection. No binary is vendored, downloaded automatically or silently upgraded.
@@ -81,6 +87,8 @@ do not deploy the generated site.
 See [SWE-Lancer candidate evaluation](docs/experiment/swe-lancer-candidate-evaluation-20260920.md)
 for the one-task fail-closed observation, the zero-request boundary and the
 conditions required before any future trace attempt.
+See [Accountless native quickstart](docs/accountless-native.md) for the measured
+cached boundary, the preserved recorder red, source rights and exit diagnostics.
 
 ## Data grades
 

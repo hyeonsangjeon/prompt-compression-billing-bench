@@ -46,18 +46,27 @@ class BenchmarkRunTests(unittest.TestCase):
 
     def test_readme_no_call_validation_record_matches_sources_and_boundaries(self):
         record = json.loads((ROOT / "data/experiment/readme-benchmark-validation-20260920.json").read_bytes())
+        bridge = json.loads((ROOT / "data/experiment/readme-benchmark-validation-20260920-accountless.json").read_bytes())
         self.assertEqual(record["kind"], "readme_benchmark_no_call_validation")
+        self.assertEqual(
+            hashlib.sha256((ROOT / bridge["base_record"]["path"]).read_bytes()).hexdigest(),
+            bridge["base_record"]["sha256"],
+        )
+        self.assertFalse(bridge["commands_reexecuted"])
+        self.assertFalse(bridge["provider_execution_performed"])
         for relative, expected in record["source_files"].items():
             with self.subTest(relative=relative):
                 self.assertEqual(hashlib.sha256((ROOT / relative).read_bytes()).hexdigest(), expected)
         readme = (ROOT / "README.md").read_text()
-        section = record["readme_execution_section"]
-        start = readme.index(section["heading"])
-        end = readme.index("\n## ", start + len(section["heading"]))
+        section = bridge["current_readme"]
+        start = readme.index(section["section_heading"])
+        end = readme.index("\n## ", start + len(section["section_heading"]))
         self.assertEqual(
             hashlib.sha256(readme[start:end].encode()).hexdigest(),
-            section["sha256"],
+            section["section_sha256"],
         )
+        self.assertEqual(len(readme[start:end].encode()), section["section_bytes"])
+        self.assertEqual(hashlib.sha256((ROOT / "README.md").read_bytes()).hexdigest(), section["full_file_sha256"])
         codes = {item["stage"]: item["exit_code"] for item in record["commands"]}
         self.assertEqual(codes, {
             "install": 0,
@@ -77,6 +86,11 @@ class BenchmarkRunTests(unittest.TestCase):
         self.assertEqual(
             hashlib.sha256(historical.read_bytes()).hexdigest(),
             "7c41509855045881ea37e04d42d839d1fe42f080d44054310845f6da1b4f08cb",
+        )
+        current_historical = ROOT / "data/experiment/readme-benchmark-validation-20260920.json"
+        self.assertEqual(
+            hashlib.sha256(current_historical.read_bytes()).hexdigest(),
+            "e32f242ce0148d9fdbb274c15d7039e45a5ecf73768641dea388fcb478a43e77",
         )
 
     def test_missing_wrong_type_url_and_unknown_task_are_rejected(self):
