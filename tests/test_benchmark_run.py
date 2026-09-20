@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -54,19 +55,37 @@ class BenchmarkRunTests(unittest.TestCase):
         )
         self.assertFalse(bridge["commands_reexecuted"])
         self.assertFalse(bridge["provider_execution_performed"])
+        historical_changed_sources = {
+            "schemas/experiment-result.schema.json",
+            "src/benchmark_run.py",
+            "src/experiment_run.py",
+        }
         for relative, expected in record["source_files"].items():
             with self.subTest(relative=relative):
-                self.assertEqual(hashlib.sha256((ROOT / relative).read_bytes()).hexdigest(), expected)
+                current = hashlib.sha256((ROOT / relative).read_bytes()).hexdigest()
+                if relative in historical_changed_sources:
+                    self.assertNotEqual(current, expected)
+                else:
+                    self.assertEqual(current, expected)
         readme = (ROOT / "README.md").read_text()
         section = bridge["current_readme"]
         start = readme.index(section["section_heading"])
         end = readme.index("\n## ", start + len(section["section_heading"]))
         self.assertEqual(
+            json.loads((ROOT / "data/experiment/readme-benchmark-validation.json").read_bytes())[
+                "readme_execution_section"
+            ]["sha256"],
+            "85fca6f62890e2c0c908e96410774c8873709f7abb22007a689a7fa44b8dd0af",
+        )
+        self.assertEqual(
+            section["section_sha256"],
+            "1013fe55b4fad6db1330c46c2664c5a6fdbc058dad2261f9071b90aaf97202bf",
+        )
+        self.assertNotEqual(
             hashlib.sha256(readme[start:end].encode()).hexdigest(),
             section["section_sha256"],
         )
-        self.assertEqual(len(readme[start:end].encode()), section["section_bytes"])
-        self.assertEqual(hashlib.sha256((ROOT / "README.md").read_bytes()).hexdigest(), section["full_file_sha256"])
+        self.assertIn("provider execution safety policy", readme[start:end])
         codes = {item["stage"]: item["exit_code"] for item in record["commands"]}
         self.assertEqual(codes, {
             "install": 0,
@@ -154,6 +173,11 @@ class BenchmarkRunTests(unittest.TestCase):
         text = text.replace('deployment_isolation_reference = ""', 'deployment_isolation_reference = "test isolation record"')
         text = text.replace("preregistered = false", "preregistered = true")
         text = text.replace("execution_authorized = false", "execution_authorized = true")
+        text = text.replace("cost_limits_approved = false", "cost_limits_approved = true")
+        text = text.replace("max_api_cost_usd_per_attempt = 0", "max_api_cost_usd_per_attempt = 1")
+        text = text.replace("max_api_cost_usd_per_run = 0", "max_api_cost_usd_per_run = 10")
+        deadline = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+        text = text.replace('run_deadline_utc = ""', f'run_deadline_utc = "{deadline}"')
         text = text.replace('reference = ""', 'reference = "test operator approval"')
         operational.write_text(text)
 
@@ -170,6 +194,7 @@ class BenchmarkRunTests(unittest.TestCase):
             "evidence_disposition": "quality_result_complete",
             "classification": {
                 "result": "pass",
+                "termination": None,
                 "provider_cost": {"calculated_cost_usd": 0.25},
                 "metrics": {
                     "provider_tokens": {

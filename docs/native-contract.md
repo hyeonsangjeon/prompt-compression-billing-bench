@@ -45,9 +45,10 @@ compressor, not a generated summary. Eight offline Python 3.10 workers load one
 model copy each and accept at most one request per worker. All eight workers run
 the three fixed fixtures; a ledger mismatch or cross-worker output mismatch stops
 the run. Pool wait, adapter execution and worker inference time are recorded
-separately. The current native path does not impose a worker-response or pool-wait
-timer, and every worker must complete its close handshake or report an explicit
-process error.
+separately. The native path has no separate worker-response or pool-wait timer,
+but the outer schema-v4 supervisor still applies the 2,400-second attempt boundary
+and run deadline. Every worker must complete its close handshake or report an
+explicit process error.
 
 The checkpoint loads from a verified local directory while the upstream 0.2.2
 token-boundary branch reads its `model_name` string. After loading, the worker
@@ -61,24 +62,23 @@ line counts; discarded-suffix fields remain empty for schema continuity. This
 is an adapter policy, not behavior supplied by LLMLingua.
 
 The template at `ledgers/native.template.toml` is deliberately unapproved and
-not runnable. Before execution it needs an explicit rule/execution approval
-reference, current rates with a source/check time, a deployment coordination
-reference and a reporting target. The reporting target is not a process timer.
-The public schema-v3 template stores only the environment-variable names for
-provider throughput limits; the private runtime supplies positive integer values.
-Historical schema-v2 snapshots with numeric fields remain hash-bound and
-verifiable, but new result records do not republish the runtime values. The
-ledger treats provider limits and service errors as external constraints and
-fixes eight simultaneous native trial processes. These are deployment
-constraints and comparison controls, not a harness cost or time stop.
+not runnable. Before execution it needs explicit rule, execution and cost-limit
+approval references; current rates with a source/check time; a deployment
+coordination reference; positive per-attempt and whole-run calculated API-cost
+ceilings; and a future UTC deadline. The public schema-v4 template stores only
+the environment-variable names for provider throughput limits; the private
+runtime supplies positive integer values. Historical schema-v2/v3 snapshots
+remain hash-bound and verifiable, but only schema v4 can start new provider work.
 
-The current native path does not impose a dollar stop, provider-call count,
-completion-token cap, request-byte cap, phase timer, whole-run timer or deadline
-timer. It omits Terminus 2 `max_turns`; Harbor 0.22.0 then uses its internal
-default of 1,000,000, which remains a product implementation boundary and is not
-described as unlimited. Provider context length, request size, throughput and
-policy rejection remain external constraints. All calls, elapsed time and costs
-are still measured.
+Schema v4 fixes 60 provider HTTP attempts per attempt, 2,048 output tokens,
+8,000,000 wire bytes per request, 2,400 wall-clock seconds per attempt, a
+300-second provider HTTP timeout, at most three transient HTTP attempts and a
+120-second maximum retry wait. It also stops when the latest eight logical
+requests contain fewer than three distinct progress signals. Cost ceilings and
+the run deadline have no public default: all three must be approved together.
+Harbor's competing phase timers remain disabled, while the outer supervisor and
+guarded loopback transport enforce these boundaries. Provider context length,
+throughput and policy rejection remain separate external constraints.
 
 Concurrency is a comparison control, not an experiment arm. The validator rejects
 any value other than eight instead of issuing a warning that could be ignored.
@@ -189,7 +189,8 @@ All metrics are collected for **all four** conditions from the same path.
 | `timing.transport_seconds` | Client HTTP wall time minus provider-reported service TTLT when both are available; otherwise null with a known subtotal |
 | `timing.model_seconds` | Provider-reported `engine_ttlt_ms`, converted to seconds; otherwise null with a known subtotal |
 | `native_outcome` | Unmodified native binary reward plus failure categories, per-test evidence and integrity warnings |
-| `concurrency`, `deployment_limits` | Fixed outer native-trial concurrency plus the public environment-variable names, check time and source; schema-v3 records do not expose private runtime limit values |
+| `concurrency`, `deployment_limits` | Fixed outer native-trial concurrency plus the public environment-variable names, check time and source; schema-v4 records do not expose private runtime limit values |
+| `execution_safety` | Applied schema-v4 limits, confirmed calculated API cost, unconfirmed exposure, pending reservation, last request/response usage state and any technical stop |
 | `retrieval` | Per-repetition local payload size/SHA, Blob names, attempts, sanitized failure category and ETags; payload-before-manifest ordering is recorded, while collection-host read verification remains an external shutdown gate |
 
 Waits, control keystrokes, undecomposable scripts and uncertain submissions have
@@ -230,9 +231,11 @@ threshold for this small, heterogeneous binary sample.
   safety; unchanged short logs cannot establish that throwing away lines is safe.
 
 Invalid/missing judge evidence, incomplete mandatory metrics, protection errors,
-settings/model-revision changes, explicit process errors and ambiguous transport
-failures stop the run. Elapsed time or accumulated cost alone does not. They are
-not native zeros or grounds for replacing tasks.
+settings/model-revision changes, explicit process errors, ambiguous transport
+failures and schema-v4 safety boundaries stop the run. A safety stop is
+`technical_incomplete` with unknown quality, never a native zero or a reason to
+replace a task. Elapsed time and calculated-cost exposure below the approved
+boundaries remain observations rather than quality evidence.
 Stored decisions and repetitions are reconstructed from per-trial artifacts on
 verification; changing a summary alone cannot change the accepted baseline.
 

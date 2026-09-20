@@ -99,7 +99,12 @@ Terminal-Bench 2.1 원본 verifier는 Nginx에서 동등한 `$http_user_agent`�
 
 **관측:** 정식 선별의 `gpt2-codegolf`는 네 번째 provider 요청이 HTTP 400 `content_filter`로 거부되어 첫 채점 전에 끝났다. 정식 분모에서 제외한 새 단일 과제 진단에서는 provider 요청 60건이 모두 HTTP 200이었고, 그중 2건은 `finish_reason=length`였다. Terminus 2는 출력 길이 제한 뒤 보정 호출을 사용했고, 60회 상한 다음 호출이 로컬에서 차단되자 verifier를 실행하지 않았다. 두 실행의 요청 내용과 작업 이력이 달라 HTTP 400의 재현 여부를 같은 입력 비교로 말할 수 없다.
 
-**처리:** 과제당 provider 호출 상한 60회, `max_turns=60`, 시간과 비용 상한은 바꾸지 않는다. 60회에 닿으면 새 provider 호출 없이 agent 실행을 끝내고 현재 workspace를 verifier로 채점한다. 저장·복원·재채점과 원격 hash 확인이 끝난 결과만 품질 분모에 넣는다. 수정 전 두 `gpt2-codegolf` 실행은 기술 진단으로 남기며 사후 품질 결과로 바꾸지 않는다.
+**당시 처리:** 과제당 provider 호출 상한 60회와 `max_turns=60`만 유지하고, 당시
+시간·비용 정책은 바꾸지 않았다. 60회에 닿으면 새 provider 호출 없이 agent 실행을
+끝내고 현재 workspace를 verifier로 채점했다. 저장·복원·재채점과 원격 hash 확인이
+끝난 결과만 품질 분모에 넣었다. 이는 아래 schema version 4 결정 전의 역사 기록이며
+현재 운영 규칙이 아니다. 수정 전 두 `gpt2-codegolf` 실행은 기술 진단으로 남기며 사후
+품질 결과로 바꾸지 않는다.
 
 **한계:** 이 처리는 Terminus 2가 호출 상한에 닿았을 때 verifier가 생략되는 실행 경로를 고친다. 터미널에서 오래 실행 중인 명령을 모델이 중단하지 못한 원인이나 HTTP 400 정책 거부를 고치지 않는다. 실제 단일 과제 전체 경로 검증은 수정 source commit에서 별도로 수행한다.
 
@@ -131,14 +136,31 @@ Terminal-Bench 2.1 원본 verifier는 Nginx에서 동등한 `$http_user_agent`�
 
 **한계:** 완료된 기술 제외는 품질 통과나 실패가 아니다. `timeout` 4개와 `provider_error` 1개는 해당 과제를 부적격으로 처리하지만 압축 비교 결과로 해석하지 않는다. terminal 종료 수정은 로컬 회귀 검사와 기존 원문 대조를 마쳤으며, 같은 최종 source commit으로 새 연속 실행을 시작하기 전에 읽기 전용 연결·중복·비용 대사를 다시 확인한다.
 
-## 사용자 지정 실행 제한 제거
+## 사용자 지정 실행 제한 제거 — 2026-09-15 당시 결정
 
-**결정:** 2026-09-15 22:40 KST 이후 새 선별과 평가에는 harness가 정한 300 USD 중단, 잔액 차감 차단, 2 USD 진단 상한, 과제당 provider 호출 60회, `max_turns=60`, 최대 출력 2,048 token, 요청 byte 상한, agent·setup·verifier·과제 실행 시간, 전체 실행 시간과 deadline 중단을 적용하지 않는다. 이전 절의 상한과 잔액은 당시 실행 조건과 비용 관측을 설명하는 역사 기록이며 현재 중단 조건이 아니다.
+**당시 결정:** 2026-09-15 22:40 KST 이후 진행한 선별과 평가에는 harness가 정한 300 USD 중단, 잔액 차감 차단, 2 USD 진단 상한, 과제당 provider 호출 60회, `max_turns=60`, 최대 출력 2,048 token, 요청 byte 상한, agent·setup·verifier·과제 실행 시간, 전체 실행 시간과 deadline 중단을 적용하지 않았다. 이 문단은 당시 실행 조건의 역사 기록이다. 앞으로의 유료 실행에는 아래 schema version 4 정책이 적용되며 이 결정을 현재 운영 규칙으로 재사용하지 않는다.
 
-**구현 확인:** 새 실행 원장은 제한 없음 상태를 숫자를 크게 바꾸는 방식이 아니라 명시적인 정책 값으로 기록한다. Harbor `0.22.0`의 phase 시간 계산은 `None`을 반환하도록 실행 진입점에서 적용하고, Terminus 2에는 `max_turns`와 `max_completion_tokens`를 전달하지 않는다. `max_turns` 생략 시 Terminus 2 내부 기본값 1,000,000이 적용되므로 이를 무제한이라고 부르지 않는다. provider 처리량 제한과 서비스 오류, context 길이·요청 크기·정책 거부는 외부 제품 제약으로 남긴다. 일시적 HTTP 오류의 transport 내부 재시도 3회와 Blob 로컬 우선 보존·재시도는 총 호출·시간·달러 중단과 구분해 유지한다.
+**당시 구현 확인:** 당시 실행 원장은 제한 없음 상태를 숫자를 크게 바꾸는 방식이 아니라 명시적인 정책 값으로 기록했다. Harbor `0.22.0`의 phase 시간 계산은 `None`을 반환하도록 실행 진입점에서 적용했고, Terminus 2에는 `max_turns`와 `max_completion_tokens`를 전달하지 않았다. `max_turns` 생략 시 Terminus 2 내부 기본값 1,000,000이 적용되므로 이를 무제한이라고 부르지 않았다. provider 처리량 제한과 서비스 오류, context 길이·요청 크기·정책 거부는 외부 제품 제약으로 남겼다.
 
 **모델 호출 없는 검증:** 실제 Harbor `0.22.0`, LiteLLM `1.100.0`과 로컬 가짜 upstream을 연결한 검사에서 첫 응답의 `finish_reason=length` 보정 호출을 포함해 62건이 전달됐다. 61번째 이후 호출도 전달됐고, 모든 요청에서 `max_completion_tokens`가 빠졌으며 이후 verifier 결과 수집 분류에 진입했다. Harbor의 agent·agent setup·environment setup·verifier 제한 계산은 모두 `None`이었고 native supervisor에는 deadline이 없었다. 이 검증은 실제 provider 실행이나 새 품질 결과가 아니다.
 
 **연속 실행:** 기존 정식 `attempt` 24개와 단일 진단 원본은 덮어쓰지 않는다. 과거 호출·출력·시간 제한 경계에 닿았거나 그 영향을 배제할 수 없는 결과는 새 정책의 품질 결과로 연결하지 않고, 새 실행 ID에서 필요한 과제·반복만 다시 실행한다. 영향이 없고 증거가 완전한 결과만 읽기 전용으로 한 번 연결한다. 확인된 provider 비용 21.4084845 USD와 당시 미확정 예약액 0.37733 USD는 관측 계보를 보존해 각각 확인값과 옛 정책 기반 미확정 추정값으로 기록하며 새 실행 차단에 쓰지 않는다.
 
 **일정:** 이 결정을 기록한 당시 운영 목표는 `2026-09-16 23:59 KST`까지 실제 비교 수치와 근거를 확보하는 것이었다. 이 시각은 process 종료 타이머가 아니었으며, 이전 `2026-09-17 09:00 KST` 실행 종료 목표와 `2026-09-17 21:00 KST` 보고 목표를 대체했다. 새 제한 정책의 실제 provider 선별은 이 결정 기록 시점에 아직 시작하지 않은 상태였다.
+
+## 다음 유료 실행 안전 상한 — schema version 4
+
+**결정:** 앞으로의 provider 유료 실행은 [종료·비용 안전 정책](execution-safety-policy.md)을
+적용한다. attempt당 provider HTTP 시도 60회, 출력 2,048 token, 요청
+8,000,000 bytes, 경과 시간 2,400초와 진행 신호 규칙을 고정한다. attempt·전체 실행
+API 계산 비용 상한과 미래 UTC deadline은 실행별로 승인해야 한다. 셋 중 하나라도
+비어 있으면 provider 호출 전에 실패한다.
+
+**분류:** 상한 도달은 `technical_incomplete`이고 품질은 `unknown`이다. 호출·비용
+경계는 `budget_stopped`, 시간·크기·출력·진행 신호 경계는 `censored`로 기록하며
+`wrong_answer`로 바꾸지 않는다. 확인 비용, 미확정 노출액, 마지막 요청·응답·usage,
+workspace·상태 재생과 verifier 실행 여부를 함께 보존한다.
+
+**자연 종료 관찰:** 일반 비교에서는 허용하지 않는다. 사전 비용 승인, 최대 노출액과
+수동 종료 조건을 독립 계약으로 고정한 별도 파일럿만 검토할 수 있다. 현재 실행기에는
+그 파일럿 진입점이 없다.

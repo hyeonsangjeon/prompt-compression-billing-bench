@@ -24,7 +24,7 @@ class ScreeningCostTests(unittest.TestCase):
         self.assertEqual(result["unknown_attempts_without_estimate"], 0)
         self.assertEqual(
             result["requests"][0]["estimate_basis"],
-            "legacy_budget_reservation_with_output_cap",
+            "pre_dispatch_uncached_input_plus_output_cap",
         )
 
     def test_active_vm_cost_is_shared_only_during_overlap(self):

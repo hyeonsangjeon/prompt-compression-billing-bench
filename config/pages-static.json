@@ -23,7 +23,7 @@
     {
       "source_path": "docs/experiment/screening-protocol.md",
       "fragment": "기존-기준선에-미치는-영향",
-      "before_line": 105,
+      "before_line": 112,
       "line_sha256": "dae9bdf8d43e3618a70e9d45c1a9477bc00d22ed5477c7f37e61d995b1bde46f",
       "reason": "Preserve the existing fragment link without changing the source measurement text."
     }

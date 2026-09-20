@@ -1,4 +1,5 @@
 from copy import deepcopy
+from datetime import datetime, timedelta, timezone
 import os
 from pathlib import Path
 import unittest
@@ -21,8 +22,14 @@ class ScreeningContractTests(unittest.TestCase):
         ledger["approval"] = {
             "preregistered": True,
             "execution_authorized": True,
+            "cost_limits_approved": True,
             "reference": "delegated-final-design-2026-09-15",
         }
+        ledger["limits"].update(
+            max_api_cost_usd_per_attempt=1,
+            max_api_cost_usd_per_run=10,
+            run_deadline_utc=(datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
+        )
         with self.assertRaisesRegex(ValueError, "shared-deployment coordination"):
             require_operational_screening(ledger)
 
@@ -45,16 +52,22 @@ class ScreeningContractTests(unittest.TestCase):
         ledger["approval"] = {
             "preregistered": True,
             "execution_authorized": True,
+            "cost_limits_approved": True,
             "reference": "synthetic test approval",
         }
+        ledger["limits"].update(
+            max_api_cost_usd_per_attempt=1,
+            max_api_cost_usd_per_run=10,
+            run_deadline_utc=(datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
+        )
         ledger["queue"]["deployment_isolation_reference"] = "synthetic test isolation"
         with patch.dict(os.environ, {"PROVIDER_RPM_LIMIT": "17", "PROVIDER_TPM_LIMIT": "1700"}):
-            self.assertGreater(require_operational_screening(ledger), 0)
+            self.assertEqual(require_operational_screening(ledger)["status"], "applied")
 
     def test_legacy_ledger_cannot_start_new_provider_work(self):
         ledger = load_screening_ledger(self.path)
         ledger["schema_version"] = 2
-        with self.assertRaisesRegex(ValueError, "schema-v3"):
+        with self.assertRaisesRegex(ValueError, "schema-v4"):
             require_operational_screening(ledger)
 
 

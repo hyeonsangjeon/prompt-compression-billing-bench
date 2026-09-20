@@ -1,4 +1,4 @@
-"""Run pinned Harbor without harness-imposed phase time limits."""
+"""Disable competing Harbor phase timers beneath the schema-v4 outer safety guard."""
 
 from __future__ import annotations
 

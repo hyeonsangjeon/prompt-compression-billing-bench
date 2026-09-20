@@ -112,6 +112,31 @@ class ScreeningSchedulerTests(unittest.TestCase):
         task = self.state.connection.execute("SELECT state,reason FROM tasks WHERE task_id=?", (trial["task_id"],)).fetchone()
         self.assertEqual(tuple(task), ("ineligible", "setup_error"))
 
+    def test_safety_stops_are_technical_and_do_not_increment_quality_counters(self):
+        for result in ("budget_stopped", "censored"):
+            trial = self.state.claim(1)[0]
+            self.state.mark_attempt_runtime(
+                trial["attempt_id"], process_id=101,
+                artifact_manifest_hash="a" * 64,
+                container_instance_id=trial["attempt_id"] + "-container",
+                workspace_instance_id=trial["attempt_id"] + "-workspace",
+            )
+            self.state.complete_attempt(
+                trial["attempt_id"], result, provider_dispatched=True,
+                evidence_sha256="e" * 64, cost_usd=0.25,
+            )
+            task = self.state.connection.execute(
+                "SELECT state,reason,valid_results,passes,quality_failures "
+                "FROM tasks WHERE task_id=?",
+                (trial["task_id"],),
+            ).fetchone()
+            self.assertEqual(tuple(task), ("ineligible", result, 0, 0, 0))
+            attempt = self.state.connection.execute(
+                "SELECT error_category,cost_usd FROM attempts WHERE attempt_id=?",
+                (trial["attempt_id"],),
+            ).fetchone()
+            self.assertEqual(tuple(attempt), (result, 0.25))
+
     def test_vm_deallocation_preserves_first_attempt_and_schedules_one_fresh_attempt(self):
         trial = self.state.claim(1)[0]
         self.state.mark_attempt_runtime(

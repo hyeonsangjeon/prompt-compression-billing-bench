@@ -68,7 +68,12 @@ source commit 변경 뒤에는 이전 상태의 SHA, 상태나 요약을 새 코
 
 첫 채점 전에 명시적인 provider 거부가 끝난 경우에는 실행하지 않은 채점·복원·재채점 시간을 `null`과 `해당 없음` 사유로 남긴다. 원문 오류, 단계별 상태, 보존할 수 있었던 원본, 원격 hash, 확인된 비용과 미확정 비용 상태가 모두 있어야 기술 제외가 완료된다. 이 예외는 알 수 없는 증거 누락이나 복원 불일치를 허용하지 않는다.
 
-2026-09-15 22:40 KST 이후 새 실행에는 harness가 정한 달러 예산, 과제당 provider 호출 수, 출력 token, 요청 byte, agent·setup·verifier·과제 실행 시간, 전체 실행 시간과 deadline 중단을 두지 않는다. 보고 목표는 process 종료 타이머가 아니다. 오래 걸렸다는 사실만으로 기술 실패로 만들지 않고 실제 process 종료, 명시적 오류, 작업 진전·출력·CPU 기록을 구분한다. provider의 context 길이, 요청 크기, 배포 처리량과 정책 거부는 외부 제품 제약으로 기록한다.
+2026-09-15 22:40 KST의 상한 제거 결정은 당시 실행의 역사 기록으로만 남긴다.
+앞으로의 유료 실행은 [schema version 4 안전 정책](execution-safety-policy.md)에 따라
+attempt당 provider HTTP 시도 60회, 2,048 출력 token, 8,000,000 요청 byte,
+2,400초 경과 시간과 사전 승인한 attempt·전체 실행 API 계산 비용 상한·UTC deadline을
+적용한다. 상한 종료는 `technical_incomplete`이며 품질은 `unknown`이다.
+`budget_stopped` 또는 `censored`로 기록하고 `wrong_answer`로 바꾸지 않는다.
 
 수정 전 실행에서 수락된 명시적 `exit` 명령이 terminal session을 끝내 같은 응답의 다음 명령이 첫 채점 전에 거부된 경우도 별도로 기록한다. 원문 RuntimeError, 명령 trace의 전송 시작·수락·거부 상태, native 결과와 trace의 SHA-256, 완료된 상태 저장, 원격 hash와 비용을 모두 확인한 기존 `attempt`만 기술 제외로 연결한다. 수정 뒤 실행은 session 종료 뒤 현재 workspace를 채점하므로 이 예외로 품질 증거 조건을 낮추지 않는다.
 
@@ -81,7 +86,7 @@ verifier 실행 직전 다음 상태를 보존한다. 상태 재생 묶음 revis
 - verifier가 읽는 서비스·process·container 상태와 로그
 - 민감한 환경 변수 값과 호스트 경로를 원문 대신 SHA-256으로 바꾼 inspect 기록
 
-보존한 상태를 같은 이미지와 verifier revision에 복원한 뒤 모델 호출 없이 verifier를 한 번 더 실행한다. 두 번째 실행은 첫 verifier가 끝난 뒤 같은 컨테이너를 내리기 전에 수행하며, harness가 verifier 종료 시간을 강제하지 않는다. 복원 가능한 파일 상태 hash, verifier source·명령·의존성 hash, test별 pass/fail, exit code와 reward가 모두 같아야 재생 검사가 통과한다.
+보존한 상태를 같은 이미지와 verifier revision에 복원한 뒤 모델 호출 없이 verifier를 한 번 더 실행한다. 두 번째 실행은 첫 verifier가 끝난 뒤 같은 컨테이너를 내리기 전에 수행한다. Harbor 내부 verifier 단계 타이머는 따로 두지 않지만 바깥 supervisor의 attempt 2,400초와 전체 deadline은 계속 적용된다. 복원 가능한 파일 상태 hash, verifier source·명령·의존성 hash, test별 pass/fail, exit code와 reward가 모두 같아야 재생 검사가 통과한다.
 
 실행 중인 process의 메모리 상태는 파일 archive로 재구성하지 않는다. 첫 판정 뒤에도 같은 컨테이너를 유지하며, 판정 직전과 파일 복원 직전의 process 목록이 다르거나 archive가 제외한 소켓 목록이 달라지면 재실행하지 않고 상태 복원 실패로 분류한다. 두 목록이 같아도 process 메모리의 byte 단위 일치를 증명한 것은 아니다.
 

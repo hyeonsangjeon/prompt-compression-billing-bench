@@ -17,6 +17,7 @@ import sys
 import yaml
 
 from .contracts import parse_ledger, validate
+from .execution_safety import safety_failure, safety_policy_record
 from .native_contract import load_native_ledger
 from .protection import digest
 from .provenance import ROOT
@@ -217,6 +218,7 @@ def _invoke_lower(main, arguments: list[str]) -> dict:
 def _base_result(resolved: ResolvedRequest, started_at: str) -> dict:
     request = resolved.request
     endpoint_env = request["provider"]["endpoint_env"]
+    native = request["experiment"]["type"] == "native"
     return {
         "schema_version": 1,
         "run_id": "experiment-check-" + secrets.token_hex(4),
@@ -269,6 +271,8 @@ def _base_result(resolved: ResolvedRequest, started_at: str) -> dict:
         },
         "quality": {"status": "not_measured", "judge": None},
         "completion": {"technical_status": "not_run", "operator_status": "not_applicable"},
+        "execution_safety": safety_policy_record(resolved.ledger, applied=False) if native else None,
+        "termination": None,
         "artifacts": {},
     }
 
@@ -293,13 +297,15 @@ def _static_result(result: dict, directory: Path) -> None:
 def _native_result(result: dict, directory: Path) -> None:
     summary = json.loads((directory / "summary.json").read_bytes())
     summary_status = summary["status"]
+    termination = safety_failure(summary.get("stop_reason"))
     complete = summary_status in ("complete", "inconclusive")
     quality_measured = complete or (
         summary_status == "retrieval_pending"
         and summary.get("completion_status_before_retrieval") in ("complete", "inconclusive")
     )
     operator_status = (
-        "stopped" if summary_status == "stopped"
+        "not_stopped" if termination is not None
+        else "stopped" if summary_status == "stopped"
         else "not_stopped" if complete
         else "not_recorded"
     )
@@ -330,11 +336,17 @@ def _native_result(result: dict, directory: Path) -> None:
         },
         quality={"status": "aggregate_measured" if quality_measured else "unknown", "judge": "terminal-bench-native"},
         completion={"technical_status": "complete" if complete else "incomplete", "operator_status": operator_status},
+        execution_safety=summary.get("execution_safety", result.get("execution_safety")),
+        termination=termination,
         artifacts={"artifacts.json": summary["artifact_manifest_sha256"]},
     )
     result["lineage"]["source_sha256"] = json.loads((directory / "provenance.json").read_bytes())["source_sha256"]
     if not complete:
-        category = "operator_stopped" if summary_status == "stopped" else "native_incomplete"
+        category = (
+            termination["stop_kind"] if termination is not None
+            else "operator_stopped" if summary_status == "stopped"
+            else "native_incomplete"
+        )
         result["error"] = {
             "category": category,
             "message": "Native run did not reach its verified technically complete state",
@@ -387,6 +399,8 @@ def run_request(request_path: Path, *, execute: bool = False) -> tuple[dict, int
                 raise LowerRunnerError(f"Set {endpoint_env} before native preflight")
             if execute and not request["execution"]["provider_calls_approved"]:
                 raise LowerRunnerError("Native provider calls need approval in both YAML and the low-level ledger")
+            if execute:
+                result["execution_safety"] = safety_policy_record(resolved.ledger, applied=True)
             arguments = [
                 str(resolved.ledger_path), "--source-commit", resolved.source_commit,
                 "--condition", request["condition"],

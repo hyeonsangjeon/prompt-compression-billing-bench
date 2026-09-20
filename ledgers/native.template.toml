@@ -1,4 +1,4 @@
-schema_version = 3
+schema_version = 4
 mode = "native_candidate_compression"
 conditions = ["none", "squeez", "headroom", "llmlingua2"]
 output_dir = "runs"
@@ -169,13 +169,21 @@ maximum_backoff_seconds = 60
 final_flush_seconds = 600
 
 [limits]
-provider_cost_stop = "none"
-provider_call_stop = "none"
-request_size_stop = "provider_enforced_only"
-provider_http_timeout = "none"
-run_deadline_stop = "none"
+policy_revision = 1
+max_provider_calls_per_attempt = 60
+max_api_cost_usd_per_attempt = 0
+max_api_cost_usd_per_run = 0
+max_wall_seconds_per_attempt = 2400
+run_deadline_utc = ""
+max_request_bytes = 8000000
+max_output_tokens = 2048
+protocol_token_allowance = 4096
+provider_http_timeout_seconds = 300
+max_retry_wait_seconds = 120
 transient_http_attempts = 3
-reporting_target_utc = "2026-09-16T14:59:00+00:00"
+no_progress_window_calls = 8
+no_progress_minimum_distinct_signals = 3
+natural_termination_observation = "separate_pilot_only"
 
 [prices]
 input_per_million_usd = 0
@@ -195,4 +203,5 @@ comparison_repetitions = "match_baseline"
 [approval]
 execution_approved = false
 rule_accepted = false
+cost_limits_approved = false
 reference = ""

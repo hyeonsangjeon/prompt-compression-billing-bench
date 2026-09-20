@@ -72,7 +72,7 @@ class ExperimentRequestTests(unittest.TestCase):
         self.assertEqual(code, 3)
         self.assertEqual(result["status"], "failed")
         self.assertEqual(result["completion"]["technical_status"], "incomplete")
-        self.assertNotIn("http", json.dumps(result).lower())
+        self.assertNotIn("provider.example", json.dumps(result).lower())
         lower.assert_not_called()
 
     def test_native_default_is_no_call_preflight(self):

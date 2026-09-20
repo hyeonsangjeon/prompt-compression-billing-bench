@@ -17,14 +17,14 @@ ENVIRONMENT_NAME = re.compile(r"[A-Z][A-Z0-9_]*")
 
 
 def queue_fields(schema_version: int) -> set[str]:
-    limit_fields = {"rpm_env", "tpm_env"} if schema_version == 3 else {"rpm", "tpm"}
+    limit_fields = {"rpm_env", "tpm_env"} if schema_version in (3, 4) else {"rpm", "tpm"}
     return COMMON_QUEUE_FIELDS | limit_fields
 
 
 def validate_queue_limits(queue: dict, schema_version: int) -> None:
     if set(queue) != queue_fields(schema_version):
         raise ValueError("Unexpected or missing queue fields")
-    if schema_version == 3:
+    if schema_version in (3, 4):
         for field in ("rpm_env", "tpm_env"):
             if not isinstance(queue[field], str) or not ENVIRONMENT_NAME.fullmatch(queue[field]):
                 raise ValueError("Provider limits must use environment variable names")

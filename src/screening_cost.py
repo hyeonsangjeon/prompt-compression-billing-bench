@@ -32,8 +32,8 @@ def provider_cost(events: list[dict], transport_trial_id: str) -> dict:
         if value is not None and not known:
             raise ValueError("Provider calculated cost is invalid")
         input_estimate = dispatch.get("input_cost_estimate_usd")
-        historical_reservation = dispatch.get("budget_reservation_usd")
-        estimate = input_estimate if input_estimate is not None else historical_reservation
+        budget_reservation = dispatch.get("budget_reservation_usd")
+        estimate = budget_reservation if budget_reservation is not None else input_estimate
         if estimate is not None and (
             type(estimate) not in (int, float)
             or isinstance(estimate, bool)
@@ -54,10 +54,10 @@ def provider_cost(events: list[dict], transport_trial_id: str) -> dict:
             "billing_unknown": not known,
             "unconfirmed_cost_estimate_usd": estimate,
             "estimate_basis": (
+                "pre_dispatch_uncached_input_plus_output_cap"
+                if budget_reservation is not None else
                 "local_input_tokens_times_full_input_rate"
-                if input_estimate is not None else
-                "legacy_budget_reservation_with_output_cap"
-                if historical_reservation is not None else None
+                if input_estimate is not None else None
             ),
         })
     known = [record["calculated_cost_usd"] for record in records if not record["billing_unknown"]]

@@ -9,6 +9,7 @@ import re
 import tomllib
 
 from .screening_inventory import REVISION
+from .execution_safety import LIMIT_FIELDS, require_operational_safety, validate_safety_limits
 from .runtime_limits import queue_fields, runtime_queue_limits, validate_queue_limits
 from .verifier_revisions import VERIFIER_SPECS
 
@@ -40,11 +41,7 @@ FIELDS = {
     "runner": {"harbor_version", "agent_import_path", "environment_import_path", "concurrency"},
     "measurement": {"tokenizer", "tiktoken_version", "cache_env", "table_sha256"},
     "retrieval": {"account_url_env", "spool_root_env", "container", "prefix", "upload_timeout_seconds", "maximum_attempts", "initial_backoff_seconds", "maximum_backoff_seconds", "final_flush_seconds"},
-    "limits": {
-        "provider_cost_stop", "provider_call_stop", "request_size_stop",
-        "provider_http_timeout", "run_deadline_stop", "transient_http_attempts",
-        "reporting_target_utc",
-    },
+    "limits": set(),
     "prices": {"input_per_million_usd", "cached_input_per_million_usd", "output_per_million_usd", "source_reference", "checked_at_utc"},
     "screening": {"condition", "maximum_repetitions_per_task", "valid_results_required", "passes_required", "stop_after_quality_failures", "preparation_retry_maximum", "randomization_seed"},
     "replay": {"required", "bundle_revision", "require_complete_capture"},
@@ -55,6 +52,11 @@ FIELDS = {
         "blob_network_meter_reference", "blob_network_price_checked_at_utc", "near_zero_usd",
     },
     "approval": {"preregistered", "execution_authorized", "reference"},
+}
+LEGACY_UNBOUNDED_LIMIT_FIELDS = {
+    "provider_cost_stop", "provider_call_stop", "request_size_stop",
+    "provider_http_timeout", "run_deadline_stop", "transient_http_attempts",
+    "reporting_target_utc",
 }
 
 
@@ -79,13 +81,15 @@ def validate_screening_ledger(ledger: dict) -> None:
         _validate_legacy_screening_ledger(ledger)
         return
     schema_version = ledger.get("schema_version")
-    fields = {**FIELDS, "queue": queue_fields(schema_version)}
+    limit_fields = LIMIT_FIELDS if schema_version == 4 else LEGACY_UNBOUNDED_LIMIT_FIELDS
+    approval_fields = FIELDS["approval"] | ({"cost_limits_approved"} if schema_version == 4 else set())
+    fields = {**FIELDS, "limits": limit_fields, "approval": approval_fields, "queue": queue_fields(schema_version)}
     if set(ledger) != set(fields) | {"schema_version", "mode", "output_dir", "raw_retrieval"}:
         raise ValueError("Unexpected or missing screening ledger sections")
     for section, names in fields.items():
         if not isinstance(ledger[section], dict) or set(ledger[section]) != names:
             raise ValueError(f"Unexpected or missing [{section}] fields")
-    if schema_version not in (2, 3) or ledger["mode"] != "terminal_bench_screening":
+    if schema_version not in (2, 3, 4) or ledger["mode"] != "terminal_bench_screening":
         raise ValueError("Screening ledger schema or mode differs")
     if ledger["output_dir"] != "runs" or ledger["raw_retrieval"] != "not_exposed_to_agent":
         raise ValueError("Raw screening evidence must remain private and unavailable to the agent")
@@ -140,17 +144,15 @@ def validate_screening_ledger(ledger: dict) -> None:
     if ledger["replay"] != {"required": True, "bundle_revision": 2, "require_complete_capture": True}:
         raise ValueError("Every valid screening result needs a complete replay bundle")
     limits = ledger["limits"]
-    if limits != {
-        "provider_cost_stop": "none",
-        "provider_call_stop": "none",
-        "request_size_stop": "provider_enforced_only",
-        "provider_http_timeout": "none",
-        "run_deadline_stop": "none",
-        "transient_http_attempts": 3,
+    if schema_version == 4:
+        validate_safety_limits(limits)
+    elif limits != {
+        "provider_cost_stop": "none", "provider_call_stop": "none",
+        "request_size_stop": "provider_enforced_only", "provider_http_timeout": "none",
+        "run_deadline_stop": "none", "transient_http_attempts": 3,
         "reporting_target_utc": "2026-09-16T14:59:00+00:00",
     }:
-        raise ValueError("Keep the delegated no-cost, no-call-count, no-size, no-time-stop policy")
-    _timestamp(limits["reporting_target_utc"], "limits.reporting_target_utc")
+        raise ValueError("Keep the historical schema-v2/v3 no-harness-stop policy")
     for section, names in {
         "prices": ("input_per_million_usd", "cached_input_per_million_usd", "output_per_million_usd"),
         "cost": (
@@ -184,23 +186,25 @@ def validate_screening_ledger(ledger: dict) -> None:
     _timestamp(ledger["prices"]["checked_at_utc"], "prices.checked_at_utc")
     if not ledger["prices"]["source_reference"].strip():
         raise ValueError("Provider rates need a source reference")
-    for name in ("preregistered", "execution_authorized"):
+    approval_booleans = ("preregistered", "execution_authorized") + (("cost_limits_approved",) if schema_version == 4 else ())
+    for name in approval_booleans:
         if type(ledger["approval"][name]) is not bool:
             raise ValueError("Approval values must be booleans")
 
 
-def require_operational_screening(ledger: dict) -> float:
-    if ledger["schema_version"] != 3:
-        raise ValueError("New provider execution requires the environment-backed schema-v3 ledger")
-    if not ledger["approval"]["preregistered"] or not ledger["approval"]["execution_authorized"] or not ledger["approval"]["reference"].strip():
+def require_operational_screening(ledger: dict) -> dict:
+    if ledger.get("schema_version") != 4:
+        raise ValueError("New provider execution requires the safety-capped schema-v4 ledger")
+    if not ledger["approval"].get("preregistered") or not ledger["approval"].get("execution_authorized") or not ledger["approval"].get("cost_limits_approved") or not ledger["approval"]["reference"].strip():
         raise ValueError("Preregistration and delegated execution authorization must be recorded")
+    policy = require_operational_safety(ledger)
     queue = ledger["queue"]
     if not queue["limits_source_reference"].strip() or not queue["deployment_isolation_reference"].strip():
         raise ValueError("Quota and shared-deployment coordination need evidence references")
     runtime_queue_limits(queue, ledger["schema_version"])
     if ledger["prices"]["input_per_million_usd"] <= 0 or ledger["prices"]["output_per_million_usd"] <= 0:
-        raise ValueError("Verified rates are required for measurement even without a cost stop")
-    return _timestamp(ledger["limits"]["reporting_target_utc"], "limits.reporting_target_utc").timestamp()
+        raise ValueError("Verified rates are required to enforce and measure the cost ceilings")
+    return policy
 
 
 def _validate_legacy_screening_ledger(ledger: dict) -> None:

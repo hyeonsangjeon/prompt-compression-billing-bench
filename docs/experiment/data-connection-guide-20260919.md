@@ -52,9 +52,14 @@ KT가 공개 YAML에서 고를 수 있는 것은 공개 색인에 있는 과제 
 | 조건 | 추가 압축 없는 기준인 `none` | 공개 참조 원장과 YAML |
 | 실행 경로 | `src.screening_run --diagnose-task` | 결과 JSON의 `resolved_contract.runner` |
 | 보호 계약 | 재현 묶음(replay bundle), 완전한 증거 보존, 재시도(retry) 설정 | 공개 참조 원장과 결과 JSON |
+| 안전 상한 | 호출·비용·시간·요청·출력 경계와 품질 미확정 종료 분류 | [안전 정책](execution-safety-policy.md) |
 | 결과 모양 | 상태, 사용량, 비용, 품질, 완료와 산출물 해시 | [결과 Schema](../../schemas/experiment-result.schema.json) |
 
-실행 연결 코드(wrapper)는 비공개 실행 원장을 공개 참조 원장과 비교한다. 비공개 원장에서 바꿀 수 있는 것은 inventory 파일 지문, provider 제한 근거, deployment 분리 근거와 세 승인 필드뿐이다. 모델, 조건, 실행기(runner), 판정 규칙이나 retry를 함께 바꾸면 실행 전에 거부한다.
+실행 연결 코드(wrapper)는 비공개 실행 원장을 공개 참조 원장과 비교한다. 비공개
+원장에서 바꿀 수 있는 것은 inventory 파일 지문, provider 제한·deployment 분리 근거,
+승인 필드, attempt·전체 실행 비용 상한과 UTC deadline뿐이다. 모델, 조건,
+실행기(runner), 판정 규칙, 고정 호출·시간·크기 경계나 retry를 함께 바꾸면 실행 전에
+거부한다.
 
 ## 1. 원본 데이터를 저장소 밖에서 준비한다
 
@@ -63,7 +68,7 @@ KT가 공개 YAML에서 고를 수 있는 것은 공개 색인에 있는 과제 
 1. 고정 revision의 benchmark checkout과 inventory를 저장소 밖 비공개 위치에 둔다.
 2. inventory 파일의 SHA-256을 계산한다.
 3. 공개 참조 원장을 저장소 밖으로 복사해 비공개 실행 원장으로 쓴다.
-4. 허용된 여섯 필드만 채우고, 원본 inventory와 실행 원장의 해시 기록을 함께 보관한다.
+4. 아래 허용 필드만 채우고, 원본 inventory와 실행 원장의 해시 기록을 함께 보관한다.
 
 ```bash
 sha256sum '<private-inventory-file>'
@@ -80,7 +85,11 @@ sha256sum '<private-directory>/screening.operational.toml'
 | `queue.deployment_isolation_reference` | 공유 deployment 조정 근거 참조 |
 | `approval.preregistered` | 사전 계획 승인 여부 |
 | `approval.execution_authorized` | 실제 유료 실행 승인 여부 |
+| `approval.cost_limits_approved` | 아래 비용 상한과 deadline 승인 여부 |
 | `approval.reference` | 승인 기록 참조 |
+| `limits.max_api_cost_usd_per_attempt` | 한 과제의 한 실제 시도에 허용할 API 계산 비용 |
+| `limits.max_api_cost_usd_per_run` | 이번 새 실행 전체에 허용할 API 계산 비용 |
+| `limits.run_deadline_utc` | 실행을 끝낼 미래 UTC 시각 |
 
 원본 입력, prompt, endpoint 값, credential, tenant 값과 내부 경로는 이 파일에도 넣지 않는다. 환경변수에는 앞 표의 이름에 해당하는 값을 실행 시점에 주입한다.
 
@@ -136,12 +145,16 @@ completion.technical_status = not_run
 실행 전 운영자는 다음을 확인한다.
 
 - 환경변수 값과 플랫폼 identity가 실행 세션에만 주입됐는가.
-- 비공개 실행 원장이 허용된 여섯 필드만 바꿨는가.
+- 비공개 실행 원장이 위 허용 필드만 바꿨는가.
 - inventory SHA-256과 실제 파일이 일치하는가.
 - provider 처리량 제한, deployment 공유 조정과 유료 실행 승인이 기록됐는가.
+- attempt·전체 실행 API 계산 비용 상한과 미래 UTC deadline이 승인됐는가.
 - 원본과 실행 산출물이 고객사 관리 경계를 벗어나지 않는가.
 
-현재 공개 참조 원장은 저장소 차원의 비용·호출 수·경과 시간 중단값을 두지 않는다. Provider 제한과 운영자 승인만으로 실행해도 되는지 KT가 먼저 결정해야 한다. 이 가이드는 새 중단 장치를 추가하지 않는다.
+현재 공개 참조 원장은 schema version 4의 호출·시간·요청·출력 경계를 고정하지만,
+비용 상한과 UTC deadline은 일부러 비워 둔다. 이 세 값과
+`cost_limits_approved=true`를 비공개 원장에 함께 기록하지 않으면 provider 호출 전에
+실패한다. 자세한 값과 종료 분류는 [안전 정책](execution-safety-policy.md)을 따른다.
 
 모든 값과 승인이 준비된 경우에만 다음 명령을 사용한다.
 

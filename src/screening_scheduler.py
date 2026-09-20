@@ -18,6 +18,7 @@ QUALITY_RESULTS = {"pass", "wrong_answer", "wrong_format"}
 PREPARATION_ERRORS = {"image_error", "setup_error"}
 TECHNICAL_ERRORS = {
     "provider_error", "network_error", "timeout", "verifier_crash", "evidence_missing", "replay_mismatch",
+    "budget_stopped", "censored",
 }
 COMPARISON_CONDITIONS = ("none", "squeez", "headroom", "llmlingua2")
 

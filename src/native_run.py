@@ -22,7 +22,15 @@ from .compressors import check_compressor_artifacts, make_compressor
 from .contracts import safe_child, save_json
 from .harbor_no_time_limits import apply_no_time_limit_policy, command as harbor_command
 from .live_observations import POLICY
-from .live_transport import DeploymentQueue, FoundrySender, LiveRecorder, ManagedIdentity, start_live_proxy
+from .execution_safety import SafetyLimitReached, safety_policy_record
+from .live_transport import (
+    DeploymentQueue,
+    FoundrySender,
+    LiveRecorder,
+    ManagedIdentity,
+    TrialRequestBlocked,
+    start_live_proxy,
+)
 from .measurement import load_encoder
 from .native_contract import CONDITIONS, TASKS, load_native_ledger, require_operational_values
 from .native_judge import collect_native_outcome
@@ -108,6 +116,9 @@ def prepare_task(task: str, files: dict[str, bytes], target: Path, image: str, v
 
 def harbor_config(ledger: dict, task_path: Path, jobs: Path, trial_id: str, api_base: str) -> dict:
     runner, model = ledger["runner"], ledger["model"]
+    llm_kwargs = {"num_retries": 0}
+    if ledger.get("schema_version") == 4:
+        llm_kwargs["max_completion_tokens"] = ledger["limits"]["max_output_tokens"]
     return {
         "job_name": trial_id, "jobs_dir": str(jobs), "n_attempts": 1, "n_concurrent_trials": 1,
         "retry": {"max_retries": 0}, "quiet": True,
@@ -121,7 +132,7 @@ def harbor_config(ledger: dict, task_path: Path, jobs: Path, trial_id: str, api_
                 "api_base": api_base, "enable_summarize": False,
                 "use_responses_api": False, "store_all_messages": True,
                 "temperature": model["temperature"], "reasoning_effort": model["reasoning_effort"],
-                "llm_kwargs": {"num_retries": 0},
+                "llm_kwargs": llm_kwargs,
             },
         }],
     }
@@ -150,12 +161,14 @@ def supervise(
     environment: dict,
     on_start=None,
     on_timing_start=None,
+    trial_id: str | None = None,
 ) -> dict:
     recorder.check()
     started, started_at = time.monotonic(), now()
     if on_timing_start is not None:
         on_timing_start(started_at)
     stopped = False
+    safety_stop = None
     with log.open("xb") as output:
         process = subprocess.Popen(command, stdout=output, stderr=subprocess.STDOUT,
                                    env=environment, cwd=ROOT, start_new_session=True, stdin=subprocess.DEVNULL)
@@ -163,7 +176,16 @@ def supervise(
             if on_start is not None:
                 on_start(process.pid)
             while process.poll() is None:
-                stopped = recorder.stopped.is_set()
+                if trial_id is not None:
+                    try:
+                        recorder.check_trial(trial_id)
+                    except SafetyLimitReached as error:
+                        recorder.record_safety_stop(trial_id, error)
+                        safety_stop = error.details
+                        stopped = True
+                    except TrialRequestBlocked:
+                        stopped = True
+                stopped = stopped or recorder.stopped.is_set()
                 if stopped:
                     terminate_group(process)
                     break
@@ -174,7 +196,7 @@ def supervise(
             raise
     return {"returncode": process.returncode, "timed_out": False, "stopped_by_guard": stopped,
             "started_at": started_at, "finished_at": now(), "elapsed_seconds": time.monotonic() - started,
-            "docker_cleanup_verified": False}
+            "docker_cleanup_verified": False, "safety_stop": safety_stop}
 
 
 def runtime_versions() -> dict:
@@ -197,7 +219,7 @@ def preflight(
     *,
     required_conditions=CONDITIONS,
 ) -> dict:
-    reporting_target = require_operational_values(ledger)
+    safety_policy = require_operational_values(ledger)
     if condition not in ledger["conditions"]:
         raise ValueError("Condition is not part of the fixed native design")
     provenance, snapshots = capture(ledger_path, source_commit)
@@ -210,7 +232,11 @@ def preflight(
     benchmark_root, tasks = benchmark_sources(ledger)
     retrieval = retrieval_settings(ledger, ROOT)
     endpoint = os.environ.get(ledger["model"]["endpoint_env"], "")
-    sender = FoundrySender(endpoint, ManagedIdentity())
+    sender = FoundrySender(
+        endpoint,
+        ManagedIdentity(),
+        timeout_seconds=ledger["limits"]["provider_http_timeout_seconds"],
+    )
     queue_value = os.environ.get(ledger["queue"]["state_path_env"])
     if not queue_value or not Path(queue_value).is_absolute():
         raise ValueError("Use the same absolute queue file for every deployment caller")
@@ -224,7 +250,7 @@ def preflight(
             "benchmark_root": str(benchmark_root), "sender": sender, "queue_path": Path(queue_value).resolve(),
             "queue_limits": runtime_queue_limits(ledger["queue"], ledger["schema_version"]),
             "runtime_versions": versions, "retrieval": retrieval,
-            "reporting_target": reporting_target,
+            "safety_policy": safety_policy,
             "harbor_limit_policy": harbor_limit_policy}
 
 
@@ -242,6 +268,10 @@ def verify_native_run(directory: Path) -> dict:
         raise ValueError("Native result concurrency or deployment limits differ from the ledger")
     if execution.get("concurrency") != ledger["runner"]["concurrency"] or execution.get("deployment_limits") != deployment_limits:
         raise ValueError("Native execution metadata concurrency or limits differ from the ledger")
+    if ledger["schema_version"] == 4:
+        expected_safety = safety_policy_record(ledger, applied=True)
+        if summary.get("execution_safety") != expected_safety or execution.get("execution_safety") != expected_safety:
+            raise ValueError("Native execution safety record differs from the applied ledger")
     if summary.get("verifier_revisions") != ledger["benchmark"]["verifiers"] or execution.get("verifier_revisions") != ledger["benchmark"]["verifiers"]:
         raise ValueError("Native result verifier revisions differ from the ledger")
     manifest_path = directory / "artifacts.json"
@@ -365,6 +395,10 @@ def verify_cache_bundle_run(directory: Path) -> dict:
     execution = json.loads((directory / "execution.json").read_bytes())
     if execution.get("cache_reuse") != context or execution.get("concurrency") != 1:
         raise ValueError("Cache bundle execution metadata differs from its context")
+    if ledger["schema_version"] == 4:
+        expected_safety = safety_policy_record(ledger, applied=True)
+        if summary.get("execution_safety") != expected_safety or execution.get("execution_safety") != expected_safety:
+            raise ValueError("Cache bundle execution safety record differs from the applied ledger")
     manifest_path = directory / "artifacts.json"
     if digest(manifest_path.read_bytes()) != summary.get("artifact_manifest_sha256"):
         raise ValueError("Cache bundle artifact manifest changed")
@@ -439,7 +473,7 @@ def baseline_for_comparison(directory: Path, ledger: dict, source_commit: str) -
         if original_ledger[key] != ledger[key]:
             raise ValueError(f"Comparison differs from baseline {key}")
     if original_ledger["limits"] != ledger["limits"]:
-        raise ValueError("Comparison differs from the baseline no-harness-limit policy")
+        raise ValueError("Comparison differs from the baseline execution safety policy")
     if summary["condition"] != "none" or summary["source_commit"] != source_commit or summary["status"] != "complete":
         raise ValueError("Use a complete none baseline from the same execution SHA")
     decision = baseline_summary(summary["repetitions"], list(TASKS))
@@ -461,20 +495,37 @@ def run_trial(directory: Path, ledger: dict, recorder, server, key: str, task: s
         config_path = trial_directory / "harbor-config.json"
         save_json(config_path, config)
         command = harbor_command("run", "--config", str(config_path))
-        process = supervise(command, trial_directory / "harbor.log", recorder, runtime_environment(key))
+        process = supervise(
+            command,
+            trial_directory / "harbor.log",
+            recorder,
+            runtime_environment(key),
+            trial_id=trial_id,
+        )
     except BaseException as error:
-        recorder.stop("NativeTrialExecutionError", {"trial_id": trial_id, "error_type": type(error).__name__})
+        if isinstance(error, SafetyLimitReached):
+            recorder.record_safety_stop(trial_id, error)
+        else:
+            recorder.stop("NativeTrialExecutionError", {"trial_id": trial_id, "error_type": type(error).__name__})
         process.update(stopped_by_guard=True, error_type=type(error).__name__)
     finally:
         recorder.close_trial(trial_id)
     job = directory / "jobs" / trial_id
-    transport_failure = deepcopy(recorder.failure)
+    with recorder.lock:
+        trial_failure = deepcopy(recorder.trials[trial_id]["failure"])
+    transport_failure = trial_failure or deepcopy(recorder.failure)
     outcome = collect_native_outcome(job, process=process, transport_failure=transport_failure)
     completed = not process["timed_out"] and not process["stopped_by_guard"] and process["returncode"] == 0
     metrics = collect_trial_metrics(job, directory / "transport", trial_id, process_complete=completed)
     trial = {"kind": recorder.evidence_kind, "source_commit": recorder.source_commit, "condition": recorder.condition,
              "task": task, "repetition": repetition, "trial_id": trial_id, "transport_failure": transport_failure,
-             "native_outcome": outcome, "metrics": metrics, "process": process}
+             "native_outcome": outcome, "metrics": metrics, "process": process,
+             "execution_safety": recorder.safety_snapshot(trial_id),
+             "evidence_state": {
+                 "workspace_recorded": job.exists(),
+                 "replay_evidence": "not_configured_for_native_five_task_runner",
+                 "verifier_executed": outcome["native_reward"] is not None,
+             }}
     path = trial_directory / "trial.json"
     save_json(path, trial)
     return {**trial, "record_path": path.relative_to(directory).as_posix()}
@@ -512,8 +563,20 @@ def run_trial_plans(directory: Path, ledger: dict, recorder, server, key: str,
                 on_repetition(expected_repetition, group)
             reported += len(TASKS)
         if any(not trial_is_complete(trial) for trial in trials):
-            recorder.stop("NativeOutcomeOrMandatoryMetricsIncomplete", {
-                "trial_ids": [trial["trial_id"] for trial in trials if not trial_is_complete(trial)]})
+            incomplete = [trial for trial in trials if not trial_is_complete(trial)]
+            safety = next(
+                (
+                    trial["transport_failure"] for trial in incomplete
+                    if (trial.get("transport_failure") or {}).get("reason") == "SafetyLimitReached"
+                ),
+                None,
+            )
+            recorder.stop(
+                "SafetyLimitReached" if safety is not None else "NativeOutcomeOrMandatoryMetricsIncomplete",
+                safety["details"] if safety is not None else {
+                    "trial_ids": [trial["trial_id"] for trial in incomplete]
+                },
+            )
             break
     return completed
 
@@ -617,6 +680,7 @@ def execute_native(
         "verifier_revisions": ledger["benchmark"]["verifiers"],
         "compressor_metrics": aggregate_run_compressor_metrics([]),
         "timing_metrics": aggregate_run_timing_metrics([]),
+        "execution_safety": setup["safety_policy"],
     }
     if cache_mode:
         summary["cache_reuse"] = cache_context
@@ -659,8 +723,8 @@ def execute_native(
                 "credentials": "system_assigned_managed_identity_not_recorded",
                 "nas_read_verification": "external_shutdown_gate",
             },
-            "reporting_target_utc_epoch": setup["reporting_target"],
-            "reporting_target_is_process_timer": False, "benchmark_root": setup["benchmark_root"],
+            "benchmark_root": setup["benchmark_root"],
+            "execution_safety": setup["safety_policy"],
             "harness_stop_policy": ledger["limits"],
             "harbor_limit_policy": setup["harbor_limit_policy"],
             "runtime_versions": setup["runtime_versions"], "python": sys.version,
@@ -736,7 +800,7 @@ def execute_native(
     except BaseException as error:
         summary.update(status="stopped", error={"type": type(error).__name__, "message": str(error)})
         if recorder is not None:
-            recorder.stop(type(error).__name__)
+            recorder.stop(type(error).__name__, getattr(error, "details", {"message": str(error)}))
     finally:
         if server is not None:
             server.shutdown()
@@ -755,6 +819,8 @@ def execute_native(
             with recorder.lock:
                 summary["stop_reason"] = recorder.failure
                 summary["known_provider_cost_usd"] = recorder.known_provider_cost_usd
+                summary["unconfirmed_provider_exposure_usd"] = recorder.unconfirmed_provider_exposure_usd
+                summary["pending_provider_exposure_usd"] = recorder.pending_provider_exposure_usd
         if queue is not None:
             queue.close()
         if retrieval is not None:

@@ -30,6 +30,7 @@ from .blob_retrieval import (
 )
 from .compressors import NoOpCompressor, make_compressor
 from .contracts import safe_child, save_json
+from .execution_safety import SafetyLimitReached, safety_failure, safety_policy_record
 from .harbor_no_time_limits import apply_no_time_limit_policy, command as harbor_command
 from .live_observations import POLICY
 from .live_transport import DeploymentQueue, FoundrySender, LiveRecorder, ManagedIdentity, start_live_proxy
@@ -67,6 +68,9 @@ def screening_harbor_config(
     else:
         environment["type"] = "docker"
     concurrency = min(runner["concurrency"], len(task_paths))
+    llm_kwargs = {"num_retries": 0}
+    if ledger.get("schema_version") == 4:
+        llm_kwargs["max_completion_tokens"] = ledger["limits"]["max_output_tokens"]
     return {
         "job_name": job_name,
         "jobs_dir": str(jobs),
@@ -89,7 +93,7 @@ def screening_harbor_config(
                 "store_all_messages": True,
                 "temperature": model["temperature"],
                 "reasoning_effort": model["reasoning_effort"],
-                "llm_kwargs": {"num_retries": 0},
+                "llm_kwargs": llm_kwargs,
             },
         }],
     }
@@ -133,8 +137,8 @@ def _queue_path(ledger: dict) -> Path:
 
 
 def screening_preflight(ledger_path: Path, source_commit: str) -> dict:
-    reporting_target = require_operational_screening(load_screening_ledger(ledger_path))
     ledger = load_screening_ledger(ledger_path)
+    safety_policy = require_operational_screening(ledger)
     provenance, snapshots = capture(ledger_path, source_commit)
     inventory_path, inventory, task_files = _load_inventory(ledger)
     versions = runtime_versions()
@@ -149,11 +153,15 @@ def screening_preflight(ledger_path: Path, source_commit: str) -> dict:
     encoder = load_encoder(ledger["measurement"])
     retrieval = retrieval_settings(ledger, ROOT)
     endpoint = os.environ.get(ledger["model"]["endpoint_env"], "")
-    sender = FoundrySender(endpoint, ManagedIdentity())
+    sender = FoundrySender(
+        endpoint,
+        ManagedIdentity(),
+        timeout_seconds=ledger["limits"]["provider_http_timeout_seconds"],
+    )
     queue_path = _queue_path(ledger)
     return {
         "ledger": ledger,
-        "reporting_target": reporting_target,
+        "safety_policy": safety_policy,
         "provenance": provenance,
         "snapshots": snapshots,
         "inventory_path": inventory_path,
@@ -187,6 +195,8 @@ def _task_artifact(
     }
     if ledger.get("schema_version") == 2:
         payload["limits"] = ledger["limits"]
+    elif ledger.get("schema_version") == 4:
+        payload["execution_safety"] = safety_policy_record(ledger, applied=True)
     if intervention is not None:
         payload["intervention"] = intervention
     return {**payload, "artifact_manifest_sha256": digest(canonical_json(payload))}
@@ -258,6 +268,7 @@ def _prepare_inputs(
             setup["ledger"]["queue"], setup["ledger"]["schema_version"]
         ),
         "harness_stop_policy": setup["ledger"]["limits"],
+        "execution_safety": setup["safety_policy"],
         "harbor_limit_policy": setup["harbor_limit_policy"],
         "verifier_replay": "same_preserved_state_one_additional_verifier_execution_no_model_call",
         "execution_scope": execution_scope or {
@@ -461,6 +472,9 @@ def _classify_attempt(attempt: dict, process: dict, recorder: LiveRecorder, tran
     dispatched = provider["http_attempts"] > 0
     with recorder.lock:
         request_failure = recorder.trials[attempt_id]["failure"]
+        if request_failure is None and safety_failure(recorder.failure) is not None:
+            request_failure = recorder.failure
+    termination = safety_failure(request_failure)
     outcome = collect_native_outcome(job, process=process, transport_failure=None)
     completed_process = not process["timed_out"] and not process["stopped_by_guard"] and process["returncode"] == 0
     metrics = collect_trial_metrics(job, transport, attempt_id, process_complete=completed_process)
@@ -473,7 +487,9 @@ def _classify_attempt(attempt: dict, process: dict, recorder: LiveRecorder, tran
         if isinstance(failure, dict)
     )
     result = None
-    if not dispatched:
+    if termination is not None:
+        result = termination["stop_kind"]
+    elif not dispatched:
         image_markers = r"(?:manifest unknown|pull access denied|No such image|failed to pull|ImagePull)"
         result = "image_error" if re.search(image_markers, log_text, re.IGNORECASE) else "setup_error"
     elif process["timed_out"]:
@@ -529,6 +545,8 @@ def _classify_attempt(attempt: dict, process: dict, recorder: LiveRecorder, tran
     pre_verifier_exclusion_reason = (
         "explicit_provider_rejection_before_first_verifier"
         if provider_rejected_before_verifier else
+        "safety_stop_before_first_verifier"
+        if termination is not None and outcome["native_reward"] is None else
         "terminal_session_ended_before_first_verifier"
         if result == "replay_mismatch" and terminal_session_exit is not None else None
     )
@@ -561,6 +579,15 @@ def _classify_attempt(attempt: dict, process: dict, recorder: LiveRecorder, tran
         },
         "verifier_test_ids": test_ids,
         "request_failure": request_failure,
+        "termination": termination,
+        "execution_safety": recorder.safety_snapshot(attempt_id),
+        "workspace_replay_evidence": {
+            "container_instance_id": attempt.get("container_instance_id"),
+            "workspace_instance_id": attempt.get("workspace_instance_id"),
+            "replay_manifest_sha256": None if replay is None else replay.get("manifest_sha256"),
+            "replay_capture_status": None if replay is None else replay.get("status"),
+            "verifier_executed": outcome["native_reward"] is not None,
+        },
     }
 
 
@@ -621,8 +648,11 @@ def _run_attempt(
             runtime_environment(key),
             on_start=started,
             on_timing_start=timing_started,
+            trial_id=attempt["attempt_id"],
         )
     except BaseException as error:
+        if isinstance(error, SafetyLimitReached):
+            recorder.record_safety_stop(attempt["attempt_id"], error)
         process.update(
             started_at=process_started_at or started_at,
             stopped_by_guard=recorder.stopped.is_set(),
@@ -1020,8 +1050,9 @@ def _completed_attempt_evidence(record: dict, retrieval_record: dict | None, led
     exclusion_basis = classification.get("technical_exclusion_basis") or {}
     exclusion_kind = exclusion_basis.get("kind")
     explicit_rejection = exclusion_kind == "explicit_provider_rejection_before_first_verifier"
+    safety_stop = exclusion_kind == "safety_stop_before_first_verifier"
     terminal_session_exit = exclusion_kind == "terminal_session_ended_before_first_verifier"
-    pre_verifier_technical_exclusion = explicit_rejection or terminal_session_exit
+    pre_verifier_technical_exclusion = explicit_rejection or safety_stop or terminal_session_exit
     required_timings = [
         name for name in ("task_process_wall_seconds", "state_save_wall_seconds")
         if not _measured_seconds(timing.get(name))
@@ -1096,6 +1127,21 @@ def _completed_attempt_evidence(record: dict, retrieval_record: dict | None, led
             "state_restore_wall_seconds",
         }
     )
+    safety_stop_complete = (
+        safety_stop
+        and classification["result"] in {"budget_stopped", "censored"}
+        and replay_checks.get("capture_status") == "complete"
+        and replay_checks.get("capture_phase") == "teardown_without_verifier"
+        and exclusion_basis.get("original_error_recorded") is True
+        and (classification.get("termination") or {}).get("quality_status") == "unknown"
+        and not required_timings
+        and set(not_applicable_timings) == {
+            "first_verifier_wall_seconds",
+            "repeated_verifier_wall_seconds",
+            "restore_and_repeated_verifier_wall_seconds",
+            "state_restore_wall_seconds",
+        }
+    )
     result = classification["result"]
     quality_result = result in QUALITY_RESULTS
     completed_evidence = (
@@ -1104,6 +1150,7 @@ def _completed_attempt_evidence(record: dict, retrieval_record: dict | None, led
         and (
             (strict_replay_complete and not required_timings)
             or explicit_rejection_complete
+            or safety_stop_complete
             or terminal_session_exit_complete
         )
     )
@@ -1120,6 +1167,7 @@ def _completed_attempt_evidence(record: dict, retrieval_record: dict | None, led
         "evidence_disposition": disposition,
         "strict_replay_complete": strict_replay_complete,
         "explicit_provider_rejection_complete": explicit_rejection_complete,
+        "safety_stop_complete": safety_stop_complete,
         "terminal_session_exit_complete": terminal_session_exit_complete,
         "remote_hash_verified": remote_hash_verified,
         "timing": {**timing, "upload_wall_seconds": upload_seconds},
@@ -1629,19 +1677,38 @@ def _carried_continuation_records(
 def _legacy_policy_transition(prior: dict, current: dict) -> dict:
     prior_version = prior["schema_version"]
     current_version = current["schema_version"]
-    if prior_version == current_version and current_version in (2, 3):
+    current_boundaries = {
+        "max_completion_tokens": (
+            current["limits"]["max_output_tokens"] if current_version == 4 else None
+        ),
+        "max_calls_per_trial": (
+            current["limits"]["max_provider_calls_per_attempt"]
+            if current_version == 4 else None
+        ),
+    }
+    if prior_version == current_version and current_version in (2, 3, 4):
         if prior != current:
-            raise ValueError("Continuation changes the fixed no-harness-limit screening ledger")
-        return {"max_completion_tokens": None, "max_calls_per_trial": None}
-    if prior_version not in (1, 2) or current_version not in (2, 3):
+            raise ValueError("Continuation changes the fixed screening execution ledger")
+        return current_boundaries
+    if prior_version not in (1, 2, 3) or current_version not in (2, 3, 4):
         raise ValueError("Unsupported screening ledger transition")
     for name in (
         "mode", "output_dir", "raw_retrieval", "benchmark", "measurement",
-        "retrieval", "prices", "screening", "replay", "cost", "approval",
+        "retrieval", "prices", "screening", "replay", "cost",
     ):
         if prior[name] != current[name]:
             raise ValueError(f"Continuation changes the fixed screening {name}")
-    if current_version == 3:
+    prior_approval = {
+        name: value for name, value in prior["approval"].items()
+        if name != "cost_limits_approved"
+    }
+    current_approval = {
+        name: value for name, value in current["approval"].items()
+        if name != "cost_limits_approved"
+    }
+    if prior_approval != current_approval:
+        raise ValueError("Continuation changes the fixed screening approval")
+    if prior_version in (1, 2) and current_version in (3, 4):
         queue_fields = (
             "state_path_env",
             "limits_checked_at_utc",
@@ -1657,8 +1724,10 @@ def _legacy_policy_transition(prior: dict, current: dict) -> dict:
             raise ValueError("Private runtime limits differ from the legacy screening ledger")
     elif prior["queue"] != current["queue"]:
         raise ValueError("Continuation changes the fixed screening queue")
-    if prior_version == 2:
-        return {"max_completion_tokens": None, "max_calls_per_trial": None}
+    if prior_version in (2, 3):
+        if prior["model"] != current["model"] or prior["runner"] != current["runner"]:
+            raise ValueError("Continuation changes fixed model or runner settings")
+        return current_boundaries
     prior_model = {key: value for key, value in prior["model"].items() if key != "max_completion_tokens"}
     if prior_model != current["model"] or prior["model"]["max_completion_tokens"] != 2048:
         raise ValueError("Continuation changes model settings beyond removing the output-token cap")
@@ -1690,8 +1759,14 @@ def _legacy_policy_transition(prior: dict, current: dict) -> dict:
     ):
         raise ValueError("Legacy screening limits differ from the reviewed removal boundary")
     return {
-        "max_completion_tokens": prior["model"]["max_completion_tokens"],
-        "max_calls_per_trial": limits["max_calls_per_trial"],
+        "max_completion_tokens": min(
+            prior["model"]["max_completion_tokens"],
+            current_boundaries["max_completion_tokens"] or prior["model"]["max_completion_tokens"],
+        ),
+        "max_calls_per_trial": min(
+            limits["max_calls_per_trial"],
+            current_boundaries["max_calls_per_trial"] or limits["max_calls_per_trial"],
+        ),
     }
 
 
@@ -2155,6 +2230,8 @@ def _resume_inputs(directory: Path, setup: dict, source_commit: str) -> tuple[di
     }
     if any(execution.get(name) != value for name, value in expected_execution.items()):
         raise ValueError("Screening resume execution record differs")
+    if execution.get("execution_safety") != setup["safety_policy"]:
+        raise ValueError("Screening resume safety policy differs")
     artifacts = json.loads((inputs / "task-artifacts.json").read_bytes())
     expected_artifacts = {
         task["task_id"]: _task_artifact(task, setup["ledger"], source_commit)
@@ -2215,10 +2292,13 @@ def _resume_inputs(directory: Path, setup: dict, source_commit: str) -> tuple[di
             "manifest_sha256": manifest["manifest_sha256"],
             "started_at": execution["started_at"],
             "classification_policy": POLICY,
+            "execution_safety": setup["safety_policy"],
         }
         for name, value in expected_execution.items():
             if summary.get(name) != value:
                 raise ValueError(f"Screening resume summary differs: {name}")
+        if summary.get("execution_safety") != setup["safety_policy"]:
+            raise ValueError("Screening resume summary safety policy differs")
         if continuation_sha256 is not None and (
             summary.get("continuation") or {}
         ).get("continuation_sha256") != continuation_sha256:
@@ -2418,6 +2498,7 @@ def execute_screening(
             "completed_attempts": state.summary()["completed_attempts"],
             "retrieval_inputs": inputs_retrieval,
             "classification_policy": POLICY,
+            "execution_safety": setup["safety_policy"],
             "execution_scope": execution_scope,
             "sessions": [{"kind": "initial", "started_at": now()}],
         }
@@ -2461,6 +2542,17 @@ def execute_screening(
         evidence_kind=summary["kind"],
         request_error_scope="trial",
     )
+    prior_cost = state.local_provider_cost_state()
+    try:
+        recorder.initialize_run_cost_exposure(
+            known_cost_usd=prior_cost["known_cost_usd"],
+            unconfirmed_exposure_usd=prior_cost["unconfirmed_input_cost_estimate_usd"],
+            unknown_without_estimate=prior_cost["unknown_requests_without_input_estimate"],
+        )
+    except SafetyLimitReached as error:
+        recorder.stop(type(error).__name__, error.details)
+    except ValueError as error:
+        recorder.stop(type(error).__name__, {"message": str(error)})
     key = secrets.token_urlsafe(32)
     server = start_live_proxy(recorder, key)
     batch_number = 0
@@ -2608,7 +2700,7 @@ def execute_screening(
     except BaseException as error:
         summary["status"] = "stopped"
         summary["error"] = {"type": type(error).__name__, "message": str(error)}
-        recorder.stop(type(error).__name__, {"message": str(error)})
+        recorder.stop(type(error).__name__, getattr(error, "details", {"message": str(error)}))
         state.pause_interrupted()
     finally:
         server.shutdown()
@@ -2625,6 +2717,9 @@ def execute_screening(
         summary["state"] = state.summary()
         if recorder.failure is not None:
             summary["stop_reason"] = recorder.failure
+        summary["confirmed_api_calculated_cost_usd"] = recorder.known_provider_cost_usd
+        summary["unconfirmed_api_cost_exposure_usd"] = recorder.unconfirmed_provider_exposure_usd
+        summary["pending_api_cost_exposure_usd"] = recorder.pending_provider_exposure_usd
         summary["finished_at"] = now()
         try:
             _stage_checkpoint(directory, state, summary, spool)
