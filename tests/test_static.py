@@ -35,6 +35,28 @@ class StaticContractTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.directory = Path(self.temporary.name)
 
+    def test_public_squeez_pin_and_distribution_boundary(self):
+        specification = self.ledger["compressor"]["tools"]["squeez"]
+        self.assertEqual(specification["version"], "1.48.4")
+        self.assertEqual(
+            specification["sha256"],
+            "ef956365ace3aa5f362847afc000aa008d5b4a26db4ee2c5bcc0d2718d043773",
+        )
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        publication = (ROOT / "docs/publication.md").read_text(encoding="utf-8")
+        for literal in (
+            "2,056,992 bytes",
+            specification["sha256"],
+            "6d7be4e633f04f2276f5384175d435b29141562e",
+            "2026-12-02",
+            "releases/latest",
+            "not a permanent anonymous",
+        ):
+            self.assertIn(literal, readme)
+        self.assertIn("9904766312", publication)
+        self.assertIn("bring-your-own and outside the public allowlist", publication)
+        self.assertIn("does not authorize vendoring the binary or ZIP", publication)
+
     def measure(self, compressor, ledger):
         request = self.manifest["requests"][0]
         source = self.sources[0]

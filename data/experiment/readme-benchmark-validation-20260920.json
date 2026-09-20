@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "kind": "readme_benchmark_no_call_validation",
+  "validated_at": "2026-09-20T02:33:16.474974+00:00",
+  "base_commit": "447c0a94a720c765d195b606dbf81b280866f48f",
+  "validation_tree_sha1": "093190df7722f02e37b5074822a86004fab3f21d",
+  "environment": {
+    "python": "Python 3.12.13",
+    "uv": "uv 0.11.28 (x86_64-unknown-linux-gnu)"
+  },
+  "source_files": {
+    "examples/experiment/benchmark.yaml": "b69eba184dfba2206b392419e57ad19743d06af664464cd8783bf7174683bc50",
+    "schemas/benchmark-request.schema.json": "f160622ec3b03e0dadc290b29f5e82c946e774a77cbbf71596ca6e0d8306c126",
+    "schemas/experiment-result.schema.json": "74dfe3ab0356f943c4ee80bbe95b06a1bcfad8ff2b44a1e02fe5b2f272c96ae3",
+    "src/benchmark_run.py": "c0d3b6391a2c68c0173b39b52e65e9a6857d5919112c0d44c88832401d9c18fd",
+    "src/experiment_run.py": "3499c63dfb355440e2f79e7dc3af9829d2d1e054613e87d9ed6b790a2e4ba665",
+    "uv.lock": "6bcae545d7359a22a1468ebf07bd4bb31eebaa15468efa3a4e3d2e00110321d5"
+  },
+  "readme_execution_section": {
+    "heading": "## Try it in five minutes",
+    "sha256": "5fcf636d02bef7a9509e297bc381e2a92a457c0259a1fd48b09f6ab902380f11",
+    "full_file_sha256_at_validation": "58069c04b5f88f1adb47fa7521c2921d77889fffa82983390abf1307f49949b6",
+    "scope": "Command evidence binds this execution section; navigation text outside it is not execution evidence."
+  },
+  "commands": [
+    {
+      "stage": "install",
+      "command": "uv sync --locked",
+      "started_at": "2026-09-20T02:33:15.272379+00:00",
+      "finished_at": "2026-09-20T02:33:15.339018+00:00",
+      "elapsed_seconds": 0.066639,
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "bd21fe64369190e4d6a6a6d19092c848f69867892e6925acd2b2de25fc54e6ce"
+    },
+    {
+      "stage": "no_call_preflight",
+      "command": "uv run --locked python run.py experiment examples/experiment/benchmark.yaml",
+      "started_at": "2026-09-20T02:33:15.339078+00:00",
+      "finished_at": "2026-09-20T02:33:15.675191+00:00",
+      "elapsed_seconds": 0.336113,
+      "exit_code": 0,
+      "stdout_sha256": "2be13f8c048bc4256cd83d2b8d72c827dc7b74ba16fccccbcdc775bd4bfdc917",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "verify_preflight_json",
+      "command": "uv run --locked python run.py experiment --verify-result runs/readme-benchmark-result.json",
+      "started_at": "2026-09-20T02:33:15.675235+00:00",
+      "finished_at": "2026-09-20T02:33:15.937588+00:00",
+      "elapsed_seconds": 0.262353,
+      "exit_code": 0,
+      "stdout_sha256": "f1e379ae86ce5ad89ca1e4ab27f00a14612c55a04bd9bd0fb98c4c6c869f7188",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "missing_endpoint_error",
+      "command": "uv run --locked python run.py experiment examples/experiment/benchmark.yaml --execute",
+      "started_at": "2026-09-20T02:33:15.937639+00:00",
+      "finished_at": "2026-09-20T02:33:16.224381+00:00",
+      "elapsed_seconds": 0.286742,
+      "exit_code": 3,
+      "stdout_sha256": "5368425cf34280b2f606f741f847249a11037a864e40f42b5dc27e629e9d34bf",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "verify_error_json",
+      "command": "uv run --locked python run.py experiment --verify-result runs/readme-benchmark-result.json",
+      "started_at": "2026-09-20T02:33:16.224426+00:00",
+      "finished_at": "2026-09-20T02:33:16.474974+00:00",
+      "elapsed_seconds": 0.250548,
+      "exit_code": 0,
+      "stdout_sha256": "f913457def851f859ecd57b7269509ebbd6ae6c5c916aa99afc1d0f9f3c64ddb",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "outputs": {
+    "preflight": {
+      "sha256": "2be13f8c048bc4256cd83d2b8d72c827dc7b74ba16fccccbcdc775bd4bfdc917",
+      "status": "checked",
+      "outcome": "preflight_passed",
+      "measured": false,
+      "synthetic": false,
+      "provider_usage": "not_measured",
+      "quality": "not_measured",
+      "clean_checkout": true,
+      "runner": {
+        "module": "src.screening_run",
+        "action": "diagnose-task"
+      }
+    },
+    "missing_endpoint": {
+      "sha256": "5368425cf34280b2f606f741f847249a11037a864e40f42b5dc27e629e9d34bf",
+      "status": "failed",
+      "outcome": "technical_incomplete",
+      "error_category": "execution_error",
+      "quality": "not_measured"
+    }
+  },
+  "provider_execution": {
+    "performed": false,
+    "wall_time_seconds": null,
+    "quality_result": null
+  }
+}

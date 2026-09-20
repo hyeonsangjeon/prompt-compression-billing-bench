@@ -20,6 +20,8 @@ from src.verifier_revisions import (
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "fixtures/verifiers/nginx-request-logging"
 REVISION_MANIFEST = ROOT / "verifiers/terminal-bench-2.1/nginx-request-logging/revision.json"
+THIRD_PARTY_NOTICE = ROOT / "THIRD_PARTY_NOTICES.md"
+TERMINAL_BENCH_LICENSE = ROOT / "third_party/licenses/terminal-bench-2.1-Apache-2.0.txt"
 REQUIRED_VARIABLES = ("time_local", "request_method", "status", "http_user_agent")
 
 
@@ -34,6 +36,39 @@ class VerifierRevisionTests(unittest.TestCase):
             manifest["fixtures"],
             {path.name: file_sha256(path.read_bytes()) for path in sorted(FIXTURES.glob("*.conf"))},
         )
+
+    def test_notice_and_license_bind_the_reviewed_verifier_bytes(self):
+        notice_bytes = THIRD_PARTY_NOTICE.read_bytes()
+        notice = notice_bytes.decode("utf-8")
+        license_bytes = TERMINAL_BENCH_LICENSE.read_bytes()
+        self.assertEqual(len(notice_bytes), 1675)
+        self.assertEqual(
+            file_sha256(notice_bytes),
+            "1422233058b45ab6a8a1e0b8799ef3892614868fec2de89af92f70fc1e43aefc",
+        )
+        self.assertEqual(len(license_bytes), 11357)
+        self.assertEqual(
+            file_sha256(license_bytes),
+            "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+        )
+        self.assertEqual(len(UPSTREAM_LOG_FIELD_CHECK), 258)
+        self.assertEqual(
+            file_sha256(UPSTREAM_LOG_FIELD_CHECK),
+            "aaaaf254497e066827bacdd8a7aa5b02692fe0d8e63332d88601f7962fc140f6",
+        )
+        self.assertEqual(len(REVISED_LOG_FIELD_CHECK), 394)
+        self.assertEqual(
+            file_sha256(REVISED_LOG_FIELD_CHECK),
+            "ae4012e6a5bd82c90a8611a976b67e0c87c4709f3d9d044c936ca57cf36e333b",
+        )
+        for literal in (
+            "7131e4375048a0e408a8fb404b5f499d726b695b",
+            NGINX_VERIFIER_SPEC["source_sha256"],
+            file_sha256(UPSTREAM_LOG_FIELD_CHECK),
+            file_sha256(REVISED_LOG_FIELD_CHECK),
+            "does not select or grant a license for the rest of this repository",
+        ):
+            self.assertIn(literal, notice)
 
     def test_nginx_variable_fixtures_cover_original_equivalent_and_wrong_syntax(self):
         original = (FIXTURES / "unbraced.conf").read_text()

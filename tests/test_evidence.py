@@ -85,6 +85,8 @@ class EvidenceContractTests(unittest.TestCase):
             "ledger.toml",
             "evidence/local-baseline.json",
             "docs/experiment/data-connection-guide-20260919.md",
+            "THIRD_PARTY_NOTICES.md",
+            "third_party/licenses/terminal-bench-2.1-Apache-2.0.txt",
         ])
         for path in ("runs/example/response.json", ".env", "unclassified.json", "server.key"):
             with self.assertRaises(ValueError):
