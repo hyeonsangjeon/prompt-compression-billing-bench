@@ -539,24 +539,20 @@ def validate_outbound_receipt(
     }
 
 
-def admission_side_effects(value: object) -> dict[str, bool]:
-    if not isinstance(value, Mapping):
-        raise CarrierFailure("admission.side_effects")
-    effects: dict[str, bool] = {}
+def admission_side_effects(value: object) -> dict[str, bool | None]:
+    effects: dict[str, bool | None] = {}
     for name in ADMISSION_SIDE_EFFECT_FIELDS:
-        field = value.get(name)
-        if type(field) is not bool:
-            raise CarrierFailure("admission.side_effects")
-        effects[name] = field
+        field = value.get(name) if isinstance(value, Mapping) else None
+        effects[name] = field if type(field) is bool else None
     return effects
 
 
 def preserve_admission_side_effects(
-    result: dict[str, object], effects: Mapping[str, bool]
+    result: dict[str, object], effects: Mapping[str, bool | None]
 ) -> None:
     for name in ADMISSION_SIDE_EFFECT_FIELDS:
         result["side_effects"][name] = effects[name]
-    if effects["provider_called"]:
+    if effects["provider_called"] is not False:
         result["side_effects"]["provider_model_api_grader_calls"] = None
 
 
@@ -617,7 +613,7 @@ def probe(
     input_records: dict[str, dict[str, object]] = {}
     loaded = 0
     admission_invocations = 0
-    reported_admission_side_effects: dict[str, bool] | None = None
+    reported_admission_side_effects: dict[str, bool | None] | None = None
     try:
         payloads: dict[str, bytes] = {}
         for label in (
@@ -678,7 +674,7 @@ def probe(
         reported_admission_side_effects = admission_side_effects(
             admission_result.get("side_effects")
         )
-        if any(reported_admission_side_effects.values()):
+        if any(value is not False for value in reported_admission_side_effects.values()):
             raise CarrierFailure("admission.side_effects")
     except CarrierFailure as failure:
         result = failure_record(observed, environment, failure, definition, context)

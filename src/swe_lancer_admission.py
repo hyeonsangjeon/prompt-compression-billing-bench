@@ -380,8 +380,11 @@ def check_admission(
         "selection": FIXED_TASK,
         "source_pins": source_pins,
         "provider": {
-            "name": provider.get("name"),
-            "model_setting": provider.get("model_setting"),
+            "name": "openai" if provider.get("name") == "openai" else None,
+            "model_setting": (
+                "openai/gpt-4o"
+                if provider.get("model_setting") == "openai/gpt-4o" else None
+            ),
             "credential_environment_name": credential_environment_name,
             "credential_present": credential_present,
             "credential_value_recorded": False,
@@ -391,7 +394,10 @@ def check_admission(
             "endpoint_environment_name": endpoint_environment_name,
             "endpoint_present": endpoint_present,
             "endpoint_value_recorded": False,
-            "image_manifest_digest": sandbox.get("image_manifest_digest"),
+            "image_manifest_digest": (
+                FIXED_IMAGE_DIGEST
+                if sandbox.get("image_manifest_digest") == FIXED_IMAGE_DIGEST else None
+            ),
             "evidence_pins": evidence_pins,
         },
         "deadline": deadline,

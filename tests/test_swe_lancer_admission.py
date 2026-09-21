@@ -178,6 +178,28 @@ class SweLancerAdmissionTests(unittest.TestCase):
         self.assertIsNone(result["provider"]["reported_model_revision"])
         self.assertNotIn(sentinel, json.dumps(result, sort_keys=True))
 
+    def test_invalid_fixed_contract_values_are_not_reflected(self):
+        sentinel = "/private/SYNTHETIC_FIXED_CONTRACT"
+        for section, field in (
+            ("provider", "name"),
+            ("provider", "model_setting"),
+            ("sandbox", "image_manifest_digest"),
+        ):
+            with self.subTest(section=section, field=field):
+                environment = self.prepare_ready()
+                original = self.ledger[section][field]
+                try:
+                    self.ledger[section][field] = sentinel
+                    result = self.check(environment)
+                    self.assertFalse(result["ready"])
+                    self.assertIn(
+                        f"{section}.{field}", result["missing_or_invalid"]
+                    )
+                    self.assertIsNone(result[section][field])
+                    self.assertNotIn(sentinel, json.dumps(result, sort_keys=True))
+                finally:
+                    self.ledger[section][field] = original
+
     def test_stale_and_far_deadlines_fail_closed(self):
         environment = self.prepare_ready()
         for selected in (deadline(-1), deadline(5000)):

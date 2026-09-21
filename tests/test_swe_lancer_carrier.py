@@ -374,6 +374,18 @@ class SweLancerCarrierTests(unittest.TestCase):
         self.assertIn("source.pins[0].name", result["missing_or_invalid"])
         self.assertNotIn(sentinel, serialized)
 
+    def test_private_shaped_image_digest_is_not_reflected(self):
+        sentinel = "/private/SYNTHETIC_IMAGE_DIGEST"
+        self.ledger["sandbox"]["image_manifest_digest"] = sentinel
+        self.refresh_ledger_bindings()
+        result = self.check()
+        self.assertFalse(result["ready"])
+        self.assertIn(
+            "sandbox.image_manifest_digest", result["missing_or_invalid"]
+        )
+        self.assertIsNone(result["admission"]["sandbox"]["image_manifest_digest"])
+        self.assertNotIn(sentinel, json.dumps(result, sort_keys=True))
+
     def test_private_shaped_revision_and_runtime_are_not_reflected(self):
         sentinel = "/private/SYNTHETIC_METADATA"
         self.ledger["provider"]["reported_model_revision"] = sentinel
@@ -428,6 +440,46 @@ class SweLancerCarrierTests(unittest.TestCase):
         self.assertIsNone(
             result["side_effects"]["provider_model_api_grader_calls"]
         )
+
+    def test_malformed_effect_does_not_erase_valid_provider_report(self):
+        admission_result = self.ready_admission_result()
+        sentinel = "MALFORMED_SYNTHETIC_FLAG"
+        admission_result["side_effects"]["provider_called"] = True
+        admission_result["side_effects"]["network_used"] = sentinel
+        with patch(
+            "src.swe_lancer_carrier.admission.check_admission",
+            return_value=admission_result,
+        ) as admission_call:
+            result = self.check()
+        self.assertEqual(admission_call.call_count, 1)
+        self.assertFalse(result["ready"])
+        self.assertEqual(result["missing_or_invalid"], ["admission.side_effects"])
+        self.assertEqual(result["side_effects"]["admission_invocations"], 1)
+        self.assertTrue(result["side_effects"]["provider_called"])
+        self.assertIsNone(result["side_effects"]["network_used"])
+        self.assertIsNone(result["side_effects"]["provider_model_api_grader_calls"])
+        self.assertNotIn(sentinel, json.dumps(result, sort_keys=True))
+
+    def test_missing_effects_are_unknown_not_zero(self):
+        for effects in (None, {}):
+            with self.subTest(effects=effects):
+                admission_result = self.ready_admission_result()
+                admission_result["side_effects"] = effects
+                with patch(
+                    "src.swe_lancer_carrier.admission.check_admission",
+                    return_value=admission_result,
+                ):
+                    result = self.check()
+                self.assertFalse(result["ready"])
+                self.assertEqual(
+                    result["missing_or_invalid"], ["admission.side_effects"]
+                )
+                self.assertEqual(result["side_effects"]["admission_invocations"], 1)
+                for name in carrier.ADMISSION_SIDE_EFFECT_FIELDS:
+                    self.assertIsNone(result["side_effects"][name])
+                self.assertIsNone(
+                    result["side_effects"]["provider_model_api_grader_calls"]
+                )
 
     def test_attested_receipt_fingerprint_drift_stops_before_admission(self):
         self.receipts["price_receipt"]["currency"] = "EUR"
