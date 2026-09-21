@@ -74,10 +74,16 @@ jobs:
           image="${IMAGE_REPOSITORY}@${IMAGE_DIGEST}"
           container_name="pccb-swe-offline-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           label="pccb.swe.offline_smoke=${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
+          workspace_identity="${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
+          workspace_path="${RUNNER_TEMP}/pccb-swe-workspace-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           image_id=""
 
           cleanup() {
             docker rm -f "$container_name" >/dev/null 2>&1 || true
+            if [[ -n "${workspace_path:-}" && -d "$workspace_path" ]]; then
+              rm -f -- "$workspace_path/smoke-probe"
+              rmdir -- "$workspace_path" >/dev/null 2>&1 || true
+            fi
             docker image rm -f "$image" >/dev/null 2>&1 || true
             if [[ -n "$image_id" ]]; then
               docker image rm -f "$image_id" >/dev/null 2>&1 || true
@@ -102,6 +108,8 @@ jobs:
             echo "exact image unexpectedly existed before the task-owned pull" >&2
             exit 1
           fi
+          test ! -e "$workspace_path"
+          install -d -m 700 "$workspace_path"
 
           docker pull "$image"
           image_id="$(docker image inspect --format '{{.Id}}' "$image")"
@@ -111,13 +119,17 @@ jobs:
             --format '{{range .RepoDigests}}{{println .}}{{end}}' \
             "$image" | grep -Fx "$image"
 
+          set +e
           smoke="$(
-            docker run \
+            timeout --signal=TERM --kill-after=10s 120s \
+              docker run \
               --name "$container_name" \
               --label "$label" \
               --rm \
               --network none \
               --read-only \
+              --mount "type=bind,src=${workspace_path},dst=/workspace" \
+              --env "PCCB_WORKSPACE_ID=${workspace_identity}" \
               --cap-drop ALL \
               --security-opt no-new-privileges \
               --pids-limit 64 \
@@ -131,10 +143,26 @@ jobs:
                 test -z "${OPENAI_API_KEY:-}"
                 test -z "${SWE_LANCER_DOCKER_HOST:-}"
                 test -d /app/expensify
-                printf "offline-smoke-ok\n"
+                test -w /workspace
+                printf "%s\n" "$PCCB_WORKSPACE_ID" > /workspace/smoke-probe
+                test "$(cat /workspace/smoke-probe)" = "$PCCB_WORKSPACE_ID"
+                rm /workspace/smoke-probe
+                test ! -e /workspace/smoke-probe
+                printf "offline-smoke-ok:%s\n" "$PCCB_WORKSPACE_ID"
               '
           )"
-          test "$smoke" = "offline-smoke-ok"
+          smoke_exit="$?"
+          set -e
+          if (( smoke_exit != 0 )); then
+            printf '%s\n' "$smoke" >&2
+            exit "$smoke_exit"
+          fi
+          test "$smoke" = "offline-smoke-ok:${workspace_identity}"
+          test ! -e "$workspace_path/smoke-probe"
+          test -z "$(find "$workspace_path" -mindepth 1 -maxdepth 1 -print -quit)"
+          rmdir -- "$workspace_path"
+          test ! -e "$workspace_path"
+          workspace_path=""
           survivor_containers="$(
             docker ps -aq --filter "label=$label" | sed '/^$/d' | wc -l | tr -d ' '
           )"
@@ -150,7 +178,7 @@ jobs:
 
           result="$RUNNER_TEMP/swe-lancer-offline-smoke.json"
           printf '%s\n' \
-            "{\"schema_version\":1,\"kind\":\"swe_lancer_exact_image_offline_smoke\",\"status\":\"pass\",\"runner\":\"linux/amd64\",\"image_digest\":\"${IMAGE_DIGEST}\",\"image_config_digest\":\"${IMAGE_CONFIG_DIGEST}\",\"compressed_layer_bytes\":${COMPRESSED_LAYER_BYTES},\"required_free_bytes\":${REQUIRED_FREE_BYTES},\"free_bytes_before\":${free_bytes},\"container_network\":\"none\",\"credential_values_read\":0,\"provider_model_api_grader_calls\":0,\"survivor_containers\":0,\"image_present_after_cleanup\":false}" \
+            "{\"schema_version\":1,\"kind\":\"swe_lancer_exact_image_offline_smoke\",\"status\":\"pass\",\"runner\":\"linux/amd64\",\"image_digest\":\"${IMAGE_DIGEST}\",\"image_config_digest\":\"${IMAGE_CONFIG_DIGEST}\",\"compressed_layer_bytes\":${COMPRESSED_LAYER_BYTES},\"required_free_bytes\":${REQUIRED_FREE_BYTES},\"free_bytes_before\":${free_bytes},\"container_network\":\"none\",\"workspace_identity\":\"${workspace_identity}\",\"workspace_identity_bound\":true,\"workspace_mount\":\"/workspace\",\"workspace_writable\":true,\"workspace_empty_after_probe\":true,\"workspace_present_after_cleanup\":false,\"command_deadline_seconds\":120,\"command_exit_code\":0,\"credential_values_read\":0,\"provider_model_api_grader_calls\":0,\"survivor_containers\":0,\"image_present_after_cleanup\":false}" \
             | tee "$result"
       - name: Upload sanitized smoke record
         uses: actions/upload-artifact@v4
