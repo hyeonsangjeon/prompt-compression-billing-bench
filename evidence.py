@@ -31,11 +31,12 @@ SUMMARY_FIELDS = {
     "ollama_version", "model_cache_present_before_run", "not_proven",
 }
 PUBLIC_FILES = {
-    ".gitignore", ".python-version", "pyproject.toml", "uv.lock", "ledger.toml",
+    "LICENSE", ".gitignore", ".python-version", "pyproject.toml", "uv.lock", "ledger.toml",
     "run.py", "accounting.py", "evidence.py", "README.md", "STATUS.md", "THIRD_PARTY_NOTICES.md",
     "third_party/licenses/terminal-bench-2.1-Apache-2.0.txt",
     "third_party/licenses/gsm8k-MIT.txt",
-    "tests/test_accounting.py", "tests/test_evidence.py", "tests/test_run.py", ".github/workflows/check.yml",
+    "tests/test_accounting.py", "tests/test_evidence.py", "tests/test_run.py",
+    "tests/test_root_license.py", ".github/workflows/check.yml",
     ".github/workflows/pages-static.yml", "config/pages-static.json", "pages/assets/site.css",
     "requirements/pages-static.in", "requirements/pages-static.txt",
     "src/pages_build.py", "src/pages_verify.py", "src/pages_oracle.py",

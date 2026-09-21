@@ -38,7 +38,7 @@ did not. No worker, model, provider request, trace or grader started.
 | 6. Layered README | **Implemented** | Scope first, chart/method limits next, the cached accountless command and boundary, then provider/native details behind links. The local static first page preserves its source hierarchy without adding an independent result summary. The static renderer does not itself prove the accountless result or deploy GitHub Pages. |
 | 7. Terminology | **Implemented** | Candidate range, message-content denominator, tool display, local tokenizer and unavailable billing are defined at use. No tool display is named a billed-token result. |
 | 8. Failure paths | **Partial** | The accountless path distinguishes preflight, native non-pass, execution failure and run-ID collision; it enforces 300-second attempt, 120-second no-progress and zero-retry limits. Missing dependencies/resources, dirty/wrong source, cross-worker verification-input drift, malformed partitions, explicit process/tool exits and invalid UTF-8 stop explicitly elsewhere. The disabled squeez recovery path also distinguishes exit-zero not-found, rejects identity, expiry, replay and quota failures before supplier execution, and refuses unsafe cleanup. Future schema-v4 provider execution additionally enforces call, output, request-size, attempt-wall, progress, calculated-cost and UTC-deadline boundaries; these safety stops remain technical incomplete with unknown quality, not wrong answers. Historical comparison records remain unchanged. Blob failures preserve an atomic local payload for retry/resume and block a complete status; collection-host checksum verification and VM cleanup remain external conditions for each future run. |
-| 9. Publication grades | **Implemented for the tracked candidate** | The exact allowlist grades every tracked file, including the reviewed Terminal-Bench verifier notice and byte-exact Apache-2.0 copy. The squeez executable remains bring-your-own and excluded. This technical boundary does not select a root source license, establish DeepSWE redistribution rights or change repository visibility. |
+| 9. Publication grades | **Implemented for the tracked candidate** | The exact allowlist grades every tracked file, including the root MIT license, its contract test, the reviewed Terminal-Bench verifier notice and byte-exact Apache-2.0 copy. The squeez executable remains bring-your-own and excluded. The root license covers project-authored source; it does not establish DeepSWE redistribution rights or license third-party material. |
 
 ## Remaining work
 
@@ -55,9 +55,8 @@ did not. No worker, model, provider request, trace or grader started.
 
 ## Owner decisions outside this technical release
 
-- Choose a root license for this repository's own source.
 - Resolve whether any DeepSWE-derived material may be redistributed beyond the aggregate-only files already graded here.
-- Decide repository visibility separately. This work does not change it.
+- Repository visibility is already public; this work does not change it.
 - Approve and enable any GitHub Pages deployment separately. The committed workflow only builds and checks.
 
 ## Checks without model calls
