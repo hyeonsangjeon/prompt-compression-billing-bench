@@ -227,4 +227,12 @@ have not been validated.
 | Third-party provenance and exact license copies | [Third-party notices](THIRD_PARTY_NOTICES.md) |
 | Local static first page, checks and non-deployment boundary | [Static Pages candidate](docs/pages-static.md) |
 
+## License
+
+Project-authored source is licensed under the [MIT License](LICENSE).
+Third-party materials remain subject to their own terms; see
+[Third-party notices](THIRD_PARTY_NOTICES.md). The root license does not grant
+rights to unapproved assets or resolve the documented DeepSWE and LLMLingua2
+redistribution boundaries.
+
 No raw run, prompt, recovery stash, imported tree or private work note is published automatically.

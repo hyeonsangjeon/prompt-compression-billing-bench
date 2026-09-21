@@ -1,15 +1,17 @@
 # Publication grades
 
-Eligibility is not publication approval. The repository remains private until an
-explicit release decision. No command here pushes code or changes visibility.
-The exact machine allowlist is `PUBLIC_FILES` in `evidence.py`; unknown files fail
-the audit, including force-added ignored material.
+A technical publication grade is not redistribution approval. Repository visibility
+is already public; no command here changes visibility or deploys GitHub Pages. The
+root `LICENSE` covers project-authored source under MIT, while third-party materials
+and unresolved assets retain their separate terms and boundaries. The exact machine
+allowlist is `PUBLIC_FILES` in `evidence.py`; unknown files fail the audit, including
+force-added ignored material.
 
 ## Public-source candidates in this layout
 
 | Grade | Exact files | Contents |
 |---|---|---|
-| Source/configuration | `.gitignore`, `.python-version`, `pyproject.toml`, `uv.lock`, `.github/workflows/check.yml`, `.github/workflows/pages-static.yml` | Ignore boundaries, immutable benchmark dependency pins, non-model CI and a static-site build/check workflow with no deploy step |
+| Source/configuration | `LICENSE`, `.gitignore`, `.python-version`, `pyproject.toml`, `uv.lock`, `.github/workflows/check.yml`, `.github/workflows/pages-static.yml`, `tests/test_root_license.py` | Root MIT terms for project-authored source, their contract test, ignore boundaries, immutable benchmark dependency pins, non-model CI and a static-site build/check workflow with no deploy step |
 | Source/configuration | `run.py`, `accounting.py`, `evidence.py`, `ledger.toml` | Static dispatch; separate legacy native runner, usage accounting and strict evidence audit |
 | Source/configuration | `src/__init__.py`, `src/compressors.py`, `src/pipeline.py`, `src/protection.py` | Shared none/squeez/Headroom/LLMLingua adapter interfaces, frozen-observation path and designated-span checks; static schemas still permit only none/squeez |
 | Source/configuration | `src/contracts.py`, `src/provenance.py`, `src/measurement.py`, `src/static_run.py`, `src/compare.py` | Local schemas, source snapshots, distinct measurement units, static execution and name-only comparison |
@@ -122,6 +124,6 @@ with `python -m src.eda_report`; it does not reconstruct private source data.
 This is not a general secret scanner or a license/legal review. Inspect staged blobs
 for customer identifiers, internal paths, resource addresses, credentials, fixture
 specificity and internal commentary separately. A zero-match pattern scan is not
-a proof that arbitrary material is safe. The tracked candidate's file grades and
-third-party notice checks do not choose a root source license, establish DeepSWE
-redistribution rights or change repository visibility.
+a proof that arbitrary material is safe. The root MIT license and tracked file
+grades do not establish DeepSWE redistribution rights, replace third-party terms
+or authorize GitHub Pages deployment.
