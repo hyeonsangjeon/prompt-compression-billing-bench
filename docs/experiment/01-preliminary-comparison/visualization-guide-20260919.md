@@ -1,283 +1,310 @@
-# 시각화 부록: 그림을 오해 없이 읽는 법
+# Visualization Appendix: Reading the Figures Without Overclaiming
 
-이 문서는 [공유용 쉬운 설명](plain-language-results-20260917.md)과
-[설계 검토 부록](experiment-briefing-20260919.md)을 읽은 뒤 전체 그림을 확인하는
-곳이다. **탐색적 데이터 분석(EDA)**은 본 실험 전에 입력의 크기와 구성을 살펴보는
-작업이고, **native 실행**은 실제 모델이 과제를 풀고 과제 내장 채점기가 답을
-확인하는 실행이다.
+Use this document after the [plain-language guide](plain-language-results-20260917.md) and
+[design-review appendix](experiment-briefing-20260919.md) to see the full set of figures.
+**Exploratory data analysis (EDA)** examines input size and composition before the main
+experiment. A **native run** has the actual model solve a task and the task's built-in
+grader check the answer.
 
-**조건**은 같은 문제를 푸는 방식이다. `none`은 아무 작업도 하지 않았다는 뜻이
-아니라 추가 압축이 없는 기준이다. **외부 모델 서비스(provider)**는 요청을 처리하는
-API 제공자다. **API 사용량**은 이 서비스가 보고한 전체 입력·캐시·출력 토큰이다.
+A **condition** is one way to solve the same problem. `none` means a reference without
+additional compression, not that no work occurred. The external model **provider** handles
+API requests. **API usage** is the provider-reported total of input, cached-input, and
+output tokens.
 
-## 30초 읽는 법
+## 30-Second Reading Guide
 
-1. 먼저 측정 흐름을 본다. 단계마다 표본과 단위가 달라 숫자를 서로 더하지 않는다.
-2. EDA 그림 10개는 과거 입력의 구성과 후보 범위를 보여 준다. 달성 압축률이나 품질 결과가 아니다.
-3. 예비 비교 그림 6개는 증거가 완결된 **26과제·104조건**만 보여 준다. 조건당 1회라 순위·인과·비열등성을 말할 수 없다.
-4. 변경 구간의 로컬 토큰, 전체 API 사용량, 사용량에 가격표를 곱한 계산 비용은 서로 다른 측정값이다. 청구서와도 다르다.
+1. Start with the measurement flow. Samples and units differ by stage, so do not add their numbers.
+2. The 10 EDA figures describe historical input composition and candidate scope. They are not achieved compression or quality results.
+3. The 6 preliminary-comparison figures show only the evidence-complete **26 tasks and 104 conditions**. One run per condition cannot establish ranking, causality, or non-inferiority.
+4. Local tokens in changed spans, full API usage, and calculated cost from usage times a price table are different measurements. All also differ from an invoice.
 
-> **인용 규칙:** 그림 번호만 떼어 인용하지 않는다. 반드시 표본·분모·단위와 “증명하지 않는 것”을 함께 쓴다. `0`은 실제로 0을 관측한 자리에서만 쓰며, 미측정·무표본·원문 누락을 0으로 바꾸지 않는다.
+> **Citation rule:** Do not cite a figure number alone. Include its sample, denominator,
+> unit, and “does not establish” statement. Use `0` only where zero was observed; do not
+> convert unmeasured, unsampled, or source-missing states to zero.
 
-## 측정 흐름
+## Measurement Flow
 
-[브리핑의 글자 기반 흐름도(Mermaid)](experiment-briefing-20260919.md#무엇을-어떤-순서로-쟀나)는 EDA → 기준선 → 정적 측정 → native 예비 비교 → 현재 결론의 순서를 보여 준다.
+The [text-based Mermaid flow in the briefing](experiment-briefing-20260919.md#measurement-sequence)
+shows EDA → baseline → static measurement → native preliminary comparison → current
+conclusion.
 
-| 항목 | 내용 |
+| Item | Description |
 |---|---|
-| 표본 | EDA 5과제·15실행·56요청, 기준선 5과제×20회, 정적 저장 요청 56개, 예비 비교 26과제·104조건 |
-| 분모·단위 | 단계별로 다름. 과제·실행·요청·조건을 합치지 않음 |
-| 관측 | 서로 다른 질문에 답한 증거가 이 순서로 쌓임 |
-| 증명하지 않는 것 | 단계가 뒤로 갈수록 성능이 좋아졌다는 뜻이나 압축 효과의 인과 |
+| Sample | EDA: 5 tasks, 15 runs, 56 requests; baseline: 5 tasks × 20; static: 56 stored requests; preliminary comparison: 26 tasks and 104 conditions |
+| Denominator and unit | Differ by stage; tasks, runs, requests, and conditions are not combined |
+| Observation | Evidence answering different questions accumulated in this order |
+| Does not establish | That later stages performed better or that compression caused an effect |
 
-파일이 바뀌지 않았는지 확인하는 설계 검토 부록의 **SHA-256 검증값**:
+**SHA-256 check** for the design-review appendix:
 `0f79852691b64fe7cdd4bc1202345b67acd487dcba050416e6f2e8f901230e9e`
 
-## EDA 그림 10개
+## Ten EDA Figures
 
-다음 그림은 [EDA 그림 목록 파일](../../eda/manifest.json)에 고정된 순서와 SHA-256을 그대로 따른다.
+The figures follow the order and SHA-256 values pinned in the
+[EDA figure manifest](../../eda/manifest.json).
 
-### EDA 1. 과제 종류 분포
+### EDA 1. Task-Type Distribution
 
-![주 종류 분포. 공식 영어 지시문 DeepSWE n=113, Terminal n=89. 주 종류 하나로 집계하며 리뷰·수정 혼합 한 과제는 보조 라벨에 남긴다.](../../eda/figures/round2/01-task-types.svg)
+![Primary task-type distribution for official English instructions: DeepSWE n=113 and Terminal n=89. Each task counts once under its primary type; one mixed review-and-modification task retains a secondary label.](../../eda/figures/round2/01-task-types.svg)
 
-*그림 EDA 1. DeepSWE 113과제와 Terminal-Bench 2.1 89과제를 같은 주 종류 기준으로 나눴다.*
+*EDA Figure 1. The same primary-type classification is applied to 113 DeepSWE tasks and
+89 Terminal-Bench 2.1 tasks.*
 
-| 항목 | 내용 |
+| Item | Description |
 |---|---|
-| 표본 | DeepSWE 113과제·Terminal 89과제 |
-| 분모·단위 | 각 벤치마크 과제 수·과제/% |
-| 관측 | 두 과제 집합의 종류 구성이 같지 않고, 혼합 과제에는 분류 모호함이 남음 |
-| 증명하지 않는 것 | 모델 성능, 압축률, 두 벤치마크의 우열 |
-| 원본 SHA-256 | `8a2f83048fcdc865b36152c96ead0f796a125bb5e208af9483bda14f51328236` |
+| Sample | 113 DeepSWE tasks and 89 Terminal tasks |
+| Denominator and unit | Task count in each benchmark; tasks / % |
+| Observation | The two task sets have different type composition, and mixed tasks retain classification ambiguity |
+| Does not establish | Model performance, compression rate, or which benchmark is better |
+| Source SHA-256 | `8a2f83048fcdc865b36152c96ead0f796a125bb5e208af9483bda14f51328236` |
 
-### EDA 2. 저장소·언어·작성자 분류
+### EDA 2. Repository, Language, and Author Classification
 
-![DeepSWE 113과제의 저장소·주 언어와 Terminal 89과제의 종류·난이도 분포. 난이도는 저자 메타데이터이지 이번 모델의 성능 측정이 아니다.](../../eda/figures/round1/05-corpus-bias.svg)
+![Repository and primary-language distribution for 113 DeepSWE tasks and category and difficulty distribution for 89 Terminal tasks. Difficulty is author metadata, not a model-performance measurement.](../../eda/figures/round1/05-corpus-bias.svg)
 
-*그림 EDA 2. 과제가 어느 저장소·언어·작성자 분류에 몰려 있는지 보여 주는 메타데이터 집계다.*
+*EDA Figure 2. Metadata aggregation shows concentrations by repository, language, and
+author-provided classification.*
 
-| 항목 | 내용 |
+| Item | Description |
 |---|---|
-| 표본 | DeepSWE 113과제·Terminal 89과제 |
-| 분모·단위 | 각 벤치마크 과제 수·과제/% |
-| 관측 | 저장소·언어·종류·작성자 난이도 분포가 고르지 않음 |
-| 증명하지 않는 것 | 이번 모델이 쉽거나 어렵게 느낀 정도, 모집단 대표성 |
-| 원본 SHA-256 | `29e95d987133ac1405a85a0d77a9249783eb7136d16242d8b66cf66cc14887f7` |
+| Sample | 113 DeepSWE tasks and 89 Terminal tasks |
+| Denominator and unit | Task count in each benchmark; tasks / % |
+| Observation | Repository, language, type, and author-provided difficulty distributions are uneven |
+| Does not establish | Difficulty for this model or population representativeness |
+| Source SHA-256 | `29e95d987133ac1405a85a0d77a9249783eb7136d16242d8b66cf66cc14887f7` |
 
-### EDA 3. 공식 지시문 크기
+### EDA 3. Official Instruction Size
 
-![공식 DeepSWE 113과제와 Terminal 89과제의 지시문 UTF-8 바이트 및 로컬 토큰 분포. API 청구 토큰이 아니다.](../../eda/figures/round1/01-input-size.svg)
+![Distributions of instruction UTF-8 bytes and local tokens for 113 official DeepSWE tasks and 89 Terminal tasks. These are not API-billed tokens.](../../eda/figures/round1/01-input-size.svg)
 
-*그림 EDA 3. 공식 지시문의 파일 크기와 로컬 토큰 수 분포를 따로 그렸다.*
+*EDA Figure 3. Official instruction-file size and local-token counts are plotted
+separately.*
 
-| 항목 | 내용 |
+| Item | Description |
 |---|---|
-| 표본 | 공식 DeepSWE 113과제·Terminal 89과제 |
-| 분모·단위 | 지시문 파일·UTF-8 바이트/로컬 `o200k_base` 토큰 |
-| 관측 | 과제별 지시문 크기와 로컬 토큰 수가 넓게 퍼져 있음 |
-| 증명하지 않는 것 | API 청구 토큰, 실제 모델 요청 전체 크기, 비용 |
-| 원본 SHA-256 | `0e031cbf23bcfdfb4ed0f689c484fde0d185d88fc7e65730032bb18851c0dd7f` |
+| Sample | 113 official DeepSWE tasks and 89 official Terminal tasks |
+| Denominator and unit | Instruction files; UTF-8 bytes / local `o200k_base` tokens |
+| Observation | Instruction size and local-token count vary widely by task |
+| Does not establish | API-billed tokens, full live-request size, or cost |
+| Source SHA-256 | `0e031cbf23bcfdfb4ed0f689c484fde0d185d88fc7e65730032bb18851c0dd7f` |
 
-### EDA 4. 과제 종류별 입력 크기
+### EDA 4. Input Size by Task Type
 
-![입력 크기 분포. 정적 DeepSWE n=113과제와 Terminal n=89과제, 과거 Terminal n=56요청을 분리했다. UTF-8 바이트와 로컬 o200k_base 토큰이며 API 토큰이 아니다.](../../eda/figures/round2/03-input-size-by-type.svg)
+![Input-size distributions separated among static DeepSWE n=113 tasks, Terminal n=89 tasks, and 56 historical Terminal requests. Values are UTF-8 bytes and local o200k_base tokens, not API tokens.](../../eda/figures/round2/03-input-size-by-type.svg)
 
-*그림 EDA 4. 공식 지시문과 과거 실제 요청을 섞지 않고 종류별 크기 분포로 나눴다.*
+*EDA Figure 4. Official instructions and historical live requests remain separate in
+size distributions by type.*
 
-| 항목 | 내용 |
+| Item | Description |
 |---|---|
-| 표본 | 공식 DeepSWE 113과제·Terminal 89과제·과거 Terminal 56요청 |
-| 분모·단위 | 지시문/요청 본문·UTF-8 바이트/로컬 토큰 |
-| 관측 | 입력 종류와 과제 종류에 따라 크기 분포가 다름 |
-| 증명하지 않는 것 | API 입력 토큰, 청구 비용, 압축 가능성 |
-| 원본 SHA-256 | `e86b10585914a2d2e8f70c2ddfaaebb1d3bc1ac9729d4429a9bc000a431abf60` |
+| Sample | 113 official DeepSWE tasks, 89 official Terminal tasks, and 56 historical Terminal requests |
+| Denominator and unit | Instruction / message content; UTF-8 bytes / local tokens |
+| Observation | Size distributions differ by input and task type |
+| Does not establish | API input tokens, billed cost, or compressibility |
+| Source SHA-256 | `e86b10585914a2d2e8f70c2ddfaaebb1d3bc1ac9729d4429a9bc000a431abf60` |
 
-### EDA 5. 입력 본문 구성
+### EDA 5. Message-Content Composition
 
-![정적 지시문 113개·89개와 기존 Terminal 실제 요청 56개의 본문 구간 비중. 각 층의 UTF-8 바이트 합계를 분모로 하며 미분류도 별도 표시한다.](../../eda/figures/round1/02-input-composition.svg)
+![Content-span shares for 113 and 89 static instructions and 56 historical Terminal live requests. Each layer uses total UTF-8 content bytes as its denominator and shows unclassified content separately.](../../eda/figures/round1/02-input-composition.svg)
 
-*그림 EDA 5. 지시문과 요청 본문을 구간 종류로 분류해 UTF-8 바이트 비중을 비교했다.*
+*EDA Figure 5. Instruction and request content is classified by span type and compared by
+UTF-8 byte share.*
 
-| 항목 | 내용 |
+| Item | Description |
 |---|---|
-| 표본 | 공식 지시문 113개·89개, Terminal 실제 요청 56개 |
-| 분모·단위 | 각 입력층 본문 UTF-8 바이트 합계·% |
-| 관측 | 공식 지시문과 실제 요청의 본문 구성이 서로 다름 |
-| 증명하지 않는 것 | 각 구간을 안전하게 삭제할 수 있음, 달성 압축률 |
-| 원본 SHA-256 | `57aa286750015af99651a230834ed458a20936a0afa189cbcb8c32bb9a98440c` |
+| Sample | 113 and 89 official instructions; 56 Terminal live requests |
+| Denominator and unit | Total message-content UTF-8 bytes in each input layer; % |
+| Observation | Official instructions and live requests have different content composition |
+| Does not establish | That a span can be safely deleted or an achieved compression rate |
+| Source SHA-256 | `57aa286750015af99651a230834ed458a20936a0afa189cbcb8c32bb9a98440c` |
 
-### EDA 6. 과제별 1차 후보 비중
+### EDA 6. First-Pass Candidate Share by Task
 
-![Terminal 5과제, 각 3실행에서 기록된 요청 56개의 과제별 로그 후보·미분류·보호 구간 비중. 압축 결과가 아니라 본문 바이트 구성이다.](../../eda/figures/round1/03-compressible-share.svg)
+![Task-level shares of first-pass log candidates, unclassified spans, and protected spans across 56 requests from 5 Terminal tasks and 3 runs per task. This is content-byte composition, not a compression result.](../../eda/figures/round1/03-compressible-share.svg)
 
-*그림 EDA 6. 목적에 맞춰 고른 5과제에서 1차로 식별한 후보·미분류·보호 구간을 나눴다.*
+*EDA Figure 6. First-pass candidates, unclassified spans, and protected spans are separated
+across five purposively selected tasks.*
 
-| 항목 | 내용 |
+| Item | Description |
 |---|---|
-| 표본 | 5과제·각 3실행·56요청 |
-| 분모·단위 | 과제별 본문 UTF-8 바이트 합계·% |
-| 관측 | 후보로 분류된 바이트 비중이 과제마다 크게 다름 |
-| 증명하지 않는 것 | 실제 압축 결과, 안전성, 품질, 대표 표본의 절감률 |
-| 원본 SHA-256 | `dea914de8808b7ec7746d01f0b60af449a38ada5473cfce3f3ca4f49ee52f5f6` |
+| Sample | 5 tasks, 3 runs each, 56 requests |
+| Denominator and unit | Total task-level message-content UTF-8 bytes; % |
+| Observation | Byte share classified as a candidate varies widely by task |
+| Does not establish | Actual compression, safety, quality, or representative-sample savings |
+| Source SHA-256 | `dea914de8808b7ec7746d01f0b60af449a38ada5473cfce3f3ca4f49ee52f5f6` |
 
-### EDA 7. 미분류 구간 재검토
+### EDA 7. Reclassification of Unclassified Spans
 
-![미분류 분해. 서로 다른 58종, 재전송 포함 168회·158,258바이트를 전수 검토했다. 기존 과거 요청 n=56, 과제 n=5이며 API 토큰이나 실제 절감률이 아니다.](../../eda/figures/round2/04-unknown-decomposition.svg)
+![Decomposition of 58 distinct unclassified types, 168 occurrences including retransmission, and 158,258 bytes. The historical sample has n=56 requests and n=5 tasks; values are not API tokens or achieved savings.](../../eda/figures/round2/04-unknown-decomposition.svg)
 
-*그림 EDA 7. 처음에 미분류였던 158,258바이트를 7개 범주로 다시 나눈 기록이다.*
+*EDA Figure 7. The 158,258 bytes initially left unclassified are divided into seven
+categories.*
 
-| 항목 | 내용 |
+| Item | Description |
 |---|---|
-| 표본 | 서로 다른 58종·재전송 포함 168회·56요청·5과제 |
-| 분모·단위 | 미분류 158,258바이트/전체 본문 824,301바이트 |
-| 관측 | 과거 미분류 영역 안에도 후보와 보호 대상이 함께 있었음 |
-| 증명하지 않는 것 | API 토큰 비중, 실제 절감률, 다른 요청에 대한 분류 정확도 |
-| 원본 SHA-256 | `47970d1c9203dc4d838930271e9e8c6518725c1289aa77fd4d5d6a04a07bc841` |
+| Sample | 58 distinct types, 168 occurrences including retransmission, 56 requests, 5 tasks |
+| Denominator and unit | 158,258 unclassified bytes / 824,301 total message-content bytes |
+| Observation | Previously unclassified content included both candidates and protected material |
+| Does not establish | API-token share, achieved savings, or classification accuracy on other requests |
+| Source SHA-256 | `47970d1c9203dc4d838930271e9e8c6518725c1289aa77fd4d5d6a04a07bc841` |
 
-### EDA 8. 과제 종류별 후보 비중
+### EDA 8. Candidate Share by Task Type
 
-![종류별 후보와 본문 구성. 과거 Terminal n=5과제, 15실행, 56요청. UTF-8 바이트 기준이며 디버깅·리뷰 등 무표본 종류는 미측정이다.](../../eda/figures/round2/02-candidate-share-by-type.svg)
+![Candidate and content composition by type for 5 historical Terminal tasks, 15 runs, and 56 requests. Values use UTF-8 bytes; unsampled types such as debugging and review remain unmeasured.](../../eda/figures/round2/02-candidate-share-by-type.svg)
 
-*그림 EDA 8. 1차와 2차 분류의 후보 비중을 과제 종류별로 비교하되 코드가 섞인 구간은 보호했다.*
+*EDA Figure 8. First- and second-pass candidate shares are compared by task type while
+mixed-code spans remain protected.*
 
-| 항목 | 내용 |
+| Item | Description |
 |---|---|
-| 표본 | Terminal 5과제·15실행·56요청 |
-| 분모·단위 | 종류별 본문 UTF-8 바이트 합계·% |
-| 관측 | 이 목적 표본의 후보 비중은 과제별 0.48%~35.29%, 전체 15.42%였음 |
-| 증명하지 않는 것 | 무표본 종류의 값, 달성 압축률, 후보 전부 삭제 가능성 |
-| 원본 SHA-256 | `89cfaf57fc4c59ff8afd5c71fa6f64bf2c5c7fbf044fd799c21d29f0b0d3ff61` |
+| Sample | 5 Terminal tasks, 15 runs, 56 requests |
+| Denominator and unit | Total message-content UTF-8 bytes by type; % |
+| Observation | Candidate share in this purposive sample was 0.48%–35.29% by task and 15.42% overall |
+| Does not establish | Values for unsampled types, achieved compression, or that every candidate can be deleted |
+| Source SHA-256 | `89cfaf57fc4c59ff8afd5c71fa6f64bf2c5c7fbf044fd799c21d29f0b0d3ff61` |
 
-### EDA 9. 로컬 토큰과 API 입력 토큰
+### EDA 9. Local Tokens Versus API Input Tokens
 
-![기존 Terminal 5과제·15실행·56요청의 로컬 메시지 본문 토큰과 실제 API 입력 토큰 대조. 점선은 계산상 y=x이며 오른쪽은 차이 분포다.](../../eda/figures/round1/06-api-token-calibration.svg)
+![Comparison between local message-content tokens and actual API input tokens across 56 historical requests from 5 Terminal tasks and 15 runs. The dashed line is calculated y=x; the right panel shows the difference distribution.](../../eda/figures/round1/06-api-token-calibration.svg)
 
-*그림 EDA 9. 같은 과거 요청의 로컬 본문 토큰과 provider가 보고한 API 입력 토큰을 대조했다.*
+*EDA Figure 9. Local content tokens and provider-reported API input tokens are compared
+for the same historical requests.*
 
-| 항목 | 내용 |
+| Item | Description |
 |---|---|
-| 표본 | Terminal 5과제·15실행·56요청 |
-| 분모·단위 | 요청/실행·API 사용량 토큰/로컬 본문 토큰 |
-| 관측 | 두 토큰 수는 가깝지만 동일하지 않음 |
-| 증명하지 않는 것 | 청구서 대사, 새 실행의 토큰 수, 압축 절감률 |
-| 원본 SHA-256 | `70b9a531e5bfa66d5264fd04241c229f0b4ac04b03f923373a567ed11ae48cca` |
+| Sample | 5 Terminal tasks, 15 runs, 56 requests |
+| Denominator and unit | Requests / runs; API usage tokens / local content tokens |
+| Observation | The token counts are close but not identical |
+| Does not establish | Invoice reconciliation, new-run token counts, or compression savings |
+| Source SHA-256 | `70b9a531e5bfa66d5264fd04241c229f0b4ac04b03f923373a567ed11ae48cca` |
 
-### EDA 10. 공통 선두 토큰 길이
+### EDA 10. Shared Leading-Token Length
 
-![공식 지시문 과제 쌍과 실제 Terminal 요청 쌍의 공통 선두 로컬 token ID 길이 분포. 1,024 점선은 당시 GPT-5.4 서비스의 캐시 최소 길이 참고선이며 서비스 캐시 접두부 실측이 아니다.](../../eda/figures/round1/04-shared-prefix.svg)
+![Distribution of shared leading local token-ID lengths among pairs of official task instructions and live Terminal requests. The 1,024 dashed line is a reference for the GPT-5.4 service's cache minimum at the time, not a direct measurement of service cache prefixes.](../../eda/figures/round1/04-shared-prefix.svg)
 
-*그림 EDA 10. 지시문 쌍과 요청 쌍이 앞에서부터 몇 개의 로컬 토큰 ID를 공유하는지 계산했다.*
+*EDA Figure 10. The calculation counts how many local token IDs are shared from the
+beginning of each instruction or request pair.*
 
-| 항목 | 내용 |
+| Item | Description |
 |---|---|
-| 표본 | 정적 지시문 쌍 6,328/3,916·과거 요청 쌍 41/10/15 |
-| 분모·단위 | 비교층별 쌍 수·공통 선두 로컬 토큰 ID 길이 |
-| 관측 | 비교층마다 공통 선두 길이 분포가 다름 |
-| 증명하지 않는 것 | 실제 캐시 적중, 캐시 청구, 독립 표본 |
-| 원본 SHA-256 | `94f9a6f0c510530c676bafffd5f059e81a31345f9454510192a5f6c649a724e4` |
+| Sample | 6,328 / 3,916 static-instruction pairs and 41 / 10 / 15 historical-request pairs |
+| Denominator and unit | Pair count by comparison layer; shared leading local token-ID length |
+| Observation | Shared-prefix length distributions differ across comparison layers |
+| Does not establish | Actual cache hits, cache billing, or independent samples |
+| Source SHA-256 | `94f9a6f0c510530c676bafffd5f059e81a31345f9454510192a5f6c649a724e4` |
 
-## 예비 비교 결과 차트 6개
+## Six Preliminary-Comparison Charts
 
-모든 차트는 [공개 집계 JSON](../../../data/experiment/preliminary-comparison-summary.json)을 [생성 코드](../../../src/experiment_figures.py)로 그렸다. 집계 JSON SHA-256은 `28805f13df16c734e4e65aa4f6c323d885e605222754366cf4d3eea361d171c7`이며, 원문은 [쉬운 결과 설명](plain-language-results-20260917.md)의 표다.
+All charts were drawn from the
+[public aggregate JSON](../../../data/experiment/preliminary-comparison-summary.json) by
+the [generation code](../../../src/experiment_figures.py). The aggregate JSON SHA-256 is
+`28805f13df16c734e4e65aa4f6c323d885e605222754366cf4d3eea361d171c7`,
+and the source tables appear in the [plain-language results](plain-language-results-20260917.md).
 
-### 결과 1. 품질 판정
+### Result 1. Quality Judgments
 
-![26과제의 네 조건을 각 1회 실행한 104조건에서 조건별 pass와 wrong_answer 개수. 기술 미완료 5개는 제외하며 압축기 순위를 뜻하지 않는다.](../../../figures/preliminary-quality.svg)
+![Condition-level counts of pass and wrong_answer across 104 conditions from one run of four conditions on 26 tasks. Five technically incomplete runs are excluded; this is not a compressor ranking.](../../../figures/preliminary-quality.svg)
 
-*그림 결과 1. 증거가 완결된 104조건에서 `pass` 40개와 `wrong_answer` 64개를 조건별로 나눴다.*
+*Result Figure 1. The 104 evidence-complete conditions contain 40 `pass` and 64
+`wrong_answer`, separated by condition.*
 
-| 항목 | 내용 |
+| Item | Description |
 |---|---|
-| 표본 | 26과제×4조건=104조건·조건당 1회 |
-| 분모·단위 | 완결 조건 104개·조건 수 |
-| 관측 | 조건별 통과 수는 none 11, squeez 10, Headroom 9, LLMLingua-2 10 |
-| 증명하지 않는 것 | 압축기 순위, 품질 비열등성, 압축이 판정을 바꾼 원인 |
+| Sample | 26 tasks × 4 conditions = 104 conditions; one run per condition |
+| Denominator and unit | 104 completed conditions; condition count |
+| Observation | Pass counts were none 11, squeez 10, Headroom 9, and LLMLingua-2 10 |
+| Does not establish | Compressor ranking, quality non-inferiority, or compression as the cause |
 | SVG SHA-256 | `783a322fd547a80088e84c7b2aba4e56b042838d0347b0a8a2460a045274fc56` |
 
-### 결과 2. 문자열 변경이 있었던 조건
+### Result 2. Conditions With String Changes
 
-![104개 완결 조건에서 조건별 문자열 변경 있음과 변경 없음의 조건 수. 변경 여부는 품질이나 비용의 원인을 뜻하지 않는다.](../../../figures/preliminary-changed-conditions.svg)
+![Counts of conditions with and without string changes across 104 completed conditions. Change status does not establish the cause of quality or cost.](../../../figures/preliminary-changed-conditions.svg)
 
-*그림 결과 2. 104조건 중 23조건에서 실제 문자열이 달라졌고 81조건에서는 달라지지 않았다.*
+*Result Figure 2. Actual strings changed in 23 of 104 conditions and remained unchanged
+in 81.*
 
-| 항목 | 내용 |
+| Item | Description |
 |---|---|
-| 표본 | 26과제×4조건=104조건·조건당 1회 |
-| 분모·단위 | 완결 조건 104개·조건 수 |
-| 관측 | 변경 조건은 none 0, squeez 1, Headroom 4, LLMLingua-2 18 |
-| 증명하지 않는 것 | 변경 크기, 품질 영향, API 사용량 감소 |
+| Sample | 26 tasks × 4 conditions = 104 conditions; one run per condition |
+| Denominator and unit | 104 completed conditions; condition count |
+| Observation | Changed conditions: none 0, squeez 1, Headroom 4, LLMLingua-2 18 |
+| Does not establish | Change size, quality effect, or reduced API usage |
 | SVG SHA-256 | `16d5032ed5efff1437eaf8a415e97e4830bf88b7a46e93161fba1ec0266d527f` |
 
-### 결과 3. 실제 변경 구간 수
+### Result 3. Actually Changed Spans
 
-![보존 원문에서 확인한 조건별 실제 변경 구간 수. 조건 수와 다른 단위이며 원문이 없는 166건은 0으로 넣지 않았다.](../../../figures/preliminary-changed-spans.svg)
+![Counts of actually changed spans by condition, confirmed from retained source. Span count differs from condition count, and 166 source-missing records are not treated as zero.](../../../figures/preliminary-changed-spans.svg)
 
-*그림 결과 3. 실제로 달라진 구간 209건을 조건별로 나눴다. 계산 가능한 738쌍 중 529쌍은 같았고 원문이 없는 166건은 미측정이다.*
+*Result Figure 3. The 209 actually changed spans are separated by condition. Of 738
+comparable pairs, 529 were unchanged; 166 without source remain unmeasured.*
 
-| 항목 | 내용 |
+| Item | Description |
 |---|---|
-| 표본 | 보존 원문으로 대조 가능한 738쌍, 변경 209건 |
-| 분모·단위 | 조건별 확인된 변경 구간·구간 수 |
-| 관측 | 변경 구간은 none 0, squeez 2, Headroom 53, LLMLingua-2 154 |
-| 증명하지 않는 것 | 누락 166건의 값, 전체 요청 토큰 감소, 안전성 |
+| Sample | 738 pairs comparable from retained source; 209 changed |
+| Denominator and unit | Confirmed changed spans by condition; span count |
+| Observation | Changed spans: none 0, squeez 2, Headroom 53, LLMLingua-2 154 |
+| Does not establish | Values for 166 missing pairs, full-request token reduction, or safety |
 | SVG SHA-256 | `3b5c6c1ffeb1311beefd7f7ce53feb5fee70bfa41dbcee555a7289969e90cc45` |
 
-변경된 209구간만 로컬 `o200k_base`로 다시 세면 `97,723 → 50,824`토큰이다. 이 값은 다음 API 사용량 차트의 분모가 아니다.
+Recounting only the 209 changed spans with local `o200k_base` gives
+`97,723 → 50,824` tokens. This is not the denominator of the API-usage chart.
 
-### 결과 4. 요청과 응답 사건
+### Result 4. Request and Response Events
 
-![104개 완결 조건의 논리 모델 요청, provider HTTP 시도, 성공 응답, 작업 전달 응답을 조건별로 따로 센 차트. 네 총합은 각각 1,027이지만 같은 사건이나 완료율이 아니다.](../../../figures/preliminary-request-events.svg)
+![Separate counts of logical model requests, provider HTTP attempts, successful responses, and task-delivered responses across 104 completed conditions. Each total is 1,027, but they are not the same event or a completion rate.](../../../figures/preliminary-request-events.svg)
 
-*그림 결과 4. 네 카운터는 관측상 조건별 값과 총합이 같았지만, 요청 수신·외부 전송·성공 수신·작업 전달이라는 서로 다른 사건이다.*
+*Result Figure 4. The four counters happened to have matching condition-level values and
+totals, but represent receipt, external send, successful receipt, and task delivery.*
 
-| 항목 | 내용 |
+| Item | Description |
 |---|---|
-| 표본 | 증거가 완결된 104조건 |
-| 분모·단위 | 각 사건을 기록한 횟수·사건 수 |
-| 관측 | 네 카운터의 총합이 관측상 각각 1,027회였음 |
-| 증명하지 않는 것 | 작업 완료율, 답에 가까워진 정도, 네 사건이 같은 개념임 |
+| Sample | 104 evidence-complete conditions |
+| Denominator and unit | Recorded occurrence of each event; event count |
+| Observation | Each of the four counters totaled 1,027 |
+| Does not establish | Task completion rate, proximity to an answer, or conceptual equivalence of the events |
 | SVG SHA-256 | `be8d2738f784cf7fb6581f20c9f8f0da799242cda56e9fd619cf4771f4e81e06` |
 
-### 결과 5. 전체 API 사용량
+### Result 5. Full API Usage
 
-![104개 완결 조건의 조건별 provider 보고 입력 토큰, 캐시 입력 토큰, 출력 토큰. 변경 구간 로컬 토큰과 다른 범위다.](../../../figures/preliminary-provider-usage.svg)
+![Provider-reported input, cached-input, and output tokens by condition across 104 completed conditions. This scope differs from local tokens in changed spans.](../../../figures/preliminary-provider-usage.svg)
 
-*그림 결과 5. 전체 API 사용량은 입력 14,510,757토큰, 그중 캐시 입력 9,706,496토큰, 출력 526,407토큰이었다.*
+*Result Figure 5. Full API usage totaled 14,510,757 input tokens, including 9,706,496
+cached-input tokens, and 526,407 output tokens.*
 
-| 항목 | 내용 |
+| Item | Description |
 |---|---|
-| 표본 | 증거가 완결된 104조건 |
-| 분모·단위 | 조건별 전체 provider 보고 사용량·토큰 |
-| 관측 | 조건별 요청 수와 입력·캐시·출력 토큰이 달랐음 |
-| 증명하지 않는 것 | 변경 구간만의 토큰, 캐시 통제, 청구서 대사 |
+| Sample | 104 evidence-complete conditions |
+| Denominator and unit | Full provider-reported usage by condition; tokens |
+| Observation | Request count and input, cached-input, and output tokens differed by condition |
+| Does not establish | Changed-span tokens, cache control, or invoice reconciliation |
 | SVG SHA-256 | `8e814c4e7605b25e6dc8c2ad1e64285f3bdfb2652e79a5e47aad2b3ba2e4e5e8` |
 
-### 결과 6. API 계산 비용
+### Result 6. Calculated API Cost
 
-![104개 완결 조건의 API 사용량에 고정 가격표를 곱한 조건별 미국 달러 계산 비용. 청구서 대사액이나 압축 절감률이 아니다.](../../../figures/preliminary-calculated-cost.svg)
+![Calculated US-dollar cost by condition from provider usage across 104 completed conditions and a fixed price table. This is not invoice-reconciled spend or a compression-savings rate.](../../../figures/preliminary-calculated-cost.svg)
 
-*그림 결과 6. API 사용량에 고정 가격표를 곱한 합은 `$22.3333885`였다. 실제 청구서와 대사하지 않았다.*
+*Result Figure 6. Applying the fixed price table to API usage gives `$22.3333885` in
+total. It was not reconciled to an actual invoice.*
 
-| 항목 | 내용 |
+| Item | Description |
 |---|---|
-| 표본 | 증거가 완결된 104조건 |
-| 분모·단위 | 조건별 API 사용량×가격표·USD |
-| 관측 | none `$5.6186600`, squeez `$6.6631870`, Headroom `$5.3620835`, LLMLingua-2 `$4.6894580` |
-| 증명하지 않는 것 | 청구서 금액, 압축이 만든 절감, 제품 도입 순위 |
+| Sample | 104 evidence-complete conditions |
+| Denominator and unit | API usage × price table by condition; USD |
+| Observation | none `$5.6186600`, squeez `$6.6631870`, Headroom `$5.3620835`, LLMLingua-2 `$4.6894580` |
+| Does not establish | Invoice amount, savings caused by compression, or a product-adoption ranking |
 | SVG SHA-256 | `949a24e9c4072f8fe21cefbdef2c7fa827a1734c0291ba06ba1f9329a6867725` |
 
-## 이 그림으로 말할 수 있는 범위
+## Claim Scope for These Figures
 
-| 말할 수 있는 것 | 아직 말할 수 없는 것 |
+| Supported | Not yet supported |
 |---|---|
-| 목적 표본의 입력 구성과 후보 바이트 범위 | 대표 모집단의 달성 압축률 |
-| 26과제·104조건에서 관측한 판정·변경·요청·사용량·계산 비용 | 압축기 순위·인과 효과·품질 비열등성 |
-| 단위와 분모가 다른 측정값의 구분 | 변경 구간 토큰을 API 사용량이나 청구서로 환산 |
-| 장기 5개가 주 분석과 분리된 품질 미확정 실행이라는 사실 | 중도 종료 실행의 pass 또는 wrong_answer |
+| Input composition and candidate-byte scope in the purposive sample | Achieved compression rate in a representative population |
+| Observed judgments, changes, requests, usage, and calculated cost across 26 tasks and 104 conditions | Compressor ranking, causal effects, or quality non-inferiority |
+| Separation of measurements with different units and denominators | Converting changed-span tokens into API usage or an invoice |
+| The five long runs were separate, quality-unknown executions | `pass` or `wrong_answer` for operator-stopped executions |
 
-## 다음 읽기 순서
+## Next Reading
 
-1. [예비 비교 기술 증거](preliminary-comparison-20260916.md)에서 조건별 실행 식별자·복원 재채점·원격 hash를 확인한다.
-2. [실제 1과제 YAML 실행 안내](../../../README.md#try-it-in-five-minutes)에서 기본 무호출 확인과 명시적 `--execute` 경계를 확인한다.
-3. 실행 전에는 [공개·비공개 등급](../../publication.md)과 [현재 미지원 범위](../../../STATUS.md)를 함께 확인한다.
+1. Use the [technical preliminary-comparison evidence](preliminary-comparison-20260916.md) for condition-level execution identifiers, restoration regrading, and remote hashes.
+2. Use the [one-task YAML walkthrough](../../../README.md#try-it-in-five-minutes) to see the default no-call check and explicit `--execute` boundary.
+3. Before execution, review the [public and private classifications](../../publication.md) and [currently unsupported scope](../../../STATUS.md).

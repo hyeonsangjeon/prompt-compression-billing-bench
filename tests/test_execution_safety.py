@@ -52,18 +52,22 @@ class ExecutionSafetyPolicyTests(unittest.TestCase):
             )
         )
         for stale_instruction in (
-            "시간과 비용 상한은 두지 않는다",
-            "전체 실행 시간과 deadline 중단을 적용하지 않는다",
-            "제한 없음 상태로 실행한다",
+            "do not set time or cost limits",
+            "do not apply a full-run time or deadline stop",
+            "run with no limits",
         ):
             self.assertNotIn(stale_instruction, current_guidance)
 
-        decisions = (root / "docs/experiment/decisions.md").read_text()
-        self.assertIn("이 문단은 당시 실행 조건의 역사 기록이다", decisions)
-        self.assertIn("앞으로의 유료 실행에는 아래 schema version 4 정책이 적용", decisions)
-        policy = (root / "docs/experiment/execution-safety-policy.md").read_text()
-        self.assertIn("자연 종료까지 기다리는 관찰은 일반 비교에서 허용하지 않는다", policy)
-        self.assertIn("상한 종료는 `pass`, `wrong_answer`, `wrong_format`", policy)
+        decisions = " ".join(
+            (root / "docs/experiment/decisions.md").read_text().split()
+        )
+        self.assertIn("This paragraph is a historical record of conditions at the time", decisions)
+        self.assertIn("Future paid execution follows schema version 4 below", decisions)
+        policy = " ".join(
+            (root / "docs/experiment/execution-safety-policy.md").read_text().split()
+        )
+        self.assertIn("Waiting for natural termination is not allowed in the general comparison", policy)
+        self.assertIn("A limit stop is not a quality judgment such as `pass`, `wrong_answer`, or `wrong_format`", policy)
 
     def test_template_and_applied_policy_are_strict_and_schema_valid(self):
         ledger = ledger_fixture()

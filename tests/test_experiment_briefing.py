@@ -14,57 +14,58 @@ class ExperimentBriefingTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.text = BRIEFING.read_text()
+        cls.text_flat = " ".join(cls.text.split())
 
     def test_protected_facts_and_denominators_are_present(self):
         required = (
-            "5과제·15실행·56요청",
-            "0.48%~35.29%",
-            "전체 15.42%",
-            "후보 전부 삭제 가정 22.83%",
-            "5과제 × 20회 = 100",
-            "26과제 × 4조건 = 104조건",
-            "`pass` 40조건, `wrong_answer` 64조건",
-            "23조건의 209구간",
+            "5 tasks, 15 runs, and 56 requests",
+            "0.48%–35.29%",
+            "15.42% overall",
+            "hypothetical deletion of all candidates 22.83%",
+            "5 tasks × 20 = 100 trials",
+            "26 tasks × 4 conditions = 104 conditions",
+            "40 `pass` and 64 `wrong_answer`",
+            "209 spans across 23 conditions",
             "`97,723 → 50,824`",
-            "각각 1,027회",
+            "each totaled 1,027",
             "`$22.3333885`",
             "`$87.771254`",
             "`$0.1294175`",
         )
         for fact in required:
             with self.subTest(fact=fact):
-                self.assertIn(fact, self.text)
+                self.assertIn(fact, self.text_flat)
 
     def test_claim_limits_and_design_gaps_stay_next_to_results(self):
         for phrase in (
-            "조건당 1회",
-            "캐시, 요청 수, 모델이 밟은 실행 경로, 조건 간 동시성은 통제하지 못했다",
-            "`temperature=0`도 같은 답을 보장하지 않는다",
-            "채점기의 거짓 실패 사례",
-            "압축의 인과 효과",
-            "압축기 순위",
-            "품질 비열등성",
-            "전체 모집단 절감률",
-            "사후 종료",
-            "품질 미확정",
+            "one run per condition",
+            "Cache, request count, model execution path, and cross-condition concurrency were uncontrolled",
+            "`temperature=0` does not guarantee identical answers",
+            "verifier false failure",
+            "causal compression effect",
+            "compressor ranking",
+            "quality non-inferiority",
+            "population savings",
+            "stopped post hoc",
+            "unknown quality",
         ):
             with self.subTest(phrase=phrase):
-                self.assertIn(phrase, self.text)
+                self.assertIn(phrase, self.text_flat)
         self.assertEqual(len(re.findall(r"^\| [0-9]+\.", self.text, re.MULTILINE)), 10)
 
     def test_figures_have_alt_text_captions_and_hash_bound_lineage(self):
-        self.assertIn("**그림 1 대체 텍스트.**", self.text)
+        self.assertIn("**Figure 1 alternative text.**", self.text)
         self.assertIn("```mermaid", self.text)
-        self.assertIn("*그림 1.", self.text)
-        self.assertIn("**그림 2 대체 텍스트.**", self.text)
-        self.assertIn("*그림 2.", self.text)
+        self.assertIn("*Figure 1.", self.text)
+        self.assertIn("**Figure 2 alternative text.**", self.text)
+        self.assertIn("*Figure 2.", self.text)
         figure = ROOT / "docs/eda/figures/round2/02-candidate-share-by-type.svg"
         actual = hashlib.sha256(figure.read_bytes()).hexdigest()
         manifest = json.loads((ROOT / "docs/eda/manifest.json").read_bytes())
         entry = next(item for item in manifest["figures"] if item["path"].endswith("02-candidate-share-by-type.svg"))
         self.assertEqual(actual, entry["sha256"])
         self.assertIn(actual, self.text)
-        for fact in ("5과제", "15실행", "56요청", "UTF-8"):
+        for fact in ("5 tasks", "15 runs", "56 requests", "UTF-8"):
             self.assertIn(fact, entry["alt"])
         self.assertIn("NOT API token share", figure.read_text())
 
@@ -86,9 +87,10 @@ class DataConnectionGuideTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.text = DATA_GUIDE.read_text()
+        cls.text_flat = " ".join(cls.text.split())
 
     def test_sha256_is_defined_before_first_use(self):
-        definition = "**파일 지문(SHA-256 해시)**"
+        definition = "**file fingerprint (SHA-256 hash)**"
         self.assertIn(definition, self.text)
         self.assertEqual(
             self.text.index("SHA-256"),
@@ -102,37 +104,37 @@ class DataConnectionGuideTests(unittest.TestCase):
             "src/screening_run.py",
             "schemas/experiment-result.schema.json",
             "screening_run --diagnose-task",
-            "새 실행기나 우회 경로를 만들지 않는다",
+            "does not create a new runner or bypass",
         ):
             with self.subTest(phrase=phrase):
-                self.assertIn(phrase, self.text)
+                self.assertIn(phrase, self.text_flat)
 
     def test_no_call_and_quality_boundaries_are_explicit(self):
         for phrase in (
-            "무호출 확인(preflight)",
+            "no-call preflight",
             "status = checked",
             "outcome = preflight_passed",
             "technical_incomplete",
-            "오답으로 바꾸지 않음",
+            "do not convert to a wrong answer",
             "quality.status=wrong_answer",
             "quality.status=wrong_format",
             "--execute",
         ):
             with self.subTest(phrase=phrase):
-                self.assertIn(phrase, self.text)
+                self.assertIn(phrase, self.text_flat)
 
     def test_private_values_and_measurement_units_stay_separate(self):
         for phrase in (
-            "고객 데이터 반출 금지",
-            "실제 변경 구간 토큰",
-            "전체 API usage",
-            "계산 비용",
-            "실제 청구서",
+            "Do not move source data",
+            "actually changed-span tokens",
+            "Full API usage",
+            "Calculated cost",
+            "Actual invoice",
             "cost.invoice_reconciled=false",
-            "관측되지 않은 usage를 0으로 바꾸지 않는다",
+            "unobserved usage to zero",
         ):
             with self.subTest(phrase=phrase):
-                self.assertIn(phrase, self.text)
+                self.assertIn(phrase, self.text_flat)
         for environment_name in (
             "FOUNDRY_ENDPOINT",
             "SCREENING_OPERATIONAL_LEDGER",
@@ -144,13 +146,13 @@ class DataConnectionGuideTests(unittest.TestCase):
 
     def test_fixed_benchmark_scope_is_not_presented_as_arbitrary_customer_data(self):
         for phrase in (
-            "임의의 고객 데이터 형식을 받는 범용 실행기가 아니다",
-            "공개 과제 색인에 없는 과제는 무호출 확인에서 거부된다",
-            "별도 검토 필요",
-            "반복 없이 조건 간 순위나 비열등성을 말할 수 없다",
+            "not a generic runner for arbitrary customer-data formats",
+            "A task absent from the public index is rejected during no-call preflight",
+            "Requires separate review",
+            "one run cannot establish cross-condition ranking or non-inferiority",
         ):
             with self.subTest(phrase=phrase):
-                self.assertIn(phrase, self.text)
+                self.assertIn(phrase, self.text_flat)
 
 
 if __name__ == "__main__":

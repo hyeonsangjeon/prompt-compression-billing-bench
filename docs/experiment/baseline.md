@@ -1,86 +1,86 @@
-# 추가 압축 없는 기준선
+# Baseline Without Additional Compression
 
-**증거 상태:** 비공개 원본에서 집계한 측정이다. 압축 비교 결과가 아니다.
+**Evidence status:** Measurement aggregated from private raw records. This is not a compression-comparison result.
 
-2026-09-14 UTC에 `none` 조건을 20회 실행했다. 사전 규칙은 `stop_inconclusive`와 `comparison_informative=false`를 반환했다. 따라서 이 결과만으로 압축 조건의 품질 허용 범위를 확정하지 않는다.
+The `none` condition was run 20 times on 2026-09-14 UTC. The preregistered rule returned `stop_inconclusive` and `comparison_informative=false`. This result alone therefore does not establish an acceptable quality range for the compression conditions.
 
-## 측정 조건
+## Measurement Conditions
 
-| 항목 | 값 | 성격 |
+| Item | Value | Classification |
 | --- | --- | --- |
-| 표본 | 목적 선정 5과제 × 20회 = 100 native trial | 측정 분모 |
-| 벤치마크 | Terminal-Bench 2.1, revision `7131e4375048a0e408a8fb404b5f499d726b695b` | 고정 조건 |
-| 모델 | `gpt-5.4`, 제공자 보고 revision `gpt-5.4-2026-03-05` | 고정 조건 |
-| 실행기 | Harbor `0.22.0`, instrumented Terminus 2 `2.0.0` | 고정 조건 |
-| 환경 | cloud VM, Linux kernel `6.17.0-1022-azure`, 8 vCPU | 측정 조건 |
-| 병렬도·provider 제약 | 동시 native trial 8개, provider 처리량 제한과 서비스 오류만 따른다 | 비교 통제·운영값 |
-| 생성 설정 | temperature `0`, reasoning effort `none` | 고정 조건·결정론 보장 아님 |
-| 로컬 token | tiktoken `0.14.0`, `o200k_base` | 계산 조건 |
-| 실행 소스 | `2984a3879252d51d1681b9d4f6b3bf4f4871a12e` | 측정 계보 |
+| Sample | 5 purposively selected tasks × 20 repetitions = 100 native trials | Measurement denominator |
+| Benchmark | Terminal-Bench 2.1, revision `7131e4375048a0e408a8fb404b5f499d726b695b` | Fixed condition |
+| Model | `gpt-5.4`, provider-reported revision `gpt-5.4-2026-03-05` | Fixed condition |
+| Runner | Harbor `0.22.0`, instrumented Terminus 2 `2.0.0` | Fixed condition |
+| Environment | Cloud VM, Linux kernel `6.17.0-1022-azure`, 8 vCPU | Measurement condition |
+| Concurrency and provider constraints | 8 concurrent native trials; only provider throughput limits and service errors applied | Comparison control and operating value |
+| Generation settings | temperature `0`, reasoning effort `none` | Fixed condition; not a guarantee of determinism |
+| Local tokens | tiktoken `0.14.0`, `o200k_base` | Calculation condition |
+| Execution source | `2984a3879252d51d1681b9d4f6b3bf4f4871a12e` | Measurement lineage |
 
-## 흔들림과 중단
+## Variability and Stopping
 
-회차별 통과 과제 수는 다음과 같다. 한 값의 분모는 5과제다.
+The number of passing tasks in each repetition was as follows. Each value has a denominator of 5 tasks.
 
 ```text
 4, 3, 3, 3, 4, 3, 3, 2, 2, 3, 4, 4, 3, 3, 3, 4, 3, 3, 3, 3
 ```
 
-| 지표 | 값 | 표본·분모 | 성격 |
+| Metric | Value | Sample or denominator | Classification |
 | --- | ---: | --- | --- |
-| 전체 관측 최소·최대 | 2·4과제 | 20회, 회차당 5과제 | 측정 |
-| 관측 범위 폭 | 2과제 | 20회 | 계산 |
-| 평균 | 3.15과제 | 20회 | 계산 |
-| 표본 표준편차 | 0.5871과제 | 20회 | 계산·보조 지표 |
-| 첫 5회 범위 | 3–4과제, 폭 1 | 5회 | 측정·계산. 계속 실행 조건 충족 |
-| 1–10회 범위 | 2–4과제 | 10회 | 측정 |
-| 11–20회 범위 | 3–4과제 | 10회 | 측정 |
-| 최종 판정 | `stop_inconclusive` | 사전 규칙 1건 | 계산 규칙의 판정 |
+| Overall observed minimum and maximum | 2 and 4 tasks | 20 repetitions, 5 tasks per repetition | Measurement |
+| Observed range width | 2 tasks | 20 repetitions | Calculation |
+| Mean | 3.15 tasks | 20 repetitions | Calculation |
+| Sample standard deviation | 0.5871 tasks | 20 repetitions | Calculation; supporting metric |
+| First 5 repetitions | 3–4 tasks, width 1 | 5 repetitions | Measurement and calculation; continuation criterion met |
+| Repetitions 1–10 | 2–4 tasks | 10 repetitions | Measurement |
+| Repetitions 11–20 | 3–4 tasks | 10 repetitions | Measurement |
+| Final decision | `stop_inconclusive` | One preregistered rule | Decision from a calculation rule |
 
-10회에서 앞뒤 5회의 범위와 과제별 관측값 집합이 달라 20회로 늘렸다. 20회에서도 두 절반의 범위가 달랐고, `log-summary-date-ranges`와 `nginx-request-logging`의 과제별 관측값 집합도 달랐다.
+At 10 repetitions, the ranges for the first and second groups of five and the sets of task-level observations differed, so collection continued to 20 repetitions. At 20 repetitions, the ranges of the two halves still differed, as did the task-level observation sets for `log-summary-date-ranges` and `nginx-request-logging`.
 
-## 과제별 결과
+## Results by Task
 
-| 과제 | 통과 | 분모 | 실패 분류 | 성격 |
+| Task | Passes | Denominator | Failure classification | Classification |
 | --- | ---: | ---: | --- | --- |
-| `cancel-async-tasks` | 4 | 20 | 16건 `wrong_answer` | 측정·분류 판단 |
-| `log-summary-date-ranges` | 1 | 20 | 19건 `wrong_answer` | 측정·분류 판단 |
-| `multi-source-data-merger` | 20 | 20 | 없음 | 측정 |
-| `nginx-request-logging` | 18 | 20 | 2건 `wrong_answer` | 측정·분류 판단 |
-| `openssl-selfsigned-cert` | 20 | 20 | 없음 | 측정 |
+| `cancel-async-tasks` | 4 | 20 | 16 `wrong_answer` | Measurement and classification judgment |
+| `log-summary-date-ranges` | 1 | 20 | 19 `wrong_answer` | Measurement and classification judgment |
+| `multi-source-data-merger` | 20 | 20 | None | Measurement |
+| `nginx-request-logging` | 18 | 20 | 2 `wrong_answer` | Measurement and classification judgment |
+| `openssl-selfsigned-cert` | 20 | 20 | None | Measurement |
 
-100/100 trial의 native 판정 증거가 유효했다. 실행 당시 자동 분류기는 실패 37건을 모두 `native_assertion_failed` 서명에 따라 `wrong_answer`로 기록했다. 이 값은 실패 형태의 자동 분류이며 실제 답이 틀렸다는 원인 진단이 아니다. 추가 압축이 없었으므로 이 실패를 압축에 귀속할 수 없다.
+Native judgment evidence was valid for 100/100 trials. At execution time, the automatic classifier recorded all 37 failures as `wrong_answer` based on the `native_assertion_failed` signature. This is an automatic classification of the observed failure form, not a diagnosis that the answer itself was wrong. Because no additional compression was applied, these failures cannot be attributed to compression.
 
-**2026-09-14 UTC 분류 설명 정정 제안:** 이후 정적 대조에서 nginx의 `wrong_answer` 2건은 동등한 문법을 원본 verifier가 거부한 거짓 실패로 확인됐다. 따라서 “실제 오답 37건”이라고 쓰지 않는다. 원장에는 실행 당시 자동 분류 37건을 유지하되, 원인 대조 상태는 nginx verifier 거짓 실패 2건과 원인이 독립 검증되지 않은 자동 분류 35건으로 구분한다. 이는 분류 설명의 정정 제안이며 원측정의 통과 수를 바꾸지 않는다.
+**Proposed clarification to the 2026-09-14 UTC classification:** A later static comparison found that the two nginx `wrong_answer` cases were false failures caused by the original verifier rejecting equivalent syntax. The record should therefore not describe these as “37 actual wrong answers.” The execution-time automatic classification of 37 cases remains in the ledger, while the causal comparison status distinguishes two nginx verifier false failures from 35 automatic classifications whose causes were not independently verified. This proposes a clarification to the classification; it does not change the original pass counts.
 
-이 표는 실행 당시 원본 verifier의 측정값이다. 이후 정적 대조에서 nginx 실패 2건이 동등한 `${http_user_agent}` 문법을 원본 verifier가 거부한 거짓 실패로 확인됐다. 수정본의 변수 검사에 대한 계산값은 nginx 20/20, 전체 65/100이다. 이는 보존 trace와 당시 verifier 결과에 근거한 정적 반사실 계산이며 실제 workspace replay가 아니다. 새 실행이나 원본 측정값으로 바꾸지 않는다. 근거와 고정 SHA는 [선별 규약](screening-protocol.md#기존-기준선에-미치는-영향)에 기록한다.
+The table reports measurements from the original verifier at execution time. A later static comparison found that the two nginx failures used equivalent `${http_user_agent}` syntax that the original verifier rejected. Under the corrected variable check, the calculated values would be nginx 20/20 and 65/100 overall. This is a static counterfactual calculation based on preserved traces and the original verifier results, not a replay of the actual workspaces. It does not replace a new run or the original measurements. The evidence and pinned SHA values are recorded in the [screening protocol](screening-protocol.md#effect-on-the-existing-baseline).
 
-## 사용량과 실행량
+## Usage and Execution Volume
 
-| 지표 | 값 | 표본·분모 | 성격 |
+| Metric | Value | Sample or denominator | Classification |
 | --- | ---: | --- | --- |
-| 제공자 보고 입력 token | 1,340,765 | 351회 성공 응답 | 측정. API usage, 청구서 대사 아님 |
-| 제공자 보고 cached input token | 222,080 | 입력 token의 부분집합 | 측정·관측만 |
-| 제공자 보고 출력 token | 179,805 | 351회 성공 응답 | 측정. API usage, 청구서 대사 아님 |
-| 로컬 입력 token | 1,333,459 | 351회 요청의 message content | `o200k_base` 계산 |
-| 로컬 출력 token | 178,145 | 351회 응답의 보이는 assistant content | `o200k_base` 계산 |
-| agent turn | 332 | 100 trial | 측정 |
-| 논리 모델 호출·총 HTTP 호출 | 351·351 | 100 trial | 측정 |
-| HTTP 200·재시도 | 351·0 | 351회 HTTP 시도 | 측정 |
-| 같은 명령 재실행 | 11 | 100 trial에서 terminal이 받아들인 명령 블록 | 계산 |
-| 같은 하위 명령 재실행 | 18 | 100 trial에서 보수적으로 나눈 shell 하위 명령 | 계산 |
-| 계산 비용 | `$5.5493075` | 제공자 usage × 고정 원장 단가 | 계산. invoice 대사 아님 |
-| native trial 관측 구간 | 1,405.368초, 약 23분 25초 | 100 trial의 가장 이른 시작부터 가장 늦은 종료까지 | 측정 타임스탬프의 차이 계산 |
+| Provider-reported input tokens | 1,340,765 | 351 successful responses | Measurement; API usage, not invoice reconciliation |
+| Provider-reported cached input tokens | 222,080 | Subset of input tokens | Measurement; observation only |
+| Provider-reported output tokens | 179,805 | 351 successful responses | Measurement; API usage, not invoice reconciliation |
+| Local input tokens | 1,333,459 | Message content from 351 requests | `o200k_base` calculation |
+| Local output tokens | 178,145 | Visible assistant content from 351 responses | `o200k_base` calculation |
+| Agent turns | 332 | 100 trials | Measurement |
+| Logical model calls and total HTTP calls | 351 and 351 | 100 trials | Measurement |
+| HTTP 200 responses and retries | 351 and 0 | 351 HTTP attempts | Measurement |
+| Repeated identical commands | 11 | Command blocks accepted by the terminal across 100 trials | Calculation |
+| Repeated identical subcommands | 18 | Conservatively split shell subcommands across 100 trials | Calculation |
+| Calculated cost | `$5.5493075` | Provider usage × fixed ledger rates | Calculation; not invoice reconciliation |
+| Native-trial observation interval | 1,405.368 seconds, about 23 minutes 25 seconds | Earliest start to latest finish across 100 trials | Difference between measured timestamps |
 
-계산 비용은 비캐시 입력, cached input, 출력에 각각 원장의 백만 token당 `$2.50`, `$0.25`, `$15.00`을 적용했다. 로컬 token과 제공자 usage를 서로 대체하지 않는다.
+Calculated cost applies the ledger rates of `$2.50`, `$0.25`, and `$15.00` per million tokens to uncached input, cached input, and output, respectively. Local token counts and provider usage are not interchangeable.
 
-회차별 결과 payload 20개, 총 51.846 MiB를 object storage에서 회수했다. 수집 호스트에서 크기, SHA-256, 실행 소스와 원장 계보를 20/20 대조한 뒤 실행 VM을 deallocate했다. native trial 관측 구간에는 실행 전 준비와 마지막 회수 검증 시간이 포함되지 않는다. 저장소에는 원문 요청과 응답을 공개하지 않는다.
+Twenty repetition-level result payloads totaling 51.846 MiB were retrieved from object storage. On the collection host, size, SHA-256, execution source, and ledger lineage matched for 20/20 payloads before the execution VM was deallocated. The native-trial observation interval excludes preparation before execution and final retrieval verification. Raw requests and responses are not published in this repository.
 
-## 이 결과의 한계
+## Limitations
 
-- 기준선은 20회에서도 사전 안정 조건을 충족하지 못했다. 관측 범위 2를 압축 비교의 확정 허용폭으로 쓰지 않는다.
-- 두 과제는 20/20으로 천장에 있고, 두 과제는 4/20과 1/20으로 바닥에 가깝다. 바닥 과제는 추가 저하를 충분히 드러내지 못할 수 있다.
-- 5과제는 목적 선정 표본이며 Terminal-Bench 2.1 전체나 코드 어시스턴트 업무의 대표 표본이 아니다.
-- temperature `0`과 reasoning effort `none`은 출력 결정론을 보장하지 않는다. cached input도 통제된 축이 아니다.
-- `none`은 추가 압축이 없다는 뜻이다. Harbor의 기존 10,000바이트 중간 생략까지 없는 원문 조건은 아니다.
-- 이 2026-09-14 기준선 실험 범위에서는 squeez, Headroom, LLMLingua-2의 native 품질, token, 비용, 시간을 측정하지 않았다.
+- The baseline did not meet the preregistered stability condition after 20 repetitions. The observed range of 2 is not a confirmed tolerance for the compression comparison.
+- Two tasks were at the ceiling with 20/20 passes, while two were near the floor with 4/20 and 1/20. Floor tasks may not reveal further degradation adequately.
+- The five tasks were purposively selected and are not representative of all Terminal-Bench 2.1 tasks or code-assistant work.
+- temperature `0` and reasoning effort `none` do not guarantee deterministic output. Cached input was also not a controlled factor.
+- `none` means no additional compression. It does not mean raw input without Harbor's existing 10,000-byte intermediate truncation.
+- The 2026-09-14 baseline experiment did not measure native quality, tokens, cost, or time for squeez, Headroom, or LLMLingua-2.

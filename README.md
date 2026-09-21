@@ -25,17 +25,17 @@ not from a new compression or billing experiment. The instruction classification
 for the two benchmarks contain no review-only task; current performance on mixed
 review-and-fix tasks is unmeasured.
 
-The [two-round EDA review (Korean)](docs/eda/README.md) collects the existing
+The [two-round EDA review](docs/eda/README.md) collects the existing
 benchmark/input figures and tables with sample counts, denominators and measurement
 labels. Its ten figures use relative paths; tool-behavior experiments are separate.
 
 For external sharing, start with the [first-study one-page summary](docs/experiment/01-preliminary-comparison/README.md),
-then use the [plain-language Korean summary](docs/experiment/01-preliminary-comparison/plain-language-results-20260917.md),
-the [Korean experiment-design appendix](docs/experiment/01-preliminary-comparison/experiment-briefing-20260919.md)
+then use the [plain-language summary](docs/experiment/01-preliminary-comparison/plain-language-results-20260917.md),
+the [experiment-design appendix](docs/experiment/01-preliminary-comparison/experiment-briefing-20260919.md)
 and [plain-language visualization guide](docs/experiment/01-preliminary-comparison/visualization-guide-20260919.md),
 then use the [technical evidence report](docs/experiment/01-preliminary-comparison/preliminary-comparison-20260916.md)
 for condition-level figures, run identifiers and hashes. The broader
-[experiment record (Korean)](docs/experiment/README.md) separates the fixed protocol,
+[experiment record](docs/experiment/README.md) separates the fixed protocol,
 the measured none baseline, static compressor measurements, preliminary comparison
 and open decisions. The none baseline completed 20 repetitions but stopped
 inconclusive under its predeclared rule; the preliminary comparison is one run per
@@ -211,7 +211,7 @@ have not been validated.
 |---|---|
 | First preliminary comparison in one page | [First-study summary](docs/experiment/01-preliminary-comparison/README.md) |
 | Experiment-design review and remaining gaps | [Experiment-design appendix](docs/experiment/01-preliminary-comparison/experiment-briefing-20260919.md) |
-| Preliminary results in plain Korean | [Plain-language sharing summary](docs/experiment/01-preliminary-comparison/plain-language-results-20260917.md) |
+| Preliminary results in plain English | [Plain-language sharing summary](docs/experiment/01-preliminary-comparison/plain-language-results-20260917.md) |
 | User-facing benchmark YAML and JSON contract | [Single-task YAML](examples/experiment/benchmark.yaml) · [Result schema](schemas/experiment-result.schema.json) |
 | Offline synthetic contract fixture | [Static YAML](examples/experiment/static.yaml) · [Static JSON](examples/experiment/static-result.json) |
 | All EDA and preliminary-result charts | [Plain-language visualization guide](docs/experiment/01-preliminary-comparison/visualization-guide-20260919.md) |

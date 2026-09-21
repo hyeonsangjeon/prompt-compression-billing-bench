@@ -8,20 +8,20 @@
       "id": "figure-1",
       "path": "figures/round2/01-task-types.svg",
       "sha256": "8a2f83048fcdc865b36152c96ead0f796a125bb5e208af9483bda14f51328236",
-      "alt": "주 종류 분포. 공식 영어 지시문 DeepSWE n=113, Terminal n=89. 주 종류 하나로 집계하며 리뷰·수정 혼합 한 과제는 보조 라벨에 남긴다.",
-      "caption": "공식 113·89과제의 공통 주 종류 분포와 모호함",
+      "alt": "Primary-type distribution for the official English instructions: DeepSWE n=113 and Terminal n=89. Each task contributes one primary type; one mixed review-and-repair task remains in a secondary label.",
+      "caption": "Common primary-type distribution and ambiguity in the 113 and 89 official tasks",
       "metadata": [
         [
-          "표본",
+          "Sample",
           "DeepSWE n=113 · Terminal n=89"
         ],
         [
-          "분모 · 단위",
-          "각 벤치마크 과제 수 · 과제 / %"
+          "Denominator · unit",
+          "Task count in each benchmark · tasks / %"
         ],
         [
-          "성격",
-          "분류 판단·집계"
+          "Kind",
+          "Classification judgment · aggregation"
         ]
       ],
       "visible_text_sha256": "6edbd1862ebfd24d4a2adc6a84ae7ea57d191cf9fa4846b65a2c488069ab4b74"
@@ -30,20 +30,20 @@
       "id": "figure-2",
       "path": "figures/round1/05-corpus-bias.svg",
       "sha256": "29e95d987133ac1405a85a0d77a9249783eb7136d16242d8b66cf66cc14887f7",
-      "alt": "DeepSWE 113과제의 저장소·주 언어와 Terminal 89과제의 종류·난이도 분포. 난이도는 저자 메타데이터이지 이번 모델의 성능 측정이 아니다.",
-      "caption": "DeepSWE 저장소·언어와 Terminal 작성자 category·난이도 분포",
+      "alt": "Repository and primary-language distribution for 113 DeepSWE tasks, and type and difficulty distribution for 89 Terminal tasks. Difficulty is author metadata, not a performance measurement for this model.",
+      "caption": "DeepSWE repositories and languages; Terminal author category and difficulty",
       "metadata": [
         [
-          "표본",
+          "Sample",
           "DeepSWE n=113 · Terminal n=89"
         ],
         [
-          "분모 · 단위",
-          "각 벤치마크 과제 수 · 과제 / %"
+          "Denominator · unit",
+          "Task count in each benchmark · tasks / %"
         ],
         [
-          "성격",
-          "계산 · 메타데이터 집계"
+          "Kind",
+          "Calculation · metadata aggregation"
         ]
       ],
       "visible_text_sha256": "cd337fefa1a841a5b4fe332b5abd5458a4cc5608d23491066f63751f581f58b7"
@@ -52,20 +52,20 @@
       "id": "figure-3",
       "path": "figures/round1/01-input-size.svg",
       "sha256": "0e031cbf23bcfdfb4ed0f689c484fde0d185d88fc7e65730032bb18851c0dd7f",
-      "alt": "공식 DeepSWE 113과제와 Terminal 89과제의 지시문 UTF-8 바이트 및 로컬 토큰 분포. API 청구 토큰이 아니다.",
-      "caption": "공식 DeepSWE 113·Terminal 89 지시문의 UTF-8 바이트와 로컬 토큰 히스토그램",
+      "alt": "UTF-8 byte and local-token distributions for instructions from 113 official DeepSWE tasks and 89 official Terminal tasks. These are not API billing tokens.",
+      "caption": "UTF-8 byte and local-token histograms for the official instructions from 113 DeepSWE and 89 Terminal tasks",
       "metadata": [
         [
-          "표본",
-          "공식 DeepSWE n=113 · Terminal n=89"
+          "Sample",
+          "Official DeepSWE n=113 · Terminal n=89"
         ],
         [
-          "분모 · 단위",
-          "공식 지시문 파일 · UTF-8 바이트 / 로컬 o200k_base 토큰"
+          "Denominator · unit",
+          "Official instruction files · UTF-8 bytes / local `o200k_base` tokens"
         ],
         [
-          "성격",
-          "측정 · 분위수 계산"
+          "Kind",
+          "Measurement · quantile calculation"
         ]
       ],
       "visible_text_sha256": "49bd9a78a82ad48001fd2e1263791091587d983b109d02ea4f7035bfc150b59c"
@@ -74,20 +74,20 @@
       "id": "figure-4",
       "path": "figures/round2/03-input-size-by-type.svg",
       "sha256": "e86b10585914a2d2e8f70c2ddfaaebb1d3bc1ac9729d4429a9bc000a431abf60",
-      "alt": "입력 크기 분포. 정적 DeepSWE n=113과제와 Terminal n=89과제, 과거 Terminal n=56요청을 분리했다. UTF-8 바이트와 로컬 o200k_base 토큰이며 API 토큰이 아니다.",
-      "caption": "공식 두 집합과 Terminal 56요청을 나눈 종류별 바이트/로컬 토큰 상자·개별점",
+      "alt": "Input-size distributions separated into static DeepSWE n=113 tasks, Terminal n=89 tasks, and historical Terminal n=56 requests. Units are UTF-8 bytes and local o200k_base tokens, not API tokens.",
+      "caption": "Byte and local-token box-and-point plots by type for both official sets and 56 Terminal requests",
       "metadata": [
         [
-          "표본",
-          "공식 DeepSWE 113 · Terminal 89 · 과거 Terminal 56요청"
+          "Sample",
+          "Official DeepSWE 113 · Terminal 89 · historical Terminal 56 requests"
         ],
         [
-          "분모 · 단위",
-          "지시문 / 요청 본문 · UTF-8 바이트 / 로컬 토큰"
+          "Denominator · unit",
+          "Instructions / request bodies · UTF-8 bytes / local tokens"
         ],
         [
-          "성격",
-          "측정 · 분위수 계산"
+          "Kind",
+          "Measurement · quantile calculation"
         ]
       ],
       "visible_text_sha256": "c482b8e56ca1d3c8298581477c757923c8ec1db3e19f99d691175fe57edf9157"
@@ -96,20 +96,20 @@
       "id": "figure-5",
       "path": "figures/round1/02-input-composition.svg",
       "sha256": "57aa286750015af99651a230834ed458a20936a0afa189cbcb8c32bb9a98440c",
-      "alt": "정적 지시문 113개·89개와 기존 Terminal 실제 요청 56개의 본문 구간 비중. 각 층의 UTF-8 바이트 합계를 분모로 하며 미분류도 별도 표시한다.",
-      "caption": "공식 두 집합과 과거 Terminal 56요청의 본문 구성",
+      "alt": "Body-segment shares for 113 and 89 static instructions and 56 historical Terminal actual requests. Each layer uses total UTF-8 body bytes as its denominator and shows unclassified content separately.",
+      "caption": "Body composition of both official sets and 56 historical Terminal requests",
       "metadata": [
         [
-          "표본",
-          "공식 지시문 113개·89개 · Terminal 실제 요청 56개"
+          "Sample",
+          "Official instructions 113 and 89 · Terminal actual requests 56"
         ],
         [
-          "분모 · 단위",
-          "각 입력층의 본문 UTF-8 바이트 합계 · %"
+          "Denominator · unit",
+          "Total UTF-8 body bytes in each input layer · %"
         ],
         [
-          "성격",
-          "분류 판단·바이트 집계"
+          "Kind",
+          "Classification judgment · byte aggregation"
         ]
       ],
       "visible_text_sha256": "17dda5a8d0c7fa1853b3aca5680c0560ee4d5d9a361e13338b6681af7aa984db"
@@ -118,20 +118,20 @@
       "id": "figure-6",
       "path": "figures/round1/03-compressible-share.svg",
       "sha256": "dea914de8808b7ec7746d01f0b60af449a38ada5473cfce3f3ca4f49ee52f5f6",
-      "alt": "Terminal 5과제, 각 3실행에서 기록된 요청 56개의 과제별 로그 후보·미분류·보호 구간 비중. 압축 결과가 아니라 본문 바이트 구성이다.",
-      "caption": "Terminal 5과제의 1차 식별 후보·미분류·보호 비중",
+      "alt": "Task-level shares of log candidates, unclassified content, and protected segments across 56 requests recorded for 5 Terminal tasks with 3 runs each. This shows body-byte composition, not compression results.",
+      "caption": "Initially identified candidate, unclassified, and protected shares for 5 Terminal tasks",
       "metadata": [
         [
-          "표본",
-          "5과제 · 각 n=3실행 · 56요청"
+          "Sample",
+          "5 tasks · n=3 runs each · 56 requests"
         ],
         [
-          "분모 · 단위",
-          "과제별 본문 UTF-8 바이트 합계 · %"
+          "Denominator · unit",
+          "Total body UTF-8 bytes by task · %"
         ],
         [
-          "성격",
-          "분류 판단·바이트 집계"
+          "Kind",
+          "Classification judgment · byte aggregation"
         ]
       ],
       "visible_text_sha256": "5d8a68f4acc99d17a05c7b87538e59deebe28bbd7c68ec1aac7ad0de5b18d463"
@@ -140,20 +140,20 @@
       "id": "figure-7",
       "path": "figures/round2/04-unknown-decomposition.svg",
       "sha256": "47970d1c9203dc4d838930271e9e8c6518725c1289aa77fd4d5d6a04a07bc841",
-      "alt": "미분류 분해. 서로 다른 58종, 재전송 포함 168회·158,258바이트를 전수 검토했다. 기존 과거 요청 n=56, 과제 n=5이며 API 토큰이나 실제 절감률이 아니다.",
-      "caption": "옛 미분류 158,258바이트의 7범주 분해",
+      "alt": "Decomposition of unclassified content after complete review of 58 distinct segments and 168 occurrences including retransmission, totaling 158,258 bytes. Historical requests n=56 and tasks n=5; these are neither API tokens nor an actual savings rate.",
+      "caption": "Seven-category decomposition of 158,258 formerly unclassified bytes",
       "metadata": [
         [
-          "표본",
-          "58종 · 재전송 포함 168회 · 56요청·5과제"
+          "Sample",
+          "58 distinct segments · 168 occurrences including retransmission · 56 requests · 5 tasks"
         ],
         [
-          "분모 · 단위",
-          "미분류 158,258바이트 / 전체 본문 824,301바이트"
+          "Denominator · unit",
+          "Unclassified 158,258 bytes / all request-body 824,301 bytes"
         ],
         [
-          "성격",
-          "분류 판단·바이트 집계"
+          "Kind",
+          "Classification judgment · byte aggregation"
         ]
       ],
       "visible_text_sha256": "7fc03e1054920b576a89f8a8513a85e2d570c42854bacc658dca25117b8e6840"
@@ -162,20 +162,20 @@
       "id": "figure-8",
       "path": "figures/round2/02-candidate-share-by-type.svg",
       "sha256": "89cfaf57fc4c59ff8afd5c71fa6f64bf2c5c7fbf044fd799c21d29f0b0d3ff61",
-      "alt": "종류별 후보와 본문 구성. 과거 Terminal n=5과제, 15실행, 56요청. UTF-8 바이트 기준이며 디버깅·리뷰 등 무표본 종류는 미측정이다.",
-      "caption": "Terminal 종류별 1차→2차 후보와 코드 혼합을 보호한 전체 구성",
+      "alt": "Candidate and body composition by type for historical Terminal data: n=5 tasks, 15 runs, and 56 requests. Units are UTF-8 bytes; types without samples, such as debugging and review, are not measured.",
+      "caption": "Terminal candidate and full protected-composition view by type, from Round 1 to Round 2",
       "metadata": [
         [
-          "표본",
-          "Terminal 5과제 · 15실행 · 56요청"
+          "Sample",
+          "Terminal 5 tasks · 15 runs · 56 requests"
         ],
         [
-          "분모 · 단위",
-          "종류별 본문 UTF-8 바이트 합계 · %"
+          "Denominator · unit",
+          "Total body UTF-8 bytes by type · %"
         ],
         [
-          "성격",
-          "분류 판단·바이트 집계"
+          "Kind",
+          "Classification judgment · byte aggregation"
         ]
       ],
       "visible_text_sha256": "5a94f044e36b385fd9100db65a2cf834ecf64db46dd94be6566a4e71abdeac07"
@@ -184,20 +184,20 @@
       "id": "figure-9",
       "path": "figures/round1/06-api-token-calibration.svg",
       "sha256": "70b9a531e5bfa66d5264fd04241c229f0b4ac04b03f923373a567ed11ae48cca",
-      "alt": "기존 Terminal 5과제·15실행·56요청의 로컬 메시지 본문 토큰과 실제 API 입력 토큰 대조. 점선은 계산상 y=x이며 오른쪽은 차이 분포다.",
-      "caption": "같은 Terminal 56요청의 API 입력과 로컬 본문 토큰 대조·차이 분포",
+      "alt": "Local message-body tokens compared with actual API input tokens for 5 historical Terminal tasks, 15 runs, and 56 requests. The dashed line is the calculated y=x reference; the right panel shows the difference distribution.",
+      "caption": "Comparison and difference distribution for API input and local body tokens in the same 56 Terminal requests",
       "metadata": [
         [
-          "표본",
-          "Terminal 5과제 · 15실행 · 56요청"
+          "Sample",
+          "Terminal 5 tasks · 15 runs · 56 requests"
         ],
         [
-          "분모 · 단위",
-          "요청 / 실행 · API usage 토큰 / 로컬 본문 토큰"
+          "Denominator · unit",
+          "Request / run · API usage tokens / local body tokens"
         ],
         [
-          "성격",
-          "과거 API·로컬 측정 · 통계 계산"
+          "Kind",
+          "Historical API and local measurement · statistical calculation"
         ]
       ],
       "visible_text_sha256": "27989fb625e8bad274f5556f639c1deced657f0d26b9356a45dd57272102db9c"
@@ -206,20 +206,20 @@
       "id": "figure-10",
       "path": "figures/round1/04-shared-prefix.svg",
       "sha256": "94f9a6f0c510530c676bafffd5f059e81a31345f9454510192a5f6c649a724e4",
-      "alt": "공식 지시문 과제 쌍과 실제 Terminal 요청 쌍의 공통 선두 로컬 token ID 길이 분포. 1,024 점선은 당시 GPT-5.4 서비스의 캐시 최소 길이 참고선이며 서비스 캐시 접두부 실측이 아니다.",
-      "caption": "정적 지시문/첫 요청/인접 요청 쌍의 공통 로컬 token ID 길이 누적분포",
+      "alt": "Distribution of shared leading local token-ID lengths for official instruction-task pairs and actual Terminal request pairs. The 1,024 dashed line is a reference for the GPT-5.4 service's cache minimum at the time, not a measurement of service cache prefixes.",
+      "caption": "Cumulative distribution of shared leading local token-ID length for static instructions, first requests, and adjacent requests",
       "metadata": [
         [
-          "표본",
-          "정적 지시문 쌍 6,328 / 3,916 · 과거 요청 쌍 41 / 10 / 15"
+          "Sample",
+          "Static instruction pairs 6,328 / 3,916 · historical request pairs 41 / 10 / 15"
         ],
         [
-          "분모 · 단위",
-          "비교층별 쌍 수 · 공통 선두 로컬 token ID 길이"
+          "Denominator · unit",
+          "Pair count by comparison layer · common leading local token-ID length"
         ],
         [
-          "성격",
-          "측정 · 통계 계산"
+          "Kind",
+          "Measurement · statistical calculation"
         ]
       ],
       "visible_text_sha256": "6f545a82247d3cb8653efbe4b29a7d7e429ddcd8533971ffb9930925c16a7d40"
@@ -228,543 +228,570 @@
   "tables": [
     {
       "id": "table-5",
-      "source": "2차 분석",
+      "source": "Round 2 analysis",
       "source_table": 2,
       "rows_sha256": "27493ad2d1e89808f277818860801184742b7d185e5813f466fe531b2ad68dbd",
       "metadata": [
         [
-          "표본",
+          "Sample",
           "DeepSWE n=113 · Terminal n=89"
         ],
         [
-          "분모 · 단위",
-          "각 벤치마크 과제 수 · 과제 / %"
+          "Denominator · unit",
+          "Task count in each benchmark · tasks / %"
         ],
         [
-          "성격",
-          "분류 판단·집계"
+          "Kind",
+          "Classification judgment · aggregation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "d3a6711982a72a8b05ffea75b062ede7c0d6d6054845a8f87139363e256b5c6a"
     },
     {
       "id": "table-6",
-      "source": "1차 측정표",
+      "source": "Round 1 measurement table",
       "source_table": 14,
       "rows_sha256": "850e5f4b9a620d87c409780ae8ee1a08131d0400340a769a97ac21b7643a4855",
       "metadata": [
         [
-          "표본",
-          "DeepSWE n=113과제 · 91개 저장소"
+          "Sample",
+          "DeepSWE n=113 tasks · 91 repositories"
         ],
         [
-          "분모 · 단위",
-          "113과제 · 과제 / %"
+          "Denominator · unit",
+          "113 tasks · tasks / %"
         ],
         [
-          "성격",
-          "계산 · 메타데이터 집계"
+          "Kind",
+          "Calculation · metadata aggregation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "50c6d886f5f5b501f80c0074cddca0393c86ee6631f6b7030c678a0bc9221331"
     },
     {
       "id": "table-7",
-      "source": "1차 측정표",
+      "source": "Round 1 measurement table",
       "source_table": 8,
       "rows_sha256": "10b40ec095753d33253ccd1b970eb8fc918d1c43a73545334d903f02d4109308",
       "metadata": [
         [
-          "표본",
-          "DeepSWE n=113과제"
+          "Sample",
+          "DeepSWE n=113 tasks"
         ],
         [
-          "분모 · 단위",
-          "113과제 · 과제 / %"
+          "Denominator · unit",
+          "113 tasks · tasks / %"
         ],
         [
-          "성격",
-          "계산 · 메타데이터 집계"
+          "Kind",
+          "Calculation · metadata aggregation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "ba9299a71bcaa23f1ee2b030c474f490eefc356f24ab40c68fdc643b7c0ce804"
     },
     {
       "id": "table-8",
-      "source": "1차 측정표",
+      "source": "Round 1 measurement table",
       "source_table": 12,
       "rows_sha256": "d714f308811d103fc0fd6d568cf3f4a947bf3e2d838f262e3f6a7bfa127fc631",
       "metadata": [
         [
-          "표본",
-          "Terminal n=89과제"
+          "Sample",
+          "Terminal n=89 tasks"
         ],
         [
-          "분모 · 단위",
-          "89과제 · 과제 / %"
+          "Denominator · unit",
+          "89 tasks · tasks / %"
         ],
         [
-          "성격",
-          "계산 · 메타데이터 집계"
+          "Kind",
+          "Calculation · metadata aggregation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "5117bd248976697253ee501d53eb2ee538261b406194375a314c672a42b18869"
     },
     {
       "id": "table-9",
-      "source": "1차 측정표",
+      "source": "Round 1 measurement table",
       "source_table": 13,
       "rows_sha256": "50c08d311e7198a3f24d9cacb942e237735179203566bdc9c13df17c096a8160",
       "metadata": [
         [
-          "표본",
-          "Terminal n=89과제"
+          "Sample",
+          "Terminal n=89 tasks"
         ],
         [
-          "분모 · 단위",
-          "89과제 · 과제 / %"
+          "Denominator · unit",
+          "89 tasks · tasks / %"
         ],
         [
-          "성격",
-          "계산 · 저자 메타데이터 집계"
+          "Kind",
+          "Calculation · author-metadata aggregation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "16270a0f1b6165ab1e59fb9f3c8fb1a7764a690661e6cb5ccdbf038dfbc5d217"
     },
     {
       "id": "table-10",
-      "source": "1차 측정표",
+      "source": "Round 1 measurement table",
       "source_table": 9,
       "rows_sha256": "dc48e293e93ad2a2a44f37a3044294c0edca288087ca014ea50d972047ea2919",
       "metadata": [
         [
-          "표본",
+          "Sample",
           "DeepSWE n=113 · Terminal n=89"
         ],
         [
-          "분모 · 단위",
-          "각 벤치마크 과제 수 · 과제 / %"
+          "Denominator · unit",
+          "Task count in each benchmark · tasks / %"
         ],
         [
-          "성격",
-          "계산 · 메타데이터 집계"
+          "Kind",
+          "Calculation · metadata aggregation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "447cddd65b0d7948c3689f45f084ad62e3b89f8172645b7b4d018653a651241e"
     },
     {
       "id": "table-11",
-      "source": "1차 측정표",
+      "source": "Round 1 measurement table",
       "source_table": 10,
       "rows_sha256": "00d2c837b1bd5426b299bc2db305dba5935f9ff36cb895dbbbff49c2d507f2ed",
       "metadata": [
         [
-          "표본",
+          "Sample",
           "DeepSWE n=113 · Terminal n=89"
         ],
         [
-          "분모 · 단위",
-          "각 벤치마크 과제 수 · 과제 / %"
+          "Denominator · unit",
+          "Task count in each benchmark · tasks / %"
         ],
         [
-          "성격",
-          "계산 · 메타데이터 집계"
+          "Kind",
+          "Calculation · metadata aggregation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "8312c021424e5002fd96b0841b61731ac13f259d0a2c27602bcb66c5c4cd03ea"
     },
     {
       "id": "table-12",
-      "source": "1차 측정표",
+      "source": "Round 1 measurement table",
       "source_table": 11,
       "rows_sha256": "d8760a5a6aac8c64c0bd679b2146999107e6a8541af70e7ab71a3066194adbcf",
       "metadata": [
         [
-          "표본",
+          "Sample",
           "DeepSWE n=113 · Terminal n=89"
         ],
         [
-          "분모 · 단위",
-          "각 벤치마크 과제 수 · 과제 / %"
+          "Denominator · unit",
+          "Task count in each benchmark · tasks / %"
         ],
         [
-          "성격",
-          "계산 · 메타데이터 집계"
+          "Kind",
+          "Calculation · metadata aggregation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "531f66ac44c48f599c5442b18af07947921eff719722394ab1320cc5d77a9c2b"
     },
     {
       "id": "table-13",
-      "source": "1차 측정표",
+      "source": "Round 1 measurement table",
       "source_table": 1,
       "rows_sha256": "5d41a0a5590836de5e412c04211641331498ae07f10151e73a80d8cf34cae894",
       "metadata": [
         [
-          "표본",
-          "공식 DeepSWE 113 · Terminal 89 · 이관 영어/한국어 각 113"
+          "Sample",
+          "Official DeepSWE 113 · Terminal 89 · imported English/Korean, 113 each"
         ],
         [
-          "분모 · 단위",
-          "각 지시문 파일 · 바이트 / 로컬 o200k_base 토큰"
+          "Denominator · unit",
+          "Each instruction file · bytes / local o200k_base tokens"
         ],
         [
-          "성격",
-          "측정 · 분위수 계산"
+          "Kind",
+          "Measurement · quantile calculation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "5255ddbe0c69d16ba293c0d8386a5a3bd120bf053c5c734c4d4e906a85530bc4"
     },
     {
       "id": "table-14",
-      "source": "2차 측정표",
+      "source": "Round 2 measurement table",
       "source_table": 1,
       "rows_sha256": "4bdd33891c06da704b777b8664ea2d8118ccb7e3795d08f58f83b4aea69fdb22",
       "metadata": [
         [
-          "표본",
-          "DeepSWE n=113과제"
+          "Sample",
+          "DeepSWE n=113 tasks"
         ],
         [
-          "분모 · 단위",
-          "각 공식 지시문 · UTF-8 바이트 / 로컬 토큰"
+          "Denominator · unit",
+          "Each official instruction · UTF-8 bytes / local tokens"
         ],
         [
-          "성격",
-          "측정 · 분위수 계산"
+          "Kind",
+          "Measurement · quantile calculation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "ddcccf9445bec583669bf3faf1f3465c25cd9733b7a00774e6d3ad78d92b5585"
     },
     {
       "id": "table-15",
-      "source": "2차 측정표",
+      "source": "Round 2 measurement table",
       "source_table": 3,
       "rows_sha256": "c278dd48ed59cb38ac524add12796767b5619eeedb9a5796f0cdacc46f43ceec",
       "metadata": [
         [
-          "표본",
-          "Terminal n=89과제"
+          "Sample",
+          "Terminal n=89 tasks"
         ],
         [
-          "분모 · 단위",
-          "각 공식 지시문 · UTF-8 바이트 / 로컬 토큰"
+          "Denominator · unit",
+          "Each official instruction · UTF-8 bytes / local tokens"
         ],
         [
-          "성격",
-          "측정 · 분위수 계산"
+          "Kind",
+          "Measurement · quantile calculation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "23f2b0d406a6c157470db2ca30c0ed50c932090df6d7c6f1a0563ee9abab26be"
     },
     {
       "id": "table-16",
-      "source": "2차 측정표",
+      "source": "Round 2 measurement table",
       "source_table": 6,
       "rows_sha256": "eaacb062ca5559972bb08a6c463327d198c96a77197f24f320369c45156b65b3",
       "metadata": [
         [
-          "표본",
-          "Terminal 5과제 · 56요청"
+          "Sample",
+          "Terminal 5 tasks · 56 requests"
         ],
         [
-          "분모 · 단위",
-          "각 요청 본문 · UTF-8 바이트 / 로컬 토큰"
+          "Denominator · unit",
+          "Each request body · UTF-8 bytes / local tokens"
         ],
         [
-          "성격",
-          "측정 · 분위수 계산"
+          "Kind",
+          "Measurement · quantile calculation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "925dc7b341abd8f3106ce5aff10c400830c6af75f35abd526c6ece130e3c7184"
     },
     {
       "id": "table-17",
-      "source": "1차 측정표",
+      "source": "Round 1 measurement table",
       "source_table": 2,
       "rows_sha256": "3af75ca2dba59283e484cffc7e1c9c154eaa4a76ab34f0211b02d38a5a63963b",
       "metadata": [
         [
-          "표본",
-          "공식 지시문 113개·89개 · Terminal 실제 요청 56개"
+          "Sample",
+          "Official instructions 113 and 89 · Terminal actual requests 56"
         ],
         [
-          "분모 · 단위",
-          "각 입력층의 본문 UTF-8 바이트 합계 · %"
+          "Denominator · unit",
+          "Total UTF-8 body bytes in each input layer · %"
         ],
         [
-          "성격",
-          "분류 판단·바이트 집계"
+          "Kind",
+          "Classification judgment · byte aggregation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "6f97996a54562f214aadd37eb9f26d12c61f2305c69deebc2428c28c6778290d"
     },
     {
       "id": "table-18",
-      "source": "1차 측정표",
+      "source": "Round 1 measurement table",
       "source_table": 3,
       "rows_sha256": "1642ba217bd2fa03f77851fc4d68b8f268d8a4b57120b4a8e6f3b99012245e24",
       "metadata": [
         [
-          "표본",
-          "공식 지시문 113개·89개 · Terminal 56요청"
+          "Sample",
+          "Official instructions 113 and 89 · Terminal 56 requests"
         ],
         [
-          "분모 · 단위",
-          "각 지시문 / 요청 본문 UTF-8 바이트 · %"
+          "Denominator · unit",
+          "Each instruction or request body · UTF-8 bytes / %"
         ],
         [
-          "성격",
-          "분류 판단 · 분위수 계산"
+          "Kind",
+          "Classification judgment · quantile calculation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "54cbacddf3e3ed5c152c0218851af8d6908f644384105f91a4b8eeca4756727b"
     },
     {
       "id": "table-19",
-      "source": "2차 측정표",
+      "source": "Round 2 measurement table",
       "source_table": 2,
       "rows_sha256": "f9a150d18840934eb835370805f2b39426290da14d3cc0c7141207eff7520f1b",
       "metadata": [
         [
-          "표본",
-          "DeepSWE n=113과제"
+          "Sample",
+          "DeepSWE n=113 tasks"
         ],
         [
-          "분모 · 단위",
-          "종류별 공식 지시문 UTF-8 바이트 합계 · %"
+          "Denominator · unit",
+          "Total UTF-8 bytes in official instructions by type · %"
         ],
         [
-          "성격",
-          "분류 판단·바이트 집계"
+          "Kind",
+          "Classification judgment · byte aggregation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "edeaac3ecbd95c94c11c931e1bdb229f5cd299dcba0b74d6a894c5329589dfc5"
     },
     {
       "id": "table-20",
-      "source": "2차 측정표",
+      "source": "Round 2 measurement table",
       "source_table": 4,
       "rows_sha256": "1e76b1dc6be5ec18d6156c450852d36cf1193b467d7844e267091425155300c3",
       "metadata": [
         [
-          "표본",
-          "Terminal n=89과제"
+          "Sample",
+          "Terminal n=89 tasks"
         ],
         [
-          "분모 · 단위",
-          "종류별 공식 지시문 UTF-8 바이트 합계 · %"
+          "Denominator · unit",
+          "Total UTF-8 bytes in official instructions by type · %"
         ],
         [
-          "성격",
-          "분류 판단·바이트 집계"
+          "Kind",
+          "Classification judgment · byte aggregation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "f82c52251f904f3ea95a160e905260738dcb58fa388cdc45c37cedd2faf39bef"
     },
     {
       "id": "table-21",
-      "source": "1차 측정표",
+      "source": "Round 1 measurement table",
       "source_table": 4,
       "rows_sha256": "1edb26685e411d601e79206730ea374c2665b7594020af3262f301d5fe448023",
       "metadata": [
         [
-          "표본",
-          "5과제 · 각 n=3실행 · 56요청"
+          "Sample",
+          "5 tasks · n=3 runs each · 56 requests"
         ],
         [
-          "분모 · 단위",
-          "과제별 본문 UTF-8 바이트 합계 · %"
+          "Denominator · unit",
+          "Total body UTF-8 bytes by task · %"
         ],
         [
-          "성격",
-          "분류 판단·바이트 집계"
+          "Kind",
+          "Classification judgment · byte aggregation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "20613458a3861da311235b75a3baa108a4da57d8a31df1ad828a23953d0c0ead"
     },
     {
       "id": "table-22",
-      "source": "미분류 검토",
+      "source": "unknown-segment review",
       "source_table": 1,
       "rows_sha256": "159c32ec6746312c0aa4ba8e59d06d2cb96afdf450aeb893d8d25ce75a19b615",
       "metadata": [
         [
-          "표본",
-          "58종 · 재전송 포함 168회 · 56요청·5과제"
+          "Sample",
+          "58 distinct segments · 168 occurrences including retransmission · 56 requests · 5 tasks"
         ],
         [
-          "분모 · 단위",
-          "미분류 158,258바이트 / 전체 본문 824,301바이트"
+          "Denominator · unit",
+          "Unclassified 158,258 bytes / all request-body 824,301 bytes"
         ],
         [
-          "성격",
-          "분류 판단·바이트 집계"
+          "Kind",
+          "Classification judgment · byte aggregation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "402b090df7cff848c618bbc205547eaf4d08d12b775cfa8ce8f839a5d4f5aec0"
     },
     {
       "id": "table-23",
-      "source": "2차 분석",
+      "source": "Round 2 analysis",
       "source_table": 3,
       "rows_sha256": "84fe57ac1a4d293651ba27d72365adaace9d7b95c740833817fe0b08b351a2bf",
       "metadata": [
         [
-          "표본",
-          "Terminal 5과제 · 15실행 · 56요청"
+          "Sample",
+          "Terminal 5 tasks · 15 runs · 56 requests"
         ],
         [
-          "분모 · 단위",
-          "본문 UTF-8 바이트 / 로컬 본문 242,937토큰"
+          "Denominator · unit",
+          "Body UTF-8 bytes / 242,937 local body tokens"
         ],
         [
-          "성격",
-          "분류 판단 · 후보 전부 삭제 가정 계산"
+          "Kind",
+          "Classification judgment · hypothetical all-candidate deletion calculation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "637ab334aa095873daff1cbacf74670c20e0310f4d205b070d195c86d806de46"
     },
     {
       "id": "table-24",
-      "source": "2차 측정표",
+      "source": "Round 2 measurement table",
       "source_table": 8,
       "rows_sha256": "f5f8db77ee9df054f8ba7b5435476d0678029c0fc01d9b59f78222e615f33738",
       "metadata": [
         [
-          "표본",
-          "5과제 · 각 n=3실행 · 56요청"
+          "Sample",
+          "5 tasks · n=3 runs each · 56 requests"
         ],
         [
-          "분모 · 단위",
-          "과제별 본문 바이트 / 로컬 토큰 · %"
+          "Denominator · unit",
+          "Body bytes by task / local tokens · %"
         ],
         [
-          "성격",
-          "분류 판단 · 삭제 가정 계산"
+          "Kind",
+          "Classification judgment · hypothetical deletion calculation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "4ddd5ecb530a76a5c23a6deab819867d1fd8204a1f658d12da36beda876a1d5d"
     },
     {
       "id": "table-25",
-      "source": "2차 측정표",
+      "source": "Round 2 measurement table",
       "source_table": 5,
       "rows_sha256": "9013ed4750e9f69184ffb5366288747c4b1b241e31c26dc99c3388b25bae34dd",
       "metadata": [
         [
-          "표본",
-          "Terminal 5과제 · 15실행 · 56요청"
+          "Sample",
+          "Terminal 5 tasks · 15 runs · 56 requests"
         ],
         [
-          "분모 · 단위",
-          "본문 UTF-8 바이트 / 로컬 본문 242,937토큰"
+          "Denominator · unit",
+          "Body UTF-8 bytes / 242,937 local body tokens"
         ],
         [
-          "성격",
-          "분류 판단 · 후보 전부 삭제 가정 계산"
+          "Kind",
+          "Classification judgment · hypothetical all-candidate deletion calculation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "89c45e451b95b154507f679af42229ae4fe7dfedbd099bebaca692dbd9a438f4"
     },
     {
       "id": "table-26",
-      "source": "2차 측정표",
+      "source": "Round 2 measurement table",
       "source_table": 7,
       "rows_sha256": "5c55184d36df14b7f489af9d568c582e70f781835d80abd0ad3b26c4f4adb434",
       "metadata": [
         [
-          "표본",
-          "Terminal 5과제 · 15실행 · 56요청"
+          "Sample",
+          "Terminal 5 tasks · 15 runs · 56 requests"
         ],
         [
-          "분모 · 단위",
-          "종류별 본문 UTF-8 바이트 합계 · %"
+          "Denominator · unit",
+          "Total body UTF-8 bytes by type · %"
         ],
         [
-          "성격",
-          "분류 판단·바이트 집계"
+          "Kind",
+          "Classification judgment · byte aggregation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "0b38c8e699f2eb31f28c24693b6d65e8e65ed3f5d4707117187a9f05ef1594ce"
     },
     {
       "id": "table-27",
-      "source": "2차 측정표",
+      "source": "Round 2 measurement table",
       "source_table": 9,
       "rows_sha256": "1a3757235de43d94f59ee85e2eb783716f8763f2058dd302eac3b069f15ada70",
       "metadata": [
         [
-          "표본",
-          "Terminal n=15실행"
+          "Sample",
+          "Terminal n=15 runs"
         ],
         [
-          "분모 · 단위",
-          "실행별 본문 바이트 / 로컬 토큰 · %"
+          "Denominator · unit",
+          "Body bytes by run / local tokens · %"
         ],
         [
-          "성격",
-          "분류 판단 · 삭제 가정 계산"
+          "Kind",
+          "Classification judgment · hypothetical deletion calculation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "0e0689e98fba3af98279d981d76bff8661872b28fd5ebfee6260a2389b3bf3f2"
     },
     {
       "id": "table-28",
-      "source": "1차 측정표",
+      "source": "Round 1 measurement table",
       "source_table": 7,
       "rows_sha256": "46a374e77f202247074157325f9093acbaf801045e82b9aa40c05ffd13869939",
       "metadata": [
         [
-          "표본",
-          "공식 지시문 113개·89개 · Terminal 56요청"
+          "Sample",
+          "Official instructions 113 and 89 · Terminal 56 requests"
         ],
         [
-          "분모 · 단위",
-          "각 문서 / 요청 · UTF-8 바이트 / 출현 수"
+          "Denominator · unit",
+          "Each document or request · UTF-8 bytes / occurrence count"
         ],
         [
-          "성격",
-          "측정 · 패턴 계수"
+          "Kind",
+          "Measurement · pattern counting"
         ]
-      ]
+      ],
+      "english_rows_sha256": "2b6a58069b2d8e6cf53840a015c878cdeaf03e31fc938ad3c691ac182996f155"
     },
     {
       "id": "table-34",
-      "source": "1차 측정표",
+      "source": "Round 1 measurement table",
       "source_table": 5,
       "rows_sha256": "b689e65f3b7cde8674f3241bd0abb8a7b305a837c6c87bb60a34da95490c930e",
       "metadata": [
         [
-          "표본",
-          "Terminal 5과제 · 15실행 · 56요청"
+          "Sample",
+          "Terminal 5 tasks · 15 runs · 56 requests"
         ],
         [
-          "분모 · 단위",
-          "요청 / 실행 · API usage 토큰 / 로컬 본문 토큰"
+          "Denominator · unit",
+          "Request / run · API usage tokens / local body tokens"
         ],
         [
-          "성격",
-          "과거 API·로컬 측정 · 통계 계산"
+          "Kind",
+          "Historical API and local measurement · statistical calculation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "e9950b35cbaa726f65e9a265f57c5e1a4f8b939fc0a5e61da0d3d728b686b51b"
     },
     {
       "id": "table-35",
-      "source": "2차 측정표",
+      "source": "Round 2 measurement table",
       "source_table": 10,
       "rows_sha256": "3b1f94cebeb86e4755f7e53279812dddf9b6960a86c77a674ad2bececb88bf63",
       "metadata": [
         [
-          "표본",
-          "Terminal 5과제 · 15실행 · 56요청"
+          "Sample",
+          "Terminal 5 tasks · 15 runs · 56 requests"
         ],
         [
-          "분모 · 단위",
-          "요청 / 실행 · API usage 토큰 / 로컬 본문 토큰"
+          "Denominator · unit",
+          "Request / run · API usage tokens / local body tokens"
         ],
         [
-          "성격",
-          "과거 API·로컬 측정 · 통계 계산"
+          "Kind",
+          "Historical API and local measurement · statistical calculation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "390a8ceaa6c049c0546a5aefe8b5042288466d00378cbbff6b1c671cb3e5ee8b"
     },
     {
       "id": "table-36",
-      "source": "1차 측정표",
+      "source": "Round 1 measurement table",
       "source_table": 6,
       "rows_sha256": "99b0dbed923799be80ada4c93c513795c7822035e8572bb4e4e447da6471f84d",
       "metadata": [
         [
-          "표본",
-          "표의 각 비교층별 쌍 수"
+          "Sample",
+          "Pair counts for each comparison layer in the table"
         ],
         [
-          "분모 · 단위",
-          "공통 선두 로컬 token ID · 토큰 / 쌍"
+          "Denominator · unit",
+          "Common leading local token ID · tokens / pairs"
         ],
         [
-          "성격",
-          "측정 · 통계 계산"
+          "Kind",
+          "Measurement · statistical calculation"
         ]
-      ]
+      ],
+      "english_rows_sha256": "ad390b0ca4a933062788e5cd04937bdd5e28ef5307699f9f10dfdb1e38098041"
     }
   ],
   "explanation_ids": [
@@ -776,11 +803,13 @@
     "figure-8"
   ],
   "required_caveats": [
-    "식별된 후보 범위이지 검증된 상한이 아니다.",
-    "독립적인 사람 라벨 검증은 하지 않았다.",
-    "공식 원문과 이관 번역은 별개다.",
-    "과제 쌍은 서로 독립 표본이 아니다.",
-    "이 설정이 결정론이나 무손실 관측을 보장하지 않는다",
-    "DeepSWE 실제 실행 이력은 이번에 수집하지 않았다."
-  ]
+    "This is an identified candidate range, not a validated upper bound.",
+    "No independent human-label validation was performed.",
+    "Official source text and migrated translations are separate.",
+    "Task pairs are not mutually independent samples.",
+    "These settings do not guarantee determinism or lossless observation",
+    "Actual DeepSWE run history was not collected for this analysis."
+  ],
+  "source_manifest_sha256": "6218280c4433623afd07a19bb4d6bc6c9a666b6052539c19e870c97becb93edd",
+  "source_row_hashes_sha256": "3a1f109d8423eed9dfa1e17e6e377bd58e84a0c0ea2a59a75694e021365cc751"
 }

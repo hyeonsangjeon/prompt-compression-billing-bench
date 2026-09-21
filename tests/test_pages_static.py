@@ -241,7 +241,7 @@ class PagesStaticRuntimeTests(unittest.TestCase):
         self.assertEqual(references["external_requests_attempted"], 0)
         self.assertEqual(references["outside_prefix_requests_attempted"], 0)
         self.assertTrue(result["server"]["thread_stopped"])
-        self.assertTrue(result["encoded_hangul_fragment_probe"]["passed"])
+        self.assertTrue(result["fragment_navigation_probe"]["passed"])
         self.assertTrue(result["trailing_slash_redirect_probe"]["passed"])
 
     def test_browser_checks_all_public_routes_and_configured_table_route(self):
@@ -256,10 +256,10 @@ class PagesStaticRuntimeTests(unittest.TestCase):
         self.assertTrue(result["table_keyboard_overflow"]["passed"])
         self.assertTrue(result["skip_link_keyboard"]["passed"])
         self.assertEqual(
-            result["unicode_fragment_navigation"]["decoded_hash"],
-            "공개-범위",
+            result["fragment_navigation"]["decoded_hash"],
+            "publication-scope",
         )
-        self.assertTrue(result["unicode_fragment_navigation"]["passed"])
+        self.assertTrue(result["fragment_navigation"]["passed"])
 
     def test_generated_inventory_contains_only_allowlisted_content(self):
         manifest = self._json(self.first / "record/source-manifest.json")
@@ -416,9 +416,9 @@ class PagesStaticRuntimeTests(unittest.TestCase):
 
         index_path = site / "index.html"
         index = index_path.read_text(encoding="utf-8")
-        encoded_scope = 'href="#%EA%B3%B5%EA%B0%9C-%EB%B2%94%EC%9C%84"'
-        self.assertEqual(index.count(encoded_scope), 1)
-        index = index.replace(encoded_scope, 'href="#missing-scope"', 1)
+        scope_link = '<a href="#publication-scope">Jump to the publication scope</a>'
+        self.assertEqual(index.count(scope_link), 1)
+        index = index.replace(scope_link, '<a href="#missing-scope">Jump to the publication scope</a>', 1)
         index_path.write_text(index, encoding="utf-8")
 
         publication_path = site / "publication/index.html"
@@ -575,11 +575,11 @@ class PagesStaticRuntimeTests(unittest.TestCase):
         self.assertTrue(observations[0]["matched"])
         self.assertEqual(
             [(item.text, item.origin) for item in expected.strong_spans],
-            [("강조 문구", "commonmark"), ("강조 문구(예시)", "project_extension")],
+            [("Strong phrase", "commonmark"), ("Strong phrase (example)", "project_extension")],
         )
         self.assertEqual(
             [(item.text, item.origin) for item in actual.strong_spans],
-            [("강조 문구", "rendered_html"), ("강조 문구(예시)", "rendered_html")],
+            [("Strong phrase", "rendered_html"), ("Strong phrase (example)", "rendered_html")],
         )
         mutations = (
             ("Backslash *literal*", "Backslash literal", "visible_block_mismatch"),
@@ -587,7 +587,7 @@ class PagesStaticRuntimeTests(unittest.TestCase):
             ("code ` delimiter</code>", "code changed</code>", "inline_code_mismatch"),
             ('alt="Diagram"', 'alt="Changed diagram"', "image_mismatch"),
             ("../guide/index.html#target", "../guide/index.html#other", "link_mismatch"),
-            ("<strong>강조 문구(예시)</strong>", "강조 문구(예시)", "strong_semantics_mismatch"),
+            ("<strong>Strong phrase (example)</strong>", "Strong phrase (example)", "strong_semantics_mismatch"),
         )
         for original, replacement, expected_code in mutations:
             self.assertEqual(rendered.count(original), 1)
@@ -616,10 +616,10 @@ class PagesStaticSourceTests(unittest.TestCase):
             ["/", "/site-contract/", "/publication/", "/notices/"],
         )
         self.assertEqual(contract["browser_check"]["table_keyboard_route"], "/publication/")
-        encoded = contract["probes"]["encoded_hangul_fragment"]
-        self.assertEqual(encoded["source_file"], "index.html")
-        self.assertEqual(encoded["expected_target_file"], "index.html")
-        self.assertEqual(encoded["decoded_fragment"], "공개-범위")
+        fragment = contract["probes"]["fragment_navigation"]
+        self.assertEqual(fragment["source_file"], "index.html")
+        self.assertEqual(fragment["expected_target_file"], "index.html")
+        self.assertEqual(fragment["decoded_fragment"], "publication-scope")
         for path in contract["source_allowlist"]:
             with self.subTest(path=path):
                 self.assertNotEqual(path, "README.md")
@@ -631,8 +631,8 @@ class PagesStaticSourceTests(unittest.TestCase):
 
     def test_homepage_states_scope_and_links_only_to_allowlisted_sources(self):
         homepage = (ROOT / "docs/pages-home.md").read_text(encoding="utf-8")
-        self.assertIn("## 공개 범위", homepage)
-        self.assertIn("](#공개-범위)", homepage)
+        self.assertIn("## Publication scope", homepage)
+        self.assertIn("](#publication-scope)", homepage)
         for exclusion in (
             "experiment results",
             "exploratory data analysis (EDA)",
@@ -649,7 +649,7 @@ class PagesStaticSourceTests(unittest.TestCase):
         self.assertEqual(
             destinations,
             [
-                "#공개-범위",
+                "#publication-scope",
                 "pages-static.md",
                 "publication.md",
                 "../LICENSE",

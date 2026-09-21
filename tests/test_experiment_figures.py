@@ -74,8 +74,8 @@ class ExperimentFigureTests(unittest.TestCase):
                 self.assertIn(f"]({target})", self.guide)
                 self.assertIn(entry["sha256"], self.guide)
                 self.assertTrue((GUIDE.parent / target).resolve().is_file())
-        self.assertEqual(len(re.findall(r"^### 결과 [1-6]\.", self.guide, re.MULTILINE)), 6)
-        for required in ("표본", "분모·단위", "관측", "증명하지 않는 것"):
+        self.assertEqual(len(re.findall(r"^### Result [1-6]\.", self.guide, re.MULTILINE)), 6)
+        for required in ("Sample", "Denominator and unit", "Observation", "Does not establish"):
             self.assertGreaterEqual(self.guide.count(f"| {required} |"), 17)
 
     def test_units_have_separate_result_axes(self):
@@ -117,10 +117,10 @@ class ExperimentFigureTests(unittest.TestCase):
             "../../README.md#try-it-in-five-minutes",
         ):
             self.assertIn(target, briefing)
-        self.assertIn("인용 규칙", self.guide)
-        self.assertIn("표본·분모·단위", self.guide)
-        self.assertIn("조건당 1회", self.guide)
-        self.assertIn("압축기 순위·인과 효과·품질 비열등성", self.guide)
+        self.assertIn("Citation rule", self.guide)
+        self.assertIn("sample, denominator", self.guide)
+        self.assertIn("One run per condition", self.guide)
+        self.assertIn("ranking, causality, or non-inferiority", self.guide)
         for document in (
             ROOT / "README.md",
             ROOT / "docs/experiment/README.md",

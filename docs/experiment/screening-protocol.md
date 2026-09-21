@@ -1,148 +1,142 @@
-# Terminal-Bench 2.1 평가 과제 선별 규약
+# Terminal-Bench 2.1 Evaluation-Task Screening Protocol
 
-**사전등록 상태:** 이 규칙은 2026-09-15 UTC 첫 선별 호출 전에 고정했다. 이후 기술 결함으로 중단한 실행은 규칙을 바꾸지 않으며, 현재 실행 상태는 [문서 색인](README.md)에 따로 기록한다. 당시 상한 제거 결정은 역사 기록으로 보존하고, 앞으로의 유료 실행에는 [schema version 4 안전 정책](execution-safety-policy.md)을 적용한다.
+**Preregistration status:** These rules were fixed before the first screening call on 2026-09-15 UTC. Later runs stopped by technical defects do not change the rules; current execution status is recorded separately in the [documentation index](README.md). The decision at the time to remove limits is preserved as history, while future paid execution follows the [schema version 4 safety policy](execution-safety-policy.md).
 
-## 선별이 답할 질문
+## Screening Question
 
-Terminal-Bench 2.1 고정 revision의 89과제 중 어떤 과제가 압축 비교에 들어갈 최소 품질 증거를 갖추는지 정한다. 평가 적격은 과제당 최대 20개의 유효한 품질 결과 중 18회 이상 통과한 경우다. 이 표현은 작은 표본으로 과제나 모델의 안정성을 증명했다는 뜻이 아니다.
+Screening determines which of the 89 tasks in the pinned Terminal-Bench 2.1 revision have the minimum quality evidence required for the compression comparison. A task is evaluation-eligible if it passes at least 18 of up to 20 valid quality results. This does not establish task or model stability from a small sample.
 
-선별이 끝나면 통과한 정확한 과제 ID 집합만 평가 모집단으로 쓴다. 선별에서 탈락한 과제와 다른 유사 과제로 결론을 넓히지 않는다. 18/20 선별은 쉬운 과제와 높은 통과율 쪽으로 치우칠 수 있으므로, 이 선택 편향을 평가 결론의 한계로 남긴다.
+After screening, only the exact passing task-ID set becomes the evaluation population. Conclusions are not extended to rejected tasks or substituted similar tasks. Screening at 18/20 can favor easier tasks and higher pass rates, so this selection bias remains a limitation of the evaluation conclusion.
 
-## 모집단과 고정 조건
+## Population and Fixed Conditions
 
-| 항목 | 값 | 상태 |
+| Item | Value | Status |
 | --- | --- | --- |
-| 벤치마크 | Terminal-Bench 2.1, 89과제 | 고정 |
-| revision | `7131e4375048a0e408a8fb404b5f499d726b695b` | 고정 |
-| 선별 조건 | 추가 압축 없는 `none` | 고정 |
-| 모델 | `gpt-5.4`; 제공자가 돌려준 revision을 요청마다 기록 | 고정·실행 시 확인 |
-| 요청 설정 | temperature `0`, reasoning effort `none`; 출력 상한 2,048 token | 설정 기록이며 결정론 보장은 아님 |
-| 실행기 | Harbor `0.22.0`, 계측한 Terminus 2 | 고정 |
-| 병렬도 | 8 | 고정 |
-| provider 제약 | provider 처리량 제한·서비스 오류와 schema version 4 안전 상한을 분리 기록 | 실행 전 재확인 |
-| 반복 | 과제당 최대 20개 유효한 품질 결과 | 고정 |
-| 채점 | 벤치마크 verifier와 승인된 nginx 수정본 | hash 고정 |
-| 상태 재생 묶음 | revision 2; 변경 경로 일괄 보존, 마운트 순서 고정 | 고정 |
-| 로컬 token 계산 | tiktoken `0.14.0`, `o200k_base` | 청구 token과 별도 기록 |
+| Benchmark | Terminal-Bench 2.1, 89 tasks | Fixed |
+| Revision | `7131e4375048a0e408a8fb404b5f499d726b695b` | Fixed |
+| Screening condition | `none`, with no additional compression | Fixed |
+| Model | `gpt-5.4`; record the provider-returned revision for each request | Fixed; checked at execution |
+| Request settings | temperature `0`, reasoning effort `none`; output limit 2,048 tokens | Settings record, not a guarantee of determinism |
+| Runner | Harbor `0.22.0`, instrumented Terminus 2 | Fixed |
+| Concurrency | 8 | Fixed |
+| Provider constraints | Record provider throughput limits and service errors separately from schema version 4 safety limits | Rechecked before execution |
+| Repetitions | Up to 20 valid quality results per task | Fixed |
+| Grading | Benchmark verifiers and approved nginx correction | Hash-pinned |
+| State-replay bundle | Revision 2; changed paths retained together and mount order fixed | Fixed |
+| Local token calculation | tiktoken `0.14.0`, `o200k_base` | Recorded separately from billed tokens |
 
-DeepSWE와 보호 우회 검사는 이 선별 행렬에 넣지 않는다. 선별 결과를 평가의 동시 대조군으로 재사용하지 않는다. 평가는 각 과제와 반복 실행 안에서 `none`을 세 압축 조건과 다시 실행한다.
+DeepSWE and protection-bypass tests are excluded from this screening matrix. Screening results are not reused as a concurrent control for evaluation. Evaluation reruns `none` and the three compression conditions within each task and repetition.
 
-## 결과를 보기 전에 고정하는 목록
+## List Fixed Before Results Are Viewed
 
-89과제의 다음 항목을 실행 전에 한 목록으로 만들고 SHA-256을 원장에 기록한다.
+Before execution, create one list containing the following for all 89 tasks and record its SHA-256 in the ledger:
 
-- 과제 ID와 유형 분류
-- instruction, task 설정, verifier와 직접 의존성 파일의 SHA-256
-- 컨테이너 이미지의 `linux/amd64` digest
-- 적용한 verifier revision과 수정 전후 SHA-256
-- 실행 가능 여부와 제외 사유
+- Task ID and type classification
+- SHA-256 of the instruction, task configuration, verifier, and direct dependency files
+- `linux/amd64` container-image digest
+- Applied verifier revision and SHA-256 before and after any correction
+- Executability and reason for exclusion
 
-실행할 수 없는 과제가 있으면 모델 결과를 보기 전에 제외 사유를 기록하고 목록 hash를 다시 고정한다. 결과를 본 뒤 과제를 바꾸거나 같은 유형의 다른 과제로 대체하지 않는다.
+If a task cannot run, record the exclusion reason and repin the list hash before viewing model results. Do not replace a task after results are seen, even with another task of the same type.
 
-## 평가 적격 판정
+## Evaluation-Eligibility Decision
 
-| 항목 | 규칙 |
+| Item | Rule |
 | --- | --- |
-| 유효 결과 | provider 호출, agent 실행, verifier, 계측과 보존 증거가 모두 완전한 품질 결과 |
-| 통과 | native reward `1`과 구조화된 test 결과가 서로 맞음 |
-| 품질 실패 | `wrong_answer` 또는 `wrong_format`; 둘 다 실패 1건 |
-| 평가 적격 | 유효 결과 20개 중 18회 이상 통과 |
-| 조기 종료 | 세 번째 유효한 품질 실패가 확정되면 새 실행 예약을 중단 |
-| 실패 위치·종류·test ID | 진단용으로 기록하며 자동 탈락 조건으로 쓰지 않음 |
+| Valid result | Quality result with complete evidence for provider call, agent execution, verifier, instrumentation, and retention |
+| Pass | Native reward `1` agrees with structured test results |
+| Quality failure | `wrong_answer` or `wrong_format`; either counts as one failure |
+| Evaluation-eligible | At least 18 passes among 20 valid results |
+| Early stop | Stop scheduling new executions once the third valid quality failure is confirmed |
+| Failure location, type, and test ID | Record for diagnosis; do not use as an automatic exclusion criterion |
 
-18/20이면 전반 10회와 후반 10회의 최소 통과 수가 자동으로 각각 8회가 된다. 따라서 절반마다 8회 이상이라는 조건을 추가하지 않는다. 대신 전반·후반 통과 수, 차이, 실패 순서, 최장 연속 실패와 누적 통과율을 기록한다. 이 값은 시간 변화 진단에만 쓰며 과제를 빼는 데 쓰지 않는다.
+At 18/20, the minimum pass count in each half of 10 is automatically 8. Do not add a separate requirement of at least 8 passes per half. Instead, record pass counts for each half, their difference, failure order, longest failure run, and cumulative pass rate. These diagnose temporal change and do not remove tasks.
 
-정확히 18/20인 과제에서 두 실패 위치가 20개 자리에 균등하다고 가정하면, 두 실패가 같은 절반에 있는 비율은 `2×C(10,2)÷C(20,2)=90/190=47.37%`다. 실패가 같은 절반에 있다는 이유로 제외하면 같은 통과 횟수의 과제를 위치만으로 다르게 고를 수 있다. 47.37%는 조합 계산이며 실제 시간 변화의 측정값이 아니다.
+For a task with exactly 18/20, if the two failure positions are uniformly distributed over 20 positions, the proportion with both failures in the same half is `2×C(10,2)÷C(20,2)=90/190=47.37%`. Excluding tasks because both failures occur in one half would treat tasks with the same pass count differently based only on position. The 47.37% value is a combinatorial calculation, not a measurement of temporal change.
 
-## 실패 분류와 한 번의 준비 재시도
+## Failure Classification and One Preparation Retry
 
-`trial`은 한 과제의 한 반복 실행이고, `attempt`는 그 안에서 실제로 시작한 실행이다. 재시도는 provider 호출 전에 같은 준비 작업이 실패한 경우에만 정확히 한 번 허용한다.
+A `trial` is one repetition of one task; an `attempt` is an execution that actually starts within it. Exactly one retry is allowed only when the same preparation fails before any provider call.
 
-| 분류 | 품질 분모 | 재시도 | 과제 처리 |
+| Classification | Quality denominator | Retry | Task handling |
 | --- | --- | --- | --- |
-| `image_error` | 제외 | 같은 artifact로 1회 | 두 번째 실패면 부적격 |
-| `setup_error` | 제외 | 같은 artifact로 1회 | 두 번째 실패면 부적격 |
-| `provider_error`·`network_error` | 제외 | 일시적 HTTP 오류의 시도 합계 최대 3회 | 소진되면 부적격 |
-| `timeout` | 제외 | 없음 | 실제 process 종료나 benchmark 내부 제한 증거가 있을 때만 부적격 |
-| `verifier_crash` | 제외 | 없음 | 부적격 |
-| `evidence_missing`·`replay_mismatch` | 제외 | 없음 | 부적격·실행 중단 검토 |
-| `budget_stopped`·`censored` | 제외 | 없음 | 품질 미확정 기술 종료; 오답으로 세지 않음 |
-| `wrong_answer`·`wrong_format` | 포함 | 없음 | 품질 실패 |
-| `pass` | 포함 | 없음 | 통과 |
+| `image_error` | Excluded | Once with the same artifact | Ineligible after a second failure |
+| `setup_error` | Excluded | Once with the same artifact | Ineligible after a second failure |
+| `provider_error` or `network_error` | Excluded | At most 3 total attempts for transient HTTP errors | Ineligible after exhaustion |
+| `timeout` | Excluded | None | Ineligible only with evidence of actual process termination or a benchmark-internal limit |
+| `verifier_crash` | Excluded | None | Ineligible |
+| `evidence_missing` or `replay_mismatch` | Excluded | None | Ineligible; review whether to stop the run |
+| `budget_stopped` or `censored` | Excluded | None | Technical stop with unknown quality; not counted as a wrong answer |
+| `wrong_answer` or `wrong_format` | Included | None | Quality failure |
+| `pass` | Included | None | Pass |
 
-준비 재시도는 첫 실행과 같은 immutable artifact와 hash를 사용한다. 실패한 컨테이너나 workspace를 재사용하지 않고 새 컨테이너와 새 workspace에서 새 `attempt` ID로 시작한다. artifact나 설정을 바꿔야 하면 재시도가 아니라 새 revision이므로 실행을 멈춘다.
+A preparation retry uses the same immutable artifact and hash as the first attempt. It starts with a new attempt ID in a fresh container and workspace rather than reusing the failed ones. A required artifact or setting change is a new revision, not a retry, and stops the run.
 
-provider 호출이 한 번도 없으면 verifier가 우연히 통과해도 유효한 품질 결과로 세지 않는다. 첫 실행과 재시도의 시간, 비용, 오류, artifact hash는 모두 원장에 남긴다. 품질 결과는 `trial`당 한 번만 분모에 넣고, 실제로 시작한 모든 `attempt`의 비용은 포함한다.
+Without any provider call, even an incidental verifier pass is not a valid quality result. The ledger retains both attempts' times, costs, errors, and artifact hashes. Quality enters the denominator once per trial, while costs include every attempt that actually started.
 
-앞으로의 유료 실행은 attempt당 provider HTTP 시도 60회, 2,048 출력 token,
-8,000,000 요청 byte, 2,400초 경과 시간, provider HTTP 대기 300초와 사전 승인한
-attempt·전체 실행 API 계산 비용 상한·UTC deadline을 적용한다. 최근 논리 요청 8개에서
-서로 다른 진행 신호가 3개보다 적어도 외부 전송 전에 멈춘다. Harbor 내부 단계 타이머는
-서로 다른 단계에서 증거를 자르지 않도록 비활성화하지만, 바깥 supervisor가 attempt
-경과 시간과 전체 deadline을 적용한다. provider의 context 길이, 처리량과 정책 거부는
-별도 외부 제약으로 기록한다.
+Future paid runs enforce 60 provider HTTP attempts, 2,048 output tokens, 8,000,000 request bytes, 2,400 seconds elapsed, and a 300-second provider HTTP wait per attempt, together with preapproved per-attempt and full-run calculated API cost limits and a UTC deadline. Execution stops before external transmission if fewer than 3 distinct progress signals appear in the latest 8 logical requests. Harbor's internal stage timers remain disabled so they do not truncate evidence differently across stages, while the outer supervisor enforces attempt elapsed time and the full deadline. Provider context length, throughput, and policy refusals are recorded as separate external constraints.
 
-첫 채점 전에 provider가 요청을 명시적으로 거부하면 같은 과제를 다시 보내 재현하도록 요구하지 않는다. 원문 오류와 HTTP 상태, 종료 단계, 당시 남아 있던 원본, source commit·원장·과제 이미지 digest, Blob 원격 hash, 확인된 비용과 미확정 비용 상태를 모두 보존해야 기술 제외가 완료된다. 실행하지 않은 첫 채점·복원·재채점 시간은 `0`이 아니라 `해당 없음`과 사유로 기록한다. 원인을 알 수 없는 증거 누락이나 상태 복원 불일치는 완료된 기술 제외로 바꾸지 않으며 다음 과제를 예약하지 않는다. 미확정 비용은 0으로 바꾸지 않고 보수적 노출액으로 상한 계산에 포함한다. 사용량도 상한 추정값도 없는 과거 요청이 있으면 유료 재개를 막는다.
+If the provider explicitly rejects a request before first grading, reproducing it does not require sending the same task again. A completed technical exclusion must preserve the raw error and HTTP status, terminal stage, raw material that remained at the time, source commit, ledger, task-image digest, remote Blob hash, confirmed cost, and unresolved-cost status. Unexecuted initial grading, restore, and regrading times are recorded as not applicable with a reason, not as `0`. Unexplained missing evidence or a state-restore mismatch is not converted to a completed technical exclusion and stops further scheduling. Unresolved cost is not changed to zero; it enters limit calculations as conservative exposure. A historical request with neither usage nor a maximum-exposure estimate blocks paid resumption.
 
-수정 전 실행에서 모델이 보낸 한 명령이 명시적인 `exit`로 terminal session을 끝내고 같은 응답의 다음 명령이 첫 채점 전에 전달되지 않았다면, 원문 RuntimeError와 명령별 전송 시작·수락·거부 기록을 함께 확인한다. 수락된 `exit` 명령, tmux session 종료로 거부된 정확히 한 후속 명령, 완료된 상태 저장, Blob 원격 hash와 비용이 모두 확인된 기존 결과만 기술 제외로 연결한다. 이 규칙은 수정 전 결과를 사후 품질 결과로 바꾸지 않는다. 수정 뒤에는 session 종료를 agent loop의 종료로 처리하고 현재 workspace를 채점하며, 저장·복원·재채점과 원격 hash가 완전한 결과만 품질 분모에 넣는다.
+If, in a pre-fix run, one model-issued command explicitly used `exit` to end the terminal session and the next command in the same response was not delivered before first grading, compare the raw RuntimeError with per-command send-start, accepted, and rejected records. Only an existing result with the accepted `exit`, exactly one subsequent command rejected because the tmux session ended, a completed state save, remote Blob hash, and cost may be linked as a technical exclusion. This does not retrospectively turn a pre-fix result into a quality result. Post-fix execution treats session termination as the end of the agent loop and grades the current workspace; only results with complete save, restore, regrading, and remote hash enter the quality denominator.
 
-같은 과제는 동시에 두 번 실행하지 않는다. 세 번째 품질 실패 전에 이미 시작한 실행이 있다면 끝까지 보존하고 실제 결과를 기록하되, 확정된 부적격 판정을 되돌리지 않는다. 시작하지 않은 계획은 `cancelled_by_futility`로 남겨 품질 분모와 비용에서 제외한다.
+Do not run the same task concurrently twice. If an execution began before the third quality failure, preserve it through completion and record its actual result, but do not reverse a confirmed ineligibility decision. Unstarted plans remain `cancelled_by_futility` and are excluded from quality and cost denominators.
 
-source commit이 바뀌면 중단된 상태 데이터베이스의 SHA나 상태를 고쳐 자동 재개하지 않는다. 새 실행 원장은 이전 원장을 읽기 전용으로 연결한다. 증거가 완전하고 과거·현재 호출 60회와 출력 2,048 token 경계의 영향을 받지 않은 결과만 같은 과제·반복의 새 계획에 한 번 연결하며, 연결한 계획은 다시 예약하지 않는다. 품질 결과는 `trial`당 한 번만 세고 이전 `attempt`와 진단 비용은 누적 비용 기록에 남긴다. 이전 실행 비용은 누적 보고에 보존하되 새 schema version 4 실행의 상한에는 그 실행에서 새로 시작하거나 재개한 attempt의 확인·미확정 노출액만 한 번 넣는다.
+After a source-commit change, do not rewrite the interrupted state database's SHA or state to resume automatically. A new execution ledger links the old ledger read-only. Link only evidence-complete results unaffected by historical and current 60-call and 2,048-output-token boundaries, once, to a new plan for the same task and repetition; do not reschedule a linked plan. Count quality once per trial and retain prior attempts and diagnostic costs in cumulative cost records. Preserve prior execution cost in cumulative reporting, but apply the new schema version 4 run's limits only once to confirmed and unresolved exposure from attempts newly started or resumed in that run.
 
-## 판정기 확인
+## Verifier Validation
 
-모든 verifier에 대해 정답, 명백한 오답, 형식 오류와 기술 오류를 모델 호출 없이 구분하는 검사를 먼저 수행한다. 보존한 동일 상태에서 verifier를 한 번 더 실행해 test별 결과, exit code와 reward가 같아야 유효한 품질 결과로 인정한다.
+For every verifier, first test without a model call that it distinguishes a correct answer, an obvious wrong answer, a format error, and a technical error. Rerun the verifier once against the same retained state. A quality result is valid only if per-test results, exit code, and reward match.
 
-### nginx-request-logging 수정본
+### Corrected `nginx-request-logging` Verifier
 
-과제 명세는 사용자 에이전트 변수를 로그에 넣으라고 요구하지만 `$http_user_agent` 표기만 요구하지 않는다. Nginx `1.22.1`은 `$http_user_agent`와 `${http_user_agent}`를 같은 변수로 해석한다. 원본 verifier는 문자열 `$http_user_agent`만 찾아 동등한 중괄호 문법을 거짓 실패로 분류했다.
+The task requires the user-agent variable in the log but does not require only the `$http_user_agent` notation. Nginx `1.22.1` interprets `$http_user_agent` and `${http_user_agent}` as the same variable. The original verifier searched only for the literal `$http_user_agent` and falsely rejected the equivalent braced syntax.
 
-수정본 `nginx-request-logging-verifier-v2`는 네 필수 변수를 `$name`과 `${name}`으로 인식하고 다른 검사와 임계값은 바꾸지 않는다.
+`nginx-request-logging-verifier-v2` accepts `$name` and `${name}` for the four required variables without changing other checks or thresholds.
 
-| 항목 | 값 | 증거 상태 |
+| Item | Value | Evidence status |
 | --- | --- | --- |
-| 원본 `tests/test_outputs.py` SHA-256 | `045cc716c14efde3b0dcff5fc7c85ec5d18bfc6ce66f8b40a418fa2a3a4acda0` | 고정 원본 |
-| 수정본 SHA-256 | `20812107bc3bfc541728a2d10e3da0552e907d949e1347a03d33aa26954f8902` | 고정 수정본 |
-| `$http_user_agent` 검증용 입력 | 통과 | 모델 호출 없는 1건 |
-| `${http_user_agent}` 검증용 입력 | 통과 | 모델 호출 없는 1건 |
-| 오답 `$http_referer` 검증용 입력 | 실패 | 모델 호출 없는 1건 |
-| 수정 모듈 검사 | 6/6 통과 | 2026-09-14 UTC 정적 확인 |
+| Original `tests/test_outputs.py` SHA-256 | `045cc716c14efde3b0dcff5fc7c85ec5d18bfc6ce66f8b40a418fa2a3a4acda0` | Pinned original |
+| Corrected SHA-256 | `20812107bc3bfc541728a2d10e3da0552e907d949e1347a03d33aa26954f8902` | Pinned correction |
+| Validation input using `$http_user_agent` | Pass | One model-free case |
+| Validation input using `${http_user_agent}` | Pass | One model-free case |
+| Incorrect `$http_referer` validation input | Fail | One model-free case |
+| Corrected-module checks | 6/6 pass | Static check on 2026-09-14 UTC |
 
-기존 기준선 20회에서 nginx 실패 2회는 `${http_user_agent}`를 사용했고 이 문자열 검사만 실패했다. 보존 trace와 당시 verifier 결과로 수정본 판정을 계산하면 nginx는 20/20이지만, 이는 실제 workspace 재생이 아닌 정적 반사실 계산이다. 원본 측정 18/20을 덮어쓰지 않는다.
+## Effect on the Existing Baseline
 
-## 시간과 중단 조건
+The two nginx failures in the existing 20-repetition baseline used `${http_user_agent}` and failed only this string check. Applying the corrected judgment to preserved traces and original verifier results calculates nginx at 20/20, but this is a static counterfactual calculation rather than an actual workspace replay. It does not replace the original 18/20 measurement.
 
-과거 100개 native `trial`에서 관측한 개별 실행 시간은 P50 76.145초, P90 93.559초였다. 실제 구간과 `개별 시간 합계÷8`의 비율 1.4345를 사용하면, 조기 종료와 준비 재시도가 없는 1,780개 계획 실행은 P50 입력 기반 6.7662시간, P90 입력 기반 8.3136시간으로 투영된다. 이는 5과제 원자료를 89과제로 옮긴 계산이지 전체 선별 시간의 관측 P50·P90이나 상한이 아니다.
+## Time and Stopping Conditions
 
-준비 재시도 시간, 89개 이미지의 최초 준비, 처음 보는 과제의 긴 setup, 승인 대기와 최종 Blob 검증은 이 투영에 없다. 준비 재시도의 P50·P90은 아직 측정하지 않아 최악 시간을 숫자로 채우지 않는다. 조기 종료로 줄어드는 시간도 미리 가정하지 않는다.
+Across the prior 100 native trials, observed individual durations were P50 76.145 seconds and P90 93.559 seconds. Using the ratio 1.4345 between the actual interval and `sum of individual durations ÷ 8`, the 1,780 planned executions without early stopping or preparation retries project to 6.7662 hours from the P50 input and 8.3136 hours from the P90 input. This transfers five-task source data to 89 tasks; it is not an observed P50 or P90 for total screening time or an upper bound.
 
-당시 보고 목표는 `2026-09-16 23:59 KST`였다. 이 시각은 과거 운영 목표이지 당시 과제 process를 종료하는 타이머가 아니었다. 앞으로의 schema version 4 실행은 보고 목표와 별도로 승인한 `run_deadline_utc`에서 실제 종료한다.
+The projection excludes preparation-retry time, initial preparation of 89 images, long setup for unfamiliar tasks, approval waits, and final Blob verification. Preparation-retry P50 and P90 have not been measured, so the worst case is not filled with invented numbers. Time saved by early stopping is also not assumed in advance.
 
-다음 경우 선별을 중단하고 원인과 가장 작은 수정안을 기록한다.
+The reporting target at the time was `2026-09-16 23:59 KST`. It was a historical operating target, not a timer that terminated task processes. Future schema version 4 execution terminates at an approved `run_deadline_utc` independent of the reporting target.
 
-- 고정한 source commit, 목록 hash, 이미지 digest 또는 verifier SHA가 다름
-- provider가 보고한 모델 revision이 원장과 다름
-- 병렬도나 배포 한도를 유지할 수 없음
-- 필수 증거 또는 같은 상태의 verifier 재실행이 불완전함
-- 로컬 증거를 Blob에서 hash로 확인하지 못함
-- 실제 process 종료, 명시적 오류 또는 작업 진전이 없는 상태를 근거로 기술 실패가 확인됨
-- schema version 4의 호출·비용·시간·요청·출력·진행 신호 상한에 도달함
+Stop screening and record the cause and smallest correction if:
 
-일정 위험 자체는 품질 실패가 아니다. 다만 승인한 deadline이나 비용 상한에 닿으면
-기술 미완료로 종료한다. 확인되지 않은 비용은 0으로 바꾸지 않고 다음 전송의 보수적
-노출액에 포함한다.
+- The pinned source commit, list hash, image digest, or verifier SHA differs
+- The provider-reported model revision differs from the ledger
+- Concurrency or deployment limits cannot be maintained
+- Required evidence or the same-state verifier rerun is incomplete
+- Local evidence cannot be hash-verified against Blob
+- Technical failure is established by actual process termination, an explicit error, or lack of task progress
+- Any schema version 4 call, cost, time, request, output, or progress-signal limit is reached
 
-통과율, 품질 허용폭, 비용 절감 문턱이나 반복 공식을 일정에 맞춰 낮추지 않는다.
+Schedule risk itself is not a quality failure. Reaching the approved deadline or a cost limit ends as technically incomplete. Unconfirmed cost is not converted to zero and remains conservative exposure for deciding on the next send.
 
-## 선별 시작 진행 조건
+Do not lower pass rate, quality tolerance, cost-savings threshold, or the repetition formula to fit the schedule.
 
-- 격리된 Python 환경에서 Harbor `0.22.0` import와 고정 의존성 검사가 통과한다.
-- tokenizer 표를 고정한 전체 로컬 검사와 native 전용 검사가 통과한다.
-- 89과제 목록과 이미지 digest가 hash로 고정된다.
-- 89과제 install-only 검사와 실제 Docker 상태 보존·복원 검사가 통과한다.
-- Blob 쓰기와 검증 읽기, 비용 결측, 로컬 보존과 재개 경로가 검증된다.
-- 실행 원장에 source commit, schema version 4 안전 상한, 가격 시점, 배포 한도, UTC deadline과 위임된 실행 권한이 기록된다.
-- 입력 묶음이 Blob에 올라가 원격 SHA-256 확인을 마친 뒤에만 첫 provider 호출을 허용한다.
+## Screening Entry Criteria
 
-이 조건을 모두 충족했다는 기록과 시작한 작업의 PID·로그·결과 위치를 남긴다.
+- Harbor `0.22.0` imports in an isolated Python environment and pinned dependency checks pass.
+- All local tests with the tokenizer table fixed and the native-only tests pass.
+- The 89-task list and image digests are hash-pinned.
+- Install-only checks for all 89 tasks and actual Docker state save-and-restore checks pass.
+- Blob writes and verification reads, missing-cost handling, local retention, and resume paths are verified.
+- The execution ledger records source commit, schema version 4 safety limits, pricing time, deployment limits, UTC deadline, and delegated execution authority.
+- The first provider call is allowed only after the input bundle is uploaded to Blob and its remote SHA-256 is verified.
+
+Record that every criterion passed, together with the started job's PID, log location, and result location.
