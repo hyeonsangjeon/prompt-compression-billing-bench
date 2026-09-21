@@ -1,0 +1,197 @@
+name: Verify SWE-Lancer exact-image offline smoke
+on:
+  pull_request:
+    paths:
+      - .github/workflows/swe-lancer-offline-smoke.yml
+      - docs/publication.md
+      - evidence.py
+      - ledgers/swe-lancer.template.json
+      - src/swe_lancer_admission.py
+      - tests/test_swe_lancer_admission.py
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/swe-lancer-offline-smoke.yml
+      - docs/publication.md
+      - evidence.py
+      - ledgers/swe-lancer.template.json
+      - src/swe_lancer_admission.py
+      - tests/test_swe_lancer_admission.py
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: swe-lancer-offline-smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  offline-smoke:
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      IMAGE_REPOSITORY: swelancer/swelancer_x86_28565_1001
+      IMAGE_DIGEST: sha256:b6ee529bbc589b251d2e287aa28068ea4f7e69b3eac2927b393091ac968e7587
+      IMAGE_CONFIG_DIGEST: sha256:3ac386d8f793eb2c3fdef76766b551bb2c04da8b7dd9703a01b561c293b82400
+      COMPRESSED_LAYER_BYTES: "6419837118"
+      REQUIRED_FREE_BYTES: "34000000000"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify public pins and credential boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -B - <<'PY'
+          import json
+          from pathlib import Path
+
+          from src.swe_lancer_admission import FIXED_IMAGE_DIGEST, FIXED_IMAGE_REFERENCE
+
+          ledger = json.loads(Path("ledgers/swe-lancer.template.json").read_text(encoding="utf-8"))
+          expected_reference = "swelancer/swelancer_x86_28565_1001"
+          expected_digest = "sha256:b6ee529bbc589b251d2e287aa28068ea4f7e69b3eac2927b393091ac968e7587"
+          assert FIXED_IMAGE_REFERENCE == f"{expected_reference}:releasev1"
+          assert FIXED_IMAGE_DIGEST == expected_digest
+          assert ledger["sandbox"]["image_reference"] == FIXED_IMAGE_REFERENCE
+          assert ledger["sandbox"]["image_manifest_digest"] == FIXED_IMAGE_DIGEST
+          PY
+          test -z "${OPENAI_API_KEY:-}"
+          test -z "${SWE_LANCER_DOCKER_HOST:-}"
+          test -z "${SWE_LANCER_SOLVER_PATH:-}"
+          test -z "${SWE_LANCER_CATALOG_PATH:-}"
+          test -z "${SWE_LANCER_CREDENTIAL_REVIEW_PATH:-}"
+          test -z "${SWE_LANCER_NETWORK_REVIEW_PATH:-}"
+          test -z "${SWE_LANCER_CLEANUP_REVIEW_PATH:-}"
+      - name: Pull exact image and run no-network smoke
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          image="${IMAGE_REPOSITORY}@${IMAGE_DIGEST}"
+          container_name="pccb-swe-offline-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          label="pccb.swe.offline_smoke=${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
+          workspace_identity="${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
+          workspace_path="${RUNNER_TEMP}/pccb-swe-workspace-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          workspace_uid="$(id -u)"
+          workspace_gid="$(id -g)"
+          image_id=""
+
+          cleanup() {
+            docker rm -f "$container_name" >/dev/null 2>&1 || true
+            if [[ -n "${workspace_path:-}" && -d "$workspace_path" ]]; then
+              rm -f -- "$workspace_path/smoke-probe"
+              rmdir -- "$workspace_path" >/dev/null 2>&1 || true
+            fi
+            docker image rm -f "$image" >/dev/null 2>&1 || true
+            if [[ -n "$image_id" ]]; then
+              docker image rm -f "$image_id" >/dev/null 2>&1 || true
+            fi
+          }
+          trap cleanup EXIT
+
+          test "$(uname -m)" = "x86_64"
+          test "$(docker info --format '{{.Architecture}}')" = "x86_64"
+          docker_root="$(docker info --format '{{.DockerRootDir}}')"
+          test -n "$docker_root"
+          free_bytes="$(df --output=avail -B1 "$docker_root" | tail -n 1 | tr -d ' ')"
+          case "$free_bytes" in
+            ""|*[!0-9]*) echo "invalid Docker-root free-byte count" >&2; exit 1 ;;
+          esac
+          if (( free_bytes < REQUIRED_FREE_BYTES )); then
+            echo "insufficient Docker-root reserve: ${free_bytes} < ${REQUIRED_FREE_BYTES}" >&2
+            exit 1
+          fi
+          if docker image inspect "$image" >/dev/null 2>&1 ||
+            docker image inspect "$IMAGE_CONFIG_DIGEST" >/dev/null 2>&1; then
+            echo "exact image unexpectedly existed before the task-owned pull" >&2
+            exit 1
+          fi
+          test ! -e "$workspace_path"
+          install -d -m 700 "$workspace_path"
+
+          docker pull "$image"
+          image_id="$(docker image inspect --format '{{.Id}}' "$image")"
+          test "$image_id" = "$IMAGE_CONFIG_DIGEST"
+          test "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$image")" = "linux/amd64"
+          docker image inspect \
+            --format '{{range .RepoDigests}}{{println .}}{{end}}' \
+            "$image" | grep -Fx "$image"
+
+          set +e
+          smoke="$(
+            timeout --signal=TERM --kill-after=10s 120s \
+              docker run \
+              --name "$container_name" \
+              --label "$label" \
+              --rm \
+              --network none \
+              --read-only \
+              --mount "type=bind,src=${workspace_path},dst=/workspace" \
+              --user "${workspace_uid}:${workspace_gid}" \
+              --env "PCCB_WORKSPACE_ID=${workspace_identity}" \
+              --env "PCCB_WORKSPACE_UID=${workspace_uid}" \
+              --cap-drop ALL \
+              --security-opt no-new-privileges \
+              --pids-limit 64 \
+              --memory 512m \
+              --cpus 1 \
+              --entrypoint /bin/sh \
+              "$image" \
+              -eu -c '
+                test "$(uname -m)" = "x86_64"
+                test ! -e /sys/class/net/eth0
+                test -z "${OPENAI_API_KEY:-}"
+                test -z "${SWE_LANCER_DOCKER_HOST:-}"
+                test -d /app/expensify
+                test "$(id -u)" = "$PCCB_WORKSPACE_UID"
+                test -w /workspace || {
+                  echo "task-owned workspace is not writable" >&2
+                  exit 91
+                }
+                printf "%s\n" "$PCCB_WORKSPACE_ID" > /workspace/smoke-probe
+                test "$(cat /workspace/smoke-probe)" = "$PCCB_WORKSPACE_ID"
+                rm /workspace/smoke-probe
+                test ! -e /workspace/smoke-probe
+                printf "offline-smoke-ok:%s\n" "$PCCB_WORKSPACE_ID"
+              '
+          )"
+          smoke_exit="$?"
+          set -e
+          if (( smoke_exit != 0 )); then
+            printf '%s\n' "$smoke" >&2
+            exit "$smoke_exit"
+          fi
+          test "$smoke" = "offline-smoke-ok:${workspace_identity}"
+          test ! -e "$workspace_path/smoke-probe"
+          test -z "$(find "$workspace_path" -mindepth 1 -maxdepth 1 -print -quit)"
+          rmdir -- "$workspace_path"
+          test ! -e "$workspace_path"
+          workspace_path=""
+          survivor_containers="$(
+            docker ps -aq --filter "label=$label" | sed '/^$/d' | wc -l | tr -d ' '
+          )"
+          test "$survivor_containers" = "0"
+
+          docker image rm -f "$image_id" >/dev/null
+          if docker image inspect "$image_id" >/dev/null 2>&1; then
+            echo "exact image survived task-owned cleanup" >&2
+            exit 1
+          fi
+          image_id=""
+          trap - EXIT
+
+          result="$RUNNER_TEMP/swe-lancer-offline-smoke.json"
+          printf '%s\n' \
+            "{\"schema_version\":1,\"kind\":\"swe_lancer_exact_image_offline_smoke\",\"status\":\"pass\",\"runner\":\"linux/amd64\",\"image_digest\":\"${IMAGE_DIGEST}\",\"image_config_digest\":\"${IMAGE_CONFIG_DIGEST}\",\"compressed_layer_bytes\":${COMPRESSED_LAYER_BYTES},\"required_free_bytes\":${REQUIRED_FREE_BYTES},\"free_bytes_before\":${free_bytes},\"container_network\":\"none\",\"workspace_identity\":\"${workspace_identity}\",\"workspace_identity_bound\":true,\"workspace_mount\":\"/workspace\",\"workspace_owner_uid\":${workspace_uid},\"workspace_owner_gid\":${workspace_gid},\"workspace_process_uses_runner_identity\":true,\"workspace_writable\":true,\"workspace_empty_after_probe\":true,\"workspace_present_after_cleanup\":false,\"command_deadline_seconds\":120,\"command_exit_code\":0,\"credential_values_read\":0,\"provider_model_api_grader_calls\":0,\"survivor_containers\":0,\"image_present_after_cleanup\":false}" \
+            | tee "$result"
+      - name: Upload sanitized smoke record
+        uses: actions/upload-artifact@v4
+        with:
+          name: swe-lancer-offline-smoke-${{ github.run_id }}
+          path: ${{ runner.temp }}/swe-lancer-offline-smoke.json
+          if-no-files-found: error
+          retention-days: 7

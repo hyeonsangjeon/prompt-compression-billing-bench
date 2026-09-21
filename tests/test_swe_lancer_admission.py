@@ -22,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "ledgers" / "swe-lancer.template.json"
 EVALUATION = ROOT / "data" / "experiment" / "swe-lancer-candidate-evaluation.json"
 REPORT = ROOT / "docs" / "experiment" / "swe-lancer-candidate-evaluation-20260920.md"
+OFFLINE_SMOKE_WORKFLOW = ROOT / ".github" / "workflows" / "swe-lancer-offline-smoke.yml"
 
 
 def deadline(seconds=4800):
@@ -220,6 +221,64 @@ class SweLancerAdmissionTests(unittest.TestCase):
         )
         self.assertEqual(value["sandbox"]["image_manifest_digest"], FIXED_IMAGE_DIGEST)
         self.assertEqual(value["sandbox"]["image_reference"], FIXED_IMAGE_REFERENCE)
+
+    def test_hosted_offline_smoke_is_exact_secret_free_and_fail_closed(self):
+        workflow = OFFLINE_SMOKE_WORKFLOW.read_text(encoding="utf-8")
+        for required in (
+            "github.event.pull_request.head.repo.full_name == github.repository",
+            "runs-on: ubuntu-24.04",
+            "timeout-minutes: 45",
+            "REQUIRED_FREE_BYTES: \"34000000000\"",
+            "COMPRESSED_LAYER_BYTES: \"6419837118\"",
+            FIXED_IMAGE_DIGEST,
+            "sha256:3ac386d8f793eb2c3fdef76766b551bb2c04da8b7dd9703a01b561c293b82400",
+            "test -z \"${OPENAI_API_KEY:-}\"",
+            "test -z \"${SWE_LANCER_DOCKER_HOST:-}\"",
+            "--network none",
+            "--read-only",
+            "--mount \"type=bind,src=${workspace_path},dst=/workspace\"",
+            "--user \"${workspace_uid}:${workspace_gid}\"",
+            "--env \"PCCB_WORKSPACE_ID=${workspace_identity}\"",
+            "--env \"PCCB_WORKSPACE_UID=${workspace_uid}\"",
+            "--cap-drop ALL",
+            "--security-opt no-new-privileges",
+            "--pids-limit 64",
+            "--memory 512m",
+            "--cpus 1",
+            "timeout --signal=TERM --kill-after=10s 120s",
+            "test ! -e /sys/class/net/eth0",
+            "test \"$(id -u)\" = \"$PCCB_WORKSPACE_UID\"",
+            "test -w /workspace",
+            "rm /workspace/smoke-probe",
+            "rmdir -- \"$workspace_path\"",
+            "workspace_identity_bound\\\":true",
+            "workspace_process_uses_runner_identity\\\":true",
+            "workspace_writable\\\":true",
+            "workspace_empty_after_probe\\\":true",
+            "workspace_present_after_cleanup\\\":false",
+            "command_deadline_seconds\\\":120",
+            "command_exit_code\\\":0",
+            "provider_model_api_grader_calls\\\":0",
+            "survivor_containers\\\":0",
+            "image_present_after_cleanup\\\":false",
+            "docker image rm -f",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, workflow)
+        for forbidden in (
+            "${{ secrets.",
+            "docker login",
+            "/tmp/",
+            "/home/",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, workflow)
+        for environment_name in ("OPENAI_API_KEY", "SWE_LANCER_DOCKER_HOST"):
+            with self.subTest(environment_name=environment_name):
+                self.assertNotRegex(
+                    workflow,
+                    rf"(?m)^\s+{environment_name}\s*:",
+                )
 
     def test_sanitized_evaluation_preserves_no_trace_boundary(self):
         value = json.loads(EVALUATION.read_text(encoding="utf-8"))
