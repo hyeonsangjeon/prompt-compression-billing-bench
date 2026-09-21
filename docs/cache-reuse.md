@@ -45,6 +45,36 @@ The cache and native ledgers must also agree on model revision, endpoint variabl
 generation settings, and the hash-bound fixed price schedule. Both ledgers must
 carry their own current execution approval.
 
+### Sanctioned runtime context
+
+`config/cache-runtime-context.json` defines the project-owned doctor launcher.
+Its command uses only the inherited `CACHE_RUNTIME_PYTHON` executable and the
+fixed `src.cache_runtime_context` module. Ledger, runtime-fact, native-ledger,
+attestation, and output locations are supplied through the named environment
+inputs `CACHE_REUSE_LEDGER`, `CACHE_RUNTIME_FACTS`, `NATIVE_CACHE_LEDGER`,
+`CACHE_RUNTIME_CONTEXT_ATTESTATION`, and `CACHE_REUSE_DOCTOR`; none is accepted
+as an inline command argument.
+
+```bash
+"$CACHE_RUNTIME_PYTHON" -m src.cache_runtime_context
+```
+
+The launcher checks its tracked regular-file SHA-256 against the public
+definition, then requires a fresh runtime-owner attestation that repeats the
+five `SANCTIONED_PROJECT_RUNTIME_CONTEXT_*` bindings and the definition hash.
+Only then does it read the three private admission inputs and invoke the
+existing doctor once. Its no-clobber result is mode `0600` and contains only
+environment names, presence booleans, UTC times, byte counts, SHA-256 values,
+and the doctor's sanitized result. The committed attestation fixture is
+deliberately expired and cannot open the gate.
+
+This launcher does not create, discover, or authorize a runtime. Adding it to
+source closes the reusable command-and-identity gap only. A runtime owner must
+still deploy the command inside the actual sanctioned process and provide a
+fresh private attestation and current evidence. A verified launcher does not by
+itself establish managed-identity permission, model/API access, retention,
+cache-field support, prices, namespace isolation, or any live provider result.
+
 The 14 required facts cover endpoint presence, managed-identity permission,
 deployment/model/API access, effective retention, native cache fields,
 namespace/isolation, matching external traffic, queue/RPM/TPM facts, the exact
@@ -82,6 +112,7 @@ Common failures:
 
 | Exit or record | Meaning | Check |
 |---|---|---|
+| `3`, context `missing`, `stale`, or `wrong_source` | The sanctioned launcher identity or current runtime-owner attestation is absent or invalid | Supply a fresh matching private attestation in the actual project runtime; do not copy environment values into arguments |
 | `3`, doctor `no_go` | At least one required fact is not currently verified | Inspect `doctor.json`; do not inspect or print credential values |
 | `2`, `Cache-reuse preflight failed` | Ledger, source, prefix, namespace, or no-clobber contract failed | Re-run `--plan` and `--doctor` against the exact private inputs |
 | `failure.json`, `invalid_preserved` | A started cycle had missing usage, prefix/request-width drift, native failure, or another integrity stop | Preserve it and use a new cycle ID only after the cause is resolved |

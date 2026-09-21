@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "kind": "cache_reuse_runtime_context_attestation",
+  "observed_at_utc": "1970-01-01T00:00:00Z",
+  "valid_through_utc": "1970-01-01T00:00:01Z",
+  "definition_sha256": "933c018f594996c1c87778c2552f0f44516136385d84bdb89702624f60e66498",
+  "SANCTIONED_PROJECT_RUNTIME_CONTEXT_COMMAND": {
+    "executable_environment_name": "CACHE_RUNTIME_PYTHON",
+    "arguments": [
+      "-m",
+      "src.cache_runtime_context"
+    ]
+  },
+  "SANCTIONED_PROJECT_RUNTIME_CONTEXT_IDENTITY_KIND": "repository_regular_file",
+  "SANCTIONED_PROJECT_RUNTIME_CONTEXT_IDENTITY_SOURCE": "src/cache_runtime_context.py",
+  "SANCTIONED_PROJECT_RUNTIME_CONTEXT_IDENTITY_SHA256": "5ca41a3ab9a48cc2923b1905d86ee8d47412a157749f8a1e251fbedc13b0e1d5",
+  "SANCTIONED_PROJECT_RUNTIME_CONTEXT_OWNER": "runtime_owner"
+}
