@@ -236,6 +236,26 @@ class SweLancerCarrierTests(unittest.TestCase):
             self.attestation() if value is None else value,
         )
 
+    def refresh_ledger_bindings(self):
+        self.write_json(self.ledger_path, self.ledger)
+        ledger_sha256 = admission.fingerprint(self.ledger_path)["sha256"]
+        for receipt in self.receipts.values():
+            receipt["ledger_sha256"] = ledger_sha256
+        self.write_receipts()
+        self.refresh_attestation()
+
+    def ready_admission_result(self):
+        with patch.object(admission, "FIXED_SOURCE_PINS", self.control_source_pins):
+            return admission.check_admission(
+                self.ledger,
+                admission.fingerprint(self.ledger_path),
+                self.environment["SWE_LANCER_DEADLINE_UTC"],
+                self.environment,
+                presence_only_environment_names=frozenset(
+                    {"OPENAI_API_KEY", "SWE_LANCER_DOCKER_HOST"}
+                ),
+            )
+
     def check(self, environment=None):
         with patch.object(
             admission, "FIXED_SOURCE_PINS", self.control_source_pins
@@ -323,6 +343,91 @@ class SweLancerCarrierTests(unittest.TestCase):
         self.assertNotIn("credential-sentinel-never-read", serialized)
         self.assertNotIn("endpoint-sentinel-never-read", serialized)
         self.assertNotIn(str(self.root), serialized)
+
+    def test_invalid_pin_environment_is_rejected_before_value_or_file_read(self):
+        self.ledger["source"]["pins"][0]["path_env"] = "OPENAI_API_KEY"
+        self.refresh_ledger_bindings()
+        result = self.check()
+        self.assertFalse(result["ready"])
+        self.assertIn("source.pins[0].path_env", result["missing_or_invalid"])
+        self.assertEqual(result["side_effects"]["admission_invocations"], 1)
+
+    def test_private_shaped_api_version_is_rejected_without_reflection(self):
+        sentinel = "https://example.invalid/endpoint?token=SYNTHETIC_SENTINEL"
+        self.receipts["provider_contract_receipt"]["api_version"] = sentinel
+        self.write_receipts()
+        self.refresh_attestation()
+        result = self.check()
+        self.assertFalse(result["ready"])
+        self.assertEqual(
+            result["missing_or_invalid"], ["provider_contract_receipt.api_version"]
+        )
+        self.assertNotIn(sentinel, json.dumps(result, sort_keys=True))
+
+    def test_private_shaped_pin_name_is_rejected_without_reflection(self):
+        sentinel = "/private/SYNTHETIC_PIN"
+        self.ledger["source"]["pins"][0]["name"] = sentinel
+        self.refresh_ledger_bindings()
+        result = self.check()
+        serialized = json.dumps(result, sort_keys=True)
+        self.assertFalse(result["ready"])
+        self.assertIn("source.pins[0].name", result["missing_or_invalid"])
+        self.assertNotIn(sentinel, serialized)
+
+    def test_private_shaped_revision_and_runtime_are_not_reflected(self):
+        sentinel = "/private/SYNTHETIC_METADATA"
+        self.ledger["provider"]["reported_model_revision"] = sentinel
+        self.receipts["provider_contract_receipt"]["reported_model_revision"] = sentinel
+        self.refresh_ledger_bindings()
+        result = self.check()
+        self.assertEqual(
+            result["missing_or_invalid"],
+            ["provider_contract_receipt.reported_model_revision"],
+        )
+        self.assertNotIn(sentinel, json.dumps(result, sort_keys=True))
+
+        self.ledger["provider"]["reported_model_revision"] = "controlled-revision"
+        self.receipts["provider_contract_receipt"][
+            "reported_model_revision"
+        ] = "controlled-revision"
+        self.receipts["outbound_receipt"]["runtime_kind"] = sentinel
+        self.refresh_ledger_bindings()
+        result = self.check()
+        self.assertEqual(
+            result["missing_or_invalid"], ["outbound_receipt.runtime_kind"]
+        )
+        self.assertNotIn(sentinel, json.dumps(result, sort_keys=True))
+
+    def test_downstream_side_effect_violation_preserves_typed_report(self):
+        admission_result = self.ready_admission_result()
+        admission_result["side_effects"]["network_used"] = True
+        with patch(
+            "src.swe_lancer_carrier.admission.check_admission",
+            return_value=admission_result,
+        ) as admission_call:
+            result = self.check()
+        self.assertEqual(admission_call.call_count, 1)
+        self.assertFalse(result["ready"])
+        self.assertEqual(result["missing_or_invalid"], ["admission.side_effects"])
+        self.assertEqual(result["side_effects"]["admission_invocations"], 1)
+        self.assertTrue(result["side_effects"]["network_used"])
+        self.assertEqual(
+            result["side_effects"]["provider_model_api_grader_calls"], 0
+        )
+        self.assertIsNone(result["admission"])
+
+    def test_reported_provider_call_does_not_claim_zero_call_count(self):
+        admission_result = self.ready_admission_result()
+        admission_result["side_effects"]["provider_called"] = True
+        with patch(
+            "src.swe_lancer_carrier.admission.check_admission",
+            return_value=admission_result,
+        ):
+            result = self.check()
+        self.assertTrue(result["side_effects"]["provider_called"])
+        self.assertIsNone(
+            result["side_effects"]["provider_model_api_grader_calls"]
+        )
 
     def test_attested_receipt_fingerprint_drift_stops_before_admission(self):
         self.receipts["price_receipt"]["currency"] = "EUR"

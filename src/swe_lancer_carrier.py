@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFINITION_PATH = ROOT / "config/swe-lancer-carrier.json"
 SHA256 = re.compile(r"[0-9a-f]{64}")
 ENVIRONMENT_NAME = re.compile(r"[A-Z][A-Z0-9_]*")
+BOUNDED_IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
 IDENTITY_FIELDS = (
     "SANCTIONED_SWE_LANCER_CARRIER_COMMAND",
     "SANCTIONED_SWE_LANCER_CARRIER_IDENTITY_KIND",
@@ -125,6 +126,13 @@ OUTBOUND_RECEIPT_FIELDS = {
     "network_calls",
     "survivor_count",
 }
+ADMISSION_SIDE_EFFECT_FIELDS = (
+    "worker_or_model_started",
+    "provider_called",
+    "sandbox_started",
+    "container_or_vm_started",
+    "network_used",
+)
 
 
 class CarrierFailure(ValueError):
@@ -365,6 +373,12 @@ def require_nonempty(value: object, code: str) -> str:
     return value
 
 
+def require_identifier(value: object, code: str) -> str:
+    if not isinstance(value, str) or not BOUNDED_IDENTIFIER.fullmatch(value):
+        raise CarrierFailure(code)
+    return value
+
+
 def require_positive_decimal(value: object, code: str) -> str:
     if not isinstance(value, str):
         raise CarrierFailure(code)
@@ -409,8 +423,10 @@ def validate_provider_receipt(
     )
     if not SHA256.fullmatch(deployment_identity):
         raise CarrierFailure(f"{prefix}.deployment_identity_sha256")
-    api_version = require_nonempty(value["api_version"], f"{prefix}.api_version")
-    require_nonempty(value["reported_model_revision"], f"{prefix}.reported_model_revision")
+    api_version = require_identifier(value["api_version"], f"{prefix}.api_version")
+    reported_model_revision = require_identifier(
+        value["reported_model_revision"], f"{prefix}.reported_model_revision"
+    )
     if (
         value["provider_name"] != "openai"
         or value["model_setting"] != "openai/gpt-4o"
@@ -426,7 +442,7 @@ def validate_provider_receipt(
         "fresh": True,
         "deployment_identity_sha256": deployment_identity,
         "api_version": api_version,
-        "reported_model_revision": value["reported_model_revision"],
+        "reported_model_revision": reported_model_revision,
         "credential_permission_verified": True,
         "credential_value_recorded": False,
         "endpoint_value_recorded": False,
@@ -496,7 +512,7 @@ def validate_outbound_receipt(
     )
     if not SHA256.fullmatch(carrier_identity):
         raise CarrierFailure(f"{prefix}.carrier_instance_identity_sha256")
-    runtime_kind = require_nonempty(value["runtime_kind"], f"{prefix}.runtime_kind")
+    runtime_kind = require_identifier(value["runtime_kind"], f"{prefix}.runtime_kind")
     if (
         value["platform"] != "linux/amd64"
         or value["image_manifest_digest"] != admission.FIXED_IMAGE_DIGEST
@@ -521,6 +537,27 @@ def validate_outbound_receipt(
         "cleanup_contract_verified": True,
         "survivor_count": 0,
     }
+
+
+def admission_side_effects(value: object) -> dict[str, bool]:
+    if not isinstance(value, Mapping):
+        raise CarrierFailure("admission.side_effects")
+    effects: dict[str, bool] = {}
+    for name in ADMISSION_SIDE_EFFECT_FIELDS:
+        field = value.get(name)
+        if type(field) is not bool:
+            raise CarrierFailure("admission.side_effects")
+        effects[name] = field
+    return effects
+
+
+def preserve_admission_side_effects(
+    result: dict[str, object], effects: Mapping[str, bool]
+) -> None:
+    for name in ADMISSION_SIDE_EFFECT_FIELDS:
+        result["side_effects"][name] = effects[name]
+    if effects["provider_called"]:
+        result["side_effects"]["provider_model_api_grader_calls"] = None
 
 
 def probe(
@@ -580,6 +617,7 @@ def probe(
     input_records: dict[str, dict[str, object]] = {}
     loaded = 0
     admission_invocations = 0
+    reported_admission_side_effects: dict[str, bool] | None = None
     try:
         payloads: dict[str, bytes] = {}
         for label in (
@@ -630,13 +668,24 @@ def probe(
             input_records["ledger"],
             deadline,
             environment,
+            presence_only_environment_names=frozenset(
+                {
+                    EXPECTED_ADMISSION_ENVIRONMENTS["provider_credential"],
+                    EXPECTED_ADMISSION_ENVIRONMENTS["sandbox_endpoint"],
+                }
+            ),
         )
-        if any(admission_result["side_effects"].values()):
+        reported_admission_side_effects = admission_side_effects(
+            admission_result.get("side_effects")
+        )
+        if any(reported_admission_side_effects.values()):
             raise CarrierFailure("admission.side_effects")
     except CarrierFailure as failure:
         result = failure_record(observed, environment, failure, definition, context)
         result["side_effects"]["runtime_input_files_read"] = loaded
         result["side_effects"]["admission_invocations"] = admission_invocations
+        if reported_admission_side_effects is not None:
+            preserve_admission_side_effects(result, reported_admission_side_effects)
         return result
     except (InvalidOperation, TypeError, ValueError) as error:
         result = failure_record(

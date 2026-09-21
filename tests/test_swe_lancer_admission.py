@@ -154,6 +154,30 @@ class SweLancerAdmissionTests(unittest.TestCase):
         self.assertIn("provider.input_usd_per_million_tokens", result["missing_or_invalid"])
         self.assertIn("sandbox.endpoint_env", result["missing_or_invalid"])
 
+    def test_direct_admission_rejects_empty_credential_and_endpoint_values(self):
+        environment = self.prepare_ready()
+        environment["OPENAI_API_KEY"] = ""
+        environment["SWE_LANCER_DOCKER_HOST"] = ""
+        result = self.check(environment)
+        self.assertFalse(result["ready"])
+        self.assertIn(
+            "environment.OPENAI_API_KEY.present", result["missing_or_invalid"]
+        )
+        self.assertIn(
+            "environment.SWE_LANCER_DOCKER_HOST.present",
+            result["missing_or_invalid"],
+        )
+
+    def test_invalid_reported_model_revision_is_not_reflected(self):
+        environment = self.prepare_ready()
+        sentinel = "https://example.invalid/private?token=SYNTHETIC_SENTINEL"
+        self.ledger["provider"]["reported_model_revision"] = sentinel
+        result = self.check(environment)
+        self.assertFalse(result["ready"])
+        self.assertIn("provider.reported_model_revision", result["missing_or_invalid"])
+        self.assertIsNone(result["provider"]["reported_model_revision"])
+        self.assertNotIn(sentinel, json.dumps(result, sort_keys=True))
+
     def test_stale_and_far_deadlines_fail_closed(self):
         environment = self.prepare_ready()
         for selected in (deadline(-1), deadline(5000)):

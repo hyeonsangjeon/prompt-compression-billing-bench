@@ -16,6 +16,7 @@ from typing import Mapping
 
 ENVIRONMENT_NAME = re.compile(r"[A-Z][A-Z0-9_]*")
 SHA256 = re.compile(r"[0-9a-f]{64}")
+BOUNDED_IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
 FIXED_TASK = {"task_id": "28565_1001", "split": "diamond", "task_type": "ic_swe"}
 FIXED_UPSTREAM = {
     "repository": "https://github.com/openai/frontier-evals",
@@ -152,6 +153,16 @@ def _positive_decimal(value: object) -> bool:
         return False
 
 
+def _environment_value_present(
+    environment: Mapping[str, str],
+    name: str,
+    presence_only_environment_names: frozenset[str],
+) -> bool:
+    if name in presence_only_environment_names:
+        return name in environment
+    return bool(environment.get(name))
+
+
 def _pin_checks(
     pins: object,
     category: str,
@@ -173,23 +184,26 @@ def _pin_checks(
         path_environment = pin.get("path_env")
         expected_bytes = pin.get("bytes")
         expected_sha256 = pin.get("sha256")
-        if not isinstance(name, str) or not name or name in names:
+        if not isinstance(name, str) or name not in expected or name in names:
             missing.add(f"{prefix}.name")
             continue
         names.add(name)
-        expected_pin = expected.get(name)
-        if expected_pin is None:
-            missing.add(f"{category}.set")
-            expected_pin = {}
-        if not isinstance(path_environment, str) or not ENVIRONMENT_NAME.fullmatch(path_environment):
+        expected_pin = expected[name]
+        if (
+            not isinstance(path_environment, str)
+            or not ENVIRONMENT_NAME.fullmatch(path_environment)
+            or path_environment != expected_pin.get("path_env")
+        ):
             missing.add(f"{prefix}.path_env")
             continue
-        if path_environment != expected_pin.get("path_env"):
-            missing.add(f"{category}.{name}.path_env")
         if type(expected_bytes) is not int or expected_bytes <= 0:
             missing.add(f"{prefix}.bytes")
         if not isinstance(expected_sha256, str) or not SHA256.fullmatch(expected_sha256):
             missing.add(f"{prefix}.sha256")
+        if type(expected_bytes) is not int or not isinstance(expected_sha256, str):
+            continue
+        if expected_bytes <= 0 or not SHA256.fullmatch(expected_sha256):
+            continue
         for field in ("bytes", "sha256"):
             if field in expected_pin and pin.get(field) != expected_pin[field]:
                 missing.add(f"{category}.{name}.{field}")
@@ -229,7 +243,14 @@ def check_admission(
     ledger_fingerprint: Mapping[str, object],
     deadline_utc: str,
     environment: Mapping[str, str],
+    *,
+    presence_only_environment_names: frozenset[str] = frozenset(),
 ) -> dict[str, object]:
+    if not presence_only_environment_names <= {
+        "OPENAI_API_KEY",
+        "SWE_LANCER_DOCKER_HOST",
+    }:
+        raise ValueError("unsupported presence-only environment name")
     missing: set[str] = set()
     if ledger.get("schema_version") != 1:
         missing.add("schema_version")
@@ -259,13 +280,27 @@ def check_admission(
     credential_name = provider.get("credential_env")
     if credential_name != "OPENAI_API_KEY":
         missing.add("provider.credential_env")
-    credential_present = isinstance(credential_name, str) and credential_name in environment
+        credential_present = False
+        credential_environment_name = None
+    else:
+        credential_present = _environment_value_present(
+            environment,
+            credential_name,
+            presence_only_environment_names,
+        )
+        credential_environment_name = credential_name
     if not credential_present:
         missing.add("environment.OPENAI_API_KEY.present")
+    reported_model_revision = provider.get("reported_model_revision")
+    if not isinstance(reported_model_revision, str) or not BOUNDED_IDENTIFIER.fullmatch(
+        reported_model_revision
+    ):
+        missing.add("provider.reported_model_revision")
+        reported_model_revision = None
     _required(
         provider,
         "provider",
-        ("reported_model_revision", "price_source_url", "price_source_revision_or_retrieved_at"),
+        ("price_source_url", "price_source_revision_or_retrieved_at"),
         missing,
     )
     for name in ("input_usd_per_million_tokens", "output_usd_per_million_tokens"):
@@ -285,8 +320,14 @@ def check_admission(
     if endpoint_name != "SWE_LANCER_DOCKER_HOST":
         missing.add("sandbox.endpoint_env")
         endpoint_present = False
+        endpoint_environment_name = None
     else:
-        endpoint_present = endpoint_name in environment
+        endpoint_present = _environment_value_present(
+            environment,
+            endpoint_name,
+            presence_only_environment_names,
+        )
+        endpoint_environment_name = endpoint_name
         if not endpoint_present:
             missing.add(f"environment.{endpoint_name}.present")
     evidence_pins = _pin_checks(
@@ -341,13 +382,13 @@ def check_admission(
         "provider": {
             "name": provider.get("name"),
             "model_setting": provider.get("model_setting"),
-            "credential_environment_name": credential_name,
+            "credential_environment_name": credential_environment_name,
             "credential_present": credential_present,
             "credential_value_recorded": False,
-            "reported_model_revision": provider.get("reported_model_revision"),
+            "reported_model_revision": reported_model_revision,
         },
         "sandbox": {
-            "endpoint_environment_name": endpoint_name,
+            "endpoint_environment_name": endpoint_environment_name,
             "endpoint_present": endpoint_present,
             "endpoint_value_recorded": False,
             "image_manifest_digest": sandbox.get("image_manifest_digest"),
