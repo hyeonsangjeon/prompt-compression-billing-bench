@@ -82,6 +82,8 @@ The current repository also defines a sanctioned private-carrier command in [`co
 
 The carrier gate verifies its tracked source identity and a fresh runtime-owner attestation before reading the exact private admission ledger and three hash-bound receipts. Those receipts bind the provider, model revision, deployment identity, API version, fixed-price source, paid-outbound review, exact image, and cleanup contract to the same ledger. The gate records environment-name presence, byte counts, SHA-256 identities, and sanitized status only. It then invokes the existing model-free admission check once. Missing, stale, or mismatched evidence stops before that invocation, and the output remains no-clobber and owner-only.
 
+The [runtime-owner handoff guide](../runtime-owner-handoff.md) gives the canonical environment names, complete receipt and attestation field sets, binding order, and fail-closed interpretation. The guide documents the source contract; it is not a current carrier receipt or permission record.
+
 This source boundary does not create, discover, or authorize a private carrier. It does not turn the completed hosted offline smoke into evidence for a current paid carrier, and it does not change this report's historical no-trace conclusion. A runtime owner must still provide the actual sanctioned context, a fresh attestation, the exact private inputs, and current receipts. Provider, model, API, and grader calls remain zero until that separate admission is green.
 
 The machine-readable judgment is in [`data/experiment/swe-lancer-candidate-evaluation.json`](../../data/experiment/swe-lancer-candidate-evaluation.json). It excludes the private task body, raw trace, credentials, endpoint values, container identifiers, and execution paths.
