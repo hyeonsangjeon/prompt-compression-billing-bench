@@ -1,33 +1,30 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "kind": "pages_static_site_contract",
   "project_prefix": "/prompt-compression-billing-bench/",
   "labels": {
-    "source": "repository-public-files",
-    "visibility": "local-static-preview",
-    "deployment": "deployment-disabled"
+    "source": "rights-neutral-source-allowlist",
+    "visibility": "public-github-pages",
+    "deployment": "main-only-actions-deploy"
   },
+  "source_allowlist": [
+    "docs/pages-home.md",
+    "docs/pages-static.md",
+    "docs/publication.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "third_party/licenses/gsm8k-MIT.txt",
+    "third_party/licenses/terminal-bench-2.1-Apache-2.0.txt"
+  ],
   "routes": {
     "primary": {
-      "README.md": "/",
-      "docs/eda/README.md": "/eda/",
-      "docs/experiment/01-preliminary-comparison/README.md": "/first-study/",
-      "docs/experiment/01-preliminary-comparison/visualization-guide-20260919.md": "/figures/",
-      "STATUS.md": "/readiness/",
-      "docs/publication.md": "/readiness/"
-    },
-    "other_markdown_prefix": "/documents/",
-    "copied_file_prefix": "/files/"
-  },
-  "compatibility_anchors": [
-    {
-      "source_path": "docs/experiment/screening-protocol.md",
-      "fragment": "기존-기준선에-미치는-영향",
-      "before_line": 112,
-      "line_sha256": "dae9bdf8d43e3618a70e9d45c1a9477bc00d22ed5477c7f37e61d995b1bde46f",
-      "reason": "Preserve the existing fragment link without changing the source measurement text."
+      "docs/pages-home.md": "/",
+      "docs/pages-static.md": "/site-contract/",
+      "docs/publication.md": "/publication/",
+      "THIRD_PARTY_NOTICES.md": "/notices/"
     }
-  ],
+  },
+  "compatibility_anchors": [],
   "renderer_policy": {
     "source_code_execution": false,
     "active_html_execution": false,
@@ -67,11 +64,11 @@
   "browser_check": {
     "routes": [
       "/",
-      "/eda/",
-      "/first-study/",
-      "/figures/",
-      "/readiness/"
+      "/site-contract/",
+      "/publication/",
+      "/notices/"
     ],
+    "table_keyboard_route": "/publication/",
     "viewports": [
       {
         "name": "wide",
@@ -93,26 +90,26 @@
         "expected_file": "index.html"
       },
       {
-        "id": "nested-first-study",
-        "url_path": "/prompt-compression-billing-bench/first-study/",
-        "expected_file": "first-study/index.html"
+        "id": "nested-site-contract",
+        "url_path": "/prompt-compression-billing-bench/site-contract/",
+        "expected_file": "site-contract/index.html"
       },
       {
         "id": "directory-index",
-        "url_path": "/prompt-compression-billing-bench/files/examples/static/",
-        "expected_file": "files/examples/static/index.html"
+        "url_path": "/prompt-compression-billing-bench/files/third_party/licenses/",
+        "expected_file": "files/third_party/licenses/index.html"
       },
       {
         "id": "query-does-not-change-file",
-        "url_path": "/prompt-compression-billing-bench/first-study/?view=local",
-        "expected_file": "first-study/index.html"
+        "url_path": "/prompt-compression-billing-bench/publication/?view=public",
+        "expected_file": "publication/index.html"
       }
     ],
     "trailing_slash_redirect": {
-      "request_path": "/prompt-compression-billing-bench/first-study",
+      "request_path": "/prompt-compression-billing-bench/publication",
       "expected_status": 301,
-      "expected_location": "/prompt-compression-billing-bench/first-study/",
-      "expected_file": "first-study/index.html"
+      "expected_location": "/prompt-compression-billing-bench/publication/",
+      "expected_file": "publication/index.html"
     },
     "no_root_fallback": [
       {
@@ -122,16 +119,16 @@
       },
       {
         "id": "root-route",
-        "url_path": "/first-study/",
+        "url_path": "/site-contract/",
         "expected_status": 404
       }
     ],
     "encoded_hangul_fragment": {
-      "source_file": "documents/docs/experiment/baseline/index.html",
-      "href": "../screening-protocol/index.html#%EA%B8%B0%EC%A1%B4-%EA%B8%B0%EC%A4%80%EC%84%A0%EC%97%90-%EB%AF%B8%EC%B9%98%EB%8A%94-%EC%98%81%ED%96%A5",
-      "decoded_fragment": "기존-기준선에-미치는-영향",
+      "source_file": "index.html",
+      "href": "#%EA%B3%B5%EA%B0%9C-%EB%B2%94%EC%9C%84",
+      "decoded_fragment": "공개-범위",
       "expected_occurrences": 1,
-      "expected_target_file": "documents/docs/experiment/screening-protocol/index.html"
+      "expected_target_file": "index.html"
     }
   },
   "preserved_red": {

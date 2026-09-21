@@ -1,7 +1,10 @@
-name: Check static Pages candidate
+name: Check and deploy rights-neutral Pages
 on:
   push:
+    branches:
+      - main
   pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -71,3 +74,23 @@ jobs:
             --contract config/pages-static.json \
             --result "$run_root/browser.json"
           "$RUNNER_TEMP/pages-venv/bin/python" -B evidence.py audit-files .
+      - name: Upload verified Pages artifact
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/pages-static/first/site
+  deploy:
+    name: Deploy verified Pages artifact
+    needs: pages-static
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

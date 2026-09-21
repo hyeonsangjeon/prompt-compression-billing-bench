@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from src import pages_build, pages_oracle
+from src import pages_build, pages_oracle, pages_verify
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,6 +19,29 @@ PROJECT_PREFIX = "prompt-compression-billing-bench"
 PAGES_RUNTIME_VERSIONS = {
     "markdown-it-py": "3.0.0",
     "mdurl": "0.1.2",
+    "playwright": "1.61.0",
+}
+EXPECTED_SITE_SOURCE_ALLOWLIST = [
+    "docs/pages-home.md",
+    "docs/pages-static.md",
+    "docs/publication.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "third_party/licenses/gsm8k-MIT.txt",
+    "third_party/licenses/terminal-bench-2.1-Apache-2.0.txt",
+]
+EXPECTED_SITE_INVENTORY = {
+    "assets/site.css",
+    "build-manifest.json",
+    "files/LICENSE",
+    "files/third_party/index.html",
+    "files/third_party/licenses/gsm8k-MIT.txt",
+    "files/third_party/licenses/index.html",
+    "files/third_party/licenses/terminal-bench-2.1-Apache-2.0.txt",
+    "index.html",
+    "notices/index.html",
+    "publication/index.html",
+    "site-contract/index.html",
 }
 
 
@@ -98,6 +121,14 @@ class PagesStaticRuntimeTests(unittest.TestCase):
             "--contract", ROOT / "config/pages-static.json",
             "--result", cls.http_result,
         )
+        cls.browser_result = cls.first / "browser.json"
+        cls._run(
+            "src/pages_browser_check.py",
+            "--server-root", cls.server_root,
+            "--project-prefix", f"/{PROJECT_PREFIX}/",
+            "--contract", ROOT / "config/pages-static.json",
+            "--result", cls.browser_result,
+        )
 
     @classmethod
     def tearDownClass(cls):
@@ -166,14 +197,25 @@ class PagesStaticRuntimeTests(unittest.TestCase):
         result = self._json(self.verify_result)
         self.assertEqual(result["status"], "pass")
         self.assertEqual(result["counts"], {"pass": len(result["checks"])})
-        self.assertGreater(result["scope"]["source_public_files"], 0)
+        self.assertEqual(
+            result["scope"]["source_allowlisted_files"],
+            len(EXPECTED_SITE_SOURCE_ALLOWLIST),
+        )
+        self.assertGreater(
+            result["scope"]["publication_registry_files"],
+            result["scope"]["source_allowlisted_files"],
+        )
         self.assertGreater(result["scope"]["markdown_documents"], 0)
         self.assertGreater(result["scope"]["html_pages"], 0)
         self.assertEqual(result["scope"]["browser_visual_rendering"], "not_performed_by_static_verifier")
         checks = {item["id"]: item for item in result["checks"]}
         self.assertGreater(checks["html:local_href_src_and_fragments"]["detail"]["checked"], 0)
         self.assertGreater(checks["rendered_documents:block_reverse_comparison"]["detail"]["table_cells_compared"], 0)
-        self.assertGreater(checks["rendered_documents:image_alt_and_target"]["detail"]["images_compared"], 0)
+        self.assertEqual(
+            checks["rendered_documents:image_alt_and_target"]["detail"]["images_compared"],
+            0,
+        )
+        self.assertEqual(checks["site:svg_static_safety"]["detail"]["checked"], 0)
 
     def test_independent_oracle_matches_source_bodies(self):
         result = self._json(self.oracle_result)
@@ -186,7 +228,7 @@ class PagesStaticRuntimeTests(unittest.TestCase):
         for key in ("blocks", "table_cells", "code_blocks", "inline_codes", "links", "images", "headings", "task_list_items", "strong_spans"):
             self.assertEqual(expected[key], actual[key], key)
         observations = result["intended_transformations"]["boundary_validated_project_strong_observations"]
-        self.assertTrue(observations)
+        self.assertIsInstance(observations, list)
         self.assertTrue(all(item["matched"] for item in observations))
 
     def test_project_prefix_http_uses_distinct_counts_and_stops_server(self):
@@ -201,6 +243,49 @@ class PagesStaticRuntimeTests(unittest.TestCase):
         self.assertTrue(result["server"]["thread_stopped"])
         self.assertTrue(result["encoded_hangul_fragment_probe"]["passed"])
         self.assertTrue(result["trailing_slash_redirect_probe"]["passed"])
+
+    def test_browser_checks_all_public_routes_and_configured_table_route(self):
+        result = self._json(self.browser_result)
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["route_viewport_checks_total"], 8)
+        self.assertEqual(
+            result["route_viewport_checks_passed"],
+            result["route_viewport_checks_total"],
+        )
+        self.assertEqual(result["table_keyboard_overflow"]["route"], "/publication/")
+        self.assertTrue(result["table_keyboard_overflow"]["passed"])
+        self.assertTrue(result["skip_link_keyboard"]["passed"])
+        self.assertEqual(
+            result["unicode_fragment_navigation"]["decoded_hash"],
+            "공개-범위",
+        )
+        self.assertTrue(result["unicode_fragment_navigation"]["passed"])
+
+    def test_generated_inventory_contains_only_allowlisted_content(self):
+        manifest = self._json(self.first / "record/source-manifest.json")
+        self.assertEqual(
+            [row["path"] for row in manifest["files"]],
+            EXPECTED_SITE_SOURCE_ALLOWLIST,
+        )
+        self.assertEqual(manifest["source_file_count"], len(EXPECTED_SITE_SOURCE_ALLOWLIST))
+        actual_inventory = {
+            path.relative_to(self.first / "site").as_posix()
+            for path in (self.first / "site").rglob("*")
+            if path.is_file()
+        }
+        self.assertEqual(actual_inventory, EXPECTED_SITE_INVENTORY)
+        serialized = "\n".join(sorted(actual_inventory))
+        for forbidden in (
+            "README.md",
+            "STATUS.md",
+            "docs/eda/",
+            "data/",
+            "figures/",
+            "docs/experiment/",
+            "first-study",
+        ):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, serialized)
 
     def test_result_and_build_paths_are_no_clobber(self):
         case_root = self.run_root / "no-clobber"
@@ -304,7 +389,7 @@ class PagesStaticRuntimeTests(unittest.TestCase):
             destination = source_copy / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / relative, destination)
-        with (source_copy / "README.md").open("ab") as output:
+        with (source_copy / "docs/pages-home.md").open("ab") as output:
             output.write(b"\nsource drift\n")
         result_path = self.run_root / "source-drift-result.json"
         self._run(
@@ -331,28 +416,29 @@ class PagesStaticRuntimeTests(unittest.TestCase):
 
         index_path = site / "index.html"
         index = index_path.read_text(encoding="utf-8")
-        self.assertEqual(index.count('href="first-study/index.html">First-study summary'), 1)
-        index = index.replace('href="first-study/index.html">First-study summary', 'href="missing/index.html">First-study summary', 1)
-        self.assertEqual(index.count(">Need</th>"), 1)
-        index = index.replace(">Need</th>", ">Changed Need</th>", 1)
-        code_pattern = re.compile(r'(<pre data-source-block-index="\d+" data-source-block-kind="code"><code(?: class="[^"]+")?>)(.)')
-        index, code_changes = code_pattern.subn(lambda match: match.group(1) + "X" + match.group(2), index, count=1)
-        self.assertEqual(code_changes, 1)
+        encoded_scope = 'href="#%EA%B3%B5%EA%B0%9C-%EB%B2%94%EC%9C%84"'
+        self.assertEqual(index.count(encoded_scope), 1)
+        index = index.replace(encoded_scope, 'href="#missing-scope"', 1)
         index_path.write_text(index, encoding="utf-8")
 
-        first_study_path = site / "first-study/index.html"
-        first_study = first_study_path.read_text(encoding="utf-8")
-        self.assertIn("26과제", first_study)
-        first_study = first_study.replace("26과제", "27과제", 1)
-        self.assertIn('href="#1차-실험에서-확인한-것"', first_study)
-        first_study = first_study.replace('href="#1차-실험에서-확인한-것"', 'href="#missing-fragment"', 1)
-        first_study_path.write_text(first_study, encoding="utf-8")
+        publication_path = site / "publication/index.html"
+        publication = publication_path.read_text(encoding="utf-8")
+        self.assertGreaterEqual(publication.count(">Grade</th>"), 1)
+        publication = publication.replace(">Grade</th>", ">Changed Grade</th>", 1)
+        publication_path.write_text(publication, encoding="utf-8")
 
-        eda_path = site / "eda/index.html"
-        eda = eda_path.read_text(encoding="utf-8")
-        eda, image_changes = re.subn(r'(<img [^>]*alt=")[^"]+("[^>]*>)', r'\1Changed alt text\2', eda, count=1)
-        self.assertEqual(image_changes, 1)
-        eda_path.write_text(eda, encoding="utf-8")
+        contract_path = site / "site-contract/index.html"
+        contract = contract_path.read_text(encoding="utf-8")
+        self.assertEqual(contract.count("Use Python 3.12"), 1)
+        contract = contract.replace("Use Python 3.12", "Use Python 3.13", 1)
+        code_pattern = re.compile(r'(<pre data-source-block-index="\d+" data-source-block-kind="code"><code(?: class="[^"]+")?>)(.)')
+        contract, code_changes = code_pattern.subn(
+            lambda match: match.group(1) + "X" + match.group(2),
+            contract,
+            count=1,
+        )
+        self.assertEqual(code_changes, 1)
+        contract_path.write_text(contract, encoding="utf-8")
         self._rewrite_build_record(record, site)
 
         verify_result = case_root / "verify.json"
@@ -374,7 +460,6 @@ class PagesStaticRuntimeTests(unittest.TestCase):
                 "html:local_href_src_and_fragments",
                 "rendered_documents:block_reverse_comparison",
                 "rendered_documents:numeric_tokens",
-                "rendered_documents:image_alt_and_target",
             }.issubset(failed)
         )
 
@@ -396,10 +481,43 @@ class PagesStaticRuntimeTests(unittest.TestCase):
                 "visible_block_mismatch",
                 "table_cell_mismatch",
                 "code_block_mismatch",
-                "image_mismatch",
                 "link_mismatch",
             }.issubset(difference_codes)
         )
+
+    def test_ungraded_contract_source_is_rejected_by_builder_and_verifier(self):
+        case_root = self.run_root / "ungraded-contract"
+        case_root.mkdir()
+        contract = self._json(ROOT / "config/pages-static.json")
+        contract["source_allowlist"].append("ungraded-site-source.txt")
+        mutated = case_root / "pages-static.json"
+        mutated.write_text(json.dumps(contract, indent=2) + "\n", encoding="utf-8")
+
+        build = self._run(
+            "src/pages_build.py",
+            "--source-root", ROOT,
+            "--contract", mutated,
+            "--stylesheet", ROOT / "pages/assets/site.css",
+            "--output", case_root / "site",
+            "--record-dir", case_root / "record",
+            expected=2,
+        )
+        self.assertIn("not publication-graded", build.stdout)
+
+        verify_result = case_root / "verify.json"
+        self._run(
+            "src/pages_verify.py",
+            "--source-root", ROOT,
+            "--site-root", self.first / "site",
+            "--source-manifest", self.first / "record/source-manifest.json",
+            "--build-record", self.first / "record/build-record.json",
+            "--stylesheet", ROOT / "pages/assets/site.css",
+            "--contract", mutated,
+            "--result", verify_result,
+            expected=2,
+        )
+        verify = self._json(verify_result)
+        self.assertIn("not publication-graded", verify["error"])
 
     def test_root_absolute_reference_negative_control_fails_prefix_check(self):
         case_root = self.run_root / "root-absolute-negative"
@@ -479,6 +597,124 @@ class PagesStaticRuntimeTests(unittest.TestCase):
 
 
 class PagesStaticSourceTests(unittest.TestCase):
+    def test_contract_has_exact_rights_neutral_allowlist_and_routes(self):
+        contract = json.loads((ROOT / "config/pages-static.json").read_text(encoding="utf-8"))
+        self.assertEqual(contract["source_allowlist"], EXPECTED_SITE_SOURCE_ALLOWLIST)
+        publication_registry = pages_build.extract_public_files(ROOT / "evidence.py")
+        self.assertTrue(set(EXPECTED_SITE_SOURCE_ALLOWLIST).issubset(publication_registry))
+        self.assertEqual(
+            contract["routes"]["primary"],
+            {
+                "docs/pages-home.md": "/",
+                "docs/pages-static.md": "/site-contract/",
+                "docs/publication.md": "/publication/",
+                "THIRD_PARTY_NOTICES.md": "/notices/",
+            },
+        )
+        self.assertEqual(
+            contract["browser_check"]["routes"],
+            ["/", "/site-contract/", "/publication/", "/notices/"],
+        )
+        self.assertEqual(contract["browser_check"]["table_keyboard_route"], "/publication/")
+        encoded = contract["probes"]["encoded_hangul_fragment"]
+        self.assertEqual(encoded["source_file"], "index.html")
+        self.assertEqual(encoded["expected_target_file"], "index.html")
+        self.assertEqual(encoded["decoded_fragment"], "공개-범위")
+        for path in contract["source_allowlist"]:
+            with self.subTest(path=path):
+                self.assertNotEqual(path, "README.md")
+                self.assertNotEqual(path, "STATUS.md")
+                self.assertFalse(path.startswith("docs/eda/"))
+                self.assertFalse(path.startswith("docs/experiment/"))
+                self.assertFalse(path.startswith("data/"))
+                self.assertFalse(path.startswith("figures/"))
+
+    def test_homepage_states_scope_and_links_only_to_allowlisted_sources(self):
+        homepage = (ROOT / "docs/pages-home.md").read_text(encoding="utf-8")
+        self.assertIn("## 공개 범위", homepage)
+        self.assertIn("](#공개-범위)", homepage)
+        for exclusion in (
+            "experiment results",
+            "exploratory data analysis (EDA)",
+            "data files",
+            "figures",
+            "raw traces",
+            "provider artifacts",
+            "DeepSWE-derived material",
+            "unresolved LLMLingua2 material",
+        ):
+            with self.subTest(exclusion=exclusion):
+                self.assertIn(exclusion, homepage)
+        destinations = re.findall(r"\[[^\]]+\]\(([^)]+)\)", homepage)
+        self.assertEqual(
+            destinations,
+            [
+                "#공개-범위",
+                "pages-static.md",
+                "publication.md",
+                "../LICENSE",
+                "../THIRD_PARTY_NOTICES.md",
+                "../third_party/licenses/gsm8k-MIT.txt",
+                "../third_party/licenses/terminal-bench-2.1-Apache-2.0.txt",
+            ],
+        )
+        local_targets = {
+            pages_build.resolve_source_path("docs/pages-home.md", destination)
+            for destination in destinations
+            if not destination.startswith("#")
+        }
+        self.assertTrue(local_targets.issubset(EXPECTED_SITE_SOURCE_ALLOWLIST))
+
+    def test_contract_source_guards_reject_duplicate_unsafe_missing_and_non_regular(self):
+        for extractor in (
+            pages_build.extract_source_allowlist,
+            pages_verify.extract_source_allowlist,
+        ):
+            error = pages_build.BuildError if extractor is pages_build.extract_source_allowlist else pages_verify.VerificationError
+            with self.subTest(extractor=extractor.__module__, kind="duplicate"):
+                with self.assertRaises(error):
+                    extractor({"source_allowlist": ["docs/site.md", "docs/site.md"]})
+            with self.subTest(extractor=extractor.__module__, kind="unsafe"):
+                with self.assertRaises(error):
+                    extractor({"source_allowlist": ["../site.md"]})
+
+        with tempfile.TemporaryDirectory(prefix="pages-source-guards-") as temporary:
+            root = Path(temporary)
+            (root / "evidence.py").write_text(
+                'PUBLIC_FILES = {"docs/site.md"}\n',
+                encoding="utf-8",
+            )
+            contract = {"source_allowlist": ["docs/site.md"]}
+
+            with self.subTest(kind="missing"):
+                with self.assertRaises(FileNotFoundError):
+                    pages_build.source_inventory(root, contract)
+
+            docs = root / "docs"
+            docs.mkdir()
+            target = root / "target.md"
+            target.write_text("# target\n", encoding="utf-8")
+            site = docs / "site.md"
+            site.symlink_to(target)
+            with self.subTest(kind="symlink"):
+                with self.assertRaises(pages_build.BuildError):
+                    pages_build.source_inventory(root, contract)
+            site.unlink()
+
+            site.mkdir()
+            with self.subTest(kind="non_regular"):
+                with self.assertRaises(pages_build.BuildError):
+                    pages_build.source_inventory(root, contract)
+
+    def test_primary_route_mutation_is_rejected(self):
+        contract = json.loads((ROOT / "config/pages-static.json").read_text(encoding="utf-8"))
+        contract["routes"]["primary"]["docs/pages-static.md"] = "/changed/"
+        with tempfile.TemporaryDirectory(prefix="pages-route-contract-") as temporary:
+            path = Path(temporary) / "contract.json"
+            path.write_text(json.dumps(contract) + "\n", encoding="utf-8")
+            with self.assertRaises(pages_build.BuildError):
+                pages_build.load_contract(path)
+
     def test_record_directory_race_preserves_existing_bytes(self):
         with tempfile.TemporaryDirectory(prefix="pages-static-record-race-") as temporary:
             root = Path(temporary)
@@ -526,19 +762,32 @@ class PagesStaticSourceTests(unittest.TestCase):
         self.assertFalse(preserved["body_recovered"])
         self.assertFalse(preserved["new_execution_is_recovery"])
 
-    def test_pages_workflow_has_no_deploy_or_write_boundary(self):
+    def test_pages_workflow_scopes_main_only_deployment_after_checks(self):
         workflow = (ROOT / ".github/workflows/pages-static.yml").read_text(encoding="utf-8")
-        for forbidden in (
-            "actions/deploy-pages",
-            "actions/configure-pages",
-            "actions/upload-pages-artifact",
-            "pages: write",
-            "id-token: write",
-            "environment:",
-        ):
-            with self.subTest(forbidden=forbidden):
-                self.assertNotIn(forbidden, workflow)
-        self.assertIn("contents: read", workflow)
+        header, jobs = workflow.split("jobs:\n", 1)
+        build_job, deploy_job = jobs.split("\n  deploy:\n", 1)
+        self.assertIn("push:\n    branches:\n      - main", header)
+        self.assertIn("pull_request:", header)
+        self.assertIn("workflow_dispatch:", header)
+        self.assertEqual(header.count("contents: read"), 1)
+        self.assertNotIn("pages: write", header)
+        self.assertNotIn("id-token: write", header)
+        self.assertIn("actions/upload-pages-artifact@v3", build_job)
+        self.assertNotIn("actions/deploy-pages", build_job)
+        self.assertNotIn("pages: write", build_job)
+        self.assertNotIn("id-token: write", build_job)
+        self.assertIn("path: ${{ runner.temp }}/pages-static/first/site", build_job)
+        self.assertLess(build_job.index("evidence.py audit-files"), build_job.index("actions/upload-pages-artifact"))
+        deploy_condition = "if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'"
+        self.assertEqual(workflow.count(deploy_condition), 2)
+        self.assertIn("needs: pages-static", deploy_job)
+        self.assertIn("pages: write", deploy_job)
+        self.assertIn("id-token: write", deploy_job)
+        self.assertIn("name: github-pages", deploy_job)
+        self.assertIn("actions/deploy-pages@v4", deploy_job)
+        self.assertNotIn("actions/checkout", deploy_job)
+        self.assertEqual(workflow.count("pages: write"), 1)
+        self.assertEqual(workflow.count("id-token: write"), 1)
         self.assertIn("diff -qr", workflow)
         self.assertIn("--require-hashes", workflow)
         self.assertIn("--no-config", workflow)
@@ -582,6 +831,7 @@ class PagesStaticSourceTests(unittest.TestCase):
             "requirements/pages-static.in",
             "requirements/pages-static.txt",
             ".github/workflows/pages-static.yml",
+            "docs/pages-home.md",
             "docs/pages-static.md",
         )
         forbidden = (

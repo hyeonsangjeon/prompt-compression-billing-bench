@@ -21,14 +21,16 @@ from pathlib import Path, PurePosixPath
 from urllib.parse import unquote, urlsplit
 
 
-LABELS = ("repository-public-files", "local-static-preview", "deployment-disabled")
+LABELS = (
+    "rights-neutral-source-allowlist",
+    "public-github-pages",
+    "main-only-actions-deploy",
+)
 PRIMARY_ROUTES = {
-    "README.md": "/",
-    "docs/eda/README.md": "/eda/",
-    "docs/experiment/01-preliminary-comparison/README.md": "/first-study/",
-    "docs/experiment/01-preliminary-comparison/visualization-guide-20260919.md": "/figures/",
-    "STATUS.md": "/readiness/",
-    "docs/publication.md": "/readiness/",
+    "docs/pages-home.md": "/",
+    "docs/pages-static.md": "/site-contract/",
+    "docs/publication.md": "/publication/",
+    "THIRD_PARTY_NOTICES.md": "/notices/",
 }
 ACTIVE_HTML_TAGS = frozenset(
     {"script", "iframe", "object", "embed", "audio", "video", "canvas", "form"}
@@ -97,7 +99,13 @@ def normalize_text(value: str) -> str:
 
 def safe_relative_path(raw_path: str) -> PurePosixPath:
     path = PurePosixPath(raw_path)
-    if path.is_absolute() or not path.parts or any(part in ("", ".", "..") for part in path.parts):
+    if (
+        path.is_absolute()
+        or not path.parts
+        or path.as_posix() != raw_path
+        or "\\" in raw_path
+        or any(part in ("", ".", "..") for part in path.parts)
+    ):
         raise VerificationError(f"unsafe relative path: {raw_path!r}")
     return path
 
@@ -121,16 +129,25 @@ def extract_public_files(evidence_path: Path) -> list[str]:
     return paths
 
 
+def extract_source_allowlist(contract: dict[str, object]) -> list[str]:
+    value = contract.get("source_allowlist")
+    if not isinstance(value, list) or not value:
+        raise VerificationError("contract source_allowlist must be a non-empty list")
+    if any(not isinstance(path, str) for path in value):
+        raise VerificationError("contract source_allowlist entries must be strings")
+    paths = list(value)
+    if len(paths) != len(set(paths)):
+        raise VerificationError("contract source_allowlist contains duplicate paths")
+    for path in paths:
+        safe_relative_path(path)
+    return paths
+
+
 def route_for_document(source_path: str) -> str:
-    if source_path in PRIMARY_ROUTES:
+    try:
         return PRIMARY_ROUTES[source_path]
-    without_suffix = PurePosixPath(source_path).with_suffix("")
-    parts = list(without_suffix.parts)
-    if parts[-1].lower() == "readme":
-        parts.pop()
-    if not parts:
-        parts = ["document"]
-    return "/documents/" + "/".join(parts) + "/"
+    except KeyError as exc:
+        raise VerificationError(f"Markdown source has no approved route: {source_path}") from exc
 
 
 def output_for_route(route: str) -> PurePosixPath:
@@ -700,26 +717,41 @@ def resolve_site_reference(site_root: Path, page_path: Path, reference: str) -> 
     return resolved, unquote(parsed.fragment) or None, None
 
 
-def expected_site_paths(public_paths: list[str]) -> set[str]:
+def expected_site_paths(source_paths: list[str]) -> set[str]:
     outputs = {"assets/site.css", "build-manifest.json"}
-    markdown = [path for path in public_paths if path.endswith(".md")]
+    markdown = [path for path in source_paths if path.endswith(".md")]
     for path in markdown:
         outputs.add(output_for_route(route_for_document(path)).as_posix())
     directories = set()
-    for path in public_paths:
+    for path in source_paths:
         parts = PurePosixPath(path).parts[:-1]
         for count in range(1, len(parts) + 1):
             directories.add("/".join(parts[:count]))
     for directory in directories:
         if any(
             path.startswith(directory.rstrip("/") + "/") and not path.endswith(".md")
-            for path in public_paths
+            for path in source_paths
         ):
             outputs.add((PurePosixPath("files") / directory / "index.html").as_posix())
-    for path in public_paths:
+    for path in source_paths:
         if not path.endswith(".md"):
             outputs.add((PurePosixPath("files") / path).as_posix())
     return outputs
+
+
+def regular_source_file(source_root: Path, relative: str) -> Path:
+    current = source_root
+    parts = safe_relative_path(relative).parts
+    for index, part in enumerate(parts):
+        current = current / part
+        file_stat = current.lstat()
+        if stat.S_ISLNK(file_stat.st_mode):
+            raise VerificationError(f"site source traverses a symlink: {relative}")
+        if index < len(parts) - 1 and not stat.S_ISDIR(file_stat.st_mode):
+            raise VerificationError(f"site source parent is not a directory: {relative}")
+    if not stat.S_ISREG(current.lstat().st_mode):
+        raise VerificationError(f"site source is not a regular file: {relative}")
+    return current
 
 
 def verify(args: argparse.Namespace) -> dict[str, object]:
@@ -733,27 +765,62 @@ def verify(args: argparse.Namespace) -> dict[str, object]:
         raise VerificationError("invalid source manifest")
     if not isinstance(build_record, dict) or build_record.get("kind") != "pages_static_site_build_record":
         raise VerificationError("invalid build record")
+    if contract.get("routes", {}).get("primary") != PRIMARY_ROUTES:
+        raise VerificationError("contract primary routes differ from the verifier")
+    labels = contract.get("labels", {})
+    if tuple(labels.get(key) for key in ("source", "visibility", "deployment")) != LABELS:
+        raise VerificationError("contract labels differ from the verifier")
+    if args.source_root.is_symlink() or args.site_root.is_symlink():
+        raise VerificationError("source and site roots must not be symlinks")
     source_root = args.source_root.resolve(strict=True)
-    public_paths = extract_public_files(source_root / "evidence.py")
+    if not source_root.is_dir():
+        raise VerificationError("source root must be a directory")
+    publication_paths = extract_public_files(regular_source_file(source_root, "evidence.py"))
+    source_paths = extract_source_allowlist(contract)
+    if {path for path in source_paths if path.lower().endswith(".md")} != set(PRIMARY_ROUTES):
+        raise VerificationError("contract Markdown source set differs from approved primary routes")
+    ungraded = sorted(set(source_paths) - set(publication_paths))
+    if ungraded:
+        raise VerificationError(f"site sources are not publication-graded: {ungraded}")
+    recorder.check(
+        "source_allowlist:publication_grade_subset",
+        not ungraded,
+        {
+            "source_allowlist_count": len(source_paths),
+            "publication_registry_count": len(publication_paths),
+        },
+    )
     recorder.check(
         "source_allowlist:count",
-        len(public_paths) == inventory.get("public_file_count"),
-        {"manifest": inventory.get("public_file_count"), "actual": len(public_paths)},
+        len(source_paths) == inventory.get("source_file_count"),
+        {"manifest": inventory.get("source_file_count"), "actual": len(source_paths)},
     )
     rows = inventory.get("files", [])
+    if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+        raise VerificationError("source manifest files must be a list of objects")
+    inventory_sequence = [row.get("path") for row in rows]
     inventory_by_path = {row.get("path"): row for row in rows if isinstance(row, dict)}
     recorder.check(
         "source_allowlist:path_set",
-        sorted(inventory_by_path) == public_paths,
-        {"inventory_count": len(inventory_by_path), "allowlist_count": len(public_paths)},
+        inventory_sequence == source_paths and len(inventory_by_path) == len(rows),
+        {
+            "inventory_count": len(inventory_by_path),
+            "allowlist_count": len(source_paths),
+            "inventory_paths": inventory_sequence,
+        },
     )
     source_mismatches = []
+    source_files: dict[str, Path] = {}
     source_digest = hashlib.sha256()
-    for relative in public_paths:
-        path = source_root / relative
-        if not path.exists() or path.is_symlink() or not path.is_file():
-            source_mismatches.append({"path": relative, "error": "missing_or_non_regular"})
+    for relative in source_paths:
+        try:
+            path = regular_source_file(source_root, relative)
+        except (FileNotFoundError, OSError, VerificationError) as error:
+            source_mismatches.append(
+                {"path": relative, "error": f"{type(error).__name__}: {error}"}
+            )
             continue
+        source_files[relative] = path
         actual = fingerprint(path)
         expected_row = inventory_by_path.get(relative, {})
         expected = {key: expected_row.get(key) for key in ("bytes", "sha256")}
@@ -765,7 +832,7 @@ def verify(args: argparse.Namespace) -> dict[str, object]:
     recorder.check(
         "source_allowlist:bytes_and_sha256",
         not source_mismatches,
-        {"checked": len(public_paths), "mismatches": source_mismatches},
+        {"checked": len(source_paths), "mismatches": source_mismatches},
     )
     recorder.check(
         "source_allowlist:tree_sha256",
@@ -797,7 +864,7 @@ def verify(args: argparse.Namespace) -> dict[str, object]:
         if path.is_file() and not path.is_symlink()
     }
     symlinks = [path.relative_to(site_root).as_posix() for path in site_root.rglob("*") if path.is_symlink()]
-    expected_paths = expected_site_paths(public_paths)
+    expected_paths = expected_site_paths(source_paths)
     recorder.check("site:no_symlinks", not symlinks, {"symlinks": symlinks})
     recorder.check(
         "site:exact_allowlist",
@@ -810,19 +877,23 @@ def verify(args: argparse.Namespace) -> dict[str, object]:
         },
     )
     copied_mismatches = []
-    for relative in public_paths:
+    for relative in source_paths:
         if relative.endswith(".md"):
             continue
         copied = site_root / "files" / relative
         if not copied.is_file() or copied.is_symlink():
             copied_mismatches.append({"path": relative, "error": "missing_or_non_regular"})
             continue
-        if copied.read_bytes() != (source_root / relative).read_bytes():
+        source = source_files.get(relative)
+        if source is None or copied.read_bytes() != source.read_bytes():
             copied_mismatches.append({"path": relative, "error": "byte_mismatch"})
     recorder.check(
-        "site:copied_public_files_byte_exact",
+        "site:copied_source_files_byte_exact",
         not copied_mismatches,
-        {"checked": len(public_paths) - sum(path.endswith(".md") for path in public_paths), "mismatches": copied_mismatches},
+        {
+            "checked": len(source_paths) - sum(path.endswith(".md") for path in source_paths),
+            "mismatches": copied_mismatches,
+        },
     )
     recorder.check(
         "site:stylesheet_byte_exact",
@@ -833,12 +904,16 @@ def verify(args: argparse.Namespace) -> dict[str, object]:
         },
     )
     svg_errors = []
-    for relative in public_paths:
+    for relative in source_paths:
         if relative.endswith(".svg"):
             errors = validate_svg_static((site_root / "files" / relative).read_bytes())
             if errors:
                 svg_errors.append({"path": relative, "errors": errors})
-    recorder.check("site:svg_static_safety", not svg_errors, {"checked": sum(p.endswith('.svg') for p in public_paths), "errors": svg_errors})
+    recorder.check(
+        "site:svg_static_safety",
+        not svg_errors,
+        {"checked": sum(path.endswith(".svg") for path in source_paths), "errors": svg_errors},
+    )
     html_audits: dict[str, PageAudit] = {}
     html_decode_errors = []
     for relative in sorted(path for path in actual_site_paths if path.endswith(".html")):
@@ -902,7 +977,7 @@ def verify(args: argparse.Namespace) -> dict[str, object]:
                 if target_audit is None or fragment not in target_audit.ids:
                     reference_errors.append({"page": relative, "reference": value, "error": "missing_fragment"})
     recorder.check("html:local_href_src_and_fragments", not reference_errors, {"checked": reference_count, "errors": reference_errors})
-    expected_documents = [path for path in public_paths if path.endswith(".md")]
+    expected_documents = [path for path in source_paths if path.endswith(".md")]
     rendered_articles: dict[str, tuple[str, dict[str, object]]] = {}
     duplicate_articles = []
     for page_relative, audit in html_audits.items():
@@ -935,10 +1010,10 @@ def verify(args: argparse.Namespace) -> dict[str, object]:
     compared_tables = 0
     compared_code = 0
     for source_path in expected_documents:
-        if source_path not in rendered_articles:
+        if source_path not in rendered_articles or source_path not in source_files:
             continue
         page_relative, article = rendered_articles[source_path]
-        source_data = (source_root / source_path).read_bytes()
+        source_data = source_files[source_path].read_bytes()
         source_text = source_data.decode("utf-8")
         attributes = article["attrs"]
         expected_provenance = {
@@ -1077,7 +1152,7 @@ def verify(args: argparse.Namespace) -> dict[str, object]:
     homepage_ok = (
         homepage_ok
         and "<img" not in route_index_markup
-        and "adds no result summary, chart, ranking, or causal claim" in route_index_markup
+        and "adds no experiment result summary, chart, ranking, or causal claim" in route_index_markup
     )
     recorder.check(
         "homepage:navigation_before_source_without_new_chart",
@@ -1098,17 +1173,17 @@ def verify(args: argparse.Namespace) -> dict[str, object]:
     recorder.check("ui:static_guideline_checks", all(css_requirements.values()), css_requirements)
     build_manifest = json.loads((site_root / "build-manifest.json").read_text(encoding="utf-8"))
     expected_status = {
-        "source": "repository-public-files",
-        "visibility": "local-static-preview",
-        "deployment": "deployment-disabled",
-        "publication_approved": False,
+        "source": "rights-neutral-source-allowlist",
+        "visibility": "public-github-pages",
+        "deployment": "main-only-actions-deploy",
+        "publication_approved": True,
     }
     recorder.check(
         "build_manifest:scope_labels",
         build_manifest.get("kind") == "pages_static_site_build_manifest"
         and build_manifest.get("status") == expected_status
-        and build_manifest.get("source", {}).get("public_files_count") == len(public_paths)
-        and build_manifest.get("source", {}).get("public_files_tree_sha256") == inventory.get("tree_sha256")
+        and build_manifest.get("source", {}).get("allowlisted_files_count") == len(source_paths)
+        and build_manifest.get("source", {}).get("allowlisted_files_tree_sha256") == inventory.get("tree_sha256")
         and build_manifest.get("source", {}).get("markdown_documents_rendered") == len(expected_documents)
         and build_manifest.get("preserved_red") == contract.get("preserved_red"),
         {"status": build_manifest.get("status"), "source": build_manifest.get("source")},
@@ -1124,14 +1199,16 @@ def verify(args: argparse.Namespace) -> dict[str, object]:
         "counts": dict(sorted(counts.items())),
         "checks": recorder.checks,
         "scope": {
-            "source_public_files": len(public_paths),
+            "source_allowlisted_files": len(source_paths),
+            "publication_registry_files": len(publication_paths),
             "markdown_documents": len(expected_documents),
             "html_pages": len(html_audits),
             "browser_visual_rendering": "not_performed_by_static_verifier",
             "independent_markdown_oracle": "separate_check_required",
             "source_repository_module_imported_or_executed": False,
             "network_used": False,
-            "publication_or_license_approval": False,
+            "site_source_publication_approved": True,
+            "rights_outside_source_allowlist": "not_evaluated",
         },
     }
 
