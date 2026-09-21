@@ -662,7 +662,7 @@ The 9.05% Round 1 candidate share and 15.42% Round 2 share reflect reclassificat
 
 #### Round 2 · Candidates and Hypothetical Calculation by Type
 
-| Primary type | n tasks/runs/requests | Total body bytes | Candidate bytes | Round 1 candidates byte share | Round 2 candidates byte share | candidate Local-token reduction if all candidates were deleted |
+| Primary type | n tasks/runs/requests | Total body bytes | Candidate bytes | Round 1 candidates byte share | Round 2 candidates byte share | Local-token reduction if all candidates were deleted |
 | --- | --- | --- | --- | --- | --- | --- |
 | Feature request | 1/3/9 | 61,069 | 295 | 0.47% | 0.48% | 1.01% |
 | Bug fix / debugging | 0/0/0 | — | — | Not measured | Not measured | Not measured |

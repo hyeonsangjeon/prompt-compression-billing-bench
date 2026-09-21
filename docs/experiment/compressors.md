@@ -1,6 +1,6 @@
 # Static Compressor Measurements
 
-**Evidence status:** These measurements apply compressors statically to stored requests from 2026-09-11 through 2026-09-13 UTC. There were 0 `gpt-5.4` calls and 0 native grading runs. LLMLingua-2's own local compressor inference is recorded separately.
+**Evidence status:** Between 2026-09-11 and 2026-09-13 UTC, compressors were applied statically to stored requests for these measurements. There were 0 `gpt-5.4` calls and 0 native grading runs. LLMLingua-2's own local compressor inference is recorded separately.
 
 ## Shared Sample and Denominators
 

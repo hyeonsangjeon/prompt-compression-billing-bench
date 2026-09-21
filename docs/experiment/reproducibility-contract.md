@@ -123,7 +123,7 @@ Shared idle time, approval waits, one-time setup, and long-term Blob storage are
 
 Fix the evaluation array in `repetition × task × four conditions` order. Resample `none` and the three compression conditions together within the same repetition to preserve pairing and their shared-`none` correlation.
 
-Use separate purpose-specific seeds for the primary analysis and the lag-2 temporal-correlation sensitivity analysis. Record base seed `20260915`, NumPy `PCG64`, 50,000 percentile-bootstrap draws, quantile method `linear`, and batch size in the manifest. Synthetic-data validation uses independent seed `2026091501`.
+Use separate purpose-specific seeds for the primary analysis and the block-length-2 circular moving-block bootstrap sensitivity analysis. Record base seed `20260915`, NumPy `PCG64`, 50,000 percentile-bootstrap draws, quantile method `linear`, and batch size in the manifest. Synthetic-data validation uses independent seed `2026091501`.
 
 The analysis code, input array, result, and manifest record the execution source commit. Do not change the primary analysis's repetition count, threshold, or confidence interval in response to correlation or variance observed after evaluation.
 

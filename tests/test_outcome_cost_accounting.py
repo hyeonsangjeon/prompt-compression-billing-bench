@@ -298,6 +298,12 @@ class OutcomeCostDocumentTests(unittest.TestCase):
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.text_flat)
+        self.assertIn(
+            "The many repeated actions before grading may have contributed to the "
+            "long-running attempts' high confirmed calculated API cost. This evidence "
+            "does not isolate how much each factor contributed.",
+            self.text_flat,
+        )
 
     def test_document_preserves_fixed_values_and_missing_join(self):
         for phrase in (

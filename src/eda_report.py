@@ -16,6 +16,8 @@ from .protection import digest
 CANDIDATE_CAVEAT = "This is an identified candidate range, not a validated upper bound."
 SOURCE_MANIFEST_SHA256 = "6218280c4433623afd07a19bb4d6bc6c9a666b6052539c19e870c97becb93edd"
 SOURCE_ROW_HASHES_SHA256 = "3a1f109d8423eed9dfa1e17e6e377bd58e84a0c0ea2a59a75694e021365cc751"
+ENGLISH_ROW_HASHES_SHA256 = "052e774d454826068eed1da306c159b570eb21bae01d148f09dc9a6dab264e1d"
+REQUIRED_CAVEATS_SHA256 = "4c6e057fe463757dafe1168c04a37e83a194201fbb22cf619c7328fec50cdf93"
 COUNTING_METHOD_SUMMARY = "<summary>How these values were counted</summary>"
 COUNTING_METHOD_FACTS = (
     "2026-09-09", "2026-09-10", "2026-09-11", "113/113 DeepSWE tasks",
@@ -132,6 +134,13 @@ def audit_report(root: Path) -> dict:
             or manifest.get("source_row_hashes_sha256") != SOURCE_ROW_HASHES_SHA256
             or json_digest(source_row_hashes) != SOURCE_ROW_HASHES_SHA256):
         raise ValueError("Original EDA source-hash lineage changed")
+    english_row_hashes = [[entry["id"], entry["english_rows_sha256"]] for entry in manifest["tables"]]
+    if (manifest.get("english_row_hashes_sha256") != ENGLISH_ROW_HASHES_SHA256
+            or json_digest(english_row_hashes) != ENGLISH_ROW_HASHES_SHA256):
+        raise ValueError("Reviewed English EDA row-hash contract changed")
+    if (manifest.get("required_caveats_sha256") != REQUIRED_CAVEATS_SHA256
+            or json_digest(manifest.get("required_caveats")) != REQUIRED_CAVEATS_SHA256):
+        raise ValueError("Required EDA caveat contract changed")
     if re.search(r"squeez|headroom|13\.79%", markdown, re.IGNORECASE):
         raise ValueError("Tool experiment or withdrawn estimate in EDA")
     if COUNTING_METHOD_SUMMARY not in markdown or any(value not in markdown for value in COUNTING_METHOD_FACTS):

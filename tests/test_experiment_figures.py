@@ -121,6 +121,11 @@ class ExperimentFigureTests(unittest.TestCase):
         self.assertIn("sample, denominator", self.guide)
         self.assertIn("One run per condition", self.guide)
         self.assertIn("ranking, causality, or non-inferiority", self.guide)
+        self.assertIn(
+            "provider-reported input, cached-input, and output\ntoken counts",
+            self.guide,
+        )
+        self.assertNotIn("total of input, cached-input, and output tokens", self.guide)
         for document in (
             ROOT / "README.md",
             ROOT / "docs/experiment/README.md",

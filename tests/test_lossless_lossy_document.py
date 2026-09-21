@@ -64,6 +64,11 @@ class LosslessLossyDocumentTests(unittest.TestCase):
         self.assertIn("One per condition", self.text)
 
     def test_static_scope_matches_the_published_measurement(self):
+        self.assertIn(
+            "Between 2026-09-11 and 2026-09-13 UTC, compressors were applied "
+            "statically to stored requests for these measurements.",
+            self.static_report,
+        )
         source_and_document = (
             ("18/107; 6/27", "18 of 107 candidate occurrences and 6 of 27 unique inputs changed"),
             ("10/107; 3/27", "10 occurrences and 3 unique inputs actually changed"),

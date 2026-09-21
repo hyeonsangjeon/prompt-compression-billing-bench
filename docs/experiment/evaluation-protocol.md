@@ -120,7 +120,7 @@ Run screening after environment and instrumentation verification inputs pass. Af
 
 Generate 2,000 synthetic datasets per scenario and apply 50,000 bootstrap draws to each. Independent validation seed is `2026091501`. Record the execution source commit, NumPy version, quantile method, and purpose-specific child seeds.
 
-Evaluation may proceed only if the exact one-sided 95% binomial upper bound for the proportion of scenarios that falsely adopt at least one compressor is at most 0.05 at the boundary. This is a strict operating criterion for the specified synthetic scenarios, not a universal coverage proof. If it fails, do not repeatedly tune the method on the same synthetic data. Record the cause, corrected revision, and separate validation seed. Recalculate the 1,412-pair plan if the significance level or method changes.
+Within each boundary scenario, evaluation may proceed only if the exact one-sided 95% binomial upper bound for the proportion of synthetic datasets that falsely adopt at least one compressor is at most 0.05. This is a strict operating criterion for the specified synthetic scenarios, not a universal coverage proof. If it fails, do not repeatedly tune the method on the same synthetic data. Record the cause, corrected revision, and separate validation seed. Recalculate the 1,412-pair plan if the significance level or method changes.
 
 ## Schedule Calculation
 

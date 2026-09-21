@@ -176,6 +176,37 @@ class FirstStudyMetricMatrixTests(unittest.TestCase):
             self.matrix,
         )
 
+    def test_cumulative_pair_accounting_keeps_missing_source_outside_calculable_pairs(self):
+        expected = [
+            (189, 58, 131),
+            (204, 65, 139),
+            (213, 71, 142),
+            (270, 80, 190),
+            (319, 90, 229),
+            (394, 107, 287),
+            (398, 111, 287),
+            (416, 115, 301),
+            (441, 121, 320),
+            (475, 135, 340),
+            (559, 188, 371),
+            (621, 201, 420),
+            (664, 201, 463),
+            (738, 209, 529),
+        ]
+        observed = [
+            tuple(map(int, match))
+            for match in re.findall(
+                r"The aggregate contained (\d+) calculable input-output pairs: "
+                r"(\d+) changed and (\d+) remained identical\. "
+                r"A further 166 lacked source pairs\.",
+                self.report,
+            )
+        ]
+        self.assertEqual(observed, expected)
+        for calculable, changed, identical in observed:
+            self.assertEqual(calculable, changed + identical)
+        self.assertNotRegex(self.report, r"calculable[^.]*166 lacked source pairs")
+
     def test_units_claim_limits_and_reading_order_are_visible(self):
         for phrase in (
             "Tasks remain in inventory order",

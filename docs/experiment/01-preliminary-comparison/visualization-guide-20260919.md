@@ -8,8 +8,8 @@ grader check the answer.
 
 A **condition** is one way to solve the same problem. `none` means a reference without
 additional compression, not that no work occurred. The external model **provider** handles
-API requests. **API usage** is the provider-reported total of input, cached-input, and
-output tokens.
+API requests. **API usage** records the provider-reported input, cached-input, and output
+token counts.
 
 ## 30-Second Reading Guide
 

@@ -159,9 +159,9 @@ calculated API cost for the five long-running attempts before quality judgment w
 `$87.771254`.
 
 **Possible explanation.** Different task difficulty and run length may have produced
-large differences in request count and API usage. The long-running attempts accumulated
-many repeated actions before grading. This evidence does not isolate how much each factor
-contributed.
+large differences in request count and API usage. The many repeated actions before grading
+may have contributed to the long-running attempts' high confirmed calculated API cost.
+This evidence does not isolate how much each factor contributed.
 
 **Limitation.** Completed conditions ran once each, without controls for cache, request
 count, execution path, or concurrency. A known verifier false-failure case also existed.

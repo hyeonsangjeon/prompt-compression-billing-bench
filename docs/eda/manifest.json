@@ -665,7 +665,7 @@
           "Classification judgment · hypothetical all-candidate deletion calculation"
         ]
       ],
-      "english_rows_sha256": "89c45e451b95b154507f679af42229ae4fe7dfedbd099bebaca692dbd9a438f4"
+      "english_rows_sha256": "a1712231dbb60ade037e48de1659ea39db187643ed538d81a76985cc7d1573d7"
     },
     {
       "id": "table-26",
@@ -810,6 +810,8 @@
     "These settings do not guarantee determinism or lossless observation",
     "Actual DeepSWE run history was not collected for this analysis."
   ],
+  "english_row_hashes_sha256": "052e774d454826068eed1da306c159b570eb21bae01d148f09dc9a6dab264e1d",
+  "required_caveats_sha256": "4c6e057fe463757dafe1168c04a37e83a194201fbb22cf619c7328fec50cdf93",
   "source_manifest_sha256": "6218280c4433623afd07a19bb4d6bc6c9a666b6052539c19e870c97becb93edd",
   "source_row_hashes_sha256": "3a1f109d8423eed9dfa1e17e6e377bd58e84a0c0ea2a59a75694e021365cc751"
 }
