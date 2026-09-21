@@ -68,6 +68,10 @@ environment names, presence booleans, UTC times, byte counts, SHA-256 values,
 and the doctor's sanitized result. The committed attestation fixture is
 deliberately expired and cannot open the gate.
 
+The [runtime-owner handoff guide](runtime-owner-handoff.md) lists every
+canonical input name and the exact attestation field contract. It is a source
+contract, not evidence that any current runtime input is present or valid.
+
 This launcher does not create, discover, or authorize a runtime. Adding it to
 source closes the reusable command-and-identity gap only. A runtime owner must
 still deploy the command inside the actual sanctioned process and provide a
