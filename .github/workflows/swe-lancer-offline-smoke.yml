@@ -76,6 +76,8 @@ jobs:
           label="pccb.swe.offline_smoke=${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
           workspace_identity="${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
           workspace_path="${RUNNER_TEMP}/pccb-swe-workspace-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          workspace_uid="$(id -u)"
+          workspace_gid="$(id -g)"
           image_id=""
 
           cleanup() {
@@ -129,7 +131,9 @@ jobs:
               --network none \
               --read-only \
               --mount "type=bind,src=${workspace_path},dst=/workspace" \
+              --user "${workspace_uid}:${workspace_gid}" \
               --env "PCCB_WORKSPACE_ID=${workspace_identity}" \
+              --env "PCCB_WORKSPACE_UID=${workspace_uid}" \
               --cap-drop ALL \
               --security-opt no-new-privileges \
               --pids-limit 64 \
@@ -143,7 +147,11 @@ jobs:
                 test -z "${OPENAI_API_KEY:-}"
                 test -z "${SWE_LANCER_DOCKER_HOST:-}"
                 test -d /app/expensify
-                test -w /workspace
+                test "$(id -u)" = "$PCCB_WORKSPACE_UID"
+                test -w /workspace || {
+                  echo "task-owned workspace is not writable" >&2
+                  exit 91
+                }
                 printf "%s\n" "$PCCB_WORKSPACE_ID" > /workspace/smoke-probe
                 test "$(cat /workspace/smoke-probe)" = "$PCCB_WORKSPACE_ID"
                 rm /workspace/smoke-probe
@@ -178,7 +186,7 @@ jobs:
 
           result="$RUNNER_TEMP/swe-lancer-offline-smoke.json"
           printf '%s\n' \
-            "{\"schema_version\":1,\"kind\":\"swe_lancer_exact_image_offline_smoke\",\"status\":\"pass\",\"runner\":\"linux/amd64\",\"image_digest\":\"${IMAGE_DIGEST}\",\"image_config_digest\":\"${IMAGE_CONFIG_DIGEST}\",\"compressed_layer_bytes\":${COMPRESSED_LAYER_BYTES},\"required_free_bytes\":${REQUIRED_FREE_BYTES},\"free_bytes_before\":${free_bytes},\"container_network\":\"none\",\"workspace_identity\":\"${workspace_identity}\",\"workspace_identity_bound\":true,\"workspace_mount\":\"/workspace\",\"workspace_writable\":true,\"workspace_empty_after_probe\":true,\"workspace_present_after_cleanup\":false,\"command_deadline_seconds\":120,\"command_exit_code\":0,\"credential_values_read\":0,\"provider_model_api_grader_calls\":0,\"survivor_containers\":0,\"image_present_after_cleanup\":false}" \
+            "{\"schema_version\":1,\"kind\":\"swe_lancer_exact_image_offline_smoke\",\"status\":\"pass\",\"runner\":\"linux/amd64\",\"image_digest\":\"${IMAGE_DIGEST}\",\"image_config_digest\":\"${IMAGE_CONFIG_DIGEST}\",\"compressed_layer_bytes\":${COMPRESSED_LAYER_BYTES},\"required_free_bytes\":${REQUIRED_FREE_BYTES},\"free_bytes_before\":${free_bytes},\"container_network\":\"none\",\"workspace_identity\":\"${workspace_identity}\",\"workspace_identity_bound\":true,\"workspace_mount\":\"/workspace\",\"workspace_owner_uid\":${workspace_uid},\"workspace_owner_gid\":${workspace_gid},\"workspace_process_uses_runner_identity\":true,\"workspace_writable\":true,\"workspace_empty_after_probe\":true,\"workspace_present_after_cleanup\":false,\"command_deadline_seconds\":120,\"command_exit_code\":0,\"credential_values_read\":0,\"provider_model_api_grader_calls\":0,\"survivor_containers\":0,\"image_present_after_cleanup\":false}" \
             | tee "$result"
       - name: Upload sanitized smoke record
         uses: actions/upload-artifact@v4
