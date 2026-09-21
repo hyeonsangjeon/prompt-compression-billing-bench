@@ -154,6 +154,52 @@ class SweLancerAdmissionTests(unittest.TestCase):
         self.assertIn("provider.input_usd_per_million_tokens", result["missing_or_invalid"])
         self.assertIn("sandbox.endpoint_env", result["missing_or_invalid"])
 
+    def test_direct_admission_rejects_empty_credential_and_endpoint_values(self):
+        environment = self.prepare_ready()
+        environment["OPENAI_API_KEY"] = ""
+        environment["SWE_LANCER_DOCKER_HOST"] = ""
+        result = self.check(environment)
+        self.assertFalse(result["ready"])
+        self.assertIn(
+            "environment.OPENAI_API_KEY.present", result["missing_or_invalid"]
+        )
+        self.assertIn(
+            "environment.SWE_LANCER_DOCKER_HOST.present",
+            result["missing_or_invalid"],
+        )
+
+    def test_invalid_reported_model_revision_is_not_reflected(self):
+        environment = self.prepare_ready()
+        sentinel = "https://example.invalid/private?token=SYNTHETIC_SENTINEL"
+        self.ledger["provider"]["reported_model_revision"] = sentinel
+        result = self.check(environment)
+        self.assertFalse(result["ready"])
+        self.assertIn("provider.reported_model_revision", result["missing_or_invalid"])
+        self.assertIsNone(result["provider"]["reported_model_revision"])
+        self.assertNotIn(sentinel, json.dumps(result, sort_keys=True))
+
+    def test_invalid_fixed_contract_values_are_not_reflected(self):
+        sentinel = "/private/SYNTHETIC_FIXED_CONTRACT"
+        for section, field in (
+            ("provider", "name"),
+            ("provider", "model_setting"),
+            ("sandbox", "image_manifest_digest"),
+        ):
+            with self.subTest(section=section, field=field):
+                environment = self.prepare_ready()
+                original = self.ledger[section][field]
+                try:
+                    self.ledger[section][field] = sentinel
+                    result = self.check(environment)
+                    self.assertFalse(result["ready"])
+                    self.assertIn(
+                        f"{section}.{field}", result["missing_or_invalid"]
+                    )
+                    self.assertIsNone(result[section][field])
+                    self.assertNotIn(sentinel, json.dumps(result, sort_keys=True))
+                finally:
+                    self.ledger[section][field] = original
+
     def test_stale_and_far_deadlines_fail_closed(self):
         environment = self.prepare_ready()
         for selected in (deadline(-1), deadline(5000)):
@@ -333,6 +379,8 @@ class SweLancerAdmissionTests(unittest.TestCase):
         for relative in (
             "../../ledgers/swe-lancer.template.json",
             "../../src/swe_lancer_admission.py",
+            "../../src/swe_lancer_carrier.py",
+            "../../config/swe-lancer-carrier.json",
             "../../data/experiment/swe-lancer-candidate-evaluation.json",
         ):
             self.assertTrue((REPORT.parent / relative).resolve().is_file())

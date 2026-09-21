@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "kind": "swe_lancer_private_carrier_attestation",
+  "observed_at_utc": "1970-01-01T00:00:00Z",
+  "valid_through_utc": "1970-01-01T00:00:01Z",
+  "definition_sha256": "5a239c378ab0009c2dfa3cb7bb2666734eb0db764be7e97b8f0998b5985665e1",
+  "input_fingerprints": {
+    "ledger": {
+      "bytes": 1,
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+    },
+    "provider_contract_receipt": {
+      "bytes": 1,
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+    },
+    "price_receipt": {
+      "bytes": 1,
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+    },
+    "outbound_receipt": {
+      "bytes": 1,
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+    }
+  },
+  "SANCTIONED_SWE_LANCER_CARRIER_COMMAND": {
+    "executable_environment_name": "SWE_LANCER_RUNTIME_PYTHON",
+    "arguments": [
+      "-m",
+      "src.swe_lancer_carrier"
+    ]
+  },
+  "SANCTIONED_SWE_LANCER_CARRIER_IDENTITY_KIND": "repository_regular_file",
+  "SANCTIONED_SWE_LANCER_CARRIER_IDENTITY_SOURCE": "src/swe_lancer_carrier.py",
+  "SANCTIONED_SWE_LANCER_CARRIER_IDENTITY_SHA256": "4c63e1c29093607d0282293c47c62ea2785eea21b865029781f9717e36db534c",
+  "SANCTIONED_SWE_LANCER_CARRIER_OWNER": "runtime_owner"
+}

@@ -72,4 +72,16 @@ A separate backlog task must complete the following before execution is retried:
 
 The public template [`ledgers/swe-lancer.template.json`](../../ledgers/swe-lancer.template.json) has blank approval and private-evidence pins and is not executable. [`src/swe_lancer_admission.py`](../../src/swe_lancer_admission.py) first reserves the result path exclusively and checks source and evidence fingerprints and the deadline, but it does not start a worker or provider. The presence of configuration does not by itself establish isolation or permission.
 
+### Current source-only carrier boundary
+
+The current repository also defines a sanctioned private-carrier command in [`config/swe-lancer-carrier.json`](../../config/swe-lancer-carrier.json). The command takes no private paths or values as arguments:
+
+```bash
+"$SWE_LANCER_RUNTIME_PYTHON" -m src.swe_lancer_carrier
+```
+
+The carrier gate verifies its tracked source identity and a fresh runtime-owner attestation before reading the exact private admission ledger and three hash-bound receipts. Those receipts bind the provider, model revision, deployment identity, API version, fixed-price source, paid-outbound review, exact image, and cleanup contract to the same ledger. The gate records environment-name presence, byte counts, SHA-256 identities, and sanitized status only. It then invokes the existing model-free admission check once. Missing, stale, or mismatched evidence stops before that invocation, and the output remains no-clobber and owner-only.
+
+This source boundary does not create, discover, or authorize a private carrier. It does not turn the completed hosted offline smoke into evidence for a current paid carrier, and it does not change this report's historical no-trace conclusion. A runtime owner must still provide the actual sanctioned context, a fresh attestation, the exact private inputs, and current receipts. Provider, model, API, and grader calls remain zero until that separate admission is green.
+
 The machine-readable judgment is in [`data/experiment/swe-lancer-candidate-evaluation.json`](../../data/experiment/swe-lancer-candidate-evaluation.json). It excludes the private task body, raw trace, credentials, endpoint values, container identifiers, and execution paths.
