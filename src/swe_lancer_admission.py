@@ -259,7 +259,7 @@ def check_admission(
     credential_name = provider.get("credential_env")
     if credential_name != "OPENAI_API_KEY":
         missing.add("provider.credential_env")
-    credential_present = isinstance(credential_name, str) and bool(environment.get(credential_name))
+    credential_present = isinstance(credential_name, str) and credential_name in environment
     if not credential_present:
         missing.add("environment.OPENAI_API_KEY.present")
     _required(
@@ -286,7 +286,7 @@ def check_admission(
         missing.add("sandbox.endpoint_env")
         endpoint_present = False
     else:
-        endpoint_present = bool(environment.get(endpoint_name))
+        endpoint_present = endpoint_name in environment
         if not endpoint_present:
             missing.add(f"environment.{endpoint_name}.present")
     evidence_pins = _pin_checks(

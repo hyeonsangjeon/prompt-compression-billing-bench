@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "kind": "swe_lancer_private_carrier_definition",
+  "SANCTIONED_SWE_LANCER_CARRIER_COMMAND": {
+    "executable_environment_name": "SWE_LANCER_RUNTIME_PYTHON",
+    "arguments": [
+      "-m",
+      "src.swe_lancer_carrier"
+    ]
+  },
+  "SANCTIONED_SWE_LANCER_CARRIER_IDENTITY_KIND": "repository_regular_file",
+  "SANCTIONED_SWE_LANCER_CARRIER_IDENTITY_SOURCE": "src/swe_lancer_carrier.py",
+  "SANCTIONED_SWE_LANCER_CARRIER_IDENTITY_SHA256": "5e81891d8c5bd260b0f1fbfd5a4da833fde82cf102806f2bbf5e61b8119f9e34",
+  "SANCTIONED_SWE_LANCER_CARRIER_OWNER": "runtime_owner",
+  "input_environment_names": {
+    "attestation": "SWE_LANCER_CARRIER_ATTESTATION",
+    "ledger": "SWE_LANCER_ADMISSION_LEDGER",
+    "provider_contract_receipt": "SWE_LANCER_PROVIDER_CONTRACT_RECEIPT",
+    "price_receipt": "SWE_LANCER_PRICE_RECEIPT",
+    "outbound_receipt": "SWE_LANCER_OUTBOUND_RECEIPT",
+    "deadline": "SWE_LANCER_DEADLINE_UTC",
+    "output": "SWE_LANCER_ADMISSION_RESULT"
+  },
+  "admission_environment_names": {
+    "provider_credential": "OPENAI_API_KEY",
+    "sandbox_endpoint": "SWE_LANCER_DOCKER_HOST",
+    "solver": "SWE_LANCER_SOLVER_PATH",
+    "catalog": "SWE_LANCER_CATALOG_PATH",
+    "credential_review": "SWE_LANCER_CREDENTIAL_REVIEW_PATH",
+    "network_review": "SWE_LANCER_NETWORK_REVIEW_PATH",
+    "cleanup_review": "SWE_LANCER_CLEANUP_REVIEW_PATH"
+  },
+  "inline_values": false,
+  "provider_model_api_grader_calls": 0
+}

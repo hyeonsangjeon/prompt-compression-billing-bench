@@ -333,6 +333,8 @@ class SweLancerAdmissionTests(unittest.TestCase):
         for relative in (
             "../../ledgers/swe-lancer.template.json",
             "../../src/swe_lancer_admission.py",
+            "../../src/swe_lancer_carrier.py",
+            "../../config/swe-lancer-carrier.json",
             "../../data/experiment/swe-lancer-candidate-evaluation.json",
         ):
             self.assertTrue((REPORT.parent / relative).resolve().is_file())
