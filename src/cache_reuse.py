@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Mapping
 import hashlib
 import importlib.util
 import json
@@ -344,7 +345,11 @@ def validate_runtime_facts(facts: dict, ledger: dict) -> dict[str, dict]:
     return by_id
 
 
-def environment_presence(ledger: dict, native_ledger: dict) -> dict[str, bool]:
+def environment_presence(
+    ledger: dict,
+    native_ledger: dict,
+    environment: Mapping[str, str] | None = None,
+) -> dict[str, bool]:
     names = {
         ledger["model"]["endpoint_env"],
         native_ledger["benchmark"]["root_env"],
@@ -354,7 +359,8 @@ def environment_presence(ledger: dict, native_ledger: dict) -> dict[str, bool]:
         native_ledger["retrieval"]["spool_root_env"],
         native_ledger["compressor"]["tools"]["squeez"]["binary_env"],
     }
-    return {name: name in os.environ for name in sorted(names)}
+    values = os.environ if environment is None else environment
+    return {name: name in values for name in sorted(names)}
 
 
 def native_cache_contract_checks(ledger: dict, native_ledger: dict) -> dict[str, bool]:
@@ -398,7 +404,12 @@ def native_cache_contract_checks(ledger: dict, native_ledger: dict) -> dict[str,
     }
 
 
-def doctor(ledger: dict, runtime_facts: dict, native_ledger: dict) -> dict:
+def doctor(
+    ledger: dict,
+    runtime_facts: dict,
+    native_ledger: dict,
+    environment: Mapping[str, str] | None = None,
+) -> dict:
     validate_cache_ledger(ledger)
     checks = validate_runtime_facts(runtime_facts, ledger)
     results = []
@@ -424,7 +435,7 @@ def doctor(ledger: dict, runtime_facts: dict, native_ledger: dict) -> dict:
     )
     add("fixed_prices", price_ready, "fixed input prices need a source hash and check time")
     add("prefix_contract", runtime_facts.get("prefix_contract") is not None, "runtime must bind the exact serialized prefix and namespace hash")
-    presence = environment_presence(ledger, native_ledger)
+    presence = environment_presence(ledger, native_ledger, environment)
     for identifier in REQUIRED_RUNTIME_CHECKS:
         verified = checks[identifier]["status"] == "verified"
         if identifier == "R01_ENDPOINT_PRESENT":

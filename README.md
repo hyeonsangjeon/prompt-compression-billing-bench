@@ -220,6 +220,7 @@ have not been validated.
 | Disabled local squeez source recovery and lifecycle boundary | [Local recovery contract](docs/squeez-recovery.md) |
 | Accountless native execution and historical evidence | [Local native runner](docs/local-native.md) |
 | Opt-in Foundry path, workload metrics and proposed baseline rule | [Native contract](docs/native-contract.md) |
+| Hash-bound cache runtime launcher and its still-required owner context | [Cache reuse contract](docs/cache-reuse.md) |
 | Current protocol, baseline, static compressors and open decisions | [Experiment record](docs/experiment/README.md) |
 | Deferred SWE-Lancer candidate evaluation and no-trace boundary | [SWE-Lancer candidate evaluation](docs/experiment/swe-lancer-candidate-evaluation-20260920.md) |
 | Unsupported paths and readiness gaps | [Status](STATUS.md) |
