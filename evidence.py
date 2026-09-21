@@ -42,7 +42,7 @@ PUBLIC_FILES = {
     "src/pages_build.py", "src/pages_verify.py", "src/pages_oracle.py",
     "src/pages_http_check.py", "src/pages_browser_check.py",
     "tests/test_pages_static.py", "tests/fixtures/pages-oracle-control.txt",
-    "tests/fixtures/pages-oracle-control.html.txt", "docs/pages-static.md",
+    "tests/fixtures/pages-oracle-control.html.txt", "docs/pages-home.md", "docs/pages-static.md",
     "evidence/local-baseline.json", "evidence/development-3b-failure.json",
     "evidence/development-7b-timeout.json", "evidence/development-reasoning-timeout.json",
     "evidence/local-baseline-repeat.json",

@@ -1198,7 +1198,7 @@ def run_oracle(args: argparse.Namespace) -> dict[str, object]:
         if not relative or relative in public_specs:
             raise InputError(f"duplicate or empty source manifest path: {relative!r}")
         public_specs[relative] = row
-    if len(public_specs) != source_manifest.get("public_file_count"):
+    if len(public_specs) != source_manifest.get("source_file_count"):
         raise InputError("source manifest count differs from its file rows")
 
     source_to_output, source_specs = route_map(build_manifest)
@@ -1369,7 +1369,7 @@ def run_oracle(args: argparse.Namespace) -> dict[str, object]:
         "exit_code": 0 if not differences else 1,
         "correction_required": bool(differences),
         "inputs": {
-            "source_public_files": len(public_specs),
+            "source_allowlisted_files": len(public_specs),
             "markdown_documents": len(markdown_paths),
             "rendered_routes": len(set(source_to_output.values())),
             "site_tree": actual_site,

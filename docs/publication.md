@@ -1,17 +1,32 @@
 # Publication grades
 
-A technical publication grade is not redistribution approval. Repository visibility
-is already public; no command here changes visibility or deploys GitHub Pages. The
-root `LICENSE` covers project-authored source under MIT, while third-party materials
-and unresolved assets retain their separate terms and boundaries. The exact machine
-allowlist is `PUBLIC_FILES` in `evidence.py`; unknown files fail the audit, including
+A technical publication grade is not redistribution approval. Repository
+visibility is already public. The root `LICENSE` covers project-authored source
+under MIT, while third-party materials and unresolved assets retain their
+separate terms and boundaries. The repository-wide grade registry is
+`PUBLIC_FILES` in `evidence.py`; unknown files fail the audit, including
 force-added ignored material.
+
+## GitHub Pages rights-neutral source boundary
+
+GitHub Pages uses the narrower `source_allowlist` in
+`config/pages-static.json`, not all of `PUBLIC_FILES`. The approved site source
+set is exactly `docs/pages-home.md`, `docs/pages-static.md`,
+`docs/publication.md`, `LICENSE`, `THIRD_PARTY_NOTICES.md`,
+`third_party/licenses/gsm8k-MIT.txt`, and
+`third_party/licenses/terminal-bench-2.1-Apache-2.0.txt`.
+
+The main-only workflow may deploy that verified set. Pull requests run the full
+build and check suite without uploading or deploying. Experiment results, EDA,
+data, figures, raw traces, provider artifacts, DeepSWE-derived material, and
+unresolved LLMLingua2 material remain excluded from the site even where a
+repository publication grade exists.
 
 ## Public-source candidates in this layout
 
 | Grade | Exact files | Contents |
 |---|---|---|
-| Source/configuration | `LICENSE`, `.gitignore`, `.python-version`, `pyproject.toml`, `uv.lock`, `.github/workflows/check.yml`, `.github/workflows/pages-static.yml`, `tests/test_root_license.py` | Root MIT terms for project-authored source, their contract test, ignore boundaries, immutable benchmark dependency pins, non-model CI and a static-site build/check workflow with no deploy step |
+| Source/configuration | `LICENSE`, `.gitignore`, `.python-version`, `pyproject.toml`, `uv.lock`, `.github/workflows/check.yml`, `.github/workflows/pages-static.yml`, `tests/test_root_license.py` | Root MIT terms for project-authored source, their contract test, ignore boundaries, immutable benchmark dependency pins, non-model CI and a Pages workflow with full PR checks plus a main-only scoped deploy job |
 | Source/configuration | `run.py`, `accounting.py`, `evidence.py`, `ledger.toml` | Static dispatch; separate legacy native runner, usage accounting and strict evidence audit |
 | Source/configuration | `src/__init__.py`, `src/compressors.py`, `src/pipeline.py`, `src/protection.py` | Shared none/squeez/Headroom/LLMLingua adapter interfaces, frozen-observation path and designated-span checks; static schemas still permit only none/squeez |
 | Source/configuration | `src/contracts.py`, `src/provenance.py`, `src/measurement.py`, `src/static_run.py`, `src/compare.py` | Local schemas, source snapshots, distinct measurement units, static execution and name-only comparison |
@@ -22,7 +37,7 @@ force-added ignored material.
 | Source/configuration | `src/swe_lancer_admission.py`, `ledgers/swe-lancer.template.json`, `tests/test_swe_lancer_admission.py` | Non-operational one-task admission template and model-free no-clobber, source/evidence pin, deadline, credential-name and sanitized-record checks; no provider, worker, task body or private evidence |
 | Source/configuration | `src/accountless_native.py`, `ledgers/accountless-native.json`, `schemas/accountless-native-result.schema.json`, `requirements/accountless-native.txt`, `tests/test_accountless_native.py` | Offline Transformers adapter, fixed Qwen2.5 0.5B asset/runtime pins, exact-answer judge, no-clobber records and model-free failure controls; model weights and local cache paths are not included |
 | Source/configuration | `src/cache_reuse.py`, `ledgers/cache-reuse.template.json`, `schemas/cache-reuse-ledger.schema.json`, `schemas/cache-reuse-runtime-facts.schema.json`, `schemas/cache-reuse-result.schema.json`, `fixtures/cache-reuse/fake-transport.json`, `fixtures/cache-reuse/runtime-facts.template.json`, `tests/test_cache_reuse.py` | Non-operational cache-reuse count planner, serial native bundle gate, presence-only runtime doctor, prefix/isolation checks, unit-separated records and zero-network positive/negative controls; no endpoint, credential, prompt, response, runtime identifier or live cache claim |
-| Source/configuration | `requirements/pages-static.in`, `requirements/pages-static.txt`, `config/pages-static.json`, `pages/assets/site.css`, `src/pages_build.py`, `src/pages_verify.py`, `src/pages_oracle.py`, `src/pages_http_check.py`, `src/pages_browser_check.py` | Separate wheel-only, hash-locked Pages environment; deterministic static-document build, protected-content checks, independent Markdown comparison, literal project-prefix HTTP simulation and task-owned loopback Chromium checks; no deployment configuration or generated site |
+| Source/configuration | `requirements/pages-static.in`, `requirements/pages-static.txt`, `config/pages-static.json`, `pages/assets/site.css`, `src/pages_build.py`, `src/pages_verify.py`, `src/pages_oracle.py`, `src/pages_http_check.py`, `src/pages_browser_check.py` | Separate wheel-only, hash-locked Pages environment; exact site-source boundary, deterministic static-document build, protected-content checks, independent Markdown comparison, literal project-prefix HTTP simulation and task-owned loopback Chromium checks; no generated site is committed |
 | Source/configuration | `src/harbor_agent.py`, `src/harbor_no_time_limits.py`, `src/command_trace.py`, `src/task_metrics.py`, `src/live_transport.py`, `src/live_observations.py` | Actual Harbor instrumentation, disabled competing phase timers beneath the outer safety guard, separate turns/calls/repetitions/compressor timing/units, protected loopback transport and cooperative queue |
 | Source/configuration | `src/prompt_intake.py` | Archive untracked root request attachments privately before CLI/audit inventory; not a public wildcard |
 | Source/configuration | `tests/native_helpers.py`, `tests/test_baseline.py`, `tests/test_native_contract.py`, `tests/native_test_harbor_preflight.py`, `tests/test_native_compressors.py`, `tests/test_adapter_preflight.py`, `tests/test_blob_retrieval.py`, `tests/test_native_judge.py`, `tests/test_native_run.py`, `tests/test_task_metrics.py`, `tests/test_live_transport.py`, `tests/test_live_observations.py`, `tests/test_harbor_transport.py`, `tests/test_execution_safety.py`, `tests/test_prompt_intake.py`, `tests/test_squeez_recovery.py`, `tests/test_local_recovery.py` | Synthetic/fake-upstream validation, worker-pool and complete-input checks, native-only Harbor preflight, guarded adapter preflight, local spool/retry/resume checks, real SDK loopback serialization, safety-limit and classification regressions, local recovery and lifecycle controls, removed-limit regressions, malformed/failure/provenance tests and private prompt intake |
@@ -36,7 +51,7 @@ force-added ignored material.
 | Source/configuration | `schemas/frozen-input.schema.json`, `schemas/static-ledger.schema.json`, `schemas/static-result.schema.json`, `schemas/execution-safety-policy.schema.json` | Frozen input partitions, selected ledgers, typed per-record provenance and the strict future provider-execution safety record |
 | Source/configuration | `ledgers/demo.toml`, `ledgers/static.toml` | Synthetic and private historical input profiles; no resource address or credential value |
 | Source/configuration | `tests/test_accounting.py`, `tests/test_evidence.py`, `tests/test_run.py`, `tests/test_protection.py`, `tests/test_static.py`, `tests/test_compare.py`, `tests/test_eda.py` | Synthetic transport/protection/source fixtures and aggregate contracts; optional real-binary test is explicitly selected |
-| Implementation documentation | `README.md`, `STATUS.md`, `docs/static-contract.md`, `docs/squeez-recovery.md`, `docs/pages-static.md`, `docs/publication.md` | Entry points, provenance/units, local recovery and static-site boundaries, failure paths and remaining readiness gaps |
+| Implementation documentation | `README.md`, `STATUS.md`, `docs/static-contract.md`, `docs/squeez-recovery.md`, `docs/pages-home.md`, `docs/pages-static.md`, `docs/publication.md` | Entry points, provenance/units, local recovery, the rights-neutral Pages homepage and static-site boundaries, failure paths and remaining readiness gaps |
 | Sanitized public discussion record | `docs/experiment/README.md`, `docs/experiment/protocol.md`, `docs/experiment/decisions.md` | Current state, fixed protocol and decision history; private locations, resource identifiers and internal names removed |
 | Sanitized candidate evaluation | `docs/experiment/swe-lancer-candidate-evaluation-20260920.md`, `data/experiment/swe-lancer-candidate-evaluation.json` | One fixed public-example task's fail-closed admission observation and deferred decision; zero provider/tool/trace/grader counts, no raw task, message, credential, endpoint value, container identifier or private path |
 | Sanitized public design | `docs/experiment/screening-protocol.md` | Fixed 89-task screening population, 18-of-20 rule, retry boundary, nginx verifier revision and start conditions; no raw trial content |
@@ -126,4 +141,5 @@ for customer identifiers, internal paths, resource addresses, credentials, fixtu
 specificity and internal commentary separately. A zero-match pattern scan is not
 a proof that arbitrary material is safe. The root MIT license and tracked file
 grades do not establish DeepSWE redistribution rights, replace third-party terms
-or authorize GitHub Pages deployment.
+or authorize adding material outside the exact rights-neutral source set to
+GitHub Pages or another distribution.

@@ -1,20 +1,51 @@
-# Local static Pages candidate
+# Rights-neutral GitHub Pages contract
 
-This repository can render its public allowlist as deterministic static HTML.
-The output is a local preview and a CI build candidate. The workflow does not
-enable GitHub Pages, deploy an environment, publish an artifact or change
-repository visibility.
+The GitHub Pages site is built from an explicit seven-file source allowlist. It
+does not mirror the repository, `PUBLIC_FILES`, or a directory tree. The builder
+renders documents and copies license text; it does not deploy, import repository
+modules, or execute source content.
 
-The homepage is navigation into existing source documents. It does not add an
-experiment summary, chart, ranking, causal claim or non-inferiority claim. The
-renderer preserves the source text, tables, code, links, image alt text and
-byte-exact public assets under the rules in `config/pages-static.json`.
+## Exact public source boundary
+
+`config/pages-static.json` is the machine-readable contract. Its
+`source_allowlist` contains exactly:
+
+1. `docs/pages-home.md`
+2. `docs/pages-static.md`
+3. `docs/publication.md`
+4. `LICENSE`
+5. `THIRD_PARTY_NOTICES.md`
+6. `third_party/licenses/gsm8k-MIT.txt`
+7. `third_party/licenses/terminal-bench-2.1-Apache-2.0.txt`
+
+Every entry must also have a publication grade in `evidence.py:PUBLIC_FILES`.
+The build fails on an ungraded, missing, duplicate, unsafe, symlinked, or
+non-regular source. `README.md`, `STATUS.md`, `docs/eda/**`, experiment
+documents, `data/**`, `figures/**`, raw traces, provider artifacts,
+DeepSWE-derived material, and unresolved LLMLingua2 material are not site
+sources.
+
+The generated shell, stylesheet, build manifest, and directory indexes are
+build outputs or fixed renderer assets. They do not expand the document source
+allowlist.
+
+## Public routes
+
+| Route | Source |
+|---|---|
+| `/` | `docs/pages-home.md` |
+| `/site-contract/` | `docs/pages-static.md` |
+| `/publication/` | `docs/publication.md` |
+| `/notices/` | `THIRD_PARTY_NOTICES.md` |
+
+The project prefix remains `/prompt-compression-billing-bench/`. Local links
+must close over the seven-file source set or use an explicitly supported
+external URL.
 
 ## Build and check locally
 
-Use Python 3.12+ and `uv`. Pages dependencies have their own hash-locked,
-wheel-only environment so the benchmark's immutable root lock does not change.
-Every output and result path is no-clobber: choose a new path for each run.
+Use Python 3.12 and the exact hash-locked `requirements/pages-static.txt`
+environment. Every output and result path is no-clobber.
 
 ```bash
 PAGES_RUN="$(mktemp -d)"
@@ -28,37 +59,40 @@ uv pip install \
   --requirement requirements/pages-static.txt
 "$PAGES_RUN/venv/bin/python" -B -m playwright install chromium
 
-"$PAGES_RUN/venv/bin/python" -B src/pages_build.py \
-  --source-root . \
-  --contract config/pages-static.json \
-  --stylesheet pages/assets/site.css \
-  --output "$PAGES_RUN/site" \
-  --record-dir "$PAGES_RUN/build"
+for build in first second; do
+  "$PAGES_RUN/venv/bin/python" -B src/pages_build.py \
+    --source-root . \
+    --contract config/pages-static.json \
+    --stylesheet pages/assets/site.css \
+    --output "$PAGES_RUN/$build/site" \
+    --record-dir "$PAGES_RUN/$build/record"
+done
+diff -qr "$PAGES_RUN/first/site" "$PAGES_RUN/second/site"
 
 "$PAGES_RUN/venv/bin/python" -B src/pages_verify.py \
   --source-root . \
-  --site-root "$PAGES_RUN/site" \
-  --source-manifest "$PAGES_RUN/build/source-manifest.json" \
-  --build-record "$PAGES_RUN/build/build-record.json" \
+  --site-root "$PAGES_RUN/first/site" \
+  --source-manifest "$PAGES_RUN/first/record/source-manifest.json" \
+  --build-record "$PAGES_RUN/first/record/build-record.json" \
   --stylesheet pages/assets/site.css \
   --contract config/pages-static.json \
   --result "$PAGES_RUN/static-verification.json"
 
 "$PAGES_RUN/venv/bin/python" -B src/pages_oracle.py \
   --source-root . \
-  --site-root "$PAGES_RUN/site" \
-  --source-manifest "$PAGES_RUN/build/source-manifest.json" \
-  --build-record "$PAGES_RUN/build/build-record.json" \
+  --site-root "$PAGES_RUN/first/site" \
+  --source-manifest "$PAGES_RUN/first/record/source-manifest.json" \
+  --build-record "$PAGES_RUN/first/record/build-record.json" \
   --contract config/pages-static.json \
   --result "$PAGES_RUN/markdown-oracle.json"
 
 mkdir -p "$PAGES_RUN/server/prompt-compression-billing-bench"
-cp -a "$PAGES_RUN/site/." \
+cp -a "$PAGES_RUN/first/site/." \
   "$PAGES_RUN/server/prompt-compression-billing-bench/"
 "$PAGES_RUN/venv/bin/python" -B src/pages_http_check.py \
   --server-root "$PAGES_RUN/server" \
   --project-prefix /prompt-compression-billing-bench/ \
-  --source-site "$PAGES_RUN/site" \
+  --source-site "$PAGES_RUN/first/site" \
   --contract config/pages-static.json \
   --result "$PAGES_RUN/project-prefix-http.json"
 
@@ -67,62 +101,53 @@ cp -a "$PAGES_RUN/site/." \
   --project-prefix /prompt-compression-billing-bench/ \
   --contract config/pages-static.json \
   --result "$PAGES_RUN/browser.json"
+
+"$PAGES_RUN/venv/bin/python" -B evidence.py audit-files .
 ```
 
-The browser command uses a task-owned `127.0.0.1` server and Chromium. It checks
-the five configured routes at 1,365 × 900 and 390 × 844, page-level horizontal
-overflow, image loading, the skip link, keyboard access to overflowing tables
-and the percent-encoded Korean compatibility fragment. It makes no external
-request. HTTP file delivery, logical references, route probes and browser
-route/viewport checks remain separate denominators.
+The browser check visits all four routes at 1,365 x 900 and 390 x 844. It checks
+page overflow, image behavior, the skip link, keyboard scrolling of the
+publication table at the narrow viewport, and the percent-encoded `공개 범위`
+homepage fragment. It makes no external request.
 
-`requirements/pages-static.in` names the three direct dependencies.
-`requirements/pages-static.txt` pins all six resolved distributions and their
-official PyPI hashes. The ordinary root test environment does not install these
-packages; dependency-requiring Pages tests report an explicit skip there, while
-the separate `pages-static` workflow installs the lock and runs the complete suite.
+## Deployment boundary
 
-## What each check establishes
+Pull requests run the complete unit, deterministic-build, static verification,
+independent oracle, project-prefix HTTP, Chromium, and file-grade suite. They do
+not upload a Pages artifact and cannot run the deploy job.
 
-- `pages_verify.py` checks the generated tree, byte-exact copied files, static
-  SVG safety, local links and fragments, source blocks, numbers, tables, code,
-  headings, image alt text and the responsive CSS contract. It shares limited
-  Markdown helpers with the renderer and is not an independent meaning oracle.
-- `pages_oracle.py` uses `markdown-it-py==3.0.0` and `mdurl==0.1.2`, plus a
-  separate standard-library HTML extractor. It compares visible blocks, table
-  cells, code, link targets, image alt text, headings, task-list state and
-  strong emphasis. The project emphasis extension is a general boundary rule;
-  uncertain cases fail instead of entering a path-specific allowlist.
-- `pages_http_check.py` serves the unmodified site below the literal repository
-  prefix. It rejects root-absolute local references, rewrites and root fallback,
-  while classifying external links without requesting them.
-- `pages_browser_check.py` is the separate rendering check. Static success is
-  not reported as browser success.
+A push to `main`, or an explicit manual run whose ref is `main`, runs the same
+checks first. Only after they pass does the workflow upload the already-verified
+first build and deploy it to the `github-pages` environment. Top-level workflow
+permission remains `contents: read`; only the conditional deploy job receives
+`pages: write` and `id-token: write`.
 
-The renderer escapes active or unrecognized raw HTML. It expands only the
-documented static `details`/`summary` form and preserves exact explicit anchors.
-Public SVGs are copied only after active content and external references are
-rejected. Generated pages include no script and use a restrictive content
-security policy.
+Generated pages retain
+`<meta name="robots" content="noindex,nofollow,noarchive">`. This discourages
+indexing; it is not access control and does not make the public Pages site
+private.
 
-## Determinism and records
+## What the checks establish
 
-Run the builder twice with different empty output and record directories, then
-compare the two site trees. The source observation times belong to the separate
-records and are not embedded in the site. `tests/test_pages_static.py` performs
-this two-build comparison and also checks source drift, content mutations,
-result collisions, symlinks and a deliberately broken root-absolute reference.
+- `pages_verify.py` independently re-reads the contract allowlist and
+  `PUBLIC_FILES`, pins every source byte, checks the exact generated inventory,
+  copied bytes, local-link closure, fragments, protected Markdown content,
+  responsive CSS, CSP, and static SVG policy.
+- `pages_oracle.py` uses `markdown-it-py==3.0.0` and `mdurl==0.1.2` plus an
+  independent HTML extractor to compare visible blocks, tables, code, links,
+  headings, task-list state, and emphasis.
+- `pages_http_check.py` serves the unmodified tree under the literal repository
+  prefix and rejects rewrites, root fallback, and root-absolute local links.
+- `pages_browser_check.py` is the separate Chromium rendering and keyboard
+  check. Static success is not reported as browser success.
+
+These checks prove the configured sources and generated bytes passed the stated
+mechanical controls. They do not perform legal review, grant rights outside the
+allowlist, fetch external links, validate a future GitHub Pages configuration,
+test the hosted URL, or cover every browser, device, crawler, and assistive
+technology. They do not publish experiment evidence.
 
 The historical project-prefix HTTP record whose body could not be recovered
 remains recorded as 6,802 bytes with SHA-256
 `c50d7f8cb418f1e8857171ec672e5c398f55b6c5c431881226ca89dfc3a34ce6`.
-A new check is new evidence; it is not a reconstruction of that record.
-
-## Limits
-
-Passing these checks does not publish the site, verify repository visibility,
-reach external links, choose a root license or establish redistribution rights.
-The independent Markdown parser is a second implementation, not an infallible
-specification. The browser check covers the configured routes and viewports,
-not every browser, device, assistive technology or hosted Pages behavior.
-Generated HTML and run records remain untracked local output.
+A new check is new evidence, not a reconstruction of that record.

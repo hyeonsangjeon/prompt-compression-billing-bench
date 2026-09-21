@@ -101,9 +101,17 @@ def run(args: argparse.Namespace) -> dict[str, object]:
     if not isinstance(browser_policy, dict):
         raise BrowserCheckError("contract browser_check policy must be an object")
     routes = browser_policy.get("routes")
+    table_keyboard_route = browser_policy.get("table_keyboard_route")
     viewports = browser_policy.get("viewports")
     if not isinstance(routes, list) or not routes or not isinstance(viewports, list) or not viewports:
         raise BrowserCheckError("browser routes and viewports must be non-empty lists")
+    if (
+        not isinstance(table_keyboard_route, str)
+        or table_keyboard_route not in routes
+        or not table_keyboard_route.startswith("/")
+        or table_keyboard_route.startswith("//")
+    ):
+        raise BrowserCheckError("table keyboard route must be one of the configured browser routes")
 
     if args.server_root.is_symlink():
         raise BrowserCheckError("server root must not be a symlink")
@@ -252,7 +260,10 @@ def run(args: argparse.Namespace) -> dict[str, object]:
                 )
                 if not skip_link_result["passed"]:
                     errors.append({"code": "skip_link_keyboard_failed", **skip_link_result})
-                page.goto(origin + project_prefix + "first-study/", wait_until="load")
+                page.goto(
+                    origin + project_prefix.rstrip("/") + table_keyboard_route,
+                    wait_until="load",
+                )
                 overflow_index = page.locator(".table-scroll").evaluate_all(
                     "regions => regions.findIndex(region => region.scrollWidth > region.clientWidth)"
                 )
@@ -267,6 +278,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
                     page.wait_for_timeout(150)
                     scroll_after_key = overflowing.evaluate("region => region.scrollLeft")
                 table_keyboard_result = {
+                    "route": table_keyboard_route,
                     "regions": page.locator(".table-scroll").count(),
                     "overflowing_regions": overflow_count,
                     "scroll_left_after_arrow_right": scroll_after_key,
@@ -321,8 +333,8 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         "scope": {
             "loopback_http_used": True,
             "external_requests_attempted": len(external_requests),
-            "deployment_performed": False,
-            "pages_enabled": False,
+            "deployment_performed_by_check": False,
+            "hosted_pages_behavior_checked": False,
         },
         "runtime": {
             "playwright": metadata.version("playwright"),

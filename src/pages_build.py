@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build deterministic static HTML from the repository public-file allowlist."""
+"""Build deterministic static HTML from the contract source allowlist."""
 
 from __future__ import annotations
 
@@ -22,22 +22,22 @@ from pathlib import Path, PurePosixPath
 from urllib.parse import quote, unquote, urlsplit
 
 
-LABELS = ("repository-public-files", "local-static-preview", "deployment-disabled")
+LABELS = (
+    "rights-neutral-source-allowlist",
+    "public-github-pages",
+    "main-only-actions-deploy",
+)
 PRIMARY_ROUTES = {
-    "README.md": "/",
-    "docs/eda/README.md": "/eda/",
-    "docs/experiment/01-preliminary-comparison/README.md": "/first-study/",
-    "docs/experiment/01-preliminary-comparison/visualization-guide-20260919.md": "/figures/",
-    "STATUS.md": "/readiness/",
-    "docs/publication.md": "/readiness/",
+    "docs/pages-home.md": "/",
+    "docs/pages-static.md": "/site-contract/",
+    "docs/publication.md": "/publication/",
+    "THIRD_PARTY_NOTICES.md": "/notices/",
 }
-ROUTE_ORDER = ("/", "/eda/", "/first-study/", "/figures/", "/readiness/")
 ROUTE_NAVIGATION = (
-    ("/", "Repository overview", "Repository scope, claim boundaries, and documented entry points."),
-    ("/eda/", "EDA evidence", "Existing EDA report with its tables, figures, conditions, and limits."),
-    ("/first-study/", "First study", "Existing one-page study summary with its conditions and limitations."),
-    ("/figures/", "Figure guide", "Existing captions, denominators, sources, and interpretation limits."),
-    ("/readiness/", "Readiness", "Readiness status and publication-boundary documents."),
+    ("/", "Home", "Rights-neutral publication scope and approved entry points."),
+    ("/site-contract/", "Site contract", "Exact source boundary, reproduction, and verification limits."),
+    ("/publication/", "Publication boundary", "Repository file grades and unresolved rights boundaries."),
+    ("/notices/", "Notices", "Third-party provenance, license references, and unresolved questions."),
 )
 SAFE_EXTERNAL_SCHEMES = frozenset({"http", "https", "mailto"})
 ACTIVE_SVG_TAGS = frozenset({"script", "foreignobject", "iframe", "object", "embed", "audio", "video"})
@@ -90,7 +90,13 @@ def write_new_json(path: Path, value: object) -> None:
 
 def safe_relative_path(raw_path: str) -> PurePosixPath:
     path = PurePosixPath(raw_path)
-    if path.is_absolute() or not path.parts or any(part in ("", ".", "..") for part in path.parts):
+    if (
+        path.is_absolute()
+        or not path.parts
+        or path.as_posix() != raw_path
+        or "\\" in raw_path
+        or any(part in ("", ".", "..") for part in path.parts)
+    ):
         raise BuildError(f"unsafe relative path: {raw_path!r}")
     return path
 
@@ -133,17 +139,25 @@ def extract_public_files(evidence_path: Path) -> list[str]:
     return paths
 
 
+def extract_source_allowlist(contract: dict[str, object]) -> list[str]:
+    value = contract.get("source_allowlist")
+    if not isinstance(value, list) or not value:
+        raise BuildError("contract source_allowlist must be a non-empty list")
+    if any(not isinstance(path, str) for path in value):
+        raise BuildError("contract source_allowlist entries must be strings")
+    paths = list(value)
+    if len(paths) != len(set(paths)):
+        raise BuildError("contract source_allowlist contains duplicate paths")
+    for path in paths:
+        safe_relative_path(path)
+    return paths
+
+
 def route_for_document(source_path: str) -> str:
-    if source_path in PRIMARY_ROUTES:
+    try:
         return PRIMARY_ROUTES[source_path]
-    path = PurePosixPath(source_path)
-    without_suffix = path.with_suffix("")
-    parts = list(without_suffix.parts)
-    if parts[-1].lower() == "readme":
-        parts.pop()
-    if not parts:
-        parts = ["document"]
-    return "/documents/" + "/".join(parts) + "/"
+    except KeyError as exc:
+        raise BuildError(f"Markdown source has no approved route: {source_path}") from exc
 
 
 def output_for_route(route: str) -> PurePosixPath:
@@ -882,8 +896,8 @@ def render_route_index(current_output: PurePosixPath) -> str:
             + "</span></a></li>"
         )
     return (
-        '<section class="route-index" aria-labelledby="preview-routes"><h2 id="preview-routes">Documents</h2>'
-        "<p>This navigation adds no result summary, chart, ranking, or causal claim.</p>"
+        '<section class="route-index" aria-labelledby="published-routes"><h2 id="published-routes">Published pages</h2>'
+        "<p>This navigation adds no experiment result summary, chart, ranking, or causal claim.</p>"
         '<ul class="route-list">' + "".join(items) + "</ul></section>"
     )
 
@@ -922,7 +936,7 @@ def render_page(
     documents: list[SourceDocument],
     rendered_articles: list[str],
 ) -> bytes:
-    page_title = "Evidence documents" if route == "/" else documents[0].title
+    page_title = "Rights-reviewed project documents" if route == "/" else documents[0].title
     css_url = relative_output_url(current_output, PurePosixPath("assets/site.css"))
     route_index = render_route_index(current_output) if route == "/" else ""
     toc = render_toc(documents)
@@ -936,16 +950,16 @@ def render_page(
   <meta name="theme-color" content="#f7f4ed">
   <meta name="robots" content="noindex,nofollow,noarchive">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'self'; script-src 'none'; object-src 'none'; connect-src 'none'; base-uri 'none'; form-action 'none'">
-  <title>{html.escape(page_title)} · Static preview</title>
+  <title>{html.escape(page_title)} · Prompt Compression Billing Bench</title>
   <link rel="stylesheet" href="{html.escape(css_url, quote=True)}">
 </head>
 <body>
   <a class="skip-link" href="#content">Skip to content</a>
   <div class="snapshot-bar"><div class="snapshot-bar__inner">{label_markup}</div></div>
   <header class="site-header"><div class="site-header__inner">
-    <p class="site-kicker">Local evidence reader</p>
-    <p class="site-title">Evidence documents</p>
-    <p class="site-deck">Deterministic local rendering of the repository public-file allowlist. GitHub Pages deployment and repository visibility remain disabled.</p>
+    <p class="site-kicker">Rights-reviewed publication</p>
+    <p class="site-title">Prompt Compression Billing Bench</p>
+    <p class="site-deck">Deterministic rendering of the explicit site source allowlist. The verified site deploys only from the main branch workflow.</p>
     {render_navigation(current_output)}
   </div></header>
   <main id="content" class="layout">
@@ -953,7 +967,7 @@ def render_page(
     {toc}
     <section class="document-group" aria-label="Source documents">{content}</section>
   </main>
-  <footer class="page-footer">Local static preview only. Deployment, repository visibility, and unresolved rights decisions remain separate.</footer>
+  <footer class="page-footer">Public Pages content is limited to the contract allowlist; excluded rights material is not copied into the site.</footer>
 </body>
 </html>
 '''
@@ -973,10 +987,10 @@ def directory_index_page(directory: str, members: list[str], output: PurePosixPa
     return f'''<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#f7f4ed">
 <meta name="robots" content="noindex,nofollow,noarchive"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'self'; script-src 'none'; object-src 'none'; connect-src 'none'; base-uri 'none'; form-action 'none'">
-<title>Allowlisted files · Static preview</title><link rel="stylesheet" href="{html.escape(css_url, quote=True)}"></head>
+<title>Rights-reviewed files · Prompt Compression Billing Bench</title><link rel="stylesheet" href="{html.escape(css_url, quote=True)}"></head>
 <body><a class="skip-link" href="#content">Skip to content</a><div class="snapshot-bar"><div class="snapshot-bar__inner">{labels}</div></div>
-<main id="content" class="layout"><section class="document-group"><h1>Allowlisted files</h1>
-<p>Generated directory index for <code>{html.escape(directory)}/</code>.</p><ul>{''.join(list_items)}</ul></section></main></body></html>
+<main id="content" class="layout"><section class="document-group"><h1>Rights-reviewed files</h1>
+<p>Generated index for approved files below <code>{html.escape(directory)}/</code>.</p><ul>{''.join(list_items)}</ul></section></main></body></html>
 '''.encode("utf-8")
 
 
@@ -1004,34 +1018,60 @@ def load_contract(path: Path) -> dict[str, object]:
         raise BuildError("contract must be a pages_static_site_contract JSON object")
     if contract.get("routes", {}).get("primary") != PRIMARY_ROUTES:
         raise BuildError("contract primary routes differ from the renderer")
+    source_paths = extract_source_allowlist(contract)
+    markdown_paths = {source for source in source_paths if source.lower().endswith(".md")}
+    if markdown_paths != set(PRIMARY_ROUTES):
+        raise BuildError("contract Markdown source set differs from approved primary routes")
     labels = contract.get("labels", {})
     if tuple(labels.get(key) for key in ("source", "visibility", "deployment")) != LABELS:
         raise BuildError("contract labels differ from the renderer")
     return contract
 
 
-def source_inventory(source_root: Path) -> tuple[list[str], dict[str, object]]:
+def regular_source_file(source_root: Path, relative: str) -> Path:
+    current = source_root
+    parts = safe_relative_path(relative).parts
+    for index, part in enumerate(parts):
+        current = current / part
+        file_stat = current.lstat()
+        if stat.S_ISLNK(file_stat.st_mode):
+            raise BuildError(f"site source traverses a symlink: {relative}")
+        if index < len(parts) - 1 and not stat.S_ISDIR(file_stat.st_mode):
+            raise BuildError(f"site source parent is not a directory: {relative}")
+    if not stat.S_ISREG(current.lstat().st_mode):
+        raise BuildError(f"site source is not a regular file: {relative}")
+    return current
+
+
+def source_inventory(
+    source_root: Path, contract: dict[str, object]
+) -> tuple[list[str], dict[str, object]]:
+    if source_root.is_symlink():
+        raise BuildError("source root must not be a symlink")
     source_root = source_root.resolve(strict=True)
-    public_paths = extract_public_files(source_root / "evidence.py")
+    if not source_root.is_dir():
+        raise BuildError("source root must be a directory")
+    publication_paths = extract_public_files(regular_source_file(source_root, "evidence.py"))
+    source_paths = extract_source_allowlist(contract)
+    ungraded = sorted(set(source_paths) - set(publication_paths))
+    if ungraded:
+        raise BuildError(f"site sources are not publication-graded: {ungraded}")
     rows: list[dict[str, object]] = []
     digest = hashlib.sha256()
-    for relative in public_paths:
-        path = source_root.joinpath(*safe_relative_path(relative).parts)
-        file_stat = path.lstat()
-        if stat.S_ISLNK(file_stat.st_mode) or not stat.S_ISREG(file_stat.st_mode):
-            raise BuildError(f"source is not a regular file: {relative}")
+    for relative in source_paths:
+        path = regular_source_file(source_root, relative)
         fingerprint = file_fingerprint(path)
         row = {"path": relative, **fingerprint}
         rows.append(row)
         digest.update(relative.encode("utf-8") + b"\0")
         digest.update(str(fingerprint["bytes"]).encode("ascii") + b"\0")
         digest.update(str(fingerprint["sha256"]).encode("ascii") + b"\n")
-    return public_paths, {
+    return source_paths, {
         "schema_version": 1,
         "kind": "pages_static_source_manifest",
         "observed_at_utc": utc_now(),
-        "public_file_count": len(rows),
-        "public_file_bytes": sum(int(row["bytes"]) for row in rows),
+        "source_file_count": len(rows),
+        "source_file_bytes": sum(int(row["bytes"]) for row in rows),
         "tree_sha256": digest.hexdigest(),
         "files": rows,
     }
@@ -1045,12 +1085,12 @@ def reserve_record_directory(path: Path) -> None:
 def build(
     args: argparse.Namespace,
     contract: dict[str, object],
-    public_paths: list[str],
+    source_paths: list[str],
     source_manifest: dict[str, object],
 ) -> dict[str, object]:
     source_root = args.source_root.resolve(strict=True)
-    public_set = set(public_paths)
-    markdown_paths = [path for path in public_paths if path.lower().endswith(".md")]
+    source_set = set(source_paths)
+    markdown_paths = [path for path in source_paths if path.lower().endswith(".md")]
     documents: dict[str, SourceDocument] = {}
     outputs: dict[PurePosixPath, list[SourceDocument]] = {}
     for source_path in markdown_paths:
@@ -1067,19 +1107,19 @@ def build(
         outputs.setdefault(output, []).append(document)
     compatibility_anchors = apply_compatibility_anchors(documents, contract)
     public_directories = set()
-    for source_path in public_paths:
+    for source_path in source_paths:
         parts = PurePosixPath(source_path).parts[:-1]
         for count in range(1, len(parts) + 1):
             public_directories.add("/".join(parts[:count]))
     image_dimensions: dict[str, tuple[str | None, str | None]] = {}
-    for source_path in public_paths:
+    for source_path in source_paths:
         if source_path.lower().endswith(".svg"):
             data = (source_root / source_path).read_bytes()
             image_dimensions[source_path] = validate_svg(data, source_path)
-    resolver = LinkResolver(documents, public_set, public_directories, image_dimensions)
+    resolver = LinkResolver(documents, source_set, public_directories, image_dimensions)
     os.mkdir(args.output, mode=0o755)
     write_new_bytes(args.output / "assets/site.css", args.stylesheet.read_bytes())
-    for source_path in public_paths:
+    for source_path in source_paths:
         if source_path.lower().endswith(".md"):
             continue
         source = source_root.joinpath(*PurePosixPath(source_path).parts)
@@ -1088,7 +1128,7 @@ def build(
     for directory in sorted(public_directories):
         members = sorted(
             path
-            for path in public_paths
+            for path in source_paths
             if path.startswith(directory.rstrip("/") + "/") and not path.lower().endswith(".md")
         )
         if not members:
@@ -1130,11 +1170,11 @@ def build(
             "source": LABELS[0],
             "visibility": LABELS[1],
             "deployment": LABELS[2],
-            "publication_approved": False,
+            "publication_approved": True,
         },
         "source": {
-            "public_files_count": len(public_paths),
-            "public_files_tree_sha256": source_manifest["tree_sha256"],
+            "allowlisted_files_count": len(source_paths),
+            "allowlisted_files_tree_sha256": source_manifest["tree_sha256"],
             "markdown_documents_rendered": len(markdown_paths),
         },
         "inputs": {
@@ -1143,7 +1183,7 @@ def build(
             "stylesheet": file_fingerprint(args.stylesheet),
         },
         "routes": route_records,
-        "copied_public_non_markdown_files": len(public_paths) - len(markdown_paths),
+        "copied_allowlisted_non_markdown_files": len(source_paths) - len(markdown_paths),
         "renderer": {
             "source_code_executed": False,
             "repository_module_imported": False,
@@ -1153,7 +1193,7 @@ def build(
             "compatibility_anchors": compatibility_anchors,
         },
         "limits": {
-            "not_deployed": True,
+            "builder_performs_deployment": False,
             "repository_visibility_changed": False,
             "new_result_summary_or_chart": False,
         },
@@ -1171,7 +1211,7 @@ def build(
         "output_total_bytes": total_bytes,
         "output_tree_sha256": tree_sha256,
         "documents_rendered": len(markdown_paths),
-        "source_public_files_checked": len(public_paths),
+        "source_files_checked": len(source_paths),
         "network_used": False,
         "source_code_executed_or_imported": False,
     }
@@ -1200,9 +1240,9 @@ def main() -> int:
         reserve_record_directory(args.record_dir)
         record_directory_reserved = True
         contract = load_contract(args.contract)
-        public_paths, manifest = source_inventory(args.source_root)
+        source_paths, manifest = source_inventory(args.source_root, contract)
         write_new_json(args.record_dir / "source-manifest.json", manifest)
-        record = build(args, contract, public_paths, manifest)
+        record = build(args, contract, source_paths, manifest)
         write_new_json(args.record_dir / "build-record.json", record)
     except (BuildError, FileNotFoundError, json.JSONDecodeError, OSError, ValueError) as exc:
         error = {
