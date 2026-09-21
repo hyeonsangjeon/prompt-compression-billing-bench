@@ -314,6 +314,7 @@ def probe(
 
     input_records: dict[str, dict[str, object]] = {}
     loaded = 0
+    doctor_invocations = 0
     try:
         cache_payload, input_records["cache_ledger"] = load_private_input(
             environment,
@@ -337,10 +338,12 @@ def probe(
         validate_cache_ledger(cache_ledger)
         runtime_facts = parse_json_object(facts_payload, "runtime_facts")
         native_ledger = parse_native_ledger(native_payload)
+        doctor_invocations += 1
         doctor_result = doctor(cache_ledger, runtime_facts, native_ledger, environment)
     except ContextFailure as failure:
         result = failure_record(observed, environment, failure, definition, context)
         result["side_effects"]["runtime_input_files_read"] = loaded
+        result["side_effects"]["doctor_invocations"] = doctor_invocations
         return result
     except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
         result = failure_record(
@@ -351,6 +354,7 @@ def probe(
             context,
         )
         result["side_effects"]["runtime_input_files_read"] = loaded
+        result["side_effects"]["doctor_invocations"] = doctor_invocations
         return result
 
     result = base_record(observed, environment_presence(definition, environment))
@@ -360,7 +364,7 @@ def probe(
     result["runtime_inputs"] = input_records
     result["doctor"] = doctor_result
     result["side_effects"]["runtime_input_files_read"] = loaded
-    result["side_effects"]["doctor_invocations"] = 1
+    result["side_effects"]["doctor_invocations"] = doctor_invocations
     return result
 
 
