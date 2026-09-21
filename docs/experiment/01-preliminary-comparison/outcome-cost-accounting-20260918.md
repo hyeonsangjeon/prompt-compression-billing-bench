@@ -1,153 +1,212 @@
-# 결과별 비용 집계 — 어디까지 확인됐나
+# Cost Accounting by Outcome: What Was Established
 
-이 문서는 이미 끝난 실행의 비용을 **통과**, **정상 채점 후 미통과**, **품질 판정
-전 종료**로 나눠 정리한 집계 결과다. 새 모델 실행은 하지 않았다. 공개 Markdown
-표의 반올림 숫자를 다시 더하지 않고, 컴퓨터가 읽을 수 있는 비공개 구조화 원장에
-남은 외부 모델 서비스(provider) 사용량, 고정 가격표 계산값, 가상 머신 배분 기록,
-객체 저장소(Blob)와 네트워크(network) 기록만 읽었다.
+This document aggregates costs from completed execution into **pass**, **normal non-pass
+after grading**, and **ended before quality judgment**. It made no new model calls. Rather
+than summing rounded values from public Markdown tables, it reads only provider usage,
+fixed-price calculations, virtual-machine allocations, and object-storage (Blob) and
+network records retained in machine-readable private ledgers.
 
-## 30초 요약
+## 30-Second Summary
 
-- 네 조건이 모두 끝난 주 분석은 **26과제·104조건**이다. Terminal-Bench 내장 채점 통과는 40개, 정상 채점 후 `wrong_answer`는 64개, `wrong_format`은 0개다. 여기서 통과는 **고객 수락을 뜻하지 않는다**.
-- 이 104조건의 provider 사용량에 고정 가격표를 적용한 API 계산 비용은 `$22.3333885`다. 40개 통과로 나눈 단순 산술값은 `$0.5583347125`지만, 미통과 실행 비용도 분자에 들어 있으므로 “통과에 귀속된 비용”은 아니다. API 계산 비용은 **실제 청구서가 아니다**.
-- 결과와 정확한 실행 비용을 구조화 기록으로 연결할 수 있는 것은 9조건뿐이다. 그 안에서 통과 4조건의 확인된 API 계산 비용은 `$2.277506`, 정상 미통과 5조건은 `$7.56232`다. 나머지 95조건의 API 비용 `$12.4935625`는 결과별로 나누지 않았다.
-- 채점 전에 끝난 장기 실행 5개는 4개 운영자 중도 종료와 1개 HTTP 응답 정체다. 확인된 API 계산 비용은 `$87.771254`이고, 사용량을 받지 못한 요청 1회의 `$0.1294175` 추정은 이 합계에서 뺐다. 다섯 실행 모두 품질 미확정이다.
-- 따라서 **프로그램 전체 통과 1건당 비용은 미확정**이다. 확인된 소계는 보여 줄 수 있지만, 빠진 연결을 0으로 채우거나 전체 값으로 넓히지는 않는다.
+- The primary completed analysis contains **26 tasks and 104 conditions** across all four
+  conditions. The Terminal-Bench built-in grader recorded 40 passes, 64
+  `wrong_answer` results after normal grading, and 0 `wrong_format` results. A pass here
+  **does not mean customer acceptance**.
+- Applying the fixed price table to provider usage for these 104 conditions gives
+  `$22.3333885` in calculated API cost. Dividing by 40 passes gives the arithmetic value
+  `$0.5583347125`, but its numerator includes non-passing execution cost, so this is not
+  “cost attributed to passes.” Calculated API cost is **not an actual invoice**.
+- Structured records link exact execution cost to outcome for only 9 conditions. Within
+  them, confirmed calculated API cost is `$2.277506` for 4 passes and `$7.56232` for
+  5 normal non-passes. The remaining `$12.4935625` across 95 conditions is not allocated
+  by outcome.
+- Five long-running executions ended before grading: four operator stops and one stalled
+  HTTP response. Confirmed calculated API cost is `$87.771254`. A `$0.1294175`
+  input-only estimate for one request without usage is excluded. Quality is unknown for
+  all five.
+- Therefore, **program-wide cost per pass remains unknown**. Confirmed subtotals can be
+  reported, but missing links are not filled with zero or generalized into a total.
 
-> **인용할 때 지킬 범위**
+> **Scope for citation**
 >
-> `$0.5583347125`는 완결 104조건의 API 계산 비용을 통과 40개로 나눈 산술값이다. 통과 실행에 실제로 귀속된 프로그램 전체 비용이나 청구서 금액으로 인용하지 않는다. 결과별 소계도 정확히 연결된 9조건 안에서만 유효하다.
+> `$0.5583347125` is the arithmetic result of dividing calculated API cost for 104
+> completed conditions by 40 passes. Do not cite it as program-wide cost actually
+> attributable to passing executions or as an invoice amount. Outcome subtotals are valid
+> only within the nine exactly linked conditions.
 
-## 먼저 용어를 쉽게 풀면
+## Terms in Plain Language
 
-| 용어 | 이 문서에서 뜻하는 것 |
+| Term | Meaning in this document |
 |---|---|
-| 과제 | 풀어야 할 문제 1개 |
-| 조건 | 같은 과제를 `none`, squeez, Headroom, LLMLingua-2 가운데 한 방식으로 푼 실행 |
-| 통과(`pass`) | Terminal-Bench 내장 채점기가 통과로 판정한 결과. 고객 수락이나 제품 도입 승인이 아님 |
-| 정상 미통과 | 실행과 채점은 끝났지만 `wrong_answer` 또는 `wrong_format`으로 판정된 결과 |
-| 품질 판정 전 | 기술 미완료, 운영자 중도 종료 또는 HTTP 정체로 첫 공식 채점까지 가지 못한 상태. 오답이 아님 |
-| 평가 실행(`trial`) | 품질 결과를 한 번 세는 단위 |
-| 시도(`attempt`) | 실제로 시작해 비용이 생길 수 있는 실행 단위. 시작 전 취소는 비용 0으로 따로 셈 |
+| Task | One problem to solve |
+| Condition | One execution of the same task under `none`, squeez, Headroom, or LLMLingua-2 |
+| Pass | Result marked passing by the Terminal-Bench built-in grader; not customer acceptance or product-approval evidence |
+| Normal non-pass | Execution and grading completed, with `wrong_answer` or `wrong_format` |
+| Before quality judgment | Technical incompletion, operator stop, or HTTP stall before the first formal grading; not a wrong answer |
+| Evaluation `trial` | Unit counted once for a quality result |
+| `attempt` | Execution unit that actually starts and may incur cost; cancellation before start is counted separately at zero cost |
 
-품질은 `trial`마다 한 번 센다. 비용은 실제로 시작한 `attempt`마다 한 번 센다. 한 시도의 비용을 통과 수와 미통과 수에 동시에 넣지 않는다.
+Quality is counted once per trial. Cost is counted once per attempt that actually starts.
+The same attempt's cost is not included under both passes and non-passes.
 
-## 무엇을 어떻게 계산했나
+## Calculation Method
 
-### 측정 조건
+### Measurement Conditions
 
-| 항목 | 사용한 값 | 계산 단위 | 빠진 것 |
+| Item | Value used | Calculation unit | Missing |
 |---|---|---|---|
-| 품질 분모 | 26과제 × 4조건 = 104조건 | 조건당 1회 | 반복 실행의 흔들림 |
-| API | provider가 보고한 입력·캐시 입력·출력 token | USD | 청구서 대사 |
-| 가격표 | 입력 `$2.5`·캐시 입력 `$0.25`·출력 `$15` / 100만 token당 | 고정 가격표 계산 | 계약 할인·세금·청구 조정 |
-| 가상 머신 | 직접 귀속이 확인된 시간 또는 겹친 프로세스의 합집합 | USD | 104조건 전체의 결과별 배분 |
-| Blob·network | 기록된 쓰기·검증 읽기·전송 작업 | USD | 보존 기간 비용과 계측되지 않은 network |
+| Quality denominator | 26 tasks × 4 conditions = 104 conditions | One per condition | Repeated-run variability |
+| API | Provider-reported input, cached-input, and output tokens | USD | Invoice reconciliation |
+| Price table | Input `$2.5`, cached input `$0.25`, output `$15` per million tokens | Fixed-price calculation | Contract discounts, taxes, and billing adjustments |
+| Virtual machine | Confirmed directly attributable time or union of overlapping processes | USD | Outcome-level allocation for all 104 conditions |
+| Blob and network | Recorded write, verification-read, and transfer operations | USD | Retention cost and uninstrumented network activity |
 
-계산기는 각 공개 사용량 레코드에서 `입력 - 캐시 입력`, 캐시 입력, 출력을 가격표에 각각 곱한다. 원장에 저장된 API 계산 비용과 한 자리라도 다르면 검사를 실패시킨다. 미확정 상태를 나타내는 `unknown`이나 `null`은 0으로 바꾸지 않는다.
+For each public usage record, the calculator multiplies `input - cached input`, cached
+input, and output by their corresponding rates. A difference in any digit from the API
+cost stored in the ledger fails validation. `unknown` and `null` states are not changed
+to zero.
 
-### 비용 네 종류는 합쳐 읽지 않는다
+### Four Cost Types Remain Separate
 
-1. **API 계산 비용**은 provider 사용량에 고정 가격표를 곱한 값이다.
-2. **직접 귀속 가상 머신 비용**은 해당 범위에 겹치지 않게 배분할 수 있는 계산 자원 비용이다.
-3. **Blob·network 비용**은 확인된 저장·읽기·전송 작업의 비용이다.
-4. **실제 청구서**는 provider와 기반 시설 사업자가 발행한 청구 자료다. 이번 자료는 대사하지 않았다.
+1. **Calculated API cost** is provider usage multiplied by the fixed price table.
+2. **Directly attributable VM cost** is compute cost that can be allocated without overlap
+   to the scope.
+3. **Blob and network cost** covers confirmed storage, read, and transfer operations.
+4. **Actual invoice** means billing records issued by the provider and infrastructure
+   vendors. This material was not reconciled against them.
 
-로컬에서 다시 센 변경 구간 token도 별도다. 문자열이 실제로 달라진 부분의 크기를 보여 줄 뿐, 전체 API 사용량이나 비용을 대신하지 않는다.
+Locally recounted tokens in changed spans are also separate. They describe the size of
+text that actually changed; they do not replace total API usage or cost.
 
-## 결과별로 확인된 비용
+## Established Cost by Outcome
 
-### 완결 104조건
+### 104 Completed Conditions
 
-| 결과 분류 | 정확히 연결된 조건 | 확인된 API 계산 비용 | 조건당 값 |
+| Outcome classification | Exactly linked conditions | Confirmed calculated API cost | Per-condition value |
 |---|---:|---:|---:|
-| 통과 | 40개 중 4개 | `$2.277506` | 연결된 4개 안에서 `$0.5693765` |
-| 정상 미통과 | 64개 중 5개 | `$7.56232` | 연결된 5개 안에서 `$1.512464` |
-| 결과별 미배분 | 95조건 | `$12.4935625` | 계산하지 않음 |
-| **완결 104조건 합계** | **104조건** | **`$22.3333885`** | 통과 40개로 단순 나누면 **`$0.5583347125`** |
+| Pass | 4 of 40 | `$2.277506` | `$0.5693765` within the 4 linked cases |
+| Normal non-pass | 5 of 64 | `$7.56232` | `$1.512464` within the 5 linked cases |
+| Unallocated by outcome | 95 conditions | `$12.4935625` | Not calculated |
+| **All 104 completed conditions** | **104 conditions** | **`$22.3333885`** | Simple division by 40 passes: **`$0.5583347125`** |
 
-`wrong_format`은 정상 미통과에 포함하도록 계산 계약을 만들었지만, 이번 104조건에서는 0개였다. 결과별 미배분 95조건은 통과 36개와 `wrong_answer` 59개라는 품질 판정은 안다. 다만 그 결과와 정확한 시도 비용을 잇는 구조화 결합 자료가 모두 남아 있지 않아 비용을 두 결과에 임의 배분하지 않았다.
+The accounting contract includes `wrong_format` under normal non-pass, although none
+occurred among these 104 conditions. The 95 unallocated conditions have known quality
+judgments—36 passes and 59 `wrong_answer` results—but complete structured links between
+those outcomes and exact attempt costs were not retained, so cost is not assigned
+arbitrarily between the two outcomes.
 
-| 결과 분류 | 직접 귀속 가상 머신 | 확인 Blob·network | 청구서 대사 |
+| Outcome classification | Directly attributable VM | Confirmed Blob and network | Invoice reconciliation |
 |---|---:|---:|---|
-| 연결된 통과 4조건 | 미확정 | `$0.0001728` | 안 됨 |
-| 연결된 정상 미통과 5조건 | 미확정 | `$0.000216` | 안 됨 |
-| 미배분 95조건 | 미확정 | 미확정 | 안 됨 |
+| 4 linked passes | Unknown | `$0.0001728` | Not performed |
+| 5 linked normal non-passes | Unknown | `$0.000216` | Not performed |
+| 95 unallocated conditions | Unknown | Unknown | Not performed |
 
-9조건에는 실행별 원장 가상 머신 값이 남아 있지만, 동시에 돌던 실행이 같은 가상 머신 시간을 겹쳐 셌다. 이 값을 더하면 중복이 되므로 직접 귀속 비용으로 승격하지 않았다. 공개 JSON에는 원본 관측 소계를 보조 값으로 남기고, 직접 귀속 값은 `null`로 둔다.
+The nine conditions retain per-execution VM ledger values, but concurrent executions
+counted overlapping VM time. Summing them would double-count, so they were not promoted
+to directly attributable cost. The public JSON retains the raw observed subtotal as a
+supporting value and leaves direct attribution as `null`.
 
-### 품질 판정 전 장기 실행 5개
+### Five Long-Running Attempts Before Quality Judgment
 
-| 종료 상태 | 시작한 시도 | 확인된 API 계산 비용 | 품질 결과 |
+| End state | Started attempts | Confirmed calculated API cost | Quality results |
 |---|---:|---:|---|
-| 운영자 중도 종료 | 4개 | `$80.879013` | 미확정 |
-| HTTP 응답 정체 | 1개 | `$6.892241` | 미확정 |
-| **합계** | **5개** | **`$87.771254`** | **0개** |
+| Operator stop | 4 | `$80.879013` | Unknown |
+| HTTP response stall | 1 | `$6.892241` | Unknown |
+| **Total** | **5** | **`$87.771254`** | **0** |
 
-이 다섯 시도는 실제로 시작했으므로 결과가 없더라도 확인된 비용을 포함한다. 반대로 시작 전 취소는 0건이며 비용도 `$0`이다. HTTP 정체 시도의 마지막 요청 1회는 provider 사용량을 받지 못했다. 입력만으로 계산한 `$0.1294175`는 미확정 추정으로 따로 두고 `$87.771254`에 넣지 않았다.
+These five attempts actually started, so confirmed costs remain despite the lack of
+results. Conversely, there were 0 cancellations before start and their cost was `$0`.
+The final request in the stalled HTTP attempt did not return provider usage. Its
+input-only `$0.1294175` estimate remains separately unresolved and is not included in
+`$87.771254`.
 
-| 비용 구성 | 확인된 값 | 해석 |
+| Cost component | Confirmed value | Interpretation |
 |---|---:|---|
-| API 계산 비용 | `$87.771254` | 사용량이 확인된 응답만 포함 |
-| 직접 귀속 가상 머신 | `$4.204009802011` | 다섯 과제 프로세스 시간의 합집합 |
-| Blob·network | `$0.000054` | 시도 보존 자료 작업만 포함 |
-| **확인 소계** | **`$91.975317802011`** | 미확정 요청을 뺀 값, 최종 총비용 아님 |
+| Calculated API cost | `$87.771254` | Includes only responses with confirmed usage |
+| Directly attributable VM | `$4.204009802011` | Union of the five task-process intervals |
+| Blob and network | `$0.000054` | Includes only operations on retained attempt records |
+| **Confirmed subtotal** | **`$91.975317802011`** | Excludes the unresolved request; not a final total |
 
-## 합계가 양쪽에서 맞는지 확인
+## Two-Way Reconciliation
 
-공개 계산기는 결과 분류에서 한 번, 포함 범위 전체에서 한 번 더 합계를 만든다.
+The public calculator totals once by outcome classification and again by full included
+scope.
 
 ```text
-통과 정확 결합                 $2.277506
-+ 정상 미통과 정확 결합       $7.56232
-+ 완결 품질 결과 미배분       $12.4935625
-+ 품질 판정 전                $87.771254
-+ 시작 전 취소                $0
-= 포함한 확인 API 계산 비용  $110.1046425
+exactly linked passes             $2.277506
++ exactly linked normal non-pass  $7.56232
++ unallocated completed quality  $12.4935625
++ before quality judgment        $87.771254
++ cancelled before start          $0
+= included confirmed calculated API cost  $110.1046425
 ```
 
-반대 방향으로 계산한 `완결 104조건 $22.3333885 + 장기 실행 $87.771254`도 `$110.1046425`다. 두 값이 다르면 생성기와 테스트가 실패한다.
+The opposite calculation, `$22.3333885 for 104 completed conditions + $87.771254 for
+long-running attempts`, also equals `$110.1046425`. The generator and tests fail if the
+two totals differ.
 
-가상 머신과 Blob·network를 더한 공개 부분 소계 `$114.309095102011`도 JSON에 남겼다. 다만 API는 완결 104조건과 장기 시도 5개의 범위, 가상 머신 직접 귀속은 장기 5개의 범위, Blob·network는 정확히 연결된 14개 레코드 범위다. 구성 요소의 범위가 서로 달라 최종 총비용으로 쓰지 않는다.
+The public JSON also contains the partial subtotal `$114.309095102011` after adding VM,
+Blob, and network components. Its scopes differ: API covers the 104 completed conditions
+and five long-running attempts; direct VM attribution covers only the five long-running
+attempts; and Blob and network cover 14 exactly linked records. It is therefore not a
+final total cost.
 
-## 관측, 가능한 설명, 한계
+## Observation, Possible Explanation, and Limitation
 
-**관측.** 정확히 연결된 9조건에서는 통과 4개의 API 계산 비용이 `$2.277506`, 정상 미통과 5개가 `$7.56232`였다. 품질 판정 전 장기 실행 5개의 확인된 API 계산 비용은 `$87.771254`였다.
+**Observation.** Within the nine exactly linked conditions, calculated API cost was
+`$2.277506` for four passes and `$7.56232` for five normal non-passes. Confirmed
+calculated API cost for the five long-running attempts before quality judgment was
+`$87.771254`.
 
-**가능한 설명.** 과제 난도와 실행 길이가 달라 요청 수와 API 사용량이 크게 달라졌을 수 있다. 장기 실행은 채점 전 반복 작업이 많았기 때문에 확인 비용이 커졌다. 다만 이 자료만으로 어느 요인이 얼마를 만들었는지 갈라 재지는 못했다.
+**Possible explanation.** Different task difficulty and run length may have produced
+large differences in request count and API usage. The many repeated actions before grading
+may have contributed to the long-running attempts' high confirmed calculated API cost.
+This evidence does not isolate how much each factor contributed.
 
-**한계.** 완결 실행은 조건당 1회이고, 캐시·요청 수·실행 경로·동시성은 통제하지 않았다. 알려진 채점기 거짓 실패 사례도 있었다. 9조건은 비용 결합 자료가 남은 편의 표본이지 104조건의 대표 표본으로 설계한 것이 아니다. 따라서 압축기 순위, 압축 인과, 품질 비열등성, 모집단 절감률을 주장하지 않는다.
+**Limitation.** Completed conditions ran once each, without controls for cache, request
+count, execution path, or concurrency. A known verifier false-failure case also existed.
+The nine conditions are a convenience sample with retained cost links, not a
+representative sample designed for all 104. The evidence therefore does not support
+compressor ranking, compression causality, quality non-inferiority, or population savings.
 
-## 이 자료로 정할 수 있는 것
+## Decisions This Material Supports
 
-- 이미 쓴 비용을 품질 결과와 기술 미완료 비용으로 섞지 않고 보고하는 형식
-- 다음 실행부터 평가 실행(`trial`)의 품질과 실제로 시작한 시도(`attempt`)의 비용을 어떤 키로 연결할지
-- API, 가상 머신, Blob·network, 청구서 대사 상태를 따로 승인하는 절차
-- 누락된 결합 자료가 채워지기 전에는 어떤 전체 지표를 보류할지
+- A reporting format that keeps quality outcomes separate from technically incomplete cost
+- Keys that link trial quality to the cost of attempts that actually start in future runs
+- A procedure that approves API, VM, Blob and network, and invoice-reconciliation status separately
+- Which aggregate metrics remain withheld until missing links are supplied
 
-## 아직 정할 수 없는 것
+## Decisions It Does Not Support
 
-- 어느 압축기가 비용 대비 가장 낫다는 순위
-- 압축 때문에 품질이나 비용이 달라졌다는 인과 관계
-- 제품 도입 뒤의 통과 1건당 실제 청구 비용
-- 다른 과제나 고객 데이터에 적용할 모집단 절감률
+- Ranking compressors by value for cost
+- A causal claim that compression changed quality or cost
+- Actual billed cost per pass after product adoption
+- Population savings for other tasks or customer data
 
-실험 설계 관점에서도 빈자리가 남는다. 이 결과가 바꿀 의사결정과 기각 기준은 다음 실행 전에 합의해야 한다. 같은 조건의 흔들림을 먼저 재지 않았고, 채점기 검증과 고객 데이터 대표성도 충분하지 않다. 새 실행을 재개한다면 비용·시간 중단 조건, 반복 수, 캐시·동시성 통제와 청구서 대사 범위를 사전에 고정해야 한다.
+Design gaps also remain. The decision this evidence would change and the falsification
+criterion must be agreed before another run. Same-condition variability was not measured
+first, and verifier validation and customer-data representativeness remain insufficient.
+A resumed run should preregister cost and time limits, repetition count, cache and
+concurrency controls, and the scope of invoice reconciliation.
 
-## 공개 근거와 다시 계산하는 법
+## Public Evidence and Recalculation
 
-- [가공 공개 원장](../../../data/experiment/outcome-cost-evidence.json): 원문 요청·응답과 비공개 식별자를 뺀 정확한 결과·비용 결합 입력
-- [결과별 집계 JSON](../../../data/experiment/outcome-cost-accounting.json): 프로그램이 만든 공개 결과
-- [JSON Schema](../../../schemas/outcome-cost-accounting.schema.json): 필수 필드, 고정 수치와 `null` 경계
-- [집계 코드](../../../src/outcome_cost_accounting.py): 가격표 재계산, 분류와 양방향 합계 검사
-- [직접 테스트](../../../tests/test_outcome_cost_accounting.py): 중복 품질·시도, 가격표 드리프트, 미확정 값과 문서 계약 검사
-- [예비 비교 기술 증거](preliminary-comparison-20260916.md): 26과제·104조건과 장기 실행 5개의 상세 관측
+- [Processed public ledger](../../../data/experiment/outcome-cost-evidence.json): exact outcome-and-cost linkage input without raw requests, responses, or private identifiers
+- [Outcome-accounting JSON](../../../data/experiment/outcome-cost-accounting.json): public generated result
+- [JSON Schema](../../../schemas/outcome-cost-accounting.schema.json): required fields, fixed values, and `null` boundary
+- [Aggregation code](../../../src/outcome_cost_accounting.py): price-table recalculation, classification, and two-way reconciliation
+- [Direct tests](../../../tests/test_outcome_cost_accounting.py): duplicate quality and attempt records, price drift, unresolved values, and document-contract checks
+- [Technical preliminary-comparison evidence](preliminary-comparison-20260916.md): detailed observations for 26 tasks, 104 conditions, and 5 long-running attempts
 
-모델이나 provider를 호출하지 않고 다음 명령으로 공개 입력, 생성 결과와 Schema를 확인할 수 있다.
+The public input, generated result, and schema can be checked without calling a model or
+provider:
 
 ```bash
 uv run --locked python -m src.outcome_cost_accounting --check
 uv run --locked python -m unittest tests.test_outcome_cost_accounting -v
 ```
 
-공개 파일에는 원본 요청·응답, endpoint, credential, tenant 값, 개인 경로와 비공개 실행 식별자를 넣지 않았다. 더 넓은 프로그램 전체 비용을 만들려면 누락된 95조건과 다른 과거 기술 미완료 시도의 구조화 결합 자료가 먼저 필요하다.
+Public files exclude raw requests and responses, endpoints, credentials, tenant values,
+personal paths, and private execution identifiers. Program-wide cost requires structured
+linkage for the remaining 95 conditions and other historical technically incomplete
+attempts before it can be calculated.

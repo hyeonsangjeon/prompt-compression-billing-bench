@@ -282,37 +282,44 @@ class OutcomeCostDocumentTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.text = DOCUMENT.read_text()
+        cls.text_flat = " ".join(cls.text.split())
 
     def test_document_keeps_measurement_and_claim_boundaries_visible(self):
         for phrase in (
-            "Terminal-Bench 내장 채점 통과",
-            "고객 수락을 뜻하지 않는다",
-            "실제 청구서가 아니다",
-            "조건당 1회",
-            "캐시·요청 수·실행 경로·동시성",
-            "압축기 순위",
-            "압축 인과",
-            "비열등성",
-            "모집단 절감률",
+            "Terminal-Bench built-in grader",
+            "does not mean customer acceptance",
+            "not an actual invoice",
+            "ran once each",
+            "cache, request count, execution path, or concurrency",
+            "compressor ranking",
+            "compression causality",
+            "quality non-inferiority",
+            "population savings",
         ):
             with self.subTest(phrase=phrase):
-                self.assertIn(phrase, self.text)
+                self.assertIn(phrase, self.text_flat)
+        self.assertIn(
+            "The many repeated actions before grading may have contributed to the "
+            "long-running attempts' high confirmed calculated API cost. This evidence "
+            "does not isolate how much each factor contributed.",
+            self.text_flat,
+        )
 
     def test_document_preserves_fixed_values_and_missing_join(self):
         for phrase in (
-            "26과제·104조건",
-            "40개",
-            "64개",
+            "26 tasks and 104 conditions",
+            "40 passes",
+            "64 `wrong_answer`",
             "`$22.3333885`",
             "`$0.5583347125`",
             "`$87.771254`",
             "`$0.1294175`",
-            "9조건",
-            "95조건",
+            "9 conditions",
+            "95 conditions",
         ):
             with self.subTest(phrase=phrase):
-                self.assertIn(phrase, self.text)
-        self.assertIn("프로그램 전체 통과 1건당 비용은 미확정", self.text)
+                self.assertIn(phrase, self.text_flat)
+        self.assertIn("program-wide cost per pass remains unknown", self.text_flat)
 
     def test_relative_links_resolve(self):
         for target in re.findall(r"(?<!!)\[[^\]]+\]\(([^)#]+)(?:#[^)]+)?\)", self.text):
@@ -335,15 +342,15 @@ class OutcomeCostPresentationNarrativeTests(unittest.TestCase):
 
     def test_easy_narrative_keeps_result_and_cost_together(self):
         for phrase in (
-            "비용을 결과와 함께 읽는 법",
-            "Terminal-Bench 내장 채점을 통과한 조건 결과",
-            "완결 코호트 통과 조건 1건당 `$0.5583347125`",
-            "`wrong_answer` 64조건",
-            "장기 실행 5개의 확인 비용 `$87.771254`",
-            "고객 수락 대리 지표로 검증되지 않았고",
-            "API 계산 비용도 실제 청구서가 아니다",
-            "가능한 활용",
-            "실제 계약 마진을 검증한 것은 아니다",
+            "Reading Cost Together With Outcome",
+            "conditions that passed the Terminal-Bench built-in grader",
+            "`$0.5583347125` per passing\n> condition in the completed cohort",
+            "64 `wrong_answer` conditions",
+            "`$87.771254` in confirmed cost from five long-running executions",
+            "not been validated as a proxy for customer\nacceptance",
+            "calculated API cost is not an invoice",
+            "Possible use",
+            "did not validate customer acceptance or actual contract margin",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.sharing)
@@ -351,90 +358,89 @@ class OutcomeCostPresentationNarrativeTests(unittest.TestCase):
     def test_technical_report_preserves_formula_scope_and_classification(self):
         for phrase in (
             "$22.3333885 ÷ 40 = $0.5583347125",
-            "`wrong_answer` 64조건",
-            "`wrong_format`은 0조건",
-            "4조건 | `$2.277506`",
-            "5조건 | `$7.56232`",
-            "95조건 | `$12.4935625`",
-            "4시도 | `$80.879013`",
-            "1시도 | `$6.892241`",
-            "5시도`와 `$87.771254`",
-            "추정 `$0.1294175`도 확인 비용에서 제외",
-            "프로그램 전체 통과 조건 1건당 비용은 계산하지 않는다",
+            "64 `wrong_answer` conditions",
+            "0 `wrong_format` conditions",
+            "4 conditions | `$2.277506`",
+            "5 conditions | `$7.56232`",
+            "95 conditions | `$12.4935625`",
+            "4 attempts | `$80.879013`",
+            "1 attempt | `$6.892241`",
+            "5 attempts` and `$87.771254`",
+            "estimate of `$0.1294175` for one request without usage",
+            "does not calculate program-wide cost per passing condition",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.preliminary)
 
     def test_briefing_adds_only_verified_metric_and_boundary(self):
-        self.assertIn("완결 코호트 통과 조건 1건당 산술값", self.briefing)
+        self.assertIn("arithmetic value per passing condition in the completed cohort", self.briefing)
         self.assertIn("`$0.5583347125`", self.briefing)
-        self.assertIn("`pass`는 고객 수락 대리 지표로 검증되지 않았다", self.briefing)
+        self.assertIn("`pass` has not been\n  validated as a proxy for customer acceptance", self.briefing)
 
     def test_one_page_preserves_result_cost_scope_and_missing_join(self):
         for phrase in (
-            "압축 적용에서 관측한 문자열 변화와 결과별 비용",
-            "소수 둘째 자리까지 반올림",
-            "1차 실험에서 확인한 것",
-            "이 기록을 활용하는 범위",
-            "현재 자료로 확인한 범위",
-            "추가 확인이 필요할 때",
-            "추가 검증 여부는 아직 정하지 않았다",
-            "선택을 촉구하는 것이 아니라",
-            "[26과제](tasks.md)",
-            "2026-09-16~17 UTC",
-            "모두 104조건",
+            "Observed String Changes and Cost by Outcome",
+            "rounded to two decimal places",
+            "What the Preliminary Experiment Established",
+            "Appropriate Use of This Record",
+            "Established by current evidence",
+            "If further evidence is needed",
+            "No decision has been made to run additional validation",
+            "does not urge a particular choice",
+            "[26 Terminal-Bench 2.1 tasks](tasks.md)",
+            "2026-09-16–17 UTC",
+            "104 conditions total",
             "`temperature=0`, `reasoning_effort=none`",
-            "같은 답을 보장하지 않음",
-            "채점기 거짓 실패",
-            "목적 선정 5과제·15실행에서 수집한 56개 요청의 메시지 본문 UTF-8바이트",
+            "not a guarantee of identical answers",
+            "verifier false-failure case",
+            "UTF-8 bytes of message content from 56 requests collected across 5 purposively selected tasks and 15 historical runs",
             "15.42%",
-            "0.48%~35.29%",
-            "후보 범위",
-            "78조건 중 23조건",
-            "55조건에서는 달라지지 않았다",
-            "현재 공개 집계로 두 경우를 나누지는 못한다",
-            "`tiktoken 0.14.0`의 `o200k_base`",
-            "48%의 분모는 문자열이 달라진 209구간만",
-            "설치 출력에서는 30번째 내용 줄 뒤의 진단·완료 신호가 사라졌다",
-            "별도 복합 명령에서는 앞선 목록이 30줄을 채워",
-            "공개 전후 사례(정적)",
-            "`[ERROR]`·`[WARNING]`",
-            "`1.22.1`은 `. 22. 1`로 갈렸으며",
-            "설계 제안",
-            "모든 제품과 설정에 같은 보호 방식이 필요하다고 일반화하지 않는다",
-            "실제 변경은 시스템의 보호 규칙을 통과한 로그 후보에서 일어났다",
-            "209구간을 파일 목록·설치 기록·명령 실행 결과 같은 종류별로 다시 나누지 않으므로",
-            "도구 동작을 보여 주는 정적 표본으로만 읽는다",
-            "기록된 변환 문자열 변경이 0건인데도",
-            "무압축 기준과 판정이 달라진 짝이 7개",
-            "동일한 무압축 조건을 반복한 결과가 아니며",
-            "전체 요청 이력·요청 수·캐시·실행 경로가 같았다는 증거도 아니다",
-            "반복 실행은 추가 검증을 진행할 때 필요한 설계 조건",
+            "0.48%–35.29%",
+            "candidate scope",
+            "23 conditions and did not change in 55",
+            "current public aggregate cannot distinguish those cases",
+            "tiktoken `0.14.0` and `o200k_base`",
+            "denominator for 48% is only the 209 spans whose strings changed",
+            "Installation diagnostics and completion signals after the 30th content line disappeared",
+            "an earlier listing filled 30 lines",
+            "Public before-and-after example (static)",
+            "`[ERROR]` and `[WARNING]`",
+            "`1.22.1` became `. 22. 1`",
+            "Design proposal",
+            "does not establish that every product and setting requires the same protection mechanism",
+            "Actual changes occurred in log candidates that passed the system's protection rules",
+            "public aggregate does not reclassify the 209 spans as file lists, installation logs",
+            "static illustrations of tool behavior",
+            "transformed-string change count was zero",
+            "Seven squeez or Headroom pairs received different judgments from `none`",
+            "not repeated runs of the same uncompressed condition",
+            "no evidence that full request history, request count, cache state, or execution path matched",
+            "Repeated execution is a design condition for any further validation",
             "`$22.33`",
             "`$0.56`",
-            "64조건의 비용도 들어 있다",
-            "논리 요청 2,783회",
-            "성공 응답 2,782회",
-            "작업 전달 2,778회",
+            "cost of 64 normal non-passes",
+            "2,783 logical requests",
+            "2,782 successful responses",
+            "2,778 task deliveries",
             "`$2.28`",
             "`$7.56`",
-            "95조건",
+            "95 conditions",
             "`$12.49`",
             "`$87.77`",
-            "약 3.9배",
-            "상한 부재만이 비용 차이를 만들었다고 분리 측정한 것은 아니다",
-            "정확히 연결된 9조건의 조건당 API 계산 비용",
+            "about 3.9 times",
+            "did not isolate absence of a limit as the sole cause of the cost difference",
+            "Calculated API Cost per Condition for 9 Exactly Linked Conditions",
             "bar [0.57, 1.51]",
-            "통과 40조건 중 4조건",
-            "정상 미통과 64조건 중 5조건",
-            "대표 표본이 아니다",
-            "프로그램 전체 통과 1건당 비용은 계산하지 않았다",
-            "실제 청구서와 대사하지 않음",
-            "양사가 합의한 업무 수락 기준",
-            "공동으로 선정한 대표 업무 표본",
-            "API 계산 비용, 직접 귀속 인프라 비용, 청구서 대사액",
-            "실제로 시작한 미통과·재시도·품질 판정 전 시도의 비용을 각각 한 번 포함",
-            "핵심 한계",
+            "4 of 40 passing conditions",
+            "5 of 64 normal non-passing conditions",
+            "not a representative sample",
+            "Program-wide cost per pass was therefore not calculated",
+            "not reconciled to an actual invoice",
+            "jointly agreed business-acceptance criterion",
+            "representative work sample",
+            "calculated API cost, directly attributable infrastructure cost, or invoice-reconciled spend",
+            "include exactly once every cost in the preregistered attribution scope from started non-passes, retries, and attempts that ended before quality judgment",
+            "Key Limitations",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.one_page_flat)
@@ -450,20 +456,20 @@ class OutcomeCostPresentationNarrativeTests(unittest.TestCase):
             with self.subTest(exact_value=exact_value):
                 self.assertNotIn(exact_value, self.one_page)
         for internal_sales_phrase in (
-            "프리세일즈",
-            "고정가 견적",
-            "제안서",
-            "실제 계약 마진",
-            "고객이 받아들인 결과",
+            "presales",
+            "fixed-price estimate",
+            "sales proposal",
+            "actual contract margin",
+            "customer-accepted result",
         ):
             with self.subTest(internal_sales_phrase=internal_sales_phrase):
                 self.assertNotIn(internal_sales_phrase, self.one_page)
         for unsupported_claim in (
-            "토큰 압축 효과와 결과별 비용",
-            "같은 과제를, 같은 설정으로, 압축을 걸지 않은 채 여러 번",
-            "보낸 글자가 한 글자도 다르지 않았다",
-            "55조건은 압축할 만한 글이 없었기 때문",
-            "상한을 없앤 결과",
+            "Token Compression Effects and Cost by Outcome",
+            "the same tasks, with the same settings, repeatedly without compression",
+            "the sent text was byte-identical",
+            "all 55 conditions had nothing compressible",
+            "caused by removing the limit",
         ):
             with self.subTest(unsupported_claim=unsupported_claim):
                 self.assertNotIn(unsupported_claim, self.one_page)
@@ -471,7 +477,7 @@ class OutcomeCostPresentationNarrativeTests(unittest.TestCase):
     def test_task_catalog_reconciles_public_task_metrics(self):
         rows = re.findall(
             r"^\| \[(\d+)\. `([^`]+)`\]\((https://[^)]+)\) \|.*"
-            r"\| (\d)/4 \| ([^|]+) \| (\d+)회 \| "
+            r"\| (\d)/4 \| ([^|]+) \| (\d+) \| "
             r"`\$(\d+\.\d{3})` \|$",
             self.task_catalog,
             re.MULTILINE,
@@ -484,7 +490,7 @@ class OutcomeCostPresentationNarrativeTests(unittest.TestCase):
         task_ids = {row[1] for row in rows}
         report_task_ids = set(
             re.findall(
-                r"^## (?:별도 집단: )?`([^`]+)`$", self.preliminary, re.MULTILINE
+                r"^## (?:Separate Cohort: )?`([^`]+)`$", self.preliminary, re.MULTILINE
             )
         )
         self.assertEqual(task_ids, report_task_ids)
@@ -493,22 +499,22 @@ class OutcomeCostPresentationNarrativeTests(unittest.TestCase):
                 self.assertIn(
                     "7131e4375048a0e408a8fb404b5f499d726b695b", url
                 )
-                self.assertRegex(duration, r"\d+분 \d+초~\d+분 \d+초")
+                self.assertRegex(duration, r"\d+ min \d+ sec–\d+ min \d+ sec")
         for phrase in (
-            "네 비교 조건",
-            "과제당 4조건, 모두 104조건",
+            "Four Comparison Conditions",
+            "4 conditions per task and 104 total",
             "`none`",
             "squeez `1.48.4`",
             "Headroom `0.36.5` paths-only",
             "LLMLingua-2 `0.2.2`",
-            "논리 요청 합",
-            "API 계산 비용 합",
-            "실제 `pass`와 `wrong_answer`는 과제 내장 채점기의 판정",
-            "반복 통과율이 아니다",
-            "압축기 속도 비교로 읽지 않는다",
-            "HTTP 시도, 성공 응답, 작업에 전달한 응답과 같은 사건으로 취급하지 않는다",
-            "정밀 원본 합은 `$22.3333885`",
-            "실제 청구서와 대사한 금액은 아니다",
+            "Logical requests",
+            "Calculated API cost",
+            "Actual `pass` and `wrong_answer` values are judgments from the task's built-in grader",
+            "not a repeated-run pass rate",
+            "unsuitable for comparing compressor speed",
+            "not interchangeable with HTTP attempts, successful responses, or responses delivered to the task",
+            "precise source sum is `$22.3333885`",
+            "not an invoice-reconciled amount",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.task_catalog_flat)
@@ -526,9 +532,9 @@ class OutcomeCostPresentationNarrativeTests(unittest.TestCase):
         combined = "\n".join(
             (self.sharing, self.preliminary, self.briefing, self.one_page)
         )
-        self.assertNotIn("쓸모 있었던 결과물", combined)
-        self.assertNotIn("받아들여진 결과물", combined)
-        self.assertNotIn("고객이 수락한 결과", combined)
+        self.assertNotIn("useful output", combined)
+        self.assertNotIn("accepted output", combined)
+        self.assertNotIn("customer-accepted result", combined)
 
 
 if __name__ == "__main__":

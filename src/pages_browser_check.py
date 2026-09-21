@@ -145,7 +145,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
     browser_version = ""
     skip_link_result: dict[str, object] = {}
     table_keyboard_result: dict[str, object] = {}
-    unicode_fragment_result: dict[str, object] = {}
+    fragment_navigation_result: dict[str, object] = {}
     errors: list[dict[str, object]] = []
 
     def observe(page: object) -> None:
@@ -287,13 +287,13 @@ def run(args: argparse.Namespace) -> dict[str, object]:
                 if not table_keyboard_result["passed"]:
                     errors.append({"code": "table_keyboard_overflow_failed", **table_keyboard_result})
 
-                fragment_probe = contract.get("probes", {}).get("encoded_hangul_fragment", {})
+                fragment_probe = contract.get("probes", {}).get("fragment_navigation", {})
                 target_file = str(fragment_probe.get("expected_target_file", ""))
                 decoded_fragment = str(fragment_probe.get("decoded_fragment", ""))
                 fragment_url = origin + project_prefix + quote(target_file, safe="/") + "#" + quote(decoded_fragment)
                 response = page.goto(fragment_url, wait_until="load")
                 target_count = page.locator(f'[id="{decoded_fragment}"]').count()
-                unicode_fragment_result = {
+                fragment_navigation_result = {
                     "status": response.status if response else None,
                     "decoded_hash": unquote(str(page.evaluate("location.hash"))).lstrip("#"),
                     "target_count": target_count,
@@ -304,8 +304,8 @@ def run(args: argparse.Namespace) -> dict[str, object]:
                         and unquote(str(page.evaluate("location.hash"))).lstrip("#") == decoded_fragment
                     ),
                 }
-                if not unicode_fragment_result["passed"]:
-                    errors.append({"code": "unicode_fragment_navigation_failed", **unicode_fragment_result})
+                if not fragment_navigation_result["passed"]:
+                    errors.append({"code": "fragment_navigation_failed", **fragment_navigation_result})
                 page.close()
             finally:
                 browser.close()
@@ -346,7 +346,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         "route_viewport_checks_passed": sum(item["passed"] for item in route_results),
         "skip_link_keyboard": skip_link_result,
         "table_keyboard_overflow": table_keyboard_result,
-        "unicode_fragment_navigation": unicode_fragment_result,
+        "fragment_navigation": fragment_navigation_result,
         "server_thread_stopped": thread_stopped,
         "errors": errors,
     }

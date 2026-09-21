@@ -1,131 +1,89 @@
-# 다음 유료 실행 종료·비용 안전 정책
+# Stopping and Cost-Safety Policy for Future Paid Runs
 
-**적용 범위:** 이 문서는 원장 schema version 4로 시작하는 앞으로의 provider 유료
-실행에 적용한다. 과거 원장, 측정값, 해시와 결과 JSON은 바꾸지 않는다. 공개 원장은
-일부 승인값이 비어 있어 그대로는 실행할 수 없다.
+**Scope:** This document applies to future paid provider runs that begin with ledger schema version 4. It does not change historical ledgers, measurements, hashes, or result JSON. Some approval fields in the public ledgers are blank, so those ledgers cannot be executed as-is.
 
-## 30초 요약
+## 30-Second Summary
 
-- 한 과제의 한 실제 시도인 `attempt`마다 provider HTTP 시도 수, API 계산 비용,
-  경과 시간, 요청 크기와 출력 token에 상한을 둔다.
-- 전체 실행에도 API 계산 비용 상한과 UTC 종료 시각을 둔다. 두 비용 상한과 종료
-  시각 중 하나라도 비어 있거나 승인되지 않으면 provider 호출 전에 멈춘다.
-- 상한에 닿은 결과는 오답이 아니다. 품질을 아직 모르는 **기술 미완료**로 기록하고,
-  비용 때문에 멈췄으면 `budget_stopped`, 그 밖의 관찰 경계에서 멈췄으면
-  `censored`로 구분한다.
-- 자연 종료까지 기다리는 관찰은 일반 비교에서 허용하지 않는다. 별도 파일럿의 사전
-  비용 승인, 최대 노출액과 수동 종료 조건을 먼저 고정해야 하며, 현재 실행기에는 그
-  파일럿 진입점이 없다.
+- Each `attempt`—one actual attempt at one task—has limits on provider HTTP attempts, calculated API cost, elapsed time, request size, and output tokens.
+- The entire run also has a calculated API cost limit and a UTC deadline. Execution stops before any provider call if either cost limit or the deadline is missing or unapproved.
+- Reaching a limit is not a wrong answer. It is recorded as **technically incomplete** with unknown quality: `budget_stopped` when a cost or call budget stops it, and `censored` at another observation boundary.
+- Waiting for natural termination is not allowed in the general comparison. A separate pilot would require a preapproved cost, maximum exposure, and manual stopping rule. The current runner has no entry point for that pilot.
 
-## 무엇을 얼마로 막나
+## Enforced Limits
 
-`trial`은 한 과제·반복·조건의 품질 단위이고, `attempt`는 그 안에서 실제로 시작한
-시도다. 준비 재시도가 있으면 `attempt` 비용은 각각 남지만 품질 결과는 `trial`에 한
-번만 들어간다.
+A `trial` is the quality unit for one task, repetition, and condition. An `attempt` is an execution that actually starts within a trial. A preparation retry leaves separate attempt costs, but contributes only one quality result to the trial.
 
-| 경계 | schema version 4 정책 | 적용 시점 | 닿았을 때 |
+| Boundary | Schema version 4 policy | Enforcement point | Result when reached |
 |---|---:|---|---|
-| attempt당 provider HTTP 시도 | 60회 | 61번째 전송 예약 전 | `budget_stopped` |
-| attempt당 API 계산 비용 | 실행 전 승인한 양수 | 매 전송 예약 전·응답 정산 뒤 | `budget_stopped` |
-| 전체 실행 API 계산 비용 | 실행 전 승인한 양수, attempt 상한 이상 | 매 전송 예약 전·응답 정산 뒤 | `budget_stopped` |
-| attempt 경과 시간 | 2,400초 | 실행 process와 요청 대기 중 | `censored` |
-| 전체 실행 종료 시각 | 실행 전 승인한 미래 UTC 시각 | 요청·대기·process 감시 중 | `censored` |
-| 요청 크기 | 8,000,000 UTF-8 wire bytes | 변환 전 수신과 전송 직전 | `censored` |
-| 응답 출력 | 요청 `max_completion_tokens=2,048` | 전송 전 고정, 사용량 수신 뒤 대조 | `censored` |
-| provider HTTP 대기 | 300초 | 외부 HTTP 시도마다 | `censored` 또는 transport 오류 |
-| 일시적 HTTP 시도 | 합계 최대 3회 | HTTP 429 처리 | 소진 뒤 기술 오류 |
-| 한 번의 재시도 대기 | 최대 120초 | `Retry-After` 적용 전 | `censored` |
-| 진행 없는 반복 | 최근 논리 요청 8개에서 서로 다른 진행 신호 3개 미만 | 다음 외부 전송 전 | `censored` |
+| Provider HTTP attempts per attempt | 60 | Before scheduling the 61st send | `budget_stopped` |
+| Calculated API cost per attempt | Positive value approved before execution | Before scheduling each send and after reconciling each response | `budget_stopped` |
+| Calculated API cost for the full run | Positive value approved before execution and no lower than the attempt limit | Before scheduling each send and after reconciling each response | `budget_stopped` |
+| Attempt elapsed time | 2,400 seconds | While monitoring the execution process and request waits | `censored` |
+| Full-run deadline | Explicit future UTC time approved before execution | While monitoring requests, waits, and processes | `censored` |
+| Request size | 8,000,000 UTF-8 wire bytes | On receipt before transformation and immediately before sending | `censored` |
+| Response output | Request `max_completion_tokens=2,048` | Fixed before sending and checked after usage is received | `censored` |
+| Provider HTTP wait | 300 seconds | Each external HTTP attempt | `censored` or transport error |
+| Transient HTTP attempts | 3 total | HTTP 429 handling | Technical error after exhaustion |
+| One retry wait | Up to 120 seconds | Before applying `Retry-After` | `censored` |
+| No-progress repetition | Fewer than 3 distinct progress signals in the most recent 8 logical requests | Before the next external send | `censored` |
 
-provider HTTP 시도에는 같은 논리 요청의 429 재시도도 각각 포함한다. 진행 신호는
-가장 최근 assistant 명령 계획과 그 뒤 user 관찰을 원문 대신 SHA-256으로 만든 값이다.
-신호를 만들 수 없는 요청도 창에서 빠뜨리지 않고 같은 “신호 없음” 값으로 센다.
+Each 429 retry for the same logical request counts as a separate provider HTTP attempt. A progress signal is the SHA-256 of the most recent assistant command plan and the following user observation rather than their raw text. A request for which no signal can be produced remains in the window with the same “no signal” value.
 
-API 계산 비용은 provider 사용량에 원장의 고정 가격표를 곱한 값이며 실제 청구서가
-아니다. 전송 전에는 로컬에서 센 비캐시 입력 token, protocol 여유 4,096 token과 출력
-상한을 합쳐 비용을 예약한다. 이 예약은 provider의 청구 보장이 아니므로 응답 뒤 실제
-사용량과 다시 대조한다. 확인된 비용, 사용량을 받지 못한 미확정 노출액, 전송 중인
-예약액을 모두 합쳐 다음 요청 허용 여부를 판단한다. 미확정 값을 0으로 바꾸지 않는다.
+Calculated API cost is provider usage multiplied by the fixed rates in the ledger; it is not an invoice. Before sending, the runner reserves cost using locally counted uncached input tokens, 4,096 tokens of protocol headroom, and the output limit. This reservation does not guarantee provider billing, so it is reconciled against actual usage after the response. Confirmed cost, unresolved exposure for responses without usage, and in-flight reservations all count when deciding whether another request is allowed. Unknown values are not converted to zero.
 
-## 실행 전 반드시 채울 값
+## Values Required Before Execution
 
-공개 `ledgers/native.template.toml`과 `ledgers/screening.template.toml`은 고정 경계를
-보여 주는 템플릿이다. 다음 값은 공개 기본값으로 대신 정하지 않는다.
+The public `ledgers/native.template.toml` and `ledgers/screening.template.toml` show the fixed boundaries. The following values do not receive public defaults:
 
-1. `max_api_cost_usd_per_attempt`: 과제의 한 실제 시도에 허용할 API 계산 비용
-2. `max_api_cost_usd_per_run`: 전체 새 실행에 허용할 API 계산 비용
-3. `run_deadline_utc`: 미래의 명시적 UTC 종료 시각
-4. `cost_limits_approved = true`와 실제 승인 근거
-5. 실행 승인, 가격표 출처·확인 시각, deployment 공유 조정 근거
+1. `max_api_cost_usd_per_attempt`: calculated API cost allowed for one actual task attempt
+2. `max_api_cost_usd_per_run`: calculated API cost allowed for the entire new run
+3. `run_deadline_utc`: an explicit future UTC deadline
+4. `cost_limits_approved = true` and the actual approval evidence
+5. Execution approval, price-source and checked-at evidence, and deployment-sharing coordination evidence
 
-두 비용 상한은 모두 양수여야 하고 전체 실행 상한은 attempt 상한보다 작을 수 없다.
-세 값은 일부만 채울 수 없다. 종료 시각이 이미 지났거나 가격표가 비어 있어도 실행을
-시작하지 않는다. 일반 비교에서는 나머지 고정 경계를 늘리거나 끌 수 없다. 변경이
-필요하면 새 정책 revision, 새 source commit과 새 원장으로 검토한다.
+Both cost limits must be positive, and the full-run limit cannot be lower than the per-attempt limit. The three boundary values cannot be filled only in part. Execution also does not start if the deadline has passed or the price table is empty. A general comparison cannot increase or disable the remaining fixed boundaries. Any required change needs a new policy revision, source commit, and ledger review.
 
-## 상한에 닿은 결과를 읽는 법
+## Interpreting a Limit Stop
 
-상한 종료는 `pass`, `wrong_answer`, `wrong_format`과 같은 품질 판정이 아니다.
+A limit stop is not a quality judgment such as `pass`, `wrong_answer`, or `wrong_format`.
 
-| 기록 | 값 |
+| Record field | Value |
 |---|---|
-| 기술 상태 | `technical_incomplete` |
-| 품질 상태 | `unknown` |
-| 종료 성격 | `budget_stopped` 또는 `censored` |
-| 검열 표기 | `right_censored` |
-| 품질 분모 | 제외 |
-| 자동 재전송 | 없음 |
+| Technical status | `technical_incomplete` |
+| Quality status | `unknown` |
+| Stop class | `budget_stopped` or `censored` |
+| Censoring | `right_censored` |
+| Quality denominator | Excluded |
+| Automatic resend | None |
 
-`budget_stopped`는 호출 수나 계산 비용 예산에 닿았다는 뜻이다. `censored`는 시간,
-요청 크기, 출력 token, 재시도 대기 또는 진행 신호 경계에서 관찰을 끝냈다는 뜻이다.
-둘 다 내장 채점 오답으로 바꾸지 않는다. verifier가 실행되기 전에 끝났다면 품질은
-계속 미확정이다.
+`budget_stopped` means the call-count or calculated-cost budget was reached. `censored` means observation ended at a time, request-size, output-token, retry-wait, or progress-signal boundary. Neither becomes a wrong answer under the built-in grader. If execution ended before the verifier ran, quality remains unknown.
 
-## 어떤 증거를 남기나
+## Evidence Retained
 
-각 종료 기록에는 다음을 함께 보존한다.
+Each stop record preserves:
 
-- 종료 이유, 범위가 attempt인지 전체 실행인지, 실제 적용 상한과 관측값
-- 마지막 논리 요청·HTTP 시도 위치, 요청 SHA-256과 byte 수
-- 마지막 응답의 HTTP 상태·SHA-256과 usage 확인 상태
-- 확인된 API 계산 비용, 미확정 노출액과 아직 전송 중이던 예약액
-- source commit, 원장과 실행 manifest SHA-256, 과제·컨테이너·workspace 식별 계보
-- workspace 보존·상태 재생 manifest 상태와 verifier 실행 여부
+- The stop reason, whether its scope was the attempt or full run, the applied limit, and the observed value
+- The last logical-request and HTTP-attempt positions, request SHA-256, and byte count
+- The final response's HTTP status, SHA-256, and usage-confirmation state
+- Confirmed calculated API cost, unresolved exposure, and any in-flight reservation
+- Source commit; ledger and run-manifest SHA-256; and task, container, and workspace lineage
+- Workspace preservation, state-replay manifest status, and whether the verifier ran
 
-원문 요청·응답, endpoint, credential, tenant 값과 개인 경로는 공개 결과에 넣지 않는다.
-상태 재생과 원격 hash 확인이 끝나지 않은 기술 종료는 완료된 증거로 승격하지 않는다.
-같은 실행을 재개할 때 사용량 없는 요청의 최대 노출액조차 계산할 수 없으면 새 유료
-요청을 보내지 않는다.
+Published results exclude raw requests and responses, endpoints, credentials, tenant values, and personal paths. A technical stop is not promoted to complete evidence before state replay and remote-hash verification finish. If even the maximum exposure for a request without usage cannot be calculated when resuming a run, no new paid request is sent.
 
-## 자연 종료 관찰은 별도 파일럿이다
+## Natural-Termination Observation Is a Separate Pilot
 
-일반 비교 원장의 `natural_termination_observation`은 항상
-`separate_pilot_only`다. 일반 비교에서 위 상한을 해제해 자연 종료를 기다리는 설정은
-허용하지 않는다.
+`natural_termination_observation` is always `separate_pilot_only` in a general-comparison ledger. A general comparison may not disable the limits above and wait for natural termination.
 
-별도 파일럿을 만들려면 최소한 사전 승인한 계산 비용, 최대 노출액, 수동 종료 조건,
-운영 책임자와 증거 보존 범위를 독립 원장과 schema에 고정해야 한다. 현재 저장소에는
-그 파일럿 실행 계약과 진입점이 없으므로 자연 종료 관찰은 실행할 수 없다. 이 빈자리를
-일반 비교의 큰 숫자나 빈 상한으로 대신하지 않는다.
+A separate pilot would need at least a preapproved calculated cost, maximum exposure, manual stopping rule, responsible operator, and evidence-retention scope fixed in an independent ledger and schema. This repository currently has no execution contract or entry point for that pilot, so natural-termination observation cannot run. A large number or blank limit in the general comparison is not a substitute.
 
-## 과거 기록과 남은 한계
+## Historical Records and Remaining Limitations
 
-- schema version 1~3 원장과 기존 결과는 당시 정책의 역사 기록으로 계속 검증한다.
-  새 provider 실행에는 schema version 4만 쓴다.
-- 과거 결과를 읽기 전용으로 연결할 때 60회 호출 또는 2,048 출력 token 경계의 영향을
-  받은 결과는 새 실행의 같은 결과로 재사용하지 않는다.
-- 비용 예약은 provider의 실제 청구 상한을 보증하지 않는다. provider가 usage를
-  돌려주지 않거나 토큰화가 다르면 미확정 노출액이 남으며 청구서 대사가 필요하다.
-- 진행 신호는 명령 계획과 관찰 문자열의 SHA-256 다양성을 세는 운영 규칙이다. 문자열이
-  달라졌다는 사실이 의미 있는 작업 진전을 증명하지 않으므로 품질이나 완료 근거로 쓰지
-  않는다.
-- attempt의 2,400초 상한은 준비, agent와 verifier를 포함한 process 경계다. 단계별
-  원인이나 순수 모델 시간의 상한으로 해석하지 않는다.
-- Harbor 내부 단계 타이머는 증거 수집을 중간에 서로 다르게 자르지 않도록 비활성화한
-  채 유지한다. 대신 바깥 supervisor와 보호된 loopback transport가 위 attempt·요청
-  상한을 적용한다.
+- Schema version 1–3 ledgers and existing results remain verifiable as historical records under their original policies. New provider runs use only schema version 4.
+- When historical results are linked read-only, a result affected by the 60-call or 2,048-output-token boundary is not reused as the same result in a new run.
+- Cost reservation does not guarantee the provider's actual billing cap. Missing provider usage or different tokenization leaves unresolved exposure and requires invoice reconciliation.
+- The progress signal is an operating rule that counts SHA-256 diversity in command plans and observation strings. A changed string does not establish meaningful progress and is not quality or completion evidence.
+- The 2,400-second attempt limit covers the process boundary including preparation, agent work, and verification. It is not a limit on a specific stage or pure model time.
+- Harbor's internal stage timers remain disabled to avoid truncating different evidence at different stages. The outer supervisor and protected loopback transport enforce the attempt and request boundaries above.
 
-정확한 기계 계약은
-[`execution-safety-policy.schema.json`](../../schemas/execution-safety-policy.schema.json),
-원장 검사는 [`execution_safety.py`](../../src/execution_safety.py), 실행 경계는
-[`live_transport.py`](../../src/live_transport.py)에 있다.
+The exact machine contract is in [`execution-safety-policy.schema.json`](../../schemas/execution-safety-policy.schema.json), ledger validation is in [`execution_safety.py`](../../src/execution_safety.py), and runtime boundaries are in [`live_transport.py`](../../src/live_transport.py).

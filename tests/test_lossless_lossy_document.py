@@ -15,37 +15,38 @@ class LosslessLossyDocumentTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.text = DOCUMENT.read_text(encoding="utf-8")
+        cls.text_flat = " ".join(cls.text.split())
         cls.summary = json.loads(SUMMARY.read_text(encoding="utf-8"))
         cls.static_report = STATIC_REPORT.read_text(encoding="utf-8")
 
     def test_definitions_and_distinct_boundaries_are_explicit(self):
         required = (
-            "무손실 압축",
-            "원문과 정확히 같은 바이트",
-            "손실 압축",
-            "원문과 같은 바이트로 복원된다고 보장할 수 없는",
-            "전송 압축",
-            "캐시",
-            "prompt 내용 축약",
+            "lossless compression",
+            "exact source bytes",
+            "**Lossy compression**",
+            "cannot guarantee restoration to the same bytes",
+            "Transport compression",
+            "Cache",
+            "Prompt-content reduction",
         )
         for phrase in required:
             with self.subTest(phrase=phrase):
-                self.assertIn(phrase, self.text)
+                self.assertIn(phrase, self.text_flat)
 
     def test_four_conditions_keep_the_implemented_classification(self):
         expected = (
-            "`none`은 입력 문자열을 그대로 돌려준다",
-            "`squeez 1.48.4`",
-            "분류:** 손실 압축",
-            "`Headroom 0.36.5`",
-            "경로 전용 제한 설정에서 무손실 압축",
-            "`LLMLingua-2 0.2.2`",
+            "`none` returns the input string unchanged",
+            "squeez `1.48.4`",
+            "Classification:** Lossy compression",
+            "Headroom `0.36.5`",
+            "Lossless compression within a restricted paths-only configuration",
+            "LLMLingua-2 `0.2.2`",
             "`rate=0.5`",
         )
         for phrase in expected:
             with self.subTest(phrase=phrase):
-                self.assertIn(phrase, self.text)
-        self.assertGreaterEqual(self.text.count("분류:** 손실 압축"), 2)
+                self.assertIn(phrase, self.text_flat)
+        self.assertGreaterEqual(self.text.count("Classification:** Lossy compression"), 2)
 
     def test_published_change_counts_match_the_aggregate(self):
         by_condition = self.summary["changes"]["by_condition"]
@@ -56,40 +57,45 @@ class LosslessLossyDocumentTests(unittest.TestCase):
         ):
             values = by_condition[condition]
             section = self.text.split(f"### `{display}`", 1)[1].split("\n### ", 1)[0]
-            expected = f"{values['changed_conditions']}조건의 {values['changed_spans']}구간"
+            expected = f"{values['changed_spans']} spans in {values['changed_conditions']} of 26 conditions actually changed"
             with self.subTest(condition=condition):
                 self.assertIn(expected, section)
-        self.assertIn("23조건의 209구간", self.text)
-        self.assertIn("조건당 1회", self.text)
+        self.assertIn("209 spans in 23 conditions", self.text)
+        self.assertIn("One per condition", self.text)
 
     def test_static_scope_matches_the_published_measurement(self):
+        self.assertIn(
+            "Between 2026-09-11 and 2026-09-13 UTC, compressors were applied "
+            "statically to stored requests for these measurements.",
+            self.static_report,
+        )
         source_and_document = (
-            ("18/107·6/27", "107출현 가운데 18출현, 27고유 입력 가운데 6개"),
-            ("10/107·3/27", "10출현·3고유 입력"),
-            ("107/107·27/27", "107출현·27고유 입력이 모두 바뀜"),
+            ("18/107; 6/27", "18 of 107 candidate occurrences and 6 of 27 unique inputs changed"),
+            ("10/107; 3/27", "10 occurrences and 3 unique inputs actually changed"),
+            ("107/107; 27/27", "All 107 candidate occurrences and 27 unique inputs changed"),
         )
         for source_phrase, document_phrase in source_and_document:
             with self.subTest(source_phrase=source_phrase):
                 self.assertIn(source_phrase, self.static_report)
                 self.assertIn(document_phrase, self.text)
-        self.assertIn("107/107출현을 역변환했을 때 원문과 byte 단위로 같았고", self.static_report)
-        self.assertIn("후보 107출현 모두 복원 일치", self.text)
+        self.assertIn("Reverse transformation reproduced the original bytes for 107/107 occurrences", self.static_report)
+        self.assertIn("Restoration matched for all 107 candidate occurrences", self.text)
 
     def test_units_quality_and_claim_limits_are_not_merged(self):
         for phrase in (
-            "로컬 변경 구간 token",
-            "전체 API 사용량(usage)",
-            "계산 비용",
-            "실제 청구서",
-            "품질",
-            "제품 도입",
-            "압축기 순위",
-            "품질 비열등성",
-            "모집단 비용 절감률",
-            "캐시·요청 수·실행 경로·동시성 미통제",
+            "Local tokens in changed spans",
+            "Full API usage",
+            "Calculated cost",
+            "Actual invoice",
+            "Quality",
+            "product adoption",
+            "compressor ranking",
+            "quality non-inferiority",
+            "population cost savings",
+            "Cache, request count, path, and concurrency uncontrolled",
         ):
             with self.subTest(phrase=phrase):
-                self.assertIn(phrase, self.text)
+                self.assertIn(phrase, self.text_flat)
         self.assertEqual(len(re.findall(r"^\| (?:[1-9]|10) \|", self.text, re.MULTILINE)), 10)
 
     def test_direct_relative_links_resolve(self):

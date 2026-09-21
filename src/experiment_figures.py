@@ -23,10 +23,12 @@ OUTPUTS = {
     "calculated_cost": ROOT / "figures/preliminary-calculated-cost.svg",
 }
 COLORS = ("#2457a6", "#d97706", "#16856b", "#8b5cf6")
+ORIGINAL_SOURCE_SHA256 = "d07735db90578f2646f97399485d26a8900ff96f93ff775cbcfb8dccb5beaae8"
+ENGLISH_SOURCE_SHA256 = "5c39c681db5bdb03078e71535594a7e611c49d65023e85da63c7420c01e41afd"
 
 
 def _integer(value: str) -> int:
-    return int(value.replace(",", "").removesuffix("건"))
+    return int(value.replace(",", "").removesuffix(" occurrences"))
 
 
 def _money(value: str) -> float:
@@ -51,7 +53,7 @@ def _table_after(markdown: str, heading: str) -> tuple[list[str], list[list[str]
 
 
 def _rows(rows: list[list[str]]) -> dict[str, list[str]]:
-    return {row[0]: row[1:] for row in rows if row[0] != "합계"}
+    return {row[0]: row[1:] for row in rows if row[0] != "Total"}
 
 
 def load_aggregate(path: Path = DATA) -> dict:
@@ -60,19 +62,21 @@ def load_aggregate(path: Path = DATA) -> dict:
         raise ValueError("Unexpected preliminary aggregate contract")
     source = ROOT / value["source"]["path"]
     markdown_bytes = source.read_bytes()
-    if digest(markdown_bytes) != value["source"]["sha256"]:
-        raise ValueError("Public aggregate source document changed")
+    if value["source"]["sha256"] != ORIGINAL_SOURCE_SHA256:
+        raise ValueError("Original public aggregate source identity changed")
+    if digest(markdown_bytes) != ENGLISH_SOURCE_SHA256:
+        raise ValueError("English public aggregate source document changed")
     markdown = markdown_bytes.decode()
     conditions = value["conditions"]
 
-    _, quality_rows = _table_after(markdown, "### 답을 맞힌 조건은 몇 개인가")
+    _, quality_rows = _table_after(markdown, "### How Many Conditions Passed?")
     quality = _rows(quality_rows)
     for condition in conditions:
         expected = value["quality"]["by_condition"][condition]
         if [_integer(item) for item in quality[condition][:2]] != [expected["pass"], expected["wrong_answer"]]:
             raise ValueError("Quality aggregate differs from its public table")
 
-    _, change_rows = _table_after(markdown, "### 실제 문자열은 얼마나 바뀌었나")
+    _, change_rows = _table_after(markdown, "### How Much Did the Actual String Change?")
     changes = _rows(change_rows)
     for condition in conditions:
         expected = value["changes"]["by_condition"][condition]
@@ -80,11 +84,16 @@ def load_aggregate(path: Path = DATA) -> dict:
             expected["changed_conditions"], expected["unchanged_conditions"], expected["changed_spans"],
         ]:
             raise ValueError("Change aggregate differs from its public table")
-    token_match = re.search(r"738건.*209건.*529건.*`97,723 → 50,824`토큰.*166건", markdown)
+    token_match = re.search(
+        r"738 input-output pairs.*209 changed.*529 were identical strings.*"
+        r"`97,723 → 50,824` tokens.*166 spans",
+        markdown,
+        re.DOTALL,
+    )
     if token_match is None:
         raise ValueError("Changed-span token scope differs from the public report")
 
-    _, request_rows = _table_after(markdown, "### 요청, API 사용량과 비용은 어떻게 읽나")
+    _, request_rows = _table_after(markdown, "### How to Read Requests, API Usage, and Cost")
     requests = _rows(request_rows)
     request_fields = ("logical_model_calls", "provider_http_attempts", "successful_http_responses", "delivered_responses")
     for condition in conditions:
@@ -93,7 +102,7 @@ def load_aggregate(path: Path = DATA) -> dict:
         ]:
             raise ValueError("Request aggregate differs from its public table")
 
-    usage_heading = "| 조건 | 입력 토큰 | 캐시 토큰 | 출력 토큰 |"
+    usage_heading = "| Condition | Input tokens | Cached tokens | Output tokens |"
     _, usage_rows = _table_after(markdown, usage_heading)
     usage = _rows(usage_rows)
     usage_fields = ("input_tokens", "cached_input_tokens", "output_tokens")
@@ -103,7 +112,7 @@ def load_aggregate(path: Path = DATA) -> dict:
         ]:
             raise ValueError("Provider-usage aggregate differs from its public table")
 
-    cost_heading = "| 조건 | API 계산 비용 | HTTP 시도 | HTTP 시도당 비용 |"
+    cost_heading = "| Condition | Calculated API cost | HTTP attempts | Cost per HTTP attempt |"
     _, cost_rows = _table_after(markdown, cost_heading)
     costs = _rows(cost_rows)
     for condition in conditions:

@@ -21,7 +21,7 @@ def tables(section):
     lines = section.splitlines()
     found = []
     for index, line in enumerate(lines):
-        if not line.startswith("| 조건 |"):
+        if not line.startswith("| Condition |"):
             continue
         header = [cell.strip() for cell in line.strip("|").split("|")]
         rows = []
@@ -49,7 +49,7 @@ class FirstStudyMetricMatrixTests(unittest.TestCase):
     @classmethod
     def _records(cls):
         matches = list(
-            re.finditer(r"^## (?:별도 집단: )?`([^`]+)`\n", cls.report, re.MULTILINE)
+            re.finditer(r"^## (?:Separate Cohort: )?`([^`]+)`\n", cls.report, re.MULTILINE)
         )
         records = {}
         task_order = []
@@ -59,32 +59,32 @@ class FirstStudyMetricMatrixTests(unittest.TestCase):
             end = (
                 matches[index + 1].start()
                 if index + 1 < len(matches)
-                else cls.report.find("\n## 보존 원문 토큰 계산 자료", match.end())
+                else cls.report.find("\n## Preserved-Source Token Calculation Evidence", match.end())
             )
             section = cls.report[match.end() : end]
             task_tables = tables(section)
             quality_rows = next(
                 rows
                 for header, rows in task_tables
-                if any(key.startswith("provider 논리 요청") for key in header)
+                if any(key.startswith("Provider logical requests") for key in header)
             )
             cost_rows = next(
-                rows for header, rows in task_tables if "provider 계산 비용" in header
+                rows for header, rows in task_tables if "Calculated provider cost" in header
             )
             for quality, cost in zip(quality_rows, cost_rows):
-                change_key = next(key for key in quality if "실제 변경" in key)
-                records[(task, quality["조건"])] = {
-                    "quality": quality["품질"],
+                change_key = next(key for key in quality if "actual changes" in key.lower())
+                records[(task, quality["Condition"])] = {
+                    "quality": quality["Quality"],
                     "changed": int(quality[change_key].split("/")[-1].strip()),
-                    "cost": Decimal(cost["provider 계산 비용"].lstrip("$")),
+                    "cost": Decimal(cost["Calculated provider cost"].lstrip("$")),
                 }
         return records, task_order
 
     @classmethod
     def _changed_rows(cls):
         block = cls.report.split(
-            "### 보존 원문으로 계산한 변환 전후 토큰 수", 1
-        )[1].split("## 비교 조건과 해석 한계", 1)[0]
+            "### Before-and-After Token Counts from Preserved Source Text", 1
+        )[1].split("## Comparison Conditions and Interpretation Limits", 1)[0]
         rows = []
         for line in block.splitlines():
             if not line.startswith("| `"):
@@ -103,7 +103,7 @@ class FirstStudyMetricMatrixTests(unittest.TestCase):
                 (
                     task,
                     condition,
-                    int(cells[2].removesuffix("건")),
+                    int(cells[2].removesuffix(" occurrences")),
                     before,
                     after,
                     cells[5],
@@ -172,30 +172,61 @@ class FirstStudyMetricMatrixTests(unittest.TestCase):
         )
         self.assertEqual(cost, Decimal("12.335"))
         self.assertIn(
-            "| squeez·Headroom·LLMLingua-2 중 기록된 변환 문자열 변경이 0건인 조건 | 55 | 20 | 35 | `$12.335` |",
+            "| Conditions among squeez, Headroom, and LLMLingua-2 with zero recorded transformed-string changes | 55 | 20 | 35 | `$12.335` |",
             self.matrix,
         )
 
+    def test_cumulative_pair_accounting_keeps_missing_source_outside_calculable_pairs(self):
+        expected = [
+            (189, 58, 131),
+            (204, 65, 139),
+            (213, 71, 142),
+            (270, 80, 190),
+            (319, 90, 229),
+            (394, 107, 287),
+            (398, 111, 287),
+            (416, 115, 301),
+            (441, 121, 320),
+            (475, 135, 340),
+            (559, 188, 371),
+            (621, 201, 420),
+            (664, 201, 463),
+            (738, 209, 529),
+        ]
+        observed = [
+            tuple(map(int, match))
+            for match in re.findall(
+                r"The aggregate contained (\d+) calculable input-output pairs: "
+                r"(\d+) changed and (\d+) remained identical\. "
+                r"A further 166 lacked source pairs\.",
+                self.report,
+            )
+        ]
+        self.assertEqual(observed, expected)
+        for calculable, changed, identical in observed:
+            self.assertEqual(calculable, changed + identical)
+        self.assertNotRegex(self.report, r"calculable[^.]*166 lacked source pairs")
+
     def test_units_claim_limits_and_reading_order_are_visible(self):
         for phrase in (
-            "과제 순서는 기존 inventory 순서",
-            "변경 구간 로컬 토큰",
-            "전체 요청 토큰이나 청구 토큰이 아니다",
-            "변경 구간 기준 감소율",
-            "`tiktoken 0.14.0`",
+            "Tasks remain in inventory order",
+            "Local tokens in changed spans",
+            "not full-request or billed tokens",
+            "reduction in changed spans",
+            "tiktoken `0.14.0`",
             "`o200k_base`",
-            "실제 청구서와 대사한 금액은 아니다",
-            "조건당 1회",
-            "비교 기준인 `none`의 판정과 비용이 여러 행에 반복된다",
-            "마지막 두 열은 행별 비교용이며 합계로 더하지 않는다",
-            "상관이나 인과가 없다고 일반화하지 않는다",
-            "현재 공개 집계로 두 경우를 나누지는 못한다",
+            "not reconciled to an actual invoice",
+            "ran once",
+            "`none` judgment and cost repeat across rows",
+            "final two columns are row-level references and must not be summed",
+            "do not establish that correlation or causation is absent in general",
+            "current public aggregate cannot distinguish them",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.matrix_flat)
-        self.assertIn("[과제별 변경 조건 대조표](metrics.md)", SUMMARY.read_text())
+        self.assertIn("[task-level changed-condition comparison](metrics.md)", SUMMARY.read_text())
         self.assertIn(
-            "| **합계** | **23조건** | **209** | **97,723** | **50,824** | **48.0%** | **`pass` 9 · `wrong_answer` 14** | **별도 행 합계** | **`none` 값은 합산하지 않음** | **`none` 값은 합산하지 않음** |",
+            "| **Total** | **23 conditions** | **209** | **97,723** | **50,824** | **48.0%** | **`pass` 9; `wrong_answer` 14** | **Sum rows separately** | **Do not sum repeated `none` values** | **Do not sum repeated `none` values** |",
             self.matrix,
         )
         self.assertIn(

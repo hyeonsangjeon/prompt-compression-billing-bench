@@ -13,17 +13,22 @@ import xml.etree.ElementTree as ET
 from .protection import digest
 
 
-CANDIDATE_CAVEAT = "식별된 후보 범위이지 검증된 상한이 아니다."
-COUNTING_METHOD_SUMMARY = "<summary>이 값들을 어떻게 셌는가</summary>"
+CANDIDATE_CAVEAT = "This is an identified candidate range, not a validated upper bound."
+SOURCE_MANIFEST_SHA256 = "6218280c4433623afd07a19bb4d6bc6c9a666b6052539c19e870c97becb93edd"
+SOURCE_ROW_HASHES_SHA256 = "3a1f109d8423eed9dfa1e17e6e377bd58e84a0c0ea2a59a75694e021365cc751"
+ENGLISH_ROW_HASHES_SHA256 = "052e774d454826068eed1da306c159b570eb21bae01d148f09dc9a6dab264e1d"
+REQUIRED_CAVEATS_SHA256 = "4c6e057fe463757dafe1168c04a37e83a194201fbb22cf619c7328fec50cdf93"
+COUNTING_METHOD_SUMMARY = "<summary>How these values were counted</summary>"
 COUNTING_METHOD_FACTS = (
-    "2026-09-09", "2026-09-10", "2026-09-11", "DeepSWE 113/113과제",
-    "Terminal-Bench 2.1 89/89과제", "Terminal 5과제 × 3실행", "성공 HTTP 56요청",
+    "2026-09-09", "2026-09-10", "2026-09-11", "113/113 DeepSWE tasks",
+    "89/89 Terminal-Bench 2.1 tasks", "5 purpose-selected Terminal tasks × 3 runs",
+    "56 successful HTTP requests",
     "gpt-5.4-2026-03-05", "tiktoken 0.14.0", "o200k_base",
-    "UTF-8 바이트", "로컬 토큰", "청구 토큰",
+    "UTF-8 bytes", "Local tokens", "Billing tokens",
 )
 REMOVED_WORK_HISTORY = (
-    "<summary>측정 조건</summary>", "NAS 로컬", "Azure VM", "Foundry",
-    "Harbor 0.22.0", "terminus-2", "실행하지 않은 것", "새로 바꾼 것", "그대로 둔 것",
+    "<summary>Measurement conditions</summary>", "Local NAS", "Azure VM", "Foundry",
+    "Harbor 0.22.0", "terminus-2", "What was not run", "What changed", "What remained unchanged",
 )
 PRIVATE_PATTERNS = (
     r"(?:_work|local-imports)[/\\]",
@@ -107,7 +112,7 @@ def check_svg(content: bytes, entry: dict) -> None:
 
 def check_metadata(block: str, entry: dict) -> None:
     metadata = entry["metadata"]
-    if [label for label, value in metadata] != ["표본", "분모 · 단위", "성격"]:
+    if [label for label, value in metadata] != ["Sample", "Denominator · unit", "Kind"]:
         raise ValueError(f"Invalid EDA metadata: {entry['id']}")
     for label, value in metadata:
         if f"- **{label}:** {value}" not in block.splitlines():
@@ -124,6 +129,18 @@ def audit_report(root: Path) -> dict:
             or manifest.get("new_model_calls") is not False
             or manifest.get("new_compression_measurement") is not False):
         raise ValueError("EDA assembly provenance changed")
+    source_row_hashes = [[entry["id"], entry["rows_sha256"]] for entry in manifest["tables"]]
+    if (manifest.get("source_manifest_sha256") != SOURCE_MANIFEST_SHA256
+            or manifest.get("source_row_hashes_sha256") != SOURCE_ROW_HASHES_SHA256
+            or json_digest(source_row_hashes) != SOURCE_ROW_HASHES_SHA256):
+        raise ValueError("Original EDA source-hash lineage changed")
+    english_row_hashes = [[entry["id"], entry["english_rows_sha256"]] for entry in manifest["tables"]]
+    if (manifest.get("english_row_hashes_sha256") != ENGLISH_ROW_HASHES_SHA256
+            or json_digest(english_row_hashes) != ENGLISH_ROW_HASHES_SHA256):
+        raise ValueError("Reviewed English EDA row-hash contract changed")
+    if (manifest.get("required_caveats_sha256") != REQUIRED_CAVEATS_SHA256
+            or json_digest(manifest.get("required_caveats")) != REQUIRED_CAVEATS_SHA256):
+        raise ValueError("Required EDA caveat contract changed")
     if re.search(r"squeez|headroom|13\.79%", markdown, re.IGNORECASE):
         raise ValueError("Tool experiment or withdrawn estimate in EDA")
     if COUNTING_METHOD_SUMMARY not in markdown or any(value not in markdown for value in COUNTING_METHOD_FACTS):
@@ -162,10 +179,10 @@ def audit_report(root: Path) -> dict:
         ]
         if len(rows) < 2 or not all(re.fullmatch(r":?-+:?", cell) for cell in rows[1]):
             raise ValueError(f"Invalid EDA table: {entry['id']}")
-        if json_digest(rows[:1] + rows[2:]) != entry["rows_sha256"]:
+        if json_digest(rows[:1] + rows[2:]) != entry["english_rows_sha256"]:
             raise ValueError(f"EDA table cells differ from reviewed source: {entry['id']}")
         check_metadata(block, entry)
-        if f"원문 표: {entry['source']} · 표 {entry['source_table']}." not in block:
+        if f"Source table: {entry['source']} · table {entry['source_table']}." not in block:
             raise ValueError(f"EDA table provenance changed: {entry['id']}")
     return {"figures": len(figures), "tables": len(tables)}
 

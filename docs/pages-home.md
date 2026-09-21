@@ -5,7 +5,7 @@ project-authored site documentation, the project license, third-party notices,
 and the two license texts named by those notices. The site does not publish or
 summarize experiment evidence.
 
-[Jump to the publication scope](#공개-범위).
+[Jump to the publication scope](#publication-scope).
 
 ## Site documents
 
@@ -16,7 +16,7 @@ summarize experiment evidence.
 - [GSM8K MIT license text](../third_party/licenses/gsm8k-MIT.txt)
 - [Terminal-Bench 2.1 Apache License 2.0 text](../third_party/licenses/terminal-bench-2.1-Apache-2.0.txt)
 
-## 공개 범위
+## Publication scope
 
 The public site source is limited to the files linked above and this homepage.
 It intentionally omits experiment results, exploratory data analysis (EDA),

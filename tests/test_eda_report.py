@@ -10,7 +10,11 @@ from src.eda_report import (
     CANDIDATE_CAVEAT,
     COUNTING_METHOD_FACTS,
     COUNTING_METHOD_SUMMARY,
+    ENGLISH_ROW_HASHES_SHA256,
     REMOVED_WORK_HISTORY,
+    REQUIRED_CAVEATS_SHA256,
+    SOURCE_MANIFEST_SHA256,
+    SOURCE_ROW_HASHES_SHA256,
     WORK_ENVIRONMENT_PATTERNS,
     audit_report,
     check_svg,
@@ -34,13 +38,31 @@ class EdaReportTests(unittest.TestCase):
         self.markdown = self.markdown_path.read_text(encoding="utf-8")
         self.manifest = json.loads((self.report / "manifest.json").read_bytes())
 
+    def rebaseline_table(self, table_id):
+        markdown = self.markdown_path.read_text(encoding="utf-8")
+        marker = f'<a id="{table_id}"></a>'
+        block = markdown.split(marker, 1)[1].split('<a id="', 1)[0]
+        rows = [
+            [cell.strip() for cell in line.strip()[1:-1].split("|")]
+            for line in block.splitlines() if line.startswith("|") and line.endswith("|")
+        ]
+        manifest_path = self.report / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        entry = next(value for value in manifest["tables"] if value["id"] == table_id)
+        entry["english_rows_sha256"] = json_digest(rows[:1] + rows[2:])
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
     def test_reviewed_assembly(self):
         self.assertEqual(audit_report(self.root), {"figures": 10, "tables": 27})
+        self.assertEqual(self.manifest["source_manifest_sha256"], SOURCE_MANIFEST_SHA256)
+        self.assertEqual(self.manifest["source_row_hashes_sha256"], SOURCE_ROW_HASHES_SHA256)
+        self.assertEqual(self.manifest["english_row_hashes_sha256"], ENGLISH_ROW_HASHES_SHA256)
+        self.assertEqual(self.manifest["required_caveats_sha256"], REQUIRED_CAVEATS_SHA256)
 
     def test_counting_method_excludes_internal_work_history(self):
         self.assertIn(COUNTING_METHOD_SUMMARY, self.markdown)
         self.assertIn(
-            "분류 판단: 사람이 정한 규칙으로 나눈 결과. 규칙이 달라지면 값도 달라진다. 경계가 애매한 항목이 있다.",
+            "Classification judgment: results divided under human-defined rules. Different rules would produce different values, and some boundaries are ambiguous.",
             self.markdown,
         )
         for content in COUNTING_METHOD_FACTS:
@@ -72,9 +94,32 @@ class EdaReportTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "table cells"):
                     audit_report(self.root)
 
+    def test_original_row_hash_lineage_cannot_be_rewritten(self):
+        manifest_path = self.report / "manifest.json"
+        mutated = json.loads(manifest_path.read_text(encoding="utf-8"))
+        mutated["tables"][0]["rows_sha256"] = "0" * 64
+        manifest_path.write_text(json.dumps(mutated), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "source-hash lineage"):
+            audit_report(self.root)
+
+    def test_numeric_drift_cannot_be_rebaselined(self):
+        self.markdown_path.write_text(self.markdown.replace("1,975", "1,976"), encoding="utf-8")
+        self.rebaseline_table("table-13")
+        with self.assertRaisesRegex(ValueError, "English EDA row-hash contract"):
+            audit_report(self.root)
+
+    def test_unit_drift_cannot_be_rebaselined(self):
+        header = "| Input layer | Sample tasks | UTF-8 bytes | local o200k_base tokens |"
+        changed = "| Input layer | Sample tasks | local tokens | local o200k_base tokens |"
+        self.assertIn(header, self.markdown)
+        self.markdown_path.write_text(self.markdown.replace(header, changed), encoding="utf-8")
+        self.rebaseline_table("table-13")
+        with self.assertRaisesRegex(ValueError, "English EDA row-hash contract"):
+            audit_report(self.root)
+
     def test_sample_denominator_and_kind_are_required(self):
         metadata = dict(self.manifest["figures"][0]["metadata"])
-        for label in ("표본", "분모 · 단위", "성격"):
+        for label in ("Sample", "Denominator · unit", "Kind"):
             with self.subTest(label=label):
                 original = f"- **{label}:** {metadata[label]}"
                 self.markdown_path.write_text(self.markdown.replace(original, "- removed:", 1), encoding="utf-8")
@@ -84,6 +129,17 @@ class EdaReportTests(unittest.TestCase):
     def test_limitation_cannot_be_removed(self):
         self.markdown_path.write_text(self.markdown.replace(CANDIDATE_CAVEAT, ""), encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "limitation"):
+            audit_report(self.root)
+
+    def test_limitation_cannot_be_rebaselined(self):
+        caveat = "No independent human-label validation was performed."
+        self.markdown_path.write_text(self.markdown.replace(caveat, ""), encoding="utf-8")
+        manifest_path = self.report / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["required_caveats"].remove(caveat)
+        manifest["required_caveats_sha256"] = json_digest(manifest["required_caveats"])
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "caveat contract"):
             audit_report(self.root)
 
     def test_image_must_be_relative_and_unchanged(self):
@@ -112,7 +168,7 @@ class EdaReportTests(unittest.TestCase):
 
     def test_table_provenance_is_required(self):
         entry = self.manifest["tables"][0]
-        provenance = f"원문 표: {entry['source']} · 표 {entry['source_table']}."
+        provenance = f"Source table: {entry['source']} · table {entry['source_table']}."
         self.markdown_path.write_text(self.markdown.replace(provenance, ""), encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "provenance"):
             audit_report(self.root)

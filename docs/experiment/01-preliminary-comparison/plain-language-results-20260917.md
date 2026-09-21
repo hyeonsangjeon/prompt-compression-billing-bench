@@ -1,244 +1,314 @@
-# 공유용: 예비 비교 결과를 쉽게 읽는 문서
+# Shareable Plain-Language Guide to the Preliminary Results
 
-이 문서는 비전문가가 30초 안에 핵심부터 확인하는 안내서다. 결론부터 말하면, 이번 자료는 압축기 순위를 정한 성능표가 아니다. 같은 문제를 네 방식으로 한 번씩 풀어 보고, 답을 맞혔는지와 실제 입력 문자열이 바뀌었는지 관찰한 기록이다.
+This guide lets a nonspecialist see the main point in 30 seconds. The result is not a
+performance ranking of compressors. It records one attempt to solve the same problems in
+four ways, whether each answer passed, and whether the input string actually changed.
 
-세부 실행값과 SHA-256 검증값이 필요하면 [기술 증거 원문](preliminary-comparison-20260916.md)을 이어서 보면 된다.
+For detailed execution values and SHA-256 checks, continue to the
+[technical evidence](preliminary-comparison-20260916.md).
 
-## 30초 요약
+## 30-Second Summary
 
-- **무엇을 비교했나:** 문제 1개를 뜻하는 과제 26개를 네 방식으로 각각 한 번씩 실행했다. 모두 104개 조건이지만, 서로 독립된 문제 104개는 아니다.
-- **답을 맞혔나:** `pass`(과제 내장 채점을 통과한 결과) 40개, `wrong_answer`(실행은 끝났지만 답이 채점을 통과하지 못한 결과) 64개였다.
-- **실제 문자열이 바뀌었나:** 104개 조건 중 23개에서 209개 구간이 달라졌다. 바뀐 구간만 다시 세면 `97,723 → 50,824`토큰이었다.
-- **요청은 몇 번 오갔나:** 모델에 보낸 요청, 외부 API 호출 시도, 성공 응답, 작업에 돌려준 응답은 서로 다른 사건이라 따로 세었다. 104개 완결 조건에서는 네 수가 관측상 각각 1,027회로 같았다.
-- **바로 결론 내릴 수 있나:** 없다. 실제 문자열 변경이 0건인데도 판정이 달라진 사례가 있었고, 조건별 실행은 한 번뿐이었다. 캐시와 모델 실행 경로도 통제하지 않아 압축기 순위, 비열등성, 모집단 비용 절감률, 품질·비용 차이의 원인을 말할 수 없다.
-- **별도 장기 실행은 어떻게 했나:** 5개 작업은 채점 전에 끝나 품질을 모른다. 네 작업은 운영자가 중간에 종료했고, 한 작업은 HTTP 응답을 기다리는 지점에서 멈췄다. 이 5개는 26개 과제·104개 조건 결과에 합치지 않았다.
+- **What was compared:** 26 tasks—each task is one problem—ran once under each of four
+  conditions. That gives 104 conditions, not 104 independent problems.
+- **Did the answer pass:** There were 40 `pass` results, meaning the built-in task grader
+  passed them, and 64 `wrong_answer` results, meaning execution completed but the answer
+  did not pass that grader.
+- **Did the actual string change:** In 23 of 104 conditions, 209 spans changed. Recounting
+  only changed spans gives `97,723 → 50,824` tokens.
+- **How many request events occurred:** Requests sent to the model, external API-call
+  attempts, successful responses, and responses returned to the task are distinct and
+  were counted separately. Across 104 completed conditions, all four observed counts
+  happened to equal 1,027.
+- **Can a conclusion be drawn immediately:** No. Judgments sometimes differed despite zero
+  actual string changes, and each condition ran only once. Cache and model execution path
+  were uncontrolled, so the evidence does not establish compressor ranking,
+  non-inferiority, population cost savings, or causes of quality and cost differences.
+- **What happened to separate long runs:** Five tasks ended before grading, leaving quality
+  unknown. An operator stopped four; one stopped while waiting for an HTTP response. They
+  are not combined with the 26-task, 104-condition results.
 
-## 먼저 알아둘 말
+## Terms to Know
 
-| 말 | 쉬운 뜻 | 품질 결과인가 |
+| Term | Plain meaning | Quality result? |
 |---|---|---|
-| 과제 | 풀어야 할 문제 1개 | 해당 없음 |
-| 조건 | 같은 문제를 푸는 방식 1개. 과제마다 네 조건을 비교했다. | 해당 없음 |
-| `none` | 작업을 하지 않았다는 뜻이 아니다. 모델은 문제를 그대로 풀되, 입력에 **추가 압축을 하지 않은 기준 조건**이다. | 해당 없음 |
-| `pass` | 실행이 끝났고 과제 내장 채점을 통과했다. 작업공간 복원 뒤 재채점도 같은 판정이었다. | 예 |
-| `wrong_answer` | 실행이 끝났지만 답이 과제 내장 채점을 통과하지 못했다. 기술 오류나 중도 종료와는 다르다. | 예 |
-| 기술 미완료 | 실행·통신·증거 저장 중 하나가 끝나지 않아 정답과 오답을 판정할 수 없는 상태다. | 아니요 |
-| 운영자 중도 종료 | 실행 중이던 작업을 운영자가 사후 판단으로 멈춘 기술 미완료다. 미리 정한 품질 실패 기준이 아니다. | 아니요 |
-| 앞/뒤 요청 수 | `291 / 290`처럼 적힌 수는 완료율이 아니다. 앞은 보낸 요청 수, 뒤는 받은 응답 수처럼 서로 다른 사건을 센 값이다. | 해당 없음 |
-| 실제 변경 구간 토큰 | 압축 전후 문자열이 실제로 달라진 부분만 다시 센 토큰이다. | 해당 없음 |
-| API 사용량(usage) | 모델 API가 보고한 전체 입력·캐시·출력 토큰이다. 변경 구간 토큰보다 범위가 넓다. | 해당 없음 |
-| API 계산 비용 | API 사용량에 고정 가격표를 곱한 값이다. 실제 청구서와 대사한 금액은 아니다. | 해당 없음 |
-| 가상 머신 비용 | 실행 시간에 시간당 가격을 적용한 파생값이다. API 비용과 다르며, 겹친 실행의 조건별 배분에는 미확정 범위가 있다. | 해당 없음 |
+| Task | One problem to solve | Not applicable |
+| Condition | One way to solve the same problem; four conditions were compared per task | Not applicable |
+| `none` | Does not mean no work. The model solves the task without **additional input compression**. | Not applicable |
+| `pass` | Execution completed and passed the built-in task grader; regrading after workspace restoration agreed. | Yes |
+| `wrong_answer` | Execution completed, but the answer did not pass the built-in task grader; distinct from a technical error or early stop. | Yes |
+| Technical incompletion | Correctness cannot be judged because execution, communication, or evidence retention did not finish. | No |
+| Operator stop | Technical incompletion caused by an operator's post hoc decision to stop an active task; not a preregistered quality-failure criterion. | No |
+| Requests before/after | Values such as `291 / 290` are not completion rates. They count different events, such as requests sent and responses received. | Not applicable |
+| Tokens in actually changed spans | Tokens recounted only where before and after strings actually differ. | Not applicable |
+| API usage | Full input, cached-input, and output tokens reported by the model API; broader than changed-span tokens. | Not applicable |
+| Calculated API cost | API usage multiplied by a fixed price table; not an invoice-reconciled amount. | Not applicable |
+| Virtual-machine cost | Derived by applying an hourly rate to run time; distinct from API cost, with unresolved allocation where runs overlapped. | Not applicable |
 
-## 무엇을 비교했나
+## What Was Compared
 
-한 과제에 아래 네 조건을 적용했다. 과제의 이미지, 파일, 채점기는 같게 두고 조건별로 새 컨테이너와 작업공간을 사용했다.
+The four conditions below were applied to each task. Task image, files, and grader stayed
+the same, while each condition used a fresh container and workspace.
 
-| 조건 | 이 문서에서 뜻하는 것 |
+| Condition | Meaning in this document |
 |---|---|
-| `none` | 추가 압축 없이 푸는 기준 조건 |
-| `squeez` | squeez를 적용한 압축 조건 |
-| `Headroom` | Headroom을 적용한 압축 조건 |
-| `LLMLingua-2` | LLMLingua-2를 적용한 압축 조건 |
+| `none` | Reference condition without additional compression |
+| `squeez` | Compression condition using squeez |
+| `Headroom` | Compression condition using Headroom |
+| `LLMLingua-2` | Compression condition using LLMLingua-2 |
 
-| 항목 | 측정 조건 |
+| Item | Measurement condition |
 |---|---|
-| 실행일 | 2026-09-16~17 UTC |
-| 모델 | `gpt-5.4`; 제공자 보고 `gpt-5.4-2026-03-05` |
-| 생성 설정 | `temperature=0`, `reasoning_effort=none` |
-| 표본 | 26개 과제, 과제별 조건당 1회, 104개 완결 조건 |
-| 품질 확인 | 과제 내장 채점, 작업공간 복원 뒤 재채점 일치, 원격 자료 해시 검증 |
+| Execution dates | 2026-09-16–17 UTC |
+| Model | `gpt-5.4`; provider-reported `gpt-5.4-2026-03-05` |
+| Generation settings | `temperature=0`, `reasoning_effort=none` |
+| Sample | 26 tasks, one run per task and condition, 104 completed conditions |
+| Quality checks | Built-in task grading, matching regrade after workspace restoration, and remote artifact hash verification |
 
-이 표본은 전체 89개 과제를 대표하도록 무작위로 뽑은 집단이 아니다. 선정 과정과 정확한 실행 식별자는 기술 증거 원문에 남아 있다.
+This sample was not randomly selected to represent all 89 tasks. The selection path and
+exact execution identifiers remain in the technical evidence.
 
-## 무엇을 봤나
+## Observations
 
-### 답을 맞힌 조건은 몇 개인가
+### How Many Conditions Passed?
 
-아래 표는 끝까지 실행하고 채점·복원 재채점·원격 검증까지 마친 104개 조건만 센다. 기술 미완료와 운영자 중도 종료는 들어 있지 않다.
+This table counts only the 104 conditions that completed execution, grading, restoration
+regrading, and remote verification. It excludes technical incompletions and operator stops.
 
-| 조건 | `pass` | `wrong_answer` | 합계 |
+| Condition | `pass` | `wrong_answer` | Total |
 |---|---:|---:|---:|
 | `none` | 11 | 15 | 26 |
 | `squeez` | 10 | 16 | 26 |
 | `Headroom` | 9 | 17 | 26 |
 | `LLMLingua-2` | 10 | 16 | 26 |
-| 합계 | 40 | 64 | 104 |
+| Total | 40 | 64 | 104 |
 
-**한계.** 조건별 통과 수가 다르지만 각 조건을 한 번씩만 실행했다. 이 차이만으로 어느 압축기가 더 정확하다고 말할 수 없다.
+**Limitation.** Pass counts differ, but each condition ran only once. Those differences do
+not establish which compressor is more accurate.
 
-### 실제 문자열은 얼마나 바뀌었나
+### How Much Did the Actual String Change?
 
-| 조건 | 변경된 조건 | 변경 0건 조건 | 실제 변경 구간 |
+| Condition | Changed conditions | Zero-change conditions | Actually changed spans |
 |---|---:|---:|---:|
-| `none` | 0 | 26 | 0건 |
-| `squeez` | 1 | 25 | 2건 |
-| `Headroom` | 4 | 22 | 53건 |
-| `LLMLingua-2` | 18 | 8 | 154건 |
-| 합계 | 23 | 81 | 209건 |
+| `none` | 0 | 26 | 0 |
+| `squeez` | 1 | 25 | 2 |
+| `Headroom` | 4 | 22 | 53 |
+| `LLMLingua-2` | 18 | 8 | 154 |
+| Total | 23 | 81 | 209 |
 
-보존 원문으로 전후를 다시 계산할 수 있었던 입력·출력 쌍은 738건이다. 이 가운데 209건이 달라졌고 529건은 같은 문자열이었다. 달라진 209개 구간은 `97,723 → 50,824`토큰이었다. 원문 쌍이 없는 166건은 계산하지 않았고 0으로 바꾸지 않았다.
+There are 738 input-output pairs whose before and after values could be recomputed from
+preserved source. Of these, 209 changed and 529 were identical strings. The 209 changed
+spans had `97,723 → 50,824` tokens. Another 166 spans without raw pairs were not
+calculated and were not changed to zero.
 
-`97,723 → 50,824`는 **문자열이 달라진 구간만** 센 값이다. 전체 API 입력 토큰이나 청구 비용이 그만큼 줄었다는 뜻이 아니다.
+`97,723 → 50,824` counts **only spans whose strings changed**. It does not mean total API
+input tokens or billed cost fell by that amount.
 
-18개 과제에서는 적어도 한 압축 조건의 문자열이 달라졌다. 다음 8개 과제는 네 조건 모두 실제 변경이 0건이었다: `cancel-async-tasks`, `dna-insert`, `extract-elf`, `financial-document-processor`, `install-windows-3.11`, `kv-store-grpc`, `openssl-selfsigned-cert`, `sam-cell-seg`.
+At least one compression-condition string changed in 18 tasks. All four conditions had
+zero actual changes in these eight tasks: `cancel-async-tasks`, `dna-insert`,
+`extract-elf`, `financial-document-processor`, `install-windows-3.11`,
+`kv-store-grpc`, `openssl-selfsigned-cert`, and `sam-cell-seg`.
 
-### 문자열이 그대로인데 판정이 달라진 적이 있나
+### Did Judgments Ever Differ When Strings Did Not?
 
-있었다. 무압축 기준과 세 압축 조건을 짝지은 78개 비교 중 판정이 바뀐 것은 10개였다.
+Yes. Of 78 paired comparisons between the uncompressed reference and three compression
+conditions, 10 had different judgments.
 
-| 조건 | `pass→pass` | `wrong_answer→wrong_answer` | 판정 유지 합계 |
+| Condition | `pass→pass` | `wrong_answer→wrong_answer` | Same judgment |
 |---|---:|---:|---:|
 | `squeez` | 9 | 14 | 23 |
 | `Headroom` | 8 | 14 | 22 |
 | `LLMLingua-2` | 9 | 14 | 23 |
-| 합계 | 26 | 42 | 68 |
+| Total | 26 | 42 | 68 |
 
-| 조건 | `pass→wrong_answer` | `wrong_answer→pass` | 판정 변화 합계 |
+| Condition | `pass→wrong_answer` | `wrong_answer→pass` | Changed judgment |
 |---|---:|---:|---:|
 | `squeez` | 2 | 1 | 3 |
 | `Headroom` | 3 | 1 | 4 |
 | `LLMLingua-2` | 2 | 1 | 3 |
-| 합계 | 7 | 3 | 10 |
+| Total | 7 | 3 | 10 |
 
-**관측.** `squeez`의 판정 변화 3개와 `Headroom`의 판정 변화 4개는 모두 실제 문자열 변경이 0건인 조건에서 나왔다. `LLMLingua-2`의 판정 변화 3개는 실제 변경이 있었다. `llm-inference-batching-scheduler`와 `build-pov-ray`는 `pass→wrong_answer`, `overfull-hbox`는 `wrong_answer→pass`였다.
+**Observation.** All three squeez judgment changes and all four Headroom changes occurred
+in conditions with zero actual string changes. The three LLMLingua-2 judgment changes
+included actual changes. `llm-inference-batching-scheduler` and `build-pov-ray` changed
+from `pass→wrong_answer`; `overfull-hbox` changed from `wrong_answer→pass`.
 
-**가능한 설명.** 조건마다 모델이 밟은 실행 경로, 요청 수, 캐시 상태가 달랐을 수 있다. 다음 반복 실험에서 확인할 가설이다.
+**Possible explanation.** Model execution path, request count, and cache state may have
+differed by condition. This is a hypothesis for a repeated follow-up experiment.
 
-**한계.** 각 조건을 한 번씩만 실행했기 때문에 원인을 나눠 볼 수 없다. 실제 문자열 변경이 없는데 판정이 달라진 7개 사례가 있으므로 판정 차이를 압축의 직접 효과로 볼 수 없다. 반대로 문자열이 바뀌었다는 사실만으로 품질이 달라졌다고 말할 수도 없다.
+**Limitation.** One run per condition cannot separate causes. Seven judgment differences
+occurred with zero actual string changes, so judgment differences cannot be treated as a
+direct effect of compression. Conversely, a changed string alone does not establish a
+quality change.
 
-### 요청, API 사용량과 비용은 어떻게 읽나
+### How to Read Requests, API Usage, and Cost
 
-한 조건에서 논리 모델 요청 3회, provider HTTP 시도 3회, 성공 HTTP 응답 3회, Harbor 전달 응답 3회가 기록됐다고 가정해 보자. 숫자는 모두 3이지만 같은 뜻이 아니다. 요청을 받은 시점, 외부 API로 보낸 시점, 성공 응답을 받은 시점, 그 응답을 작업에 돌려준 시점을 각각 센다. `3 / 3`은 작업이 100% 끝났다는 진행률 표시가 아니다.
+Suppose one condition records 3 logical model requests, 3 provider HTTP attempts, 3
+successful HTTP responses, and 3 responses delivered to Harbor. Although all values are
+3, they mean different things: receipt by the proxy, transmission to the external API,
+receipt of a successful response, and delivery back to the task. `3 / 3` is not a
+100%-complete progress indicator.
 
-이번 104개 완결 조건에서는 네 카운터가 조건별로 같았다. 값이 같았다는 관측과 같은 개념이라는 주장은 구분해야 한다.
+All four counters happened to match by condition in the 104 completed conditions. The
+observation that values match remains distinct from a claim that the concepts are the same.
 
-| 조건 | 논리 모델 요청 | provider HTTP 시도 | 성공 HTTP 응답 | Harbor 전달 응답 |
+| Condition | Logical model requests | Provider HTTP attempts | Successful HTTP responses | Responses delivered to Harbor |
 |---|---:|---:|---:|---:|
 | `none` | 253 | 253 | 253 | 253 |
 | `squeez` | 277 | 277 | 277 | 277 |
 | `Headroom` | 208 | 208 | 208 | 208 |
 | `LLMLingua-2` | 289 | 289 | 289 | 289 |
-| 합계 | 1,027 | 1,027 | 1,027 | 1,027 |
+| Total | 1,027 | 1,027 | 1,027 | 1,027 |
 
-API 사용량은 실제 변경 구간이 아니라 각 조건에서 모델이 처리한 전체 범위다.
+API usage covers the full model-processed scope in each condition, not only changed spans.
 
-| 조건 | 입력 토큰 | 캐시 토큰 | 출력 토큰 |
+| Condition | Input tokens | Cached tokens | Output tokens |
 |---|---:|---:|---:|
 | `none` | 3,530,471 | 2,276,224 | 127,599 |
 | `squeez` | 4,913,043 | 3,543,168 | 156,847 |
 | `Headroom` | 2,392,382 | 1,117,568 | 126,377 |
 | `LLMLingua-2` | 3,674,861 | 2,769,536 | 115,584 |
-| 합계 | 14,510,757 | 9,706,496 | 526,407 |
+| Total | 14,510,757 | 9,706,496 | 526,407 |
 
-API 계산 비용은 위 사용량에 고정 가격표를 적용한 값이다. 실제 청구서 대사액은 아니다.
+Calculated API cost applies the fixed price table to this usage. It is not invoice-reconciled.
 
-| 조건 | API 계산 비용 | HTTP 시도 | HTTP 시도당 비용 |
+| Condition | Calculated API cost | HTTP attempts | Cost per HTTP attempt |
 |---|---:|---:|---:|
 | `none` | $5.6186600 | 253 | $0.022208142 |
 | `squeez` | $6.6631870 | 277 | $0.024054827 |
 | `Headroom` | $5.3620835 | 208 | $0.025779248 |
 | `LLMLingua-2` | $4.6894580 | 289 | $0.016226498 |
-| 합계 | $22.3333885 | 1,027 | $0.021746240 |
+| Total | $22.3333885 | 1,027 | $0.021746240 |
 
-### 비용을 결과와 함께 읽는 법
+### Reading Cost Together With Outcome
 
-발표에서는 이렇게 말할 수 있다.
+A presentation can say:
 
-> AI 비용은 쓴 token 양만 보지 않고, Terminal-Bench 내장 채점을 통과한 조건 결과와 함께 본다. 완결 104조건의 API 계산 비용 `$22.3333885`를 `pass` 40조건으로 나누면 **완결 코호트 통과 조건 1건당 `$0.5583347125`**다.
+> AI cost is read together with conditions that passed the Terminal-Bench built-in grader,
+> not only as tokens consumed. Dividing `$22.3333885` in calculated API cost across 104
+> completed conditions by 40 `pass` conditions gives **`$0.5583347125` per passing
+> condition in the completed cohort**.
 
-이 값의 분자에는 정상 채점 후 미통과한 `wrong_answer` 64조건의 비용도 들어 있다. 반면 품질 판정 전에 끝난 장기 실행 5개의 확인 비용 `$87.771254`는 들어 있지 않다. `pass`는 고객 수락 대리 지표로 검증되지 않았고, API 계산 비용도 실제 청구서가 아니다. 따라서 이 값을 고객 수락 비용이나 프로그램 전체 통과 1건당 비용으로 바꾸어 말하지 않는다. 정확한 분자·분모와 비용 분류는 [기술 증거의 계산식](preliminary-comparison-20260916.md#비용을-결과와-함께-읽는-정확한-범위)에서 확인할 수 있다.
+The numerator includes the cost of 64 `wrong_answer` conditions after normal grading. It
+excludes `$87.771254` in confirmed cost from five long-running executions that ended
+before quality judgment. A `pass` has not been validated as a proxy for customer
+acceptance, and calculated API cost is not an invoice. Do not restate the value as customer
+acceptance cost or program-wide cost per pass. Exact numerator, denominator, and cost
+classification appear in the [technical evidence formula](preliminary-comparison-20260916.md#exact-scope-for-reading-cost-with-outcomes).
 
-**가능한 활용.** 프리세일즈나 고정가 견적에서 정상 미통과와 품질 미확정 시도에 든 비용을 따로 보며 마진 누수 후보를 찾는 데 활용할 수 있다. 다만 이 benchmark가 고객 수락이나 실제 계약 마진을 검증한 것은 아니다.
+**Possible use.** In presales or fixed-price estimates, the split can help identify
+potential margin leakage from normal non-passes and unknown-quality attempts. This
+benchmark did not validate customer acceptance or actual contract margin.
 
-**관측.** 이 26개 과제에서 `LLMLingua-2`의 API 계산 비용 합과 HTTP 시도당 평균이 가장 낮았고, `squeez`의 비용 합이 가장 높았다. `Headroom`은 논리 모델 요청이 가장 적었다.
+**Observation.** Among these 26 tasks, LLMLingua-2 had the lowest total calculated API cost
+and mean per HTTP attempt, squeez the highest total, and Headroom the fewest logical model
+requests.
 
-**가능한 설명.** 조건별 요청 수, 요청마다 처리한 문맥 길이, 캐시 토큰과 모델 경로가 달랐다. 요청 수 차이도 비용 차이에 섞여 있다.
+**Possible explanation.** Request count, context processed per request, cached tokens, and
+model path differed by condition. Request-count differences are mixed into cost differences.
 
-**한계.** 비용 차이를 압축으로 생긴 절감률이나 압축기 순위로 해석하지 않는다. 기록된 가상 머신 비용은 겹친 실행 구간의 조건별 배분이 미확정인 항목이 있어 합계에 넣지 않았다.
+**Limitation.** Cost differences are not interpreted as compression savings or compressor
+ranking. Recorded VM cost was excluded because some condition-level allocations across
+overlapping execution intervals remain unresolved.
 
-## 따로 봐야 하는 장기 실행 5개
+## Five Long-Running Executions Kept Separate
 
-`2026-09-17 23:59 KST`에 당시 실행 중이던 5개 작업을 운영자가 사후 판단으로 종료했다. 모두 첫 채점 전에 끝났으므로 `pass`도 `wrong_answer`도 아니다.
+At `2026-09-17 23:59 KST`, an operator stopped five then-active tasks based on a post hoc
+decision. All ended before first grading, so none is a `pass` or `wrong_answer`.
 
-| 쉬운 분류 | 대상 | 수 | 품질 |
+| Plain classification | Targets | Count | Quality |
 |---|---|---:|---|
-| 운영자 중도 종료 | `circuit-fibsqrt` / `none`, `feal-linear-cryptanalysis` / `none`, `winning-avg-corewars` / `none`, `tune-mjcf` / `Headroom` | 4개 | 채점 전 미확정 |
-| HTTP 응답 대기 중 정체 | `tune-mjcf` / `none` | 1개 | 채점 전 미확정 |
+| Operator stop | `circuit-fibsqrt` / `none`, `feal-linear-cryptanalysis` / `none`, `winning-avg-corewars` / `none`, `tune-mjcf` / `Headroom` | 4 | Unknown before grading |
+| Stalled while waiting for an HTTP response | `tune-mjcf` / `none` | 1 | Unknown before grading |
 
-`tune-mjcf` / `none`의 `291 / 291 / 290 / 290`은 290번 실패했다는 뜻이 아니다. 한 작업이 답을 찾는 동안 논리 모델 요청 291회, HTTP 시도 291회가 있었고, 성공 HTTP 응답과 Harbor 전달은 각각 290회였다. 마지막 291번째 HTTP 시도는 응답이 확인되지 않았다. 요청 횟수는 진행률이나 정답에 가까워진 정도를 나타내지 않는다.
+`291 / 291 / 290 / 290` for `tune-mjcf` / `none` does not mean 290 failures. While
+trying to solve one task, it generated 291 logical model requests and 291 HTTP attempts,
+with 290 successful HTTP responses and 290 deliveries to Harbor. The final 291st HTTP
+attempt had no confirmed response. Request count does not indicate progress or proximity
+to a correct answer.
 
-다섯 작업의 확인된 API 계산 비용은 `$87.771254`다. 사용량이 없는 요청 1회의 입력 전용 추정 `$0.1294175`는 이 합에 넣지 않았다. 이 비용과 실행 횟수, 품질 미확정 상태는 26개 과제·104개 조건의 주 분석과 절대 합치지 않는다.
+Confirmed calculated API cost for the five tasks is `$87.771254`. A `$0.1294175`
+input-only estimate for one request without usage is excluded. Never combine this cost,
+execution count, or unknown-quality state with the primary 26-task, 104-condition analysis.
 
-## 그래서 무엇을 말할 수 있나
+## Supported Statements
 
-| 질문 | 현재 자료로 할 수 있는 답 |
+| Question | Answer supported by current evidence |
 |---|---|
-| 실제 입력이 바뀌었나 | 104개 조건 중 23개에서 바뀌었다. 확인된 변경 구간은 209건이다. |
-| 바뀐 구간의 크기는 줄었나 | 다시 계산할 수 있었던 변경 구간은 `97,723 → 50,824`토큰이었다. 전체 API 사용량 감소를 뜻하지 않는다. |
-| 무압축 기준과 품질 판정이 달랐나 | 78개 비교 중 10개가 달랐다. 개선 방향 3개, 악화 방향 7개였다. 그중 7개는 실제 문자열 변경이 0건이었다. |
-| 요청·사용량·비용이 같았나 | 조건마다 달랐다. 요청 수와 경로 차이가 함께 섞인 관측이다. |
+| Did actual input change? | It changed in 23 of 104 conditions, across 209 confirmed spans. |
+| Did changed-span size decrease? | Recomputable changed spans went from `97,723 → 50,824` tokens. This is not a total API-usage reduction. |
+| Did quality judgments differ from the uncompressed reference? | 10 of 78 comparisons differed: 3 toward improvement and 7 toward degradation. Seven of the 10 had zero actual string changes. |
+| Were requests, usage, and cost equal? | No. They differed by condition, mixed with request-count and execution-path differences. |
 
-## 무엇은 아직 말할 수 없나
+## Unsupported Statements
 
-| 아직 답할 수 없는 질문 | 이유 |
+| Question not yet answerable | Reason |
 |---|---|
-| 어느 압축기가 가장 좋은가 | 조건별 실행이 한 번뿐이고 표본이 전체 89개 과제를 대표하지 않는다. |
-| 압축해도 품질이 열등하지 않은가 | 반복 실행이 없어 실행 변동과 조건 효과를 분리하지 못했다. |
-| 전체 사용자의 비용이 몇 % 줄어드는가 | 모집단 표본이 아니며 캐시·요청 수·모델 경로가 통제되지 않았다. |
-| 비용이나 품질 차이가 압축 때문에 생겼는가 | 실제 변경 0건인데 판정이 바뀐 사례가 있어 인과를 확인하지 못했다. |
+| Which compressor is best? | One run per condition, and the sample does not represent all 89 tasks. |
+| Is quality non-inferior under compression? | Without repeated execution, run variability cannot be separated from condition effects. |
+| What percentage of cost falls across all users? | This is not a population sample, and cache, request count, and model path were uncontrolled. |
+| Did compression cause the cost or quality difference? | Judgment sometimes changed despite zero actual string changes, so causality was not established. |
 
-## 다음에 무엇을 확인하나
+## What to Check Next
 
-같은 과제와 조건을 여러 번 실행해 결과의 흔들림을 먼저 잰다. 캐시와 동시성을 통제하고, 실행 전에 종료 기준을 고정한다. 기술 미완료는 정답·오답과 섞지 않고 얼마나 오래 지속됐고 어떻게 끝났는지 별도로 분석한다. 이 검증이 끝나기 전에는 압축기 순위, 비열등성, 모집단 비용 절감률을 결론으로 쓰지 않는다.
+First measure variability by running the same tasks and conditions repeatedly. Control
+cache and concurrency, and preregister stopping rules. Keep technical incompletion separate
+from correct and incorrect answers, and analyze how long it persisted and how it ended.
+Until that validation is complete, do not conclude compressor ranking, non-inferiority, or
+population cost savings.
 
-## 기술 부록
+## Technical Appendix
 
-### 문자열 변경 여부와 품질의 교차값
+### String-Change and Quality Cross-Tabulation
 
-실제 문자열이 바뀐 23개 조건과 바뀌지 않은 81개 조건의 품질을 따로 나누면 아래와 같다.
+Quality for the 23 changed and 81 unchanged conditions is:
 
-| 조건 | 변경 조건 `pass` | 변경 조건 `wrong_answer` | 변경 조건 합계 |
+| Condition | Changed `pass` | Changed `wrong_answer` | Changed total |
 |---|---:|---:|---:|
 | `none` | 0 | 0 | 0 |
 | `squeez` | 0 | 1 | 1 |
 | `Headroom` | 2 | 2 | 4 |
 | `LLMLingua-2` | 7 | 11 | 18 |
-| 합계 | 9 | 14 | 23 |
+| Total | 9 | 14 | 23 |
 
-| 조건 | 무변경 조건 `pass` | 무변경 조건 `wrong_answer` | 무변경 조건 합계 |
+| Condition | Unchanged `pass` | Unchanged `wrong_answer` | Unchanged total |
 |---|---:|---:|---:|
 | `none` | 11 | 15 | 26 |
 | `squeez` | 10 | 15 | 25 |
 | `Headroom` | 7 | 15 | 22 |
 | `LLMLingua-2` | 3 | 5 | 8 |
-| 합계 | 31 | 50 | 81 |
+| Total | 31 | 50 | 81 |
 
-### 표본 선정 경로
+### Sample-Selection Path
 
-| 단계 | 과제 수 | 조건 수 | 성격 |
+| Stage | Tasks | Conditions | Classification |
 |---|---:|---:|---|
-| 첫 실행 | 1 | 4 | 후보 확인 규칙 적용 전 |
-| 보존 무압축 기록에서 허용 로그 후보 확인 | 5 | 20 | 후보가 확인된 순서 |
-| 후보 소진 뒤 고정 목록 순서로 선별 | 20 | 80 | 새 `none` 실행과 복구 증거 연결 |
-| 합계 | 26 | 104 | 104개 독립 과제가 아님 |
+| Initial execution | 1 | 4 | Before candidate-confirmation rules |
+| Candidate logs confirmed from preserved uncompressed records | 5 | 20 | Order in which candidates were confirmed |
+| Screening in fixed-list order after candidate exhaustion | 20 | 80 | New `none` runs linked to recovery evidence |
+| Total | 26 | 104 | Not 104 independent tasks |
 
-### 요청 카운터의 정확한 필드
+### Exact Request-Counter Fields
 
-| 쉬운 이름 | 증거 필드 | 세는 사건 |
+| Plain name | Evidence field | Event counted |
 |---|---|---|
-| 논리 모델 요청 | `logical_model_calls` | 프록시가 받은 호출 |
-| provider HTTP 시도 | `total_model_calls` | 재시도를 포함해 외부 provider로 보낸 HTTP 요청 |
-| 성공 HTTP 응답 | `successful_http_responses` | 상태 200으로 돌아온 응답 |
-| Harbor 전달 응답 | `delivered_responses` | 프록시가 Harbor에 돌려준 응답 |
+| Logical model request | `logical_model_calls` | Call received by the proxy |
+| Provider HTTP attempt | `total_model_calls` | HTTP request sent to the external provider, including retries |
+| Successful HTTP response | `successful_http_responses` | Response returned with status 200 |
+| Response delivered to Harbor | `delivered_responses` | Response returned by the proxy to Harbor |
 
-[기술 증거 원문](preliminary-comparison-20260916.md)의 `Harbor 단계`는 완료된 agent 단계인 `turns`다. 이번 완결 집단에서는 전달 응답 수와 값이 같았지만 정의를 합치지 않는다.
+`Harbor stage` in the [technical evidence](preliminary-comparison-20260916.md) is the
+completed agent stage `turns`. Its value matched delivered responses in this completed
+cohort, but the definitions remain distinct.
 
-### 장기 실행의 정확한 분류 코드
+### Exact Codes for Long-Running Executions
 
-| 쉬운 분류 | 기록 코드 | 적용 수 |
+| Plain classification | Record code | Count |
 |---|---|---:|
-| 운영자 중도 종료 | `post_hoc_operator_stopped/censored` | 4개 |
-| HTTP 응답 대기 중 정체 | `stalled_http_response` | 1개 |
+| Operator stop | `post_hoc_operator_stopped/censored` | 4 |
+| Stalled while waiting for an HTTP response | `stalled_http_response` | 1 |
 
-장기 실행 5개의 세부 요청 수, 경과시간, usage, 비용과 attempt 식별자는 [기술 증거 원문의 장기 꼬리 표](preliminary-comparison-20260916.md#사후-운영자-종료한-장기-꼬리)에 있다. 종료 인계의 원격 묶음 payload SHA-256은 `4776561fd65956d6de9c8f57342e055c3d90a2272b76827add7014cdadef841c`다.
+The [long-tail table in the technical evidence](preliminary-comparison-20260916.md#post-hoc-operator-stopped-long-tail)
+contains detailed request counts, elapsed time, usage, cost, and attempt identifiers for
+the five long-running executions. The remote handoff bundle payload SHA-256 is
+`4776561fd65956d6de9c8f57342e055c3d90a2272b76827add7014cdadef841c`.
