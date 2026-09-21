@@ -9,6 +9,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+import src.cache_runtime_context as cache_runtime_context
 from src.cache_runtime_context import (
     DEFINITION_PATH,
     EXPECTED_COMMAND,
@@ -122,6 +123,7 @@ class CacheRuntimeContextTests(unittest.TestCase):
             result["missing_or_invalid"],
             ["environment.CACHE_RUNTIME_CONTEXT_ATTESTATION.present"],
         )
+        self.assertEqual(result["side_effects"]["doctor_invocations"], 0)
         doctor_call.assert_not_called()
 
     def test_stale_attestation_stops_before_runtime_inputs_or_doctor(self):
@@ -133,6 +135,7 @@ class CacheRuntimeContextTests(unittest.TestCase):
             result = self.check(self.environment())
         self.assertEqual(result["context_status"], "stale")
         self.assertEqual(result["side_effects"]["runtime_input_files_read"], 0)
+        self.assertEqual(result["side_effects"]["doctor_invocations"], 0)
         doctor_call.assert_not_called()
 
     def test_wrong_source_attestation_stops_before_doctor(self):
@@ -147,10 +150,14 @@ class CacheRuntimeContextTests(unittest.TestCase):
 
     def test_verified_context_runs_only_doctor_and_never_records_values(self):
         environment = self.environment()
-        result = self.check(environment)
+        with patch(
+            "src.cache_runtime_context.doctor", wraps=cache_runtime_context.doctor
+        ) as doctor_call:
+            result = self.check(environment)
         serialized = json.dumps(result, sort_keys=True)
         self.assertEqual(result["context_status"], "verified")
         self.assertEqual(result["decision"], "no_go")
+        self.assertEqual(doctor_call.call_count, 1)
         self.assertEqual(result["side_effects"]["doctor_invocations"], 1)
         self.assertEqual(result["side_effects"]["provider_model_api_calls"], 0)
         self.assertEqual(result["side_effects"]["network_calls"], 0)
@@ -159,6 +166,29 @@ class CacheRuntimeContextTests(unittest.TestCase):
             self.assertNotIn(value, serialized)
         self.assertTrue(result["doctor"]["environment_presence"]["FOUNDRY_ENDPOINT"])
 
+    def test_invalid_runtime_facts_preserve_doctor_invocation_count(self):
+        facts = json.loads(
+            (ROOT / "fixtures/cache-reuse/runtime-facts.template.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        facts["checks"] = []
+        invalid_facts = self.root / "runtime-facts.invalid.json"
+        invalid_facts.write_text(json.dumps(facts) + "\n", encoding="utf-8")
+        environment = self.environment()
+        environment["CACHE_RUNTIME_FACTS"] = str(invalid_facts)
+
+        with patch(
+            "src.cache_runtime_context.doctor", wraps=cache_runtime_context.doctor
+        ) as doctor_call:
+            result = self.check(environment)
+
+        self.assertEqual(doctor_call.call_count, 1)
+        self.assertEqual(result["decision"], "no_go")
+        self.assertEqual(result["missing_or_invalid"], ["runtime_inputs.valid"])
+        self.assertEqual(result["side_effects"]["doctor_invocations"], 1)
+        self.assertEqual(result["side_effects"]["provider_model_api_calls"], 0)
+
     def test_missing_runtime_input_stops_before_doctor(self):
         environment = self.environment()
         del environment["NATIVE_CACHE_LEDGER"]
@@ -166,6 +196,21 @@ class CacheRuntimeContextTests(unittest.TestCase):
             result = self.check(environment)
         self.assertEqual(result["context_status"], "missing")
         self.assertEqual(result["side_effects"]["runtime_input_files_read"], 0)
+        self.assertEqual(result["side_effects"]["doctor_invocations"], 0)
+        doctor_call.assert_not_called()
+
+    def test_invalid_runtime_input_stops_before_doctor(self):
+        invalid_facts = self.root / "runtime-facts.invalid.json"
+        invalid_facts.write_text("{\n", encoding="utf-8")
+        environment = self.environment()
+        environment["CACHE_RUNTIME_FACTS"] = str(invalid_facts)
+
+        with patch("src.cache_runtime_context.doctor") as doctor_call:
+            result = self.check(environment)
+
+        self.assertEqual(result["context_status"], "invalid")
+        self.assertEqual(result["missing_or_invalid"], ["runtime_inputs.valid"])
+        self.assertEqual(result["side_effects"]["doctor_invocations"], 0)
         doctor_call.assert_not_called()
 
     def test_no_clobber_preserves_existing_output_without_reading_inputs(self):
