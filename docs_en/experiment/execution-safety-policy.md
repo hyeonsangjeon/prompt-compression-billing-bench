@@ -86,4 +86,4 @@ A separate pilot would need at least a preapproved calculated cost, maximum expo
 - The 2,400-second attempt limit covers the process boundary including preparation, agent work, and verification. It is not a limit on a specific stage or pure model time.
 - Harbor's internal stage timers remain disabled to avoid truncating different evidence at different stages. The outer supervisor and protected loopback transport enforce the attempt and request boundaries above.
 
-The exact machine contract is in [`execution-safety-policy.schema.json`](../../../schemas/execution-safety-policy.schema.json), ledger validation is in [`execution_safety.py`](../../../src/execution_safety.py), and runtime boundaries are in [`live_transport.py`](../../../src/live_transport.py).
+The exact machine contract is in [`execution-safety-policy.schema.json`](../../schemas/execution-safety-policy.schema.json), ledger validation is in [`execution_safety.py`](../../src/execution_safety.py), and runtime boundaries are in [`live_transport.py`](../../src/live_transport.py).

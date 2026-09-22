@@ -32,7 +32,7 @@ Round 1 analysis: 2026-09-10 · Round 2 analysis: 2026-09-11.
 
 ### Round 2 · Common Primary-Type Distribution and Ambiguity in the 113 and 89 Official Tasks
 
-![Primary-type distribution for the official English instructions: DeepSWE n=113 and Terminal n=89. Each task contributes one primary type; one mixed review-and-repair task remains in a secondary label.](../../eda/figures/round2/01-task-types.svg)
+![Primary-type distribution for the official English instructions: DeepSWE n=113 and Terminal n=89. Each task contributes one primary type; one mixed review-and-repair task remains in a secondary label.](../../docs/eda/figures/round2/01-task-types.svg)
 
 Common primary-type distribution and ambiguity in the 113 and 89 official tasks
 
@@ -80,7 +80,7 @@ No independent human-label validation was performed.
 
 ### Round 1 · DeepSWE Repositories and Languages; Terminal Author Category and Difficulty
 
-![Repository and primary-language distribution for 113 DeepSWE tasks, and type and difficulty distribution for 89 Terminal tasks. Difficulty is author metadata, not a performance measurement for this model.](../../eda/figures/round1/05-corpus-bias.svg)
+![Repository and primary-language distribution for 113 DeepSWE tasks, and type and difficulty distribution for 89 Terminal tasks. Difficulty is author metadata, not a performance measurement for this model.](../../docs/eda/figures/round1/05-corpus-bias.svg)
 
 DeepSWE repositories and languages; Terminal author category and difficulty
 
@@ -245,7 +245,7 @@ Source table: Round 1 measurement table · table 11.
 
 ### Round 1 · UTF-8 Byte and Local-Token Histograms for the Official 113 DeepSWE and 89 Terminal Instructions
 
-![UTF-8 byte and local-token distributions for instructions from 113 official DeepSWE tasks and 89 official Terminal tasks. These are not API billing tokens.](../../eda/figures/round1/01-input-size.svg)
+![UTF-8 byte and local-token distributions for instructions from 113 official DeepSWE tasks and 89 official Terminal tasks. These are not API billing tokens.](../../docs/eda/figures/round1/01-input-size.svg)
 
 UTF-8 byte and local-token histograms for the official instructions from 113 DeepSWE and 89 Terminal tasks
 
@@ -290,7 +290,7 @@ Official source text and migrated translations are separate.
 
 ### Round 2 · Byte and Local-Token Box-and-Point Plots by Type for Both Official Sets and 56 Terminal Requests
 
-![Input-size distributions separated into static DeepSWE n=113 tasks, Terminal n=89 tasks, and historical Terminal n=56 requests. Units are UTF-8 bytes and local o200k_base tokens, not API tokens.](../../eda/figures/round2/03-input-size-by-type.svg)
+![Input-size distributions separated into static DeepSWE n=113 tasks, Terminal n=89 tasks, and historical Terminal n=56 requests. Units are UTF-8 bytes and local o200k_base tokens, not API tokens.](../../docs/eda/figures/round2/03-input-size-by-type.svg)
 
 Byte and local-token box-and-point plots by type for both official sets and 56 Terminal requests
 
@@ -379,7 +379,7 @@ Source table: Round 2 measurement table · table 6.
 
 ### Round 1 · Body Composition of Both Official Sets and 56 Historical Terminal Requests
 
-![Body-segment shares for 113 and 89 static instructions and 56 historical Terminal actual requests. Each layer uses total UTF-8 body bytes as its denominator and shows unclassified content separately.](../../eda/figures/round1/02-input-composition.svg)
+![Body-segment shares for 113 and 89 static instructions and 56 historical Terminal actual requests. Each layer uses total UTF-8 body bytes as its denominator and shows unclassified content separately.](../../docs/eda/figures/round1/02-input-composition.svg)
 
 Body composition of both official sets and 56 historical Terminal requests
 
@@ -510,7 +510,7 @@ Source table: Round 2 measurement table · table 4.
 
 ### Round 1 · Initially Identified Candidate, Unclassified, and Protected Shares for 5 Terminal Tasks
 
-![Task-level shares of log candidates, unclassified content, and protected segments across 56 requests recorded for 5 Terminal tasks with 3 runs each. This shows body-byte composition, not compression results.](../../eda/figures/round1/03-compressible-share.svg)
+![Task-level shares of log candidates, unclassified content, and protected segments across 56 requests recorded for 5 Terminal tasks with 3 runs each. This shows body-byte composition, not compression results.](../../docs/eda/figures/round1/03-compressible-share.svg)
 
 Initially identified candidate, unclassified, and protected shares for 5 Terminal tasks
 
@@ -546,7 +546,7 @@ Across all 56 requests, the candidate share is 9.05% and the unclassified share 
 
 ### Round 2 · Seven-Category Decomposition of 158,258 Formerly Unclassified Bytes
 
-![Decomposition of unclassified content after complete review of 58 distinct segments and 168 occurrences including retransmission, totaling 158,258 bytes. Historical requests n=56 and tasks n=5; these are neither API tokens nor an actual savings rate.](../../eda/figures/round2/04-unknown-decomposition.svg)
+![Decomposition of unclassified content after complete review of 58 distinct segments and 168 occurrences including retransmission, totaling 158,258 bytes. Historical requests n=56 and tasks n=5; these are neither API tokens nor an actual savings rate.](../../docs/eda/figures/round2/04-unknown-decomposition.svg)
 
 Seven-category decomposition of 158,258 formerly unclassified bytes
 
@@ -591,7 +591,7 @@ The 9.44% protected-whole share is 77,798 bytes of code-containing mixed content
 
 ### Round 2 · Terminal Candidate and Full Protected-Composition View by Type, from Round 1 to Round 2
 
-![Candidate and body composition by type for historical Terminal data: n=5 tasks, 15 runs, and 56 requests. Units are UTF-8 bytes; types without samples, such as debugging and review, are not measured.](../../eda/figures/round2/02-candidate-share-by-type.svg)
+![Candidate and body composition by type for historical Terminal data: n=5 tasks, 15 runs, and 56 requests. Units are UTF-8 bytes; types without samples, such as debugging and review, are not measured.](../../docs/eda/figures/round2/02-candidate-share-by-type.svg)
 
 Terminal candidate and full protected-composition view by type, from Round 1 to Round 2
 
@@ -771,7 +771,7 @@ Within **candidate segments only** across 56 requests, exact duplicate lines add
 
 ### Round 1 · Comparison and Difference Distribution for API Input and Local Body Tokens in the Same 56 Terminal Requests
 
-![Local message-body tokens compared with actual API input tokens for 5 historical Terminal tasks, 15 runs, and 56 requests. The dashed line is the calculated y=x reference; the right panel shows the difference distribution.](../../eda/figures/round1/06-api-token-calibration.svg)
+![Local message-body tokens compared with actual API input tokens for 5 historical Terminal tasks, 15 runs, and 56 requests. The dashed line is the calculated y=x reference; the right panel shows the difference distribution.](../../docs/eda/figures/round1/06-api-token-calibration.svg)
 
 Comparison and difference distribution for API input and local body tokens in the same 56 Terminal requests
 
@@ -834,7 +834,7 @@ Total API usage is 244,143 input tokens, 28,603 output tokens, and 148,864 cache
 
 ### Round 1 · Cumulative Distribution of Shared Leading Local Token-ID Length for Static Instructions, First Requests, and Adjacent Requests
 
-![Distribution of shared leading local token-ID lengths for official instruction-task pairs and actual Terminal request pairs. The 1,024 dashed line is a reference for the GPT-5.4 service's cache minimum at the time, not a measurement of service cache prefixes.](../../eda/figures/round1/04-shared-prefix.svg)
+![Distribution of shared leading local token-ID lengths for official instruction-task pairs and actual Terminal request pairs. The 1,024 dashed line is a reference for the GPT-5.4 service's cache minimum at the time, not a measurement of service cache prefixes.](../../docs/eda/figures/round1/04-shared-prefix.svg)
 
 Cumulative distribution of shared leading local token-ID length for static instructions, first requests, and adjacent requests
 
@@ -888,6 +888,6 @@ A local prefix longer than the cache minimum does not by itself guarantee a serv
 - [Official DeepSWE dataset](https://huggingface.co/datasets/datacurve/deep-swe/tree/6d6f134460c137e24c6bb7e1e69954116ea9dbb3): official English instructions and task metadata at pinned revision `6d6f134460c137e24c6bb7e1e69954116ea9dbb3`.
 - [Official Terminal-Bench 2.1 tasks](https://github.com/harbor-framework/terminal-bench-2-1/tree/7131e4375048a0e408a8fb404b5f499d726b695b): official English instructions and task metadata at pinned revision `7131e4375048a0e408a8fb404b5f499d726b695b`.
 - Historical actual requests: 2026-09-09, 5 purpose-selected tasks × 3 runs and 56 requests from `gpt-5.4-2026-03-05`. Raw request text is not distributed.
-- The [public task-level candidate aggregate](../../../data/eda/task-candidate-share.csv) and its [provenance and conditions](../../../data/eda/lineage.json) contain two classification rounds over the same historical sample.
+- The [public task-level candidate aggregate](../../data/eda/task-candidate-share.csv) and its [provenance and conditions](../../data/eda/lineage.json) contain two classification rounds over the same historical sample.
 - Source table numbers follow their order in the original Round 1 and Round 2 measurement documents; they are not section numbers in this document.
 - This is a static analysis of all instructions and a historical run sample, not a new compression, quality, or billing experiment.

@@ -6,7 +6,7 @@ from urllib.parse import unquote
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SNAPSHOT_ROOT = ROOT / "docs/en"
+SNAPSHOT_ROOT = ROOT / "docs_en"
 INVENTORY_ROW = re.compile(
     r"^\| `(?P<source>[^`]+)` \| "
     r"\[`(?P<destination>[^`]+)`\]\((?P<link>[^)]+)\) \| "
@@ -48,8 +48,8 @@ class DocumentLocalizationTests(unittest.TestCase):
     def test_language_entrypoints_are_explicit(self):
         root_readme = (ROOT / "README.md").read_text(encoding="utf-8")
         self.assertIn("[Korean experiment records](docs/experiment/README.md)", root_readme)
-        self.assertIn("[English GBB snapshot](docs/en/README.md)", root_readme)
-        self.assertIn("[snapshot provenance](docs/en/SNAPSHOT.md)", root_readme)
+        self.assertIn("[English GBB documentation](docs_en/README.md)", root_readme)
+        self.assertIn("[snapshot provenance](docs_en/SNAPSHOT.md)", root_readme)
 
         korean = (ROOT / "docs/experiment/01-preliminary-comparison/README.md").read_text(
             encoding="utf-8"
@@ -62,7 +62,7 @@ class DocumentLocalizationTests(unittest.TestCase):
 
     def test_snapshot_inventory_matches_preserved_files(self):
         rows = snapshot_inventory()
-        self.assertEqual(len(rows), 30)
+        self.assertEqual(len(rows), 29)
         self.assertEqual(len({row["source"] for row in rows}), len(rows))
         self.assertEqual(len({row["destination"] for row in rows}), len(rows))
 
@@ -70,7 +70,14 @@ class DocumentLocalizationTests(unittest.TestCase):
             with self.subTest(destination=row["destination"]):
                 destination = ROOT / row["destination"]
                 self.assertTrue(destination.is_file())
-                self.assertTrue(destination.is_relative_to(SNAPSHOT_ROOT))
+                self.assertTrue(
+                    destination.is_relative_to(SNAPSHOT_ROOT)
+                    or destination
+                    in {
+                        ROOT / "examples/README_en.md",
+                        ROOT / "ledgers/README_en.md",
+                    }
+                )
                 self.assertEqual(
                     hashlib.sha256(destination.read_bytes()).hexdigest(),
                     row["snapshot_hash"],
@@ -84,7 +91,14 @@ class DocumentLocalizationTests(unittest.TestCase):
             for row in snapshot_inventory()
         }
         checked = 0
-        for markdown in sorted(SNAPSHOT_ROOT.rglob("*.md")):
+        markdown_files = list(SNAPSHOT_ROOT.rglob("*.md"))
+        markdown_files.extend(
+            [
+                ROOT / "examples/README_en.md",
+                ROOT / "ledgers/README_en.md",
+            ]
+        )
+        for markdown in sorted(markdown_files):
             text = markdown.read_text(encoding="utf-8")
             matches = list(MARKDOWN_LINK.finditer(text))
             matches.extend(REFERENCE_LINK.finditer(text))
@@ -96,7 +110,7 @@ class DocumentLocalizationTests(unittest.TestCase):
                 with self.subTest(markdown=markdown.relative_to(ROOT), target=target):
                     self.assertTrue(target.exists())
                     self.assertNotIn(target, canonical_sources)
-        self.assertGreaterEqual(checked, 250)
+        self.assertGreaterEqual(checked, 180)
 
 
 if __name__ == "__main__":

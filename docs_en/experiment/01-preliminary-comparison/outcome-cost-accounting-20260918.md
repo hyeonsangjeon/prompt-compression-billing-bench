@@ -191,11 +191,11 @@ concurrency controls, and the scope of invoice reconciliation.
 
 ## Public Evidence and Recalculation
 
-- [Processed public ledger](../../../../data/experiment/outcome-cost-evidence.json): exact outcome-and-cost linkage input without raw requests, responses, or private identifiers
-- [Outcome-accounting JSON](../../../../data/experiment/outcome-cost-accounting.json): public generated result
-- [JSON Schema](../../../../schemas/outcome-cost-accounting.schema.json): required fields, fixed values, and `null` boundary
-- [Aggregation code](../../../../src/outcome_cost_accounting.py): price-table recalculation, classification, and two-way reconciliation
-- [Direct tests](../../../../tests/test_outcome_cost_accounting.py): duplicate quality and attempt records, price drift, unresolved values, and document-contract checks
+- [Processed public ledger](../../../data/experiment/outcome-cost-evidence.json): exact outcome-and-cost linkage input without raw requests, responses, or private identifiers
+- [Outcome-accounting JSON](../../../data/experiment/outcome-cost-accounting.json): public generated result
+- [JSON Schema](../../../schemas/outcome-cost-accounting.schema.json): required fields, fixed values, and `null` boundary
+- [Aggregation code](../../../src/outcome_cost_accounting.py): price-table recalculation, classification, and two-way reconciliation
+- [Direct tests](../../../tests/test_outcome_cost_accounting.py): duplicate quality and attempt records, price drift, unresolved values, and document-contract checks
 - [Technical preliminary-comparison evidence](preliminary-comparison-20260916.md): detailed observations for 26 tasks, 104 conditions, and 5 long-running attempts
 
 The public input, generated result, and schema can be checked without calling a model or

@@ -9,7 +9,7 @@ the built-in grader evaluates the result.
 
 Suggested order: **this 30-second summary → [visual guide](visualization-guide-20260919.md)
 → [technical evidence](preliminary-comparison-20260916.md) →
-[one-task YAML walkthrough](../../README.md#try-it-in-five-minutes)**.
+[one-task YAML walkthrough](../../../README.md#try-it-in-five-minutes)**.
 
 ## 30-Second Summary
 
@@ -84,7 +84,7 @@ within message-content UTF-8 bytes by type for 5 historical Terminal tasks, 15 r
 56 requests. Types without tasks are unmeasured, and the chart does not show API-token
 share.
 
-![Comparison of first- and second-pass candidate shares in message-content UTF-8 bytes by type for 5 historical Terminal tasks, 15 runs, and 56 requests. Types without tasks are unmeasured; the figure does not show API tokens, achieved compression, quality, or cost.](../../../eda/figures/round2/02-candidate-share-by-type.svg)
+![Comparison of first- and second-pass candidate shares in message-content UTF-8 bytes by type for 5 historical Terminal tasks, 15 runs, and 56 requests. Types without tasks are unmeasured; the figure does not show API tokens, achieved compression, quality, or cost.](../../../docs/eda/figures/round2/02-candidate-share-by-type.svg)
 
 *Figure 2. Candidate byte share was 0.48%–35.29% by task and 15.42% overall across the
 purposively selected 5 tasks, 15 runs, and 56 requests. The denominator is message-content
@@ -172,7 +172,7 @@ or calculate population savings.
 - [EDA source and figure lineage](../../eda/README.md) and [figure manifest](../../eda/manifest.json) — denominators and SVG hashes for 5 tasks, 15 runs, and 56 requests
 - [Baseline](../baseline.md) and [static measurements](../compressors.md) — 100 native trials and model-free transformations
 - [Experiment documentation index](../README.md) — current decision, historical protocols, and public reading order
-- [One-task YAML](../../../../examples/experiment/benchmark.yaml) and [five-minute walkthrough](../../README.md#try-it-in-five-minutes) — default no-call check and explicit live-execution boundary
+- [One-task YAML](../../../examples/experiment/benchmark.yaml) and [five-minute walkthrough](../../../README.md#try-it-in-five-minutes) — default no-call check and explicit live-execution boundary
 
 Public evidence excludes raw prompts, credentials, endpoint addresses, and private execution
 paths.

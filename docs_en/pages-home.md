@@ -11,10 +11,10 @@ summarize experiment evidence.
 
 - [Static site contract and reproduction steps](pages-static.md)
 - [Publication grades and rights boundary](publication.md)
-- [Project MIT license](../../LICENSE)
-- [Third-party notices](../../THIRD_PARTY_NOTICES.md)
-- [GSM8K MIT license text](../../third_party/licenses/gsm8k-MIT.txt)
-- [Terminal-Bench 2.1 Apache License 2.0 text](../../third_party/licenses/terminal-bench-2.1-Apache-2.0.txt)
+- [Project MIT license](../LICENSE)
+- [Third-party notices](../THIRD_PARTY_NOTICES.md)
+- [GSM8K MIT license text](../third_party/licenses/gsm8k-MIT.txt)
+- [Terminal-Bench 2.1 Apache License 2.0 text](../third_party/licenses/terminal-bench-2.1-Apache-2.0.txt)
 
 ## Publication scope
 

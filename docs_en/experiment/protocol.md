@@ -35,7 +35,7 @@ temperature and reasoning effort are request settings. They are not controls tha
 
 ## Execution Path
 
-Cloud-native execution is orchestrated by [`src/native_run.py`](../../../src/native_run.py), and [`src/live_transport.py`](../../../src/live_transport.py) sends requests after protection checks. [`accounting.py`](../../../accounting.py) aggregates separate local Ollama records; it is not the runner or transport for this cloud baseline.
+Cloud-native execution is orchestrated by [`src/native_run.py`](../../src/native_run.py), and [`src/live_transport.py`](../../src/live_transport.py) sends requests after protection checks. [`accounting.py`](../../accounting.py) aggregates separate local Ollama records; it is not the runner or transport for this cloud baseline.
 
 ## Protections and Metrics
 

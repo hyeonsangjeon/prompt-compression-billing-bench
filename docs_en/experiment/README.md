@@ -33,7 +33,7 @@ document in advance for a second experiment that has not started.
 
 1. Read the [next paid-run safety policy](execution-safety-policy.md) for call, cost, time, request, and output limits and the classification of technically incomplete outcomes.
 2. Read the [real-data connection guide](data-connection-guide-20260919.md) for the sequence from preparation outside the public repository through no-call checks, explicit execution, and result verification.
-3. Read the [single-task YAML guide](../README.md#try-it-in-five-minutes) for the default no-call check and the explicit live-execution boundary.
+3. Read the [single-task YAML guide](../../README.md#try-it-in-five-minutes) for the default no-call check and the explicit live-execution boundary.
 
 ## Separate candidate evaluation
 

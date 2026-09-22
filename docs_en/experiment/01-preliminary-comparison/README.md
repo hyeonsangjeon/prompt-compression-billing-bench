@@ -4,7 +4,7 @@
 >
 > Dollar amounts in this document are rounded to two decimal places for readability.
 > Exact calculated values remain in [Cost Accounting by Outcome](outcome-cost-accounting-20260918.md)
-> and the [public aggregate JSON](../../../../data/experiment/outcome-cost-accounting.json).
+> and the [public aggregate JSON](../../../data/experiment/outcome-cost-accounting.json).
 > Local tokens in changed spans, provider API usage, calculated API cost, directly
 > attributable infrastructure cost, and an actual invoice are different units and
 > must not be treated as interchangeable.

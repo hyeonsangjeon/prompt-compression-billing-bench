@@ -1,8 +1,8 @@
 # prompt-compression-billing-bench
 
 Documentation: [Korean experiment records](docs/experiment/README.md) ·
-[English GBB snapshot](docs/en/README.md) ·
-[snapshot provenance](docs/en/SNAPSHOT.md)
+[English GBB documentation](docs_en/README.md) ·
+[snapshot provenance](docs_en/SNAPSHOT.md)
 
 ## In three seconds
 

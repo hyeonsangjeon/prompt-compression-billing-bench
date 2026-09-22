@@ -80,7 +80,7 @@ not add quality results, but every attempt that starts retains its cost.
 
 Recheck that condition-level calculated API costs `$5.61866`, `$6.663187`,
 `$5.3620835`, and `$4.689458` sum to `$22.3333885`. This total and the 40 passes are
-pinned in the [public aggregate JSON](../../../../data/experiment/preliminary-comparison-summary.json).
+pinned in the [public aggregate JSON](../../../data/experiment/preliminary-comparison-summary.json).
 
 ### Long-Running Attempts Before Quality Judgment
 
@@ -253,6 +253,6 @@ The plan's completion criteria were:
 
 - [Experiment-design review appendix](experiment-briefing-20260919.md)
 - [Technical preliminary-comparison evidence](preliminary-comparison-20260916.md)
-- [Public aggregate JSON](../../../../data/experiment/preliminary-comparison-summary.json)
+- [Public aggregate JSON](../../../data/experiment/preliminary-comparison-summary.json)
 - [Evaluation protocol](../evaluation-protocol.md)
 - [Reproducibility contract](../reproducibility-contract.md)

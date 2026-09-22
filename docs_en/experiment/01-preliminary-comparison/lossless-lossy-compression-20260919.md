@@ -241,10 +241,10 @@ experiment.
 
 - [Static compressor measurements](../compressors.md): static transformation scope, examples, and units for three tools
 - [Technical preliminary-comparison evidence](preliminary-comparison-20260916.md): quality, actual changes, usage, and cost scope for 26 tasks and 104 conditions
-- [Public preliminary-comparison aggregate JSON](../../../../data/experiment/preliminary-comparison-summary.json): changed-condition and span counts by condition
-- [Native execution contract](../../../native-contract.md): fixed profiles and protection, restoration, and instrumentation boundaries
-- [Compressor implementations](../../../../src/compressors.py): `NoOpCompressor`, `SqueezCompressor`, `HeadroomPathsCompressor`, and `LLMLingua2Compressor`
-- [Synthetic compressor tests](../../../../tests/test_native_compressors.py): Headroom round-trip restoration and LLMLingua worker validation
+- [Public preliminary-comparison aggregate JSON](../../../data/experiment/preliminary-comparison-summary.json): changed-condition and span counts by condition
+- [Native execution contract](../../../docs/native-contract.md): fixed profiles and protection, restoration, and instrumentation boundaries
+- [Compressor implementations](../../../src/compressors.py): `NoOpCompressor`, `SqueezCompressor`, `HeadroomPathsCompressor`, and `LLMLingua2Compressor`
+- [Synthetic compressor tests](../../../tests/test_native_compressors.py): Headroom round-trip restoration and LLMLingua worker validation
 
 Examples use only public material and small synthetic strings. They exclude customer
 source, service endpoints, credentials, internal addresses, and personal paths.

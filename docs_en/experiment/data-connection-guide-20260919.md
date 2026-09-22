@@ -15,10 +15,10 @@ execution state, usage, judgment, and file fingerprints in machine-readable form
 5. After execution, validate the JSON against the result schema and read technical completion separately from quality. `technical_incomplete` is not a wrong answer.
 
 This documentation work made no model or provider call. It describes only the public
-[one-task YAML](../../../examples/experiment/benchmark.yaml), existing
-[connection code](../../../src/benchmark_run.py), existing
-[single-task runner](../../../src/screening_run.py), and
-[result schema](../../../schemas/experiment-result.schema.json).
+[one-task YAML](../../examples/experiment/benchmark.yaml), existing
+[connection code](../../src/benchmark_run.py), existing
+[single-task runner](../../src/screening_run.py), and
+[result schema](../../schemas/experiment-result.schema.json).
 
 ## Supported Scope
 
@@ -70,13 +70,13 @@ approved source branch and run from a clean `HEAD`.
 
 | Item | Fixed content | Where to check |
 | --- | --- | --- |
-| Benchmark | Terminal-Bench 2.1 name, revision, and public task index | [Public reference ledger](../../../ledgers/screening.template.toml) |
+| Benchmark | Terminal-Bench 2.1 name, revision, and public task index | [Public reference ledger](../../ledgers/screening.template.toml) |
 | Model settings | `gpt-5.4`, reported revision, `temperature=0`, reasoning setting | Public reference ledger |
 | Condition | `none`, the reference without additional compression | Public reference ledger and YAML |
 | Execution path | `src.screening_run --diagnose-task` | `resolved_contract.runner` in result JSON |
 | Protection contract | Replay bundle, complete evidence retention, and retry settings | Public reference ledger and result JSON |
 | Safety limits | Call, cost, time, request, and output boundaries and unknown-quality stop classification | [Safety policy](execution-safety-policy.md) |
-| Result shape | State, usage, cost, quality, completion, and artifact hashes | [Result schema](../../../schemas/experiment-result.schema.json) |
+| Result shape | State, usage, cost, quality, completion, and artifact hashes | [Result schema](../../schemas/experiment-result.schema.json) |
 
 The wrapper compares the private execution ledger with the public reference ledger. Only
 inventory-file fingerprints, provider-limit and deployment-isolation evidence, approval
@@ -122,7 +122,7 @@ names above at execution time.
 
 ## 2. Review the One-Task YAML
 
-The [public example](../../../examples/experiment/benchmark.yaml) points to one real task in
+The [public example](../../examples/experiment/benchmark.yaml) points to one real task in
 the pinned benchmark; it is not synthetic input.
 
 ```yaml
@@ -157,7 +157,7 @@ uv run --locked python run.py experiment \
 
 The first command checks YAML, the current Git commit, public reference ledger, task index,
 and result contract. Without `--execute`, it makes no provider call. The second command
-checks the generated JSON against the [result schema](../../../schemas/experiment-result.schema.json).
+checks the generated JSON against the [result schema](../../schemas/experiment-result.schema.json).
 
 A successful no-call preflight produces:
 
@@ -175,7 +175,7 @@ or cost has been measured. Passing the schema checks JSON shape, not truthfulnes
 billing.
 
 The current clean-checkout validation scope for the no-call path is recorded in
-[validation evidence](../../../data/experiment/readme-benchmark-validation-20260920.json).
+[validation evidence](../../data/experiment/readme-benchmark-validation-20260920.json).
 That record also excludes actual provider execution.
 
 ## 4. Execute Only After Approval
@@ -337,7 +337,7 @@ reconciliation.
 - [ ] Before publication, pass the [publication-scope contract](../publication.md) and file allowlist checks.
 
 Related evidence is in the [reproducibility contract](reproducibility-contract.md),
-[one-task request schema](../../../schemas/benchmark-request.schema.json),
-[result schema](../../../schemas/experiment-result.schema.json),
-[public reference ledger](../../../ledgers/screening.template.toml), and
-[existing runner](../../../src/benchmark_run.py).
+[one-task request schema](../../schemas/benchmark-request.schema.json),
+[result schema](../../schemas/experiment-result.schema.json),
+[public reference ledger](../../ledgers/screening.template.toml), and
+[existing runner](../../src/benchmark_run.py).
