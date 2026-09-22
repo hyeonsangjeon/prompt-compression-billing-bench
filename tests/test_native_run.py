@@ -11,7 +11,13 @@ import unittest
 from unittest.mock import patch
 
 from native_helpers import FixtureEncoder, ledger_fixture_document, request_fixture, response_fixture
-from src.cache_reuse import summarize_native_bundle
+from src.cache_reuse import (
+    CACHE_THRESHOLD_TOKENS,
+    SCREENING_REQUEST_ORDINALS,
+    STRUCTURAL_SCREENING_TOKENS,
+    eligibility_decision_sha256,
+    summarize_native_bundle,
+)
 from src.execution_safety import safety_policy_record
 from src.native_contract import TASKS
 from src.native_run import (
@@ -27,6 +33,54 @@ from src.protection import canonical, digest
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def synthetic_eligibility_contract():
+    rows = []
+    for task_id in TASKS:
+        for request_ordinal in SCREENING_REQUEST_ORDINALS:
+            eligibility = (
+                "eligible"
+                if STRUCTURAL_SCREENING_TOKENS[task_id] >= CACHE_THRESHOLD_TOKENS
+                else "not_applicable"
+            )
+            rows.append({
+                "task_id": task_id,
+                "request_ordinal": request_ordinal,
+                "local_screening_prefix_tokens": [
+                    STRUCTURAL_SCREENING_TOKENS[task_id],
+                    STRUCTURAL_SCREENING_TOKENS[task_id],
+                ],
+                "stable_serialized_prefix_bytes": 1,
+                "capture_serialized_prefix_sha256": ["c" * 64, "c" * 64],
+                "capture_request_sha256": ["d" * 64, "e" * 64],
+                "cache_eligibility": eligibility,
+                "execution_bundle_included": True,
+                "primary_cache_estimand_included": eligibility == "eligible",
+            })
+    contract = {
+        "schema_version": 1,
+        "kind": "cache_reuse_structural_eligibility_decision",
+        "decision_version": 1,
+        "decided_at_utc": "2026-09-22T00:00:00Z",
+        "screening_source_commit": "a" * 40,
+        "screening_evidence_sha256": "b" * 64,
+        "screening_launches": 2,
+        "provider_cache_threshold_tokens": 1_024,
+        "screening_token_unit": "local_content_tokens_not_provider_billed_usage",
+        "selection_timing": "after_zero_call_structural_screening_before_provider_inference",
+        "primary_estimand": "same_task_condition_reuse_effect_structurally_eligible_tasks_only",
+        "ineligible_cache_result": "not_applicable",
+        "full_bundle_estimand": "descriptive_provider_usage_computed_cost_quality_all_five_tasks",
+        "external_validity_limit": "eligibility_screening_favors_cache_capable_inputs_no_generalization",
+        "task_denominators": {"execution": 5, "primary_eligible": 3, "not_applicable": 2},
+        "raw_content_stored": False,
+        "provider_model_api_calls": 0,
+        "rows": rows,
+        "decision_sha256": "0" * 64,
+    }
+    contract["decision_sha256"] = eligibility_decision_sha256(contract)
+    return contract
 
 
 class NativeRunTests(unittest.TestCase):
@@ -162,6 +216,7 @@ class NativeRunTests(unittest.TestCase):
              patch("src.native_run.make_blob_spool", side_effect=make_retrieval):
             keywords = {}
             if cache_bundle:
+                eligibility_contract = synthetic_eligibility_contract()
                 context = {
                     "cycle_id": "cycle-01", "bundle_id": "cycle-01-none-reuse-0",
                     "condition": "none", "reuse_level": 0, "eligible_predecessor_count": 0,
@@ -171,11 +226,19 @@ class NativeRunTests(unittest.TestCase):
                 }
 
                 def observe(**arguments):
+                    task_id = arguments["task"]
+                    eligibility = next(
+                        row["cache_eligibility"]
+                        for row in eligibility_contract["rows"]
+                        if row["task_id"] == task_id and row["request_ordinal"] == 1
+                    )
                     return {
                         "cycle_id": context["cycle_id"], "condition": context["condition"],
                         "reuse_level": context["reuse_level"], "eligible_predecessor_count": 0,
                         "serialized_prefix_sha256": digest(arguments["serialized"]),
                         "request_sha256": digest(arguments["serialized"]),
+                        "structural_cache_eligibility": eligibility,
+                        "eligibility_decision_sha256": eligibility_contract["decision_sha256"],
                     }
 
                 keywords = {"cache_context": context, "request_observer": observe}
@@ -260,10 +323,13 @@ class NativeRunTests(unittest.TestCase):
                 },
                 cache_ledger_sha256="e" * 64,
                 runtime_facts_sha256="d" * 64,
+                eligibility_contract=synthetic_eligibility_contract(),
                 parent_run_id="parent-run",
             )
         self.assertEqual(checked["cache_reuse"]["eligible_predecessor_count"], 0)
         self.assertEqual(bundle["task_denominator"], 5)
+        self.assertEqual(bundle["primary_cache_task_denominator"], 3)
+        self.assertEqual(bundle["not_applicable_cache_task_denominator"], 2)
         self.assertEqual(len(bundle["observations"]), 5)
         self.assertTrue(all(row["flags"]["measured"] for row in bundle["observations"]))
         self.assertTrue(all(row["invoice"]["status"] == "not_measured" for row in bundle["observations"]))

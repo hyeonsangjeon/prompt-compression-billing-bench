@@ -92,6 +92,38 @@ The committed
 [`runtime-context-attestation.template.json`](../fixtures/cache-reuse/runtime-context-attestation.template.json)
 is deliberately expired and is not operational evidence.
 
+### Cache structural eligibility decision
+
+`CACHE_RUNTIME_FACTS` must include `eligibility_contract` before
+`R02_SERIALIZED_PREFIX_CONTRACT` can be verified. The object is a private,
+versioned decision overlay; it does not change
+[`ledgers/cache-reuse.template.json`](../ledgers/cache-reuse.template.json). Its
+top-level fields are `schema_version`, `kind`, `decision_version`,
+`decided_at_utc`, `screening_source_commit`, `screening_evidence_sha256`,
+`screening_launches`, `provider_cache_threshold_tokens`,
+`screening_token_unit`, `selection_timing`, `primary_estimand`,
+`ineligible_cache_result`, `full_bundle_estimand`,
+`external_validity_limit`, `task_denominators`, `raw_content_stored`,
+`provider_model_api_calls`, `rows`, and `decision_sha256`.
+
+The object contains exactly ten rows: the five fixed tasks crossed with request
+ordinals one and two. Each row contains `task_id`, `request_ordinal`,
+`local_screening_prefix_tokens`, `stable_serialized_prefix_bytes`,
+`capture_serialized_prefix_sha256`, `capture_request_sha256`,
+`cache_eligibility`, `execution_bundle_included`, and
+`primary_cache_estimand_included`. Both captures must have the same serialized
+prefix hash within a task and ordinal. Raw request content, endpoint values,
+credentials, and private paths are not allowed.
+
+The threshold is 1,024 local content tokens. The decision fixes three tasks in
+the primary eligible stratum and two as `not_applicable`; all five remain in the
+execution bundle. The decision SHA-256 is calculated over the canonical object
+without its `decision_sha256` field, and the R02 evidence hash must equal that
+value. These diagnostics are not provider-billed token usage or evidence of a
+cache hit. Because the stratification follows zero-call structural screening,
+the primary result cannot be generalized to the full five-task bundle or other
+workloads.
+
 ## SWE-Lancer carrier inputs
 
 The project command identity is the `SWE_LANCER_RUNTIME_PYTHON` executable
@@ -245,8 +277,9 @@ For the cache handoff:
    bytes and repeats the five canonical `SANCTIONED_PROJECT_RUNTIME_CONTEXT_*`
    fields. This repository intentionally provides no command that manufactures
    a fresh ready attestation.
-3. Provide the exact cache ledger, 14-row runtime facts, and native ledger
-   through the named environment entries. Keep actual values and paths private.
+3. Provide the exact cache ledger, 14-row runtime facts with the hash-bound
+   structural eligibility decision, and native ledger through the named
+   environment entries. Keep actual values and paths private.
 4. Choose a new output path that does not exist, then invoke the zero-call gate
    once:
 
