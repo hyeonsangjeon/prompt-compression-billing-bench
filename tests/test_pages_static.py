@@ -261,6 +261,11 @@ class PagesStaticRuntimeTests(unittest.TestCase):
         )
         self.assertTrue(result["unicode_fragment_navigation"]["passed"])
 
+    def test_homepage_preserves_korean_and_legacy_english_fragments(self):
+        homepage = (self.first / "site/index.html").read_text(encoding="utf-8")
+        self.assertEqual(homepage.count('id="공개-범위"'), 1)
+        self.assertEqual(homepage.count('id="publication-scope"'), 1)
+
     def test_generated_inventory_contains_only_allowlisted_content(self):
         manifest = self._json(self.first / "record/source-manifest.json")
         self.assertEqual(
@@ -620,6 +625,18 @@ class PagesStaticSourceTests(unittest.TestCase):
         self.assertEqual(encoded["source_file"], "index.html")
         self.assertEqual(encoded["expected_target_file"], "index.html")
         self.assertEqual(encoded["decoded_fragment"], "공개-범위")
+        self.assertEqual(
+            contract["compatibility_anchors"],
+            [
+                {
+                    "source_path": "docs/pages-home.md",
+                    "fragment": "publication-scope",
+                    "before_line": 19,
+                    "line_sha256": "33177b6a1a00f7e9ca076b6d25baca0379eb7540dbe29654322c7c8fd53b7692",
+                    "reason": "Preserve the previously published English fragment while restoring the original Korean heading.",
+                }
+            ],
+        )
         for path in contract["source_allowlist"]:
             with self.subTest(path=path):
                 self.assertNotEqual(path, "README.md")

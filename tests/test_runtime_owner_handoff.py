@@ -133,10 +133,10 @@ class RuntimeOwnerHandoffTests(unittest.TestCase):
 
         cache_doc = (ROOT / "docs/cache-reuse.md").read_text(encoding="utf-8")
         swe_doc = (
-            ROOT / "docs/experiment/swe-lancer-candidate-evaluation-20260920.md"
+            ROOT / "docs_en/experiment/swe-lancer-candidate-evaluation-20260920.md"
         ).read_text(encoding="utf-8")
         self.assertIn("](runtime-owner-handoff.md)", cache_doc)
-        self.assertIn("](../runtime-owner-handoff.md)", swe_doc)
+        self.assertIn("](../../docs/runtime-owner-handoff.md)", swe_doc)
 
     def test_guide_is_publication_graded_but_not_added_to_pages(self):
         public_files = SourceConstants(ROOT / "evidence.py").read("PUBLIC_FILES")

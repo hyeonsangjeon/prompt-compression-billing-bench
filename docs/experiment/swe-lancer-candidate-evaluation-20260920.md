@@ -72,18 +72,4 @@ provider 요청이 없었으므로 계산된 provider 비용은 USD 0.00이다. 
 
 공개 template인 [`ledgers/swe-lancer.template.json`](../../ledgers/swe-lancer.template.json)은 승인과 private evidence pin이 비어 있어 실행용이 아니다. [`src/swe_lancer_admission.py`](../../src/swe_lancer_admission.py)는 result를 먼저 배타 예약하고 source·evidence 지문과 deadline을 검사하지만 worker나 provider를 시작하지 않는다. 설정이 적혀 있다는 사실만으로 격리나 권한이 검증됐다고 판정하지 않는다.
 
-### 현재 소스 계약의 실행 경계
-
-현재 저장소에는 [`config/swe-lancer-carrier.json`](../../config/swe-lancer-carrier.json)에 승인된 private carrier 명령도 정의되어 있다. 이 명령은 인자로 private 경로나 값을 받지 않는다.
-
-```bash
-"$SWE_LANCER_RUNTIME_PYTHON" -m src.swe_lancer_carrier
-```
-
-carrier 관문은 추적 중인 소스 식별자와 최신 runtime owner attestation을 검증한 뒤, 정확한 private admission ledger와 해시로 묶인 receipt 세 건을 읽는다. 이 receipt들은 provider, model revision, deployment identity, API version, 고정 가격 출처, 유료 outbound 검토, 정확한 image와 cleanup 계약을 같은 ledger에 연결한다. 관문은 환경 변수 이름의 존재 여부, byte 수, SHA-256 식별자와 민감 정보를 제거한 상태만 기록한다. 그런 다음 기존의 model-free admission 검사를 한 번 호출한다. 근거가 없거나 오래됐거나 서로 일치하지 않으면 호출 전에 중단하며, 출력은 기존 파일을 덮어쓰지 않고 소유자만 읽을 수 있게 유지한다.
-
-[runtime owner 인계 안내서](../runtime-owner-handoff.md)에는 정식 환경 변수 이름, receipt와 attestation의 전체 필드, 결합 순서와 fail-closed 해석이 정리되어 있다. 이 안내서는 소스 계약을 설명할 뿐, 현재 사용할 수 있는 carrier receipt나 권한 기록은 아니다.
-
-이 소스 경계는 private carrier를 만들거나 찾아내거나 승인하지 않는다. 완료된 hosted offline smoke를 현재 유료 carrier의 근거로 바꾸지도 않으며, 이 보고서의 과거 no-trace 결론도 바꾸지 않는다. runtime owner가 실제로 승인된 context, 최신 attestation, 정확한 private 입력과 현재 receipt를 제공해야 한다. 별도 admission이 green이 될 때까지 provider, model, API와 grader 호출은 0으로 유지된다.
-
 기계 판정은 [`data/experiment/swe-lancer-candidate-evaluation.json`](../../data/experiment/swe-lancer-candidate-evaluation.json)에 있다. private task body, raw trace, credential, endpoint 값, container 식별자와 실행 경로는 포함하지 않았다.
