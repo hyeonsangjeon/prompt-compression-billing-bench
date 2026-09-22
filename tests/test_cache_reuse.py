@@ -8,14 +8,20 @@ import unittest
 from unittest.mock import patch
 
 from src.cache_reuse import (
+    CACHE_THRESHOLD_TOKENS,
     CONDITIONS,
     REUSE_CONTRASTS,
     REQUIRED_RUNTIME_CHECKS,
+    SCREENING_REQUEST_ORDINALS,
+    STRUCTURAL_SCREENING_TOKENS,
+    STRUCTURALLY_ELIGIBLE_TASKS,
+    STRUCTURALLY_INELIGIBLE_TASKS,
     PrefixTracker,
     bundle_metrics,
     cache_stability,
     cache_verdict,
     doctor,
+    eligibility_decision_sha256,
     execute_cycle,
     load_cache_ledger,
     load_json,
@@ -23,7 +29,9 @@ from src.cache_reuse import (
     make_plan,
     provider_usage_record,
     result_row,
+    task_cache_eligibility,
     validate_cache_ledger,
+    validate_eligibility_contract,
     validate_plan,
     validate_runtime_facts,
     write_no_clobber,
@@ -41,8 +49,68 @@ PRICE_SOURCE = "synthetic fixed price source"
 PRICE_CHECKED_AT = "2026-09-20T00:00:00Z"
 
 
-def approved_facts():
+def synthetic_eligibility_contract(captures=None):
+    captures = captures or {}
+    rows = []
+    for task_id in TASKS:
+        for request_ordinal in SCREENING_REQUEST_ORDINALS:
+            default_prefix = f"synthetic-stable-{task_id}-{request_ordinal}:".encode()
+            first = default_prefix + b"launch-one"
+            second = default_prefix + b"launch-two"
+            first, second, prefix_bytes = captures.get(
+                (task_id, request_ordinal),
+                (first, second, len(default_prefix)),
+            )
+            eligibility = (
+                "eligible"
+                if STRUCTURAL_SCREENING_TOKENS[task_id] >= CACHE_THRESHOLD_TOKENS
+                else "not_applicable"
+            )
+            rows.append({
+                "task_id": task_id,
+                "request_ordinal": request_ordinal,
+                "local_screening_prefix_tokens": [
+                    STRUCTURAL_SCREENING_TOKENS[task_id],
+                    STRUCTURAL_SCREENING_TOKENS[task_id],
+                ],
+                "stable_serialized_prefix_bytes": prefix_bytes,
+                "capture_serialized_prefix_sha256": [
+                    digest(first[:prefix_bytes]),
+                    digest(second[:prefix_bytes]),
+                ],
+                "capture_request_sha256": [digest(first), digest(second)],
+                "cache_eligibility": eligibility,
+                "execution_bundle_included": True,
+                "primary_cache_estimand_included": eligibility == "eligible",
+            })
+    contract = {
+        "schema_version": 1,
+        "kind": "cache_reuse_structural_eligibility_decision",
+        "decision_version": 1,
+        "decided_at_utc": "2026-09-22T00:00:00Z",
+        "screening_source_commit": "a" * 40,
+        "screening_evidence_sha256": "b" * 64,
+        "screening_launches": 2,
+        "provider_cache_threshold_tokens": 1_024,
+        "screening_token_unit": "local_content_tokens_not_provider_billed_usage",
+        "selection_timing": "after_zero_call_structural_screening_before_provider_inference",
+        "primary_estimand": "same_task_condition_reuse_effect_structurally_eligible_tasks_only",
+        "ineligible_cache_result": "not_applicable",
+        "full_bundle_estimand": "descriptive_provider_usage_computed_cost_quality_all_five_tasks",
+        "external_validity_limit": "eligibility_screening_favors_cache_capable_inputs_no_generalization",
+        "task_denominators": {"execution": 5, "primary_eligible": 3, "not_applicable": 2},
+        "raw_content_stored": False,
+        "provider_model_api_calls": 0,
+        "rows": rows,
+        "decision_sha256": "0" * 64,
+    }
+    contract["decision_sha256"] = eligibility_decision_sha256(contract)
+    return contract
+
+
+def approved_facts(eligibility_contract=None):
     facts = load_json(FACTS_PATH)
+    eligibility_contract = eligibility_contract or synthetic_eligibility_contract()
     for check in facts["checks"]:
         check.update(
             status="verified",
@@ -51,11 +119,9 @@ def approved_facts():
             method="synthetic model-free fixture",
             predicate="synthetic positive control only",
         )
-    facts["prefix_contract"] = {
-        "message_count": 1,
-        "namespace_message_index": 0,
-        "namespace_content_sha256": digest(b"fixed public synthetic namespace"),
-    }
+    r02 = next(row for row in facts["checks"] if row["id"] == "R02_SERIALIZED_PREFIX_CONTRACT")
+    r02["evidence_sha256"] = eligibility_contract["decision_sha256"]
+    facts["eligibility_contract"] = eligibility_contract
     return facts
 
 
@@ -63,6 +129,7 @@ def approved_ledger():
     ledger = load_cache_ledger(LEDGER_PATH)
     ledger["status"] = "runtime_bound_approved"
     ledger["live_execution_authorized"] = True
+    ledger["design_source_commit"] = "a" * 40
     ledger["pricing"].update(
         status="verified",
         input_per_million_usd=2.0,
@@ -118,6 +185,7 @@ def stable_cycles(share_difference=0.1, cost_difference=-0.01, count=10, start=1
                 "temperature": 0,
                 "reasoning_effort": "none",
                 "isolation_evidence_sha256": "e" * 64,
+                "eligibility_decision_sha256": "f" * 64,
             },
             "valid": True,
             "contrasts": {
@@ -258,14 +326,22 @@ class RuntimeDoctorTests(unittest.TestCase):
 
     def test_missing_prefix_and_concurrency_eight_remain_no_go(self):
         facts = approved_facts()
-        del facts["prefix_contract"]
-        result = doctor(approved_ledger(), facts, load_native_ledger(ROOT / "ledgers/native.template.toml"))
+        del facts["eligibility_contract"]
+        with self.assertRaisesRegex(ValueError, "task-stratified"):
+            doctor(approved_ledger(), facts, load_native_ledger(ROOT / "ledgers/native.template.toml"))
+
+        facts = approved_facts()
+        facts["checks"][-1]["status"] = "not_verified"
+        result = doctor(
+            approved_ledger(),
+            facts,
+            load_native_ledger(ROOT / "ledgers/native.template.toml"),
+        )
         failed = {row["id"] for row in result["checks"] if not row["passed"]}
-        self.assertIn("prefix_contract", failed)
         self.assertIn("native_concurrency_one", failed)
 
     def test_runtime_fact_ids_are_exact_and_values_are_forbidden(self):
-        ledger = load_cache_ledger(LEDGER_PATH)
+        ledger = approved_ledger()
         facts = approved_facts()
         validate(facts, "cache-reuse-runtime-facts.schema.json")
         validate_runtime_facts(facts, ledger)
@@ -290,6 +366,70 @@ class RuntimeDoctorTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_runtime_facts(changed, ledger)
         self.assertEqual(tuple(row["id"] for row in facts["checks"]), REQUIRED_RUNTIME_CHECKS)
+
+    def test_leader_approval_requires_the_other_thirteen_verified_facts(self):
+        facts = approved_facts()
+        facts["checks"][0]["status"] = "not_verified"
+        with self.assertRaisesRegex(ValueError, "other thirteen"):
+            validate_runtime_facts(facts, approved_ledger())
+
+    def test_eligibility_decision_rejects_incomplete_swapped_or_rebaselined_rows(self):
+        contract = synthetic_eligibility_contract()
+        validate_eligibility_contract(contract)
+        validate(approved_facts(contract), "cache-reuse-runtime-facts.schema.json")
+
+        mutations = []
+        changed = deepcopy(contract)
+        changed["rows"].pop()
+        mutations.append(changed)
+        changed = deepcopy(contract)
+        changed["rows"][0], changed["rows"][2] = changed["rows"][2], changed["rows"][0]
+        mutations.append(changed)
+        changed = deepcopy(contract)
+        changed["provider_cache_threshold_tokens"] = 1_025
+        mutations.append(changed)
+        changed = deepcopy(contract)
+        changed["rows"][0]["local_screening_prefix_tokens"] = [1_024, 1_024]
+        mutations.append(changed)
+        changed = deepcopy(contract)
+        changed["rows"][0]["cache_eligibility"] = "eligible"
+        changed["rows"][0]["primary_cache_estimand_included"] = True
+        mutations.append(changed)
+        changed = deepcopy(contract)
+        changed["rows"][0]["capture_serialized_prefix_sha256"][1] = "f" * 64
+        mutations.append(changed)
+        changed = deepcopy(contract)
+        changed["decision_sha256"] = "f" * 64
+        mutations.append(changed)
+        for mutation in mutations:
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                validate_eligibility_contract(mutation)
+
+    def test_r02_evidence_must_bind_the_decision_and_legacy_global_prefix_cannot_replace_it(self):
+        facts = approved_facts()
+        r02 = next(row for row in facts["checks"] if row["id"] == "R02_SERIALIZED_PREFIX_CONTRACT")
+        r02["evidence_sha256"] = "f" * 64
+        with self.assertRaisesRegex(ValueError, "must bind"):
+            validate_runtime_facts(facts, approved_ledger())
+
+        facts = approved_facts()
+        facts["prefix_contract"] = {
+            "message_count": 1,
+            "namespace_message_index": 0,
+            "namespace_content_sha256": "e" * 64,
+        }
+        with self.assertRaisesRegex(ValueError, "cannot mix"):
+            validate_runtime_facts(facts, approved_ledger())
+
+        facts = approved_facts()
+        facts["eligibility_contract"]["screening_source_commit"] = "f" * 40
+        facts["eligibility_contract"]["decision_sha256"] = eligibility_decision_sha256(
+            facts["eligibility_contract"]
+        )
+        r02 = next(row for row in facts["checks"] if row["id"] == "R02_SERIALIZED_PREFIX_CONTRACT")
+        r02["evidence_sha256"] = facts["eligibility_contract"]["decision_sha256"]
+        with self.assertRaisesRegex(ValueError, "source differs"):
+            validate_runtime_facts(facts, approved_ledger())
 
     def test_cli_doctor_stops_before_any_provider_surface(self):
         with patch("src.cache_reuse.doctor") as doctor_call, patch("sys.stdout", new_callable=io.StringIO):
@@ -325,28 +465,35 @@ class RuntimeDoctorTests(unittest.TestCase):
 
 class PrefixTrackerTests(unittest.TestCase):
     def setUp(self):
-        self.namespace = "fixed public synthetic namespace"
-        self.contract = {
-            "message_count": 1,
-            "namespace_message_index": 0,
-            "namespace_content_sha256": digest(self.namespace.encode()),
-        }
+        captures = {}
+        for task in TASKS:
+            for request_ordinal in SCREENING_REQUEST_ORDINALS:
+                first = canonical(self.payload(task, request_ordinal, "launch-one"))
+                second = canonical(self.payload(task, request_ordinal, "launch-two"))
+                marker = b"launch-"
+                prefix_bytes = first.index(marker)
+                self.assertEqual(first[:prefix_bytes], second[:prefix_bytes])
+                captures[(task, request_ordinal)] = (first, second, prefix_bytes)
+        self.contract = synthetic_eligibility_contract(captures)
 
-    def payload(self, suffix="question"):
+    def payload(self, task, request_ordinal=1, suffix="question"):
         return {
             "model": "gpt-5.4",
             "temperature": 0,
             "reasoning_effort": "none",
             "messages": [
-                {"role": "system", "content": self.namespace},
-                {"role": "user", "content": suffix},
+                {"role": "system", "content": f"stable public prefix for {task}"},
+                {
+                    "role": "user",
+                    "content": f"ordinal {request_ordinal} stable boundary | launch-{suffix}",
+                },
             ],
         }
 
     def complete_level(self, tracker, level, suffix="question", requests=1):
         for task in TASKS:
             for request_index in range(requests):
-                payload = self.payload(f"{suffix}-{request_index}")
+                payload = self.payload(task, request_index + 1, f"{suffix}-{request_index}")
                 tracker.observe(
                     condition="none", reuse_level=level, task=task,
                     payload=payload, serialized=canonical(payload),
@@ -363,9 +510,9 @@ class PrefixTrackerTests(unittest.TestCase):
     def test_prefix_hash_drift_fails_before_dispatch(self):
         tracker = PrefixTracker(self.contract, "cycle-01")
         self.complete_level(tracker, 0)
-        payload = self.payload()
-        payload["messages"][0]["content"] = "different namespace"
-        with self.assertRaisesRegex(ValueError, "namespace hash"):
+        payload = self.payload(TASKS[0])
+        payload["messages"][0]["content"] = "different task prefix"
+        with self.assertRaisesRegex(ValueError, "zero-call screening"):
             tracker.observe(
                 condition="none", reuse_level=1, task=TASKS[0],
                 payload=payload, serialized=canonical(payload),
@@ -376,25 +523,48 @@ class PrefixTrackerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "predecessor"):
             tracker.observe(
                 condition="none", reuse_level=1, task=TASKS[0],
-                payload=self.payload(), serialized=canonical(self.payload()),
+                payload=self.payload(TASKS[0]), serialized=canonical(self.payload(TASKS[0])),
             )
         self.complete_level(tracker, 0, requests=2)
         for task in TASKS:
+            payload = self.payload(task)
             tracker.observe(
                 condition="none", reuse_level=1, task=task,
-                payload=self.payload(), serialized=canonical(self.payload()),
+                payload=payload, serialized=canonical(payload),
             )
         with self.assertRaisesRegex(ValueError, "request count"):
             tracker.finish_bundle("none", 1, list(TASKS), successful=True)
 
     def test_noncanonical_serialization_is_rejected(self):
         tracker = PrefixTracker(self.contract, "cycle-01")
-        payload = self.payload()
+        payload = self.payload(TASKS[0])
         with self.assertRaisesRegex(ValueError, "canonical"):
             tracker.observe(
                 condition="none", reuse_level=0, task=TASKS[0],
                 payload=payload, serialized=json.dumps(payload).encode(),
             )
+
+    def test_cross_task_prefixes_may_differ_but_same_task_ordinal_must_match(self):
+        tracker = PrefixTracker(self.contract, "cycle-01")
+        observations = {}
+        for task in TASKS:
+            payload = self.payload(task, 1, "cold")
+            observations[task] = tracker.observe(
+                condition="none",
+                reuse_level=0,
+                task=task,
+                payload=payload,
+                serialized=canonical(payload),
+            )
+        self.assertEqual(len({row["serialized_prefix_sha256"] for row in observations.values()}), len(TASKS))
+        self.assertEqual(
+            {task_cache_eligibility(self.contract, task) for task in STRUCTURALLY_ELIGIBLE_TASKS},
+            {"eligible"},
+        )
+        self.assertEqual(
+            {task_cache_eligibility(self.contract, task) for task in STRUCTURALLY_INELIGIBLE_TASKS},
+            {"not_applicable"},
+        )
 
 
 class UsageAndVerdictTests(unittest.TestCase):
@@ -423,8 +593,14 @@ class UsageAndVerdictTests(unittest.TestCase):
             run_id="run-01", cycle_id="cycle-01", bundle_id="cycle-01-none-reuse-1",
             attempt_id="attempt-01", source_commit="a" * 40, ledger_sha256="b" * 64,
             native_ledger_sha256="c" * 64, runtime_facts_sha256="d" * 64,
-            condition="none", reuse_level=1, task_id=TASKS[0],
-            request_observation={"serialized_prefix_sha256": "c" * 64, "request_sha256": "d" * 64},
+            eligibility_decision_sha256="e" * 64,
+            condition="none", reuse_level=1, task_id=STRUCTURALLY_ELIGIBLE_TASKS[0],
+            request_observation={
+                "serialized_prefix_sha256": "c" * 64,
+                "request_sha256": "d" * 64,
+                "structural_cache_eligibility": "eligible",
+                "eligibility_decision_sha256": "e" * 64,
+            },
             usage=usage, local_tokens={"kind": "calculated_diagnostic_only", "input_tokens": 101},
             native_verdict="wrong_answer", pins={"source": "a" * 40}, synthetic=True,
         )
@@ -441,6 +617,29 @@ class UsageAndVerdictTests(unittest.TestCase):
         for case in ("missing", "invalid_denominator", "rate_limited", "no_progress"):
             with self.subTest(case=case):
                 self.assertFalse(bundle_metrics([self.record(case)])["valid"])
+
+    def test_not_applicable_tasks_never_become_zero_misses_or_primary_denominator(self):
+        case = self.fixture["explicit_zero"]
+        not_applicable = provider_usage_record(
+            {"usage": case["usage"]},
+            case["http_status"],
+            2,
+            self.pricing,
+            structural_eligibility="not_applicable",
+        )
+        eligible = self.record("positive", 2)
+        self.assertEqual(not_applicable["opportunity"], "not_applicable")
+        self.assertEqual(not_applicable["cache_field_status"], "not_applicable")
+        self.assertEqual(not_applicable["provider_usage"]["cached_input_tokens"], 0)
+        metrics = bundle_metrics([eligible, not_applicable])
+        self.assertEqual(metrics["request_denominator"], 1)
+        self.assertEqual(metrics["eligible_request_denominator"], 1)
+        self.assertEqual(metrics["not_applicable_request_denominator"], 1)
+        self.assertEqual(metrics["full_bundle_descriptive"]["request_denominator"], 2)
+        self.assertEqual(
+            metrics["full_bundle_descriptive"]["cache_effect"],
+            "not_applicable_as_full_bundle_estimand",
+        )
 
     def test_ten_cycle_stability_and_all_verdict_branches(self):
         self.assertEqual(cache_verdict(stable_cycles(), quality_conclusive=True)["verdict"], "supported")
@@ -490,7 +689,18 @@ class ExecutionOrchestrationTests(unittest.TestCase):
     def test_fake_native_dispatch_is_serial_exact_order_and_zero_network(self):
         namespace = "fixed public synthetic namespace"
         ledger = approved_ledger()
-        facts = approved_facts()
+        captures = {}
+        for task in TASKS:
+            payload = {
+                "model": "gpt-5.4", "temperature": 0, "reasoning_effort": "none",
+                "messages": [
+                    {"role": "system", "content": namespace},
+                    {"role": "user", "content": f"public synthetic {task}"},
+                ],
+            }
+            serialized = canonical(payload)
+            captures[(task, 1)] = (serialized, serialized, len(serialized))
+        facts = approved_facts(synthetic_eligibility_contract(captures))
         native_content = serial_native_ledger_bytes()
         calls = []
         active = 0
@@ -523,11 +733,30 @@ class ExecutionOrchestrationTests(unittest.TestCase):
                 "condition": row["condition"], "reuse_level": level,
                 "eligible_predecessor_count": level,
                 "task_denominator": 5, "run_denominator": 1, "request_denominator": 5,
+                "primary_cache_task_denominator": 3,
+                "not_applicable_cache_task_denominator": 2,
                 "provider_http_attempt_denominator": 5, "provider_http_429": 0,
                 "metrics": {
                     "valid": True,
                     "provider_cache_share": level * 0.1,
                     "computed_input_cost_usd": 1 - level * 0.1,
+                    "eligible_request_denominator": 3,
+                    "not_applicable_request_denominator": 2,
+                    "full_bundle_descriptive": {
+                        "kind": "calculated_from_unique_measured_provider_responses",
+                        "request_denominator": 5,
+                        "measured_requests": 5,
+                        "missing_native_usage": 0,
+                        "invalid_denominator": 0,
+                        "transport_or_429": 0,
+                        "provider_input_tokens": 500,
+                        "provider_cached_input_tokens": level * 50,
+                        "provider_output_tokens": 50,
+                        "computed_input_cost_usd": 2 - level * 0.1,
+                        "computed_total_cost_usd": 3 - level * 0.1,
+                        "valid": True,
+                        "cache_effect": "not_applicable_as_full_bundle_estimand",
+                    },
                 },
                 "lineage": {"native_ledger_sha256": digest(native_content)},
             }
@@ -563,7 +792,11 @@ class ExecutionOrchestrationTests(unittest.TestCase):
             self.assertEqual(network_calls, 0)
             self.assertEqual(cycle["bundle_denominator"], 6)
             self.assertEqual(cycle["task_denominator"], 30)
+            self.assertEqual(cycle["primary_cache_task_denominator"], 18)
+            self.assertEqual(cycle["not_applicable_cache_task_denominator"], 12)
             self.assertEqual(cycle["request_denominator"], 30)
+            self.assertEqual(cycle["primary_cache_request_denominator"], 18)
+            self.assertEqual(cycle["not_applicable_cache_request_denominator"], 12)
             self.assertEqual(cycle["cycle_id"], cycle_id)
             self.assertEqual(cycle["cycle_number"], 1)
             self.assertEqual(cycle["cache_ledger_sha256"], digest(cache_path.read_bytes()))

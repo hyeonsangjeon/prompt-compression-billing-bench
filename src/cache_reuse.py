@@ -50,6 +50,39 @@ SAFE_ID = re.compile(r"[a-z0-9][a-z0-9-]{0,127}")
 CYCLE_PIN_FIELDS = {
     "provider", "model", "reported_revision", "endpoint_env", "api_surface",
     "temperature", "reasoning_effort", "isolation_evidence_sha256",
+    "eligibility_decision_sha256",
+}
+CACHE_THRESHOLD_TOKENS = 1_024
+SCREENING_REQUEST_ORDINALS = (1, 2)
+STRUCTURAL_SCREENING_TOKENS = {
+    "cancel-async-tasks": 828,
+    "log-summary-date-ranges": 1_050,
+    "multi-source-data-merger": 1_155,
+    "nginx-request-logging": 1_134,
+    "openssl-selfsigned-cert": 1_016,
+}
+STRUCTURALLY_ELIGIBLE_TASKS = (
+    "log-summary-date-ranges",
+    "multi-source-data-merger",
+    "nginx-request-logging",
+)
+STRUCTURALLY_INELIGIBLE_TASKS = (
+    "cancel-async-tasks",
+    "openssl-selfsigned-cert",
+)
+ELIGIBILITY_CONTRACT_FIELDS = {
+    "schema_version", "kind", "decision_version", "decided_at_utc",
+    "screening_source_commit", "screening_evidence_sha256", "screening_launches",
+    "provider_cache_threshold_tokens", "screening_token_unit", "selection_timing",
+    "primary_estimand", "ineligible_cache_result", "full_bundle_estimand",
+    "external_validity_limit", "task_denominators", "raw_content_stored",
+    "provider_model_api_calls", "rows", "decision_sha256",
+}
+ELIGIBILITY_ROW_FIELDS = {
+    "task_id", "request_ordinal", "local_screening_prefix_tokens",
+    "stable_serialized_prefix_bytes", "capture_serialized_prefix_sha256",
+    "capture_request_sha256", "cache_eligibility", "execution_bundle_included",
+    "primary_cache_estimand_included",
 }
 
 
@@ -77,6 +110,144 @@ def load_cache_ledger(path: Path) -> dict:
 def _require_exact(value, expected, message: str) -> None:
     if value != expected:
         raise ValueError(message)
+
+
+def eligibility_decision_sha256(contract: dict) -> str:
+    if not isinstance(contract, dict) or "decision_sha256" not in contract:
+        raise ValueError("Eligibility decision is missing its self-binding SHA-256")
+    payload = {key: value for key, value in contract.items() if key != "decision_sha256"}
+    return digest(canonical(payload))
+
+
+def validate_eligibility_contract(contract: dict) -> dict:
+    if not isinstance(contract, dict) or set(contract) != ELIGIBILITY_CONTRACT_FIELDS:
+        raise ValueError("Eligibility decision fields differ")
+    _require_exact(contract["schema_version"], 1, "Unsupported eligibility decision schema")
+    _require_exact(
+        contract["kind"],
+        "cache_reuse_structural_eligibility_decision",
+        "Unexpected eligibility decision kind",
+    )
+    _require_exact(contract["decision_version"], 1, "Unsupported eligibility decision version")
+    if not isinstance(contract["decided_at_utc"], str) or not re.fullmatch(
+        r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|\+00:00)",
+        contract["decided_at_utc"],
+    ):
+        raise ValueError("Eligibility decision requires a UTC decision time")
+    if not re.fullmatch(r"[0-9a-f]{40}", contract["screening_source_commit"]):
+        raise ValueError("Eligibility screening requires an exact source commit")
+    if not re.fullmatch(r"[0-9a-f]{64}", contract["screening_evidence_sha256"]):
+        raise ValueError("Eligibility screening requires a hash-bound evidence record")
+    _require_exact(contract["screening_launches"], 2, "Eligibility screening requires two launches")
+    _require_exact(
+        contract["provider_cache_threshold_tokens"],
+        CACHE_THRESHOLD_TOKENS,
+        "Provider cache threshold changed",
+    )
+    _require_exact(
+        contract["screening_token_unit"],
+        "local_content_tokens_not_provider_billed_usage",
+        "Eligibility screening token provenance changed",
+    )
+    _require_exact(
+        contract["selection_timing"],
+        "after_zero_call_structural_screening_before_provider_inference",
+        "Eligibility selection timing changed",
+    )
+    _require_exact(
+        contract["primary_estimand"],
+        "same_task_condition_reuse_effect_structurally_eligible_tasks_only",
+        "Primary cache estimand changed",
+    )
+    _require_exact(
+        contract["ineligible_cache_result"],
+        "not_applicable",
+        "Structurally ineligible cache results must remain not_applicable",
+    )
+    _require_exact(
+        contract["full_bundle_estimand"],
+        "descriptive_provider_usage_computed_cost_quality_all_five_tasks",
+        "Full-bundle descriptive estimand changed",
+    )
+    _require_exact(
+        contract["external_validity_limit"],
+        "eligibility_screening_favors_cache_capable_inputs_no_generalization",
+        "Eligibility-screening external-validity limit changed",
+    )
+    _require_exact(
+        contract["task_denominators"],
+        {"execution": 5, "primary_eligible": 3, "not_applicable": 2},
+        "Eligibility task denominators changed",
+    )
+    if contract["raw_content_stored"] is not False or contract["provider_model_api_calls"] != 0:
+        raise ValueError("Eligibility screening must remain hash-only and zero-call")
+    rows = contract["rows"]
+    if not isinstance(rows, list) or len(rows) != len(TASKS) * len(SCREENING_REQUEST_ORDINALS):
+        raise ValueError("Eligibility decision needs every fixed task and screened ordinal")
+    expected_keys = [
+        (task_id, request_ordinal)
+        for task_id in TASKS
+        for request_ordinal in SCREENING_REQUEST_ORDINALS
+    ]
+    actual_keys = []
+    by_task: dict[str, list[dict]] = {task_id: [] for task_id in TASKS}
+    for row in rows:
+        if not isinstance(row, dict) or set(row) != ELIGIBILITY_ROW_FIELDS:
+            raise ValueError("Eligibility decision row fields differ")
+        key = (row["task_id"], row["request_ordinal"])
+        actual_keys.append(key)
+        if key not in expected_keys:
+            raise ValueError("Eligibility decision contains an unknown task or ordinal")
+        expected_tokens = STRUCTURAL_SCREENING_TOKENS[row["task_id"]]
+        _require_exact(
+            row["local_screening_prefix_tokens"],
+            [expected_tokens, expected_tokens],
+            "Eligibility screening token count changed or launch equality failed",
+        )
+        if type(row["stable_serialized_prefix_bytes"]) is not int or row["stable_serialized_prefix_bytes"] < 1:
+            raise ValueError("Eligibility rows require a positive serialized-prefix byte boundary")
+        for field in ("capture_serialized_prefix_sha256", "capture_request_sha256"):
+            hashes = row[field]
+            if (
+                not isinstance(hashes, list)
+                or len(hashes) != 2
+                or any(not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value) for value in hashes)
+            ):
+                raise ValueError("Eligibility capture hashes must bind exactly two launches")
+        if len(set(row["capture_serialized_prefix_sha256"])) != 1:
+            raise ValueError("Same-task ordinal serialized prefixes differ across screening launches")
+        expected_eligibility = "eligible" if expected_tokens >= CACHE_THRESHOLD_TOKENS else "not_applicable"
+        _require_exact(row["cache_eligibility"], expected_eligibility, "Task cache eligibility differs from the threshold")
+        _require_exact(row["execution_bundle_included"], True, "Every fixed task must remain in the execution bundle")
+        _require_exact(
+            row["primary_cache_estimand_included"],
+            expected_eligibility == "eligible",
+            "Primary eligible-stratum membership changed",
+        )
+        by_task[row["task_id"]].append(row)
+    if actual_keys != expected_keys:
+        raise ValueError("Eligibility task and ordinal rows must be complete and ordered")
+    for task_id, task_rows in by_task.items():
+        if len({row["cache_eligibility"] for row in task_rows}) != 1:
+            raise ValueError("One task cannot change eligibility across screened ordinals")
+        if task_id in STRUCTURALLY_ELIGIBLE_TASKS and task_rows[0]["cache_eligibility"] != "eligible":
+            raise ValueError("Eligible task stratum changed")
+        if task_id in STRUCTURALLY_INELIGIBLE_TASKS and task_rows[0]["cache_eligibility"] != "not_applicable":
+            raise ValueError("Not-applicable task stratum changed")
+    calculated = eligibility_decision_sha256(contract)
+    if contract["decision_sha256"] != calculated:
+        raise ValueError("Eligibility decision self-binding SHA-256 differs")
+    return contract
+
+
+def task_cache_eligibility(contract: dict, task_id: str) -> str:
+    if task_id not in TASKS:
+        raise ValueError("Eligibility lookup requires a fixed task")
+    rows = [row for row in contract["rows"] if row["task_id"] == task_id]
+    values = {row["cache_eligibility"] for row in rows}
+    if len(rows) != len(SCREENING_REQUEST_ORDINALS) or len(values) != 1:
+        raise ValueError("Eligibility lookup requires both screened ordinals")
+    return values.pop()
 
 
 def validate_cache_ledger(ledger: dict) -> None:
@@ -292,7 +463,8 @@ def validate_runtime_facts(facts: dict, ledger: dict) -> dict[str, dict]:
         "schema_version", "kind", "checks", "environment_presence",
         "values_stored", "provider_model_api_calls",
     }
-    if set(facts) - required - {"prefix_contract"} or not required <= set(facts):
+    optional = {"prefix_contract", "eligibility_contract"}
+    if set(facts) - required - optional or not required <= set(facts):
         raise ValueError("Unexpected or missing runtime fact fields")
     if facts["schema_version"] != 1 or facts["kind"] != "cache_reuse_runtime_facts":
         raise ValueError("Unexpected runtime fact identity")
@@ -326,6 +498,12 @@ def validate_runtime_facts(facts: dict, ledger: dict) -> dict[str, dict]:
         by_id[check["id"]] = check
     if tuple(by_id) != tuple(ledger["runtime_required_checks"]):
         raise ValueError("Runtime checks must preserve the exact ledger order and IDs")
+    approval = by_id["APPROVAL_CURRENT_LEADER"]
+    if approval["status"] == "verified" and any(
+        by_id[identifier]["status"] != "verified"
+        for identifier in REQUIRED_RUNTIME_CHECKS[:-1]
+    ):
+        raise ValueError("Current leader approval requires the other thirteen runtime facts")
     presence = facts["environment_presence"]
     if not isinstance(presence, dict) or any(
         not re.fullmatch(r"[A-Z][A-Z0-9_]*", name) or type(value) is not bool
@@ -342,6 +520,17 @@ def validate_runtime_facts(facts: dict, ledger: dict) -> dict[str, dict]:
             raise ValueError("Namespace message index must be inside the serialized prefix")
         if not re.fullmatch(r"[0-9a-f]{64}", prefix["namespace_content_sha256"]):
             raise ValueError("Namespace content must be represented by SHA-256 only")
+    eligibility = facts.get("eligibility_contract")
+    if eligibility is not None:
+        if prefix is not None:
+            raise ValueError("The task-stratified eligibility contract cannot mix with the legacy global prefix contract")
+        validate_eligibility_contract(eligibility)
+        if eligibility["screening_source_commit"] != ledger["design_source_commit"]:
+            raise ValueError("Eligibility screening source differs from the approved cache ledger")
+        if by_id["R02_SERIALIZED_PREFIX_CONTRACT"].get("evidence_sha256") != eligibility["decision_sha256"]:
+            raise ValueError("R02 serialized-prefix evidence must bind the eligibility decision")
+    if by_id["R02_SERIALIZED_PREFIX_CONTRACT"]["status"] == "verified" and eligibility is None:
+        raise ValueError("Verified R02 requires the task-stratified eligibility decision")
     return by_id
 
 
@@ -434,7 +623,11 @@ def doctor(
         and pricing["checked_at_utc"] is not None
     )
     add("fixed_prices", price_ready, "fixed input prices need a source hash and check time")
-    add("prefix_contract", runtime_facts.get("prefix_contract") is not None, "runtime must bind the exact serialized prefix and namespace hash")
+    add(
+        "prefix_contract",
+        runtime_facts.get("eligibility_contract") is not None,
+        "runtime must bind every fixed task and screened ordinal to the structural eligibility decision",
+    )
     presence = environment_presence(ledger, native_ledger, environment)
     for identifier in REQUIRED_RUNTIME_CHECKS:
         verified = checks[identifier]["status"] == "verified"
@@ -458,10 +651,14 @@ def doctor(
 class PrefixTracker:
     """Hash exact serialized prefixes and require predecessor equality without storing text."""
 
-    def __init__(self, prefix_contract: dict, cycle_id: str):
+    def __init__(self, eligibility_contract: dict, cycle_id: str):
         if not SAFE_ID.fullmatch(cycle_id):
             raise ValueError("Cycle ID must be a safe no-clobber identifier")
-        self.prefix_contract = prefix_contract
+        self.eligibility_contract = validate_eligibility_contract(eligibility_contract)
+        self.contract_rows = {
+            (row["task_id"], row["request_ordinal"]): row
+            for row in self.eligibility_contract["rows"]
+        }
         self.cycle_id = cycle_id
         self.completed: dict[tuple[str, str], list[list[str]]] = {}
         self.pending: dict[tuple[str, int, str], list[str]] = {}
@@ -471,25 +668,20 @@ class PrefixTracker:
             raise ValueError("Request context differs from the cache-reuse plan")
         if canonical(payload) != serialized:
             raise ValueError("Prefix hashing requires the exact canonical outgoing request")
-        messages = payload.get("messages")
-        count = self.prefix_contract["message_count"]
-        if not isinstance(messages, list) or len(messages) < count:
-            raise ValueError("Outgoing request is shorter than the verified prefix contract")
-        namespace_index = self.prefix_contract["namespace_message_index"]
-        namespace_message = messages[namespace_index]
-        if not isinstance(namespace_message, dict) or not isinstance(namespace_message.get("content"), str):
-            raise ValueError("Namespace evidence is not bound to a textual prefix message")
-        namespace_hash = digest(namespace_message["content"].encode())
-        if namespace_hash != self.prefix_contract["namespace_content_sha256"]:
-            raise ValueError("Cycle namespace hash differs before provider dispatch")
-        prefix_payload = {**payload, "messages": messages[:count]}
-        prefix_hash = digest(canonical(prefix_payload))
         history = self.completed.get((condition, task), [])
         if len(history) != reuse_level:
             raise ValueError("Eligible predecessor count differs before provider dispatch")
         pending_key = (condition, reuse_level, task)
         request_hashes = self.pending.setdefault(pending_key, [])
         request_ordinal = len(request_hashes)
+        screening_ordinal = min(request_ordinal + 1, SCREENING_REQUEST_ORDINALS[-1])
+        contract_row = self.contract_rows[(task, screening_ordinal)]
+        prefix_bytes = contract_row["stable_serialized_prefix_bytes"]
+        if len(serialized) < prefix_bytes:
+            raise ValueError("Outgoing request is shorter than the screened serialized prefix")
+        prefix_hash = digest(serialized[:prefix_bytes])
+        if prefix_hash != contract_row["capture_serialized_prefix_sha256"][0]:
+            raise ValueError("Same-task ordinal serialized prefix differs from the zero-call screening decision")
         for predecessor in history:
             if request_ordinal >= len(predecessor) or predecessor[request_ordinal] != prefix_hash:
                 raise ValueError("Cache-key-relevant serialized prefix drifted")
@@ -500,9 +692,12 @@ class PrefixTracker:
             "reuse_level": reuse_level,
             "eligible_predecessor_count": len(history),
             "request_ordinal_within_task": request_ordinal + 1,
+            "screening_request_ordinal": screening_ordinal,
             "serialized_prefix_sha256": prefix_hash,
-            "namespace_content_sha256": namespace_hash,
+            "serialized_prefix_bytes": prefix_bytes,
             "request_sha256": digest(serialized),
+            "structural_cache_eligibility": contract_row["cache_eligibility"],
+            "eligibility_decision_sha256": self.eligibility_contract["decision_sha256"],
         }
 
     def finish_bundle(self, condition: str, reuse_level: int, tasks: list[str], *, successful: bool) -> None:
@@ -525,18 +720,35 @@ class PrefixTracker:
                 self.completed.setdefault((condition, task), []).append(hashes)
 
 
-def provider_usage_record(response: dict, http_status: int | None, reuse_level: int, pricing: dict) -> dict:
+def provider_usage_record(
+    response: dict,
+    http_status: int | None,
+    reuse_level: int,
+    pricing: dict,
+    *,
+    structural_eligibility: str = "eligible",
+) -> dict:
+    if structural_eligibility not in {"eligible", "not_applicable"}:
+        raise ValueError("Cache structural eligibility must be eligible or not_applicable")
+    opportunity = (
+        "eligible"
+        if structural_eligibility == "eligible" and reuse_level > 0
+        else "not_applicable"
+    )
+    unavailable_cache_status = (
+        "not_applicable" if structural_eligibility == "not_applicable" else "missing"
+    )
     if http_status == 429:
         return {
-            "status": "rate_limited", "provider_usage": None, "cache_field_status": "missing",
-            "opportunity": "not_applicable" if reuse_level == 0 else "eligible",
+            "status": "rate_limited", "provider_usage": None, "cache_field_status": unavailable_cache_status,
+            "opportunity": opportunity, "structural_eligibility": structural_eligibility,
             "computed_input_cost_usd": None, "computed_total_cost_usd": None,
             "invoice": {"status": "not_measured", "value": None},
         }
     if http_status != 200:
         return {
-            "status": "transport_error", "provider_usage": None, "cache_field_status": "missing",
-            "opportunity": "not_applicable" if reuse_level == 0 else "eligible",
+            "status": "transport_error", "provider_usage": None, "cache_field_status": unavailable_cache_status,
+            "opportunity": opportunity, "structural_eligibility": structural_eligibility,
             "computed_input_cost_usd": None, "computed_total_cost_usd": None,
             "invoice": {"status": "not_measured", "value": None},
         }
@@ -544,12 +756,19 @@ def provider_usage_record(response: dict, http_status: int | None, reuse_level: 
     if tokens is None:
         return {
             "status": "missing_native_usage", "provider_usage": response.get("usage"),
-            "cache_field_status": "missing", "opportunity": "not_applicable" if reuse_level == 0 else "eligible",
+            "cache_field_status": unavailable_cache_status, "opportunity": opportunity,
+            "structural_eligibility": structural_eligibility,
             "computed_input_cost_usd": None, "computed_total_cost_usd": None,
             "invoice": {"status": "not_measured", "value": None},
         }
     cached = tokens["cached_input_tokens"]
-    cache_status = "missing" if cached is None else "explicit_zero" if cached == 0 else "positive"
+    cache_status = (
+        "not_applicable"
+        if structural_eligibility == "not_applicable"
+        else "missing" if cached is None
+        else "explicit_zero" if cached == 0
+        else "positive"
+    )
     status = "missing_native_usage" if cached is None else "invalid_denominator" if tokens["input_tokens"] == 0 else "measured"
     input_cost = total_cost = None
     if status == "measured" and pricing["status"] == "verified":
@@ -568,25 +787,28 @@ def provider_usage_record(response: dict, http_status: int | None, reuse_level: 
             "output_tokens": tokens["output_tokens"],
         },
         "cache_field_status": cache_status,
-        "opportunity": "not_applicable" if reuse_level == 0 else "eligible",
+        "opportunity": opportunity,
+        "structural_eligibility": structural_eligibility,
         "computed_input_cost_usd": input_cost,
         "computed_total_cost_usd": total_cost,
         "invoice": {"status": "not_measured", "value": None},
     }
 
 
-def bundle_metrics(records: list[dict]) -> dict:
+def _usage_totals(records: list[dict], *, include_cache_effect: bool) -> dict:
     if not records:
-        raise ValueError("A useful bundle needs provider response records")
+        raise ValueError("A usage stratum needs provider response records")
     missing = sum(record["status"] == "missing_native_usage" for record in records)
     invalid = sum(record["status"] == "invalid_denominator" for record in records)
     errors = sum(record["status"] in {"rate_limited", "transport_error"} for record in records)
     measured = [record for record in records if record["status"] == "measured"]
     input_tokens = sum(record["provider_usage"]["input_tokens"] for record in measured)
     cached_tokens = sum(record["provider_usage"]["cached_input_tokens"] for record in measured)
+    output_tokens = sum(record["provider_usage"]["output_tokens"] for record in measured)
     input_costs = [record["computed_input_cost_usd"] for record in measured]
+    total_costs = [record["computed_total_cost_usd"] for record in measured]
     complete = not (missing or invalid or errors) and len(measured) == len(records) and input_tokens > 0
-    return {
+    result = {
         "kind": "calculated_from_unique_measured_provider_responses",
         "request_denominator": len(records),
         "measured_requests": len(measured),
@@ -595,13 +817,40 @@ def bundle_metrics(records: list[dict]) -> dict:
         "transport_or_429": errors,
         "provider_input_tokens": input_tokens if complete else None,
         "provider_cached_input_tokens": cached_tokens if complete else None,
-        "provider_cache_share": cached_tokens / input_tokens if complete else None,
+        "provider_output_tokens": output_tokens if complete else None,
         "computed_input_cost_usd": sum(input_costs) if complete and all(value is not None for value in input_costs) else None,
-        "request_hit_rate": (
-            sum(record["cache_field_status"] == "positive" for record in measured) / len(measured)
-            if complete else None
-        ),
-        "valid": complete and all(value is not None for value in input_costs),
+        "computed_total_cost_usd": sum(total_costs) if complete and all(value is not None for value in total_costs) else None,
+        "valid": complete and all(value is not None for value in input_costs + total_costs),
+    }
+    if include_cache_effect:
+        result.update({
+            "provider_cache_share": cached_tokens / input_tokens if complete else None,
+            "request_hit_rate": (
+                sum(record["cache_field_status"] == "positive" for record in measured) / len(measured)
+                if complete else None
+            ),
+        })
+    else:
+        result["cache_effect"] = "not_applicable_as_full_bundle_estimand"
+    return result
+
+
+def bundle_metrics(records: list[dict]) -> dict:
+    if not records:
+        raise ValueError("A useful bundle needs provider response records")
+    if any(record.get("structural_eligibility") not in {"eligible", "not_applicable"} for record in records):
+        raise ValueError("Every provider response needs a structural eligibility status")
+    eligible = [record for record in records if record["structural_eligibility"] == "eligible"]
+    not_applicable = [record for record in records if record["structural_eligibility"] == "not_applicable"]
+    primary = _usage_totals(eligible, include_cache_effect=True)
+    descriptive = _usage_totals(records, include_cache_effect=False)
+    return {
+        **primary,
+        "primary_estimand": "same_task_condition_reuse_effect_structurally_eligible_tasks_only",
+        "eligible_request_denominator": len(eligible),
+        "not_applicable_request_denominator": len(not_applicable),
+        "full_bundle_descriptive": descriptive,
+        "valid": primary["valid"] and descriptive["valid"],
     }
 
 
@@ -720,7 +969,8 @@ def cache_verdict(cycles: list[dict], *, quality_conclusive: bool) -> dict:
 def result_row(
     *, run_id: str, cycle_id: str, bundle_id: str, attempt_id: str,
     source_commit: str, ledger_sha256: str, native_ledger_sha256: str,
-    runtime_facts_sha256: str, condition: str, reuse_level: int, task_id: str,
+    runtime_facts_sha256: str, eligibility_decision_sha256: str,
+    condition: str, reuse_level: int, task_id: str,
     request_observation: dict, usage: dict, local_tokens: dict | None,
     native_verdict: str | None, pins: dict, synthetic: bool = False,
 ) -> dict:
@@ -729,12 +979,25 @@ def result_row(
         raise ValueError("Run, cycle, bundle and attempt IDs are required")
     if condition not in CONDITIONS or reuse_level not in REUSE_LEVELS or task_id not in TASKS:
         raise ValueError("Result row differs from the fixed plan")
-    hashes = (ledger_sha256, native_ledger_sha256, runtime_facts_sha256)
+    hashes = (
+        ledger_sha256,
+        native_ledger_sha256,
+        runtime_facts_sha256,
+        eligibility_decision_sha256,
+    )
     if (
         not re.fullmatch(r"[0-9a-f]{40}", source_commit)
         or any(not re.fullmatch(r"[0-9a-f]{64}", value) for value in hashes)
     ):
         raise ValueError("Result lineage requires full source and ledger hashes")
+    structural_eligibility = usage.get("structural_eligibility")
+    if (
+        structural_eligibility not in {"eligible", "not_applicable"}
+        or request_observation.get("structural_cache_eligibility") != structural_eligibility
+        or request_observation.get("eligibility_decision_sha256") != eligibility_decision_sha256
+    ):
+        raise ValueError("Result eligibility differs from the admitted prefix observation")
+    primary_included = structural_eligibility == "eligible"
     return {
         "schema_version": 1,
         "kind": "cache_reuse_request_observation",
@@ -746,10 +1009,18 @@ def result_row(
         "ledger_sha256": ledger_sha256,
         "native_ledger_sha256": native_ledger_sha256,
         "runtime_facts_sha256": runtime_facts_sha256,
+        "eligibility_decision_sha256": eligibility_decision_sha256,
         "condition": condition,
         "reuse_level": reuse_level,
         "task_id": task_id,
-        "denominators": {"task": 1, "run": 1, "request": 1, "cache_cycle": 1},
+        "denominators": {
+            "task": 1,
+            "run": 1,
+            "request": 1,
+            "cache_cycle": 1,
+            "primary_cache_task": int(primary_included),
+            "full_bundle_descriptive_task": 1,
+        },
         "pins": pins,
         "serialized_prefix_sha256": request_observation["serialized_prefix_sha256"],
         "request_sha256": request_observation["request_sha256"],
@@ -772,6 +1043,8 @@ def result_row(
             "invoice": False,
             "cache_field_status": usage["cache_field_status"],
             "cache_opportunity": usage["opportunity"],
+            "structural_cache_eligibility": structural_eligibility,
+            "primary_cache_estimand_included": primary_included,
         },
     }
 
@@ -788,6 +1061,7 @@ def summarize_native_bundle(
     *,
     cache_ledger_sha256: str,
     runtime_facts_sha256: str,
+    eligibility_contract: dict,
     parent_run_id: str,
 ) -> dict:
     from .native_run import verify_cache_bundle_run
@@ -803,6 +1077,8 @@ def summarize_native_bundle(
         name: value for name, value in provenance["source_files"].items()
         if name.startswith("schemas/")
     }
+    eligibility_contract = validate_eligibility_contract(eligibility_contract)
+    eligibility_decision_sha256 = eligibility_contract["decision_sha256"]
     pins = {
         "model": native_ledger["model"]["name"],
         "deployment_sha256": execution["deployment_sha256"],
@@ -811,11 +1087,21 @@ def summarize_native_bundle(
         "input_sha256": digest(task_sources_bytes),
         "tool_sha256": digest(canonical(execution["compressor"])),
         "schema_sha256": digest(canonical(schema_hashes)),
+        "eligibility_decision_sha256": eligibility_decision_sha256,
     }
     responses = [event for event in events if event.get("event") == "http"]
     successful = [event for event in responses if event.get("status") == 200]
     usage_records = [
-        provider_usage_record({"usage": event.get("provider_usage")}, 200, row["reuse_level"], pricing)
+        provider_usage_record(
+            {"usage": event.get("provider_usage")},
+            200,
+            row["reuse_level"],
+            pricing,
+            structural_eligibility=task_cache_eligibility(
+                eligibility_contract,
+                event["trial_id"].removeprefix("r01-"),
+            ),
+        )
         for event in successful
     ]
     metrics = bundle_metrics(usage_records)
@@ -848,6 +1134,7 @@ def summarize_native_bundle(
             ledger_sha256=cache_ledger_sha256,
             native_ledger_sha256=summary["ledger_sha256"],
             runtime_facts_sha256=runtime_facts_sha256,
+            eligibility_decision_sha256=eligibility_decision_sha256,
             condition=row["condition"],
             reuse_level=row["reuse_level"],
             task_id=task_id,
@@ -871,6 +1158,8 @@ def summarize_native_bundle(
         "reuse_level": row["reuse_level"],
         "eligible_predecessor_count": row["eligible_predecessor_count_required"],
         "task_denominator": len(summary["trials"]),
+        "primary_cache_task_denominator": len(STRUCTURALLY_ELIGIBLE_TASKS),
+        "not_applicable_cache_task_denominator": len(STRUCTURALLY_INELIGIBLE_TASKS),
         "run_denominator": 1,
         "request_denominator": len(successful),
         "provider_http_attempt_denominator": len(responses),
@@ -888,6 +1177,7 @@ def summarize_native_bundle(
             "cache_ledger_sha256": cache_ledger_sha256,
             "native_ledger_sha256": summary["ledger_sha256"],
             "runtime_facts_sha256": runtime_facts_sha256,
+            "eligibility_decision_sha256": eligibility_decision_sha256,
             "run_id": parent_run_id,
             "cycle_id": row["cycle_id"],
             "bundle_id": row["bundle_id"],
@@ -895,6 +1185,21 @@ def summarize_native_bundle(
         "observations": observations,
         "native_run_id": summary["run_id"],
         "native_artifact_manifest_sha256": summary["artifact_manifest_sha256"],
+        "estimands": {
+            "primary_cache": {
+                "task_ids": list(STRUCTURALLY_ELIGIBLE_TASKS),
+                "task_denominator": len(STRUCTURALLY_ELIGIBLE_TASKS),
+                "scope": eligibility_contract["primary_estimand"],
+            },
+            "full_bundle_descriptive": {
+                "task_ids": list(TASKS),
+                "task_denominator": len(TASKS),
+                "scope": eligibility_contract["full_bundle_estimand"],
+                "cache_generalization": "not_claimed",
+            },
+            "selection_timing": eligibility_contract["selection_timing"],
+            "external_validity_limit": eligibility_contract["external_validity_limit"],
+        },
         "flags": {
             "measured": True,
             "synthetic": False,
@@ -958,6 +1263,8 @@ def execute_cycle(
     admission = doctor(ledger, facts, native)
     if admission["decision"] != "go":
         raise ValueError("Offline doctor and current-runtime admission must be green before provider dispatch")
+    if source_commit != ledger["design_source_commit"]:
+        raise ValueError("Execution source differs from the approved cache ledger")
     verify_source_commit(source_commit)
     if not SAFE_ID.fullmatch(run_id):
         raise ValueError("Run ID must be a safe no-clobber identifier")
@@ -983,7 +1290,9 @@ def execute_cycle(
     isolation_hash = by_check["R02_NAMESPACE_ISOLATION"].get("evidence_sha256")
     if isolation_hash is None:
         raise ValueError("Isolation must have hash-bound runtime evidence")
-    tracker = PrefixTracker(facts["prefix_contract"], rows[0]["cycle_id"])
+    eligibility_contract = validate_eligibility_contract(facts["eligibility_contract"])
+    eligibility_decision_hash = eligibility_contract["decision_sha256"]
+    tracker = PrefixTracker(eligibility_contract, rows[0]["cycle_id"])
     run_root.mkdir(parents=True, exist_ok=False)
     output.mkdir(exist_ok=False)
     os.chmod(run_root, 0o700)
@@ -1035,6 +1344,7 @@ def execute_cycle(
                 ledger["pricing"],
                 cache_ledger_sha256=cache_ledger_sha256,
                 runtime_facts_sha256=runtime_facts_sha256,
+                eligibility_contract=eligibility_contract,
                 parent_run_id=run_id,
             )
             if bundle["lineage"]["native_ledger_sha256"] != native_ledger_sha256:
@@ -1066,14 +1376,42 @@ def execute_cycle(
                 "temperature": ledger["generation"]["temperature"],
                 "reasoning_effort": ledger["generation"]["reasoning_effort"],
                 "isolation_evidence_sha256": isolation_hash,
+                "eligibility_decision_sha256": eligibility_decision_hash,
             },
             "valid": True,
             "bundle_denominator": len(bundles),
             "task_denominator": sum(bundle["task_denominator"] for bundle in bundles),
+            "primary_cache_task_denominator": sum(
+                bundle["primary_cache_task_denominator"] for bundle in bundles
+            ),
+            "not_applicable_cache_task_denominator": sum(
+                bundle["not_applicable_cache_task_denominator"] for bundle in bundles
+            ),
             "request_denominator": sum(bundle["request_denominator"] for bundle in bundles),
+            "primary_cache_request_denominator": sum(
+                bundle["metrics"]["eligible_request_denominator"] for bundle in bundles
+            ),
+            "not_applicable_cache_request_denominator": sum(
+                bundle["metrics"]["not_applicable_request_denominator"] for bundle in bundles
+            ),
             "contrasts": contrasts["reuse"],
             "compression_contrasts": contrasts["compression"],
             "diagonal_comparisons": contrasts["diagonal_comparisons"],
+            "full_bundle_descriptive": [
+                {
+                    "bundle_id": bundle["bundle_id"],
+                    "condition": bundle["condition"],
+                    "reuse_level": bundle["reuse_level"],
+                    **bundle["metrics"]["full_bundle_descriptive"],
+                }
+                for bundle in bundles
+            ],
+            "estimands": {
+                "primary_cache": eligibility_contract["primary_estimand"],
+                "full_bundle_descriptive": eligibility_contract["full_bundle_estimand"],
+                "selection_timing": eligibility_contract["selection_timing"],
+                "external_validity_limit": eligibility_contract["external_validity_limit"],
+            },
             "quality_status": "pending_separate_D3_10_to_20_rule",
         }
         write_no_clobber(output / "cycle.json", cycle)

@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": [
     "schema_version", "kind", "run_id", "cycle_id", "bundle_id", "attempt_id",
-    "source_commit", "ledger_sha256", "native_ledger_sha256", "runtime_facts_sha256",
+    "source_commit", "ledger_sha256", "native_ledger_sha256", "runtime_facts_sha256", "eligibility_decision_sha256",
     "condition", "reuse_level", "task_id",
     "denominators", "pins", "serialized_prefix_sha256", "request_sha256",
     "provider_usage", "local_tokens", "computed_price", "invoice", "native_verdict", "flags"
@@ -22,6 +22,7 @@
     "ledger_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "native_ledger_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "runtime_facts_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "eligibility_decision_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "condition": {"enum": ["none", "squeez"]},
     "reuse_level": {"enum": [0, 1, 2]},
     "task_id": {"type": "string"},

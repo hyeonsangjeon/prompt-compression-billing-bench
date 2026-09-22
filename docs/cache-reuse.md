@@ -16,10 +16,28 @@ contrasts hold reuse fixed. Diagonal contrasts are rejected.
 All three bundles are useful trials; there is no discarded warm-up. A warm
 bundle is admissible only when its successful eligible predecessor count equals
 its declared reuse level. The source/model/deployment/revision, generation,
-task/input/tool/schema hashes, request-prefix hash, namespace evidence, and
+task/input/tool/schema hashes, same-task request-prefix hash, cycle-isolation evidence, and
 request width must stay equal. Temperature zero and effort none are recorded
 settings, not evidence of determinism. Cache mode does not add a completion-token
 cap that the native transport does not enforce.
+
+The current private runtime facts must also carry a versioned structural
+eligibility decision. It binds two zero-call captures for request ordinals one
+and two for every fixed task. Each row stores only the stable serialized-prefix
+byte boundary, capture hashes, and local content-token diagnostics. The provider
+threshold is 1,024 tokens. The fixed screening counts are 1,050 for
+`log-summary-date-ranges`, 1,155 for `multi-source-data-merger`, and 1,134 for
+`nginx-request-logging`; these three tasks form the primary eligible stratum.
+The counts are 828 for `cancel-async-tasks` and 1,016 for
+`openssl-selfsigned-cert`; their cache result is `not_applicable`.
+
+All five tasks remain in every execution bundle. Provider usage, calculated
+total cost, native quality, and negative-control reporting use the complete
+five-task bundle. Cache-effect contrasts use only the three eligible tasks.
+The eligibility decision was made after local structural screening and before
+provider inference, so it favors cache-capable inputs and limits external
+validity. Local screening-token counts are not billed provider usage and do not
+show that a provider cache hit occurred.
 
 ## Zero-network planning and doctor
 
@@ -123,12 +141,16 @@ Common failures:
 
 ## Units and claim limit
 
-The primary cache metric is summed provider-native cached input divided by
-summed provider-native input per useful bundle. Input cost is calculated from
-those fields and fixed ledger prices. Provider usage, local tokenizer counts,
-calculated prices, and invoices remain separate. Absent, null, or malformed
-cached-input values are missing; only numeric zero is zero. Reuse zero has no
-eligible predecessor opportunity, which is `not_applicable`, not a cache miss.
+For the three-task eligible stratum, the primary cache metric is summed
+provider-native cached input divided by summed provider-native input per useful
+bundle. Input cost is calculated from those fields and fixed ledger prices. A
+separate five-task descriptive record carries provider usage, calculated total
+cost, and quality without treating it as a five-task cache-effect estimate.
+Provider usage, local tokenizer counts, calculated prices, and invoices remain
+separate. Absent, null, or malformed cached-input values are missing; only
+numeric zero is zero. Reuse zero has no eligible predecessor opportunity. The
+two structurally ineligible tasks also have no cache opportunity or result;
+both cases are `not_applicable`, not cache misses or numeric zeros.
 
 Ten valid cycles are split 1–5 and 6–10. Each paired cache-share and input-cost
 series is stable only when the two observed ranges overlap and median signs

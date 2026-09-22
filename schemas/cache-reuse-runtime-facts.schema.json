@@ -48,6 +48,75 @@
         "namespace_message_index": {"type": "integer", "minimum": 0},
         "namespace_content_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
       }
+    },
+    "eligibility_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "kind", "decision_version", "decided_at_utc",
+        "screening_source_commit", "screening_evidence_sha256", "screening_launches",
+        "provider_cache_threshold_tokens", "screening_token_unit", "selection_timing",
+        "primary_estimand", "ineligible_cache_result", "full_bundle_estimand",
+        "external_validity_limit", "task_denominators", "raw_content_stored",
+        "provider_model_api_calls", "rows", "decision_sha256"
+      ],
+      "properties": {
+        "schema_version": {"const": 1},
+        "kind": {"const": "cache_reuse_structural_eligibility_decision"},
+        "decision_version": {"const": 1},
+        "decided_at_utc": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|\\+00:00)$"},
+        "screening_source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "screening_evidence_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "screening_launches": {"const": 2},
+        "provider_cache_threshold_tokens": {"const": 1024},
+        "screening_token_unit": {"const": "local_content_tokens_not_provider_billed_usage"},
+        "selection_timing": {"const": "after_zero_call_structural_screening_before_provider_inference"},
+        "primary_estimand": {"const": "same_task_condition_reuse_effect_structurally_eligible_tasks_only"},
+        "ineligible_cache_result": {"const": "not_applicable"},
+        "full_bundle_estimand": {"const": "descriptive_provider_usage_computed_cost_quality_all_five_tasks"},
+        "external_validity_limit": {"const": "eligibility_screening_favors_cache_capable_inputs_no_generalization"},
+        "task_denominators": {
+          "const": {"execution": 5, "primary_eligible": 3, "not_applicable": 2}
+        },
+        "raw_content_stored": {"const": false},
+        "provider_model_api_calls": {"const": 0},
+        "rows": {
+          "type": "array",
+          "minItems": 10,
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "task_id", "request_ordinal", "local_screening_prefix_tokens",
+              "stable_serialized_prefix_bytes", "capture_serialized_prefix_sha256",
+              "capture_request_sha256", "cache_eligibility", "execution_bundle_included",
+              "primary_cache_estimand_included"
+            ],
+            "properties": {
+              "task_id": {"enum": ["cancel-async-tasks", "log-summary-date-ranges", "multi-source-data-merger", "nginx-request-logging", "openssl-selfsigned-cert"]},
+              "request_ordinal": {"enum": [1, 2]},
+              "local_screening_prefix_tokens": {
+                "type": "array", "minItems": 2, "maxItems": 2,
+                "items": {"type": "integer", "minimum": 0}
+              },
+              "stable_serialized_prefix_bytes": {"type": "integer", "minimum": 1},
+              "capture_serialized_prefix_sha256": {
+                "type": "array", "minItems": 2, "maxItems": 2,
+                "items": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+              },
+              "capture_request_sha256": {
+                "type": "array", "minItems": 2, "maxItems": 2,
+                "items": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+              },
+              "cache_eligibility": {"enum": ["eligible", "not_applicable"]},
+              "execution_bundle_included": {"const": true},
+              "primary_cache_estimand_included": {"type": "boolean"}
+            }
+          }
+        },
+        "decision_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
     }
   }
 }
