@@ -11,3 +11,12 @@ the KT audience.
 - [Examples guide](../examples/README_en.md)
 - [Ledger guide](../ledgers/README_en.md)
 - [Snapshot provenance and hashes](SNAPSHOT.md)
+
+Current English-only implementation guides remain at their established paths:
+
+- [Runtime-owner handoff](../docs/runtime-owner-handoff.md)
+- [Cache-reuse contract](../docs/cache-reuse.md)
+- [Native execution contract](../docs/native-contract.md)
+- [Accountless native record](../docs/accountless-native.md)
+- [Local native record](../docs/local-native.md)
+- [Local recovery contract](../docs/squeez-recovery.md)

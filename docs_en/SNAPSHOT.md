@@ -10,6 +10,12 @@ requires it. It does not add experiment evidence, revise measurements, or
 strengthen any conclusion. Source generators and executable contracts remain
 at the repository root and continue to govern the canonical Korean paths.
 
+The 28 restored Korean source artifacts are byte-identical to the reference
+revision after removing one explicit compatibility anchor from
+`docs/experiment/screening-protocol.md`. That anchor restores the existing
+`#기존-기준선에-미치는-영향` internal link without changing the surrounding
+paragraph, measurement, or claim.
+
 ## File inventory
 
 | Source at snapshot commit | Preserved path | Source SHA-256 | Snapshot SHA-256 |

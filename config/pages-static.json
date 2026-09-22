@@ -24,7 +24,15 @@
       "THIRD_PARTY_NOTICES.md": "/notices/"
     }
   },
-  "compatibility_anchors": [],
+  "compatibility_anchors": [
+    {
+      "source_path": "docs/pages-home.md",
+      "fragment": "publication-scope",
+      "before_line": 19,
+      "line_sha256": "33177b6a1a00f7e9ca076b6d25baca0379eb7540dbe29654322c7c8fd53b7692",
+      "reason": "Preserve the previously published English fragment while restoring the original Korean heading."
+    }
+  ],
   "renderer_policy": {
     "source_code_execution": false,
     "active_html_execution": false,
