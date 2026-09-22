@@ -55,11 +55,11 @@ CYCLE_PIN_FIELDS = {
 CACHE_THRESHOLD_TOKENS = 1_024
 SCREENING_REQUEST_ORDINALS = (1, 2)
 STRUCTURAL_SCREENING_TOKENS = {
-    "cancel-async-tasks": (797, 794),
-    "log-summary-date-ranges": (1_016, 1_017),
-    "multi-source-data-merger": (1_125, 1_123),
-    "nginx-request-logging": (1_101, 1_101),
-    "openssl-selfsigned-cert": (984, 983),
+    "cancel-async-tasks": 782,
+    "log-summary-date-ranges": 1_004,
+    "multi-source-data-merger": 1_109,
+    "nginx-request-logging": 1_088,
+    "openssl-selfsigned-cert": 970,
 }
 STRUCTURALLY_ELIGIBLE_TASKS = (
     "multi-source-data-merger",
@@ -128,7 +128,7 @@ def validate_eligibility_contract(contract: dict) -> dict:
         "cache_reuse_structural_eligibility_decision",
         "Unexpected eligibility decision kind",
     )
-    _require_exact(contract["decision_version"], 1, "Unsupported eligibility decision version")
+    _require_exact(contract["decision_version"], 2, "Unsupported eligibility decision version")
     if not isinstance(contract["decided_at_utc"], str) or not re.fullmatch(
         r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|\+00:00)",
         contract["decided_at_utc"],
@@ -146,7 +146,7 @@ def validate_eligibility_contract(contract: dict) -> dict:
     )
     _require_exact(
         contract["screening_token_unit"],
-        "local_content_tokens_not_provider_billed_usage",
+        "local_stable_message_content_prefix_tokens_not_provider_billed_usage",
         "Eligibility screening token provenance changed",
     )
     _require_exact(
@@ -198,9 +198,7 @@ def validate_eligibility_contract(contract: dict) -> dict:
         actual_keys.append(key)
         if key not in expected_keys:
             raise ValueError("Eligibility decision contains an unknown task or ordinal")
-        expected_tokens = STRUCTURAL_SCREENING_TOKENS[row["task_id"]][
-            row["request_ordinal"] - 1
-        ]
+        expected_tokens = STRUCTURAL_SCREENING_TOKENS[row["task_id"]]
         _require_exact(
             row["local_screening_prefix_tokens"],
             [expected_tokens, expected_tokens],

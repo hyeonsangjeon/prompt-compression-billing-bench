@@ -54,9 +54,7 @@ def synthetic_eligibility_contract(captures=None):
     rows = []
     for task_id in TASKS:
         for request_ordinal in SCREENING_REQUEST_ORDINALS:
-            expected_tokens = STRUCTURAL_SCREENING_TOKENS[task_id][
-                request_ordinal - 1
-            ]
+            expected_tokens = STRUCTURAL_SCREENING_TOKENS[task_id]
             default_prefix = f"synthetic-stable-{task_id}-{request_ordinal}:".encode()
             first = default_prefix + b"launch-one"
             second = default_prefix + b"launch-two"
@@ -89,13 +87,13 @@ def synthetic_eligibility_contract(captures=None):
     contract = {
         "schema_version": 1,
         "kind": "cache_reuse_structural_eligibility_decision",
-        "decision_version": 1,
+        "decision_version": 2,
         "decided_at_utc": "2026-09-22T00:00:00Z",
         "screening_source_commit": "a" * 40,
         "screening_evidence_sha256": "b" * 64,
         "screening_launches": 2,
         "provider_cache_threshold_tokens": 1_024,
-        "screening_token_unit": "local_content_tokens_not_provider_billed_usage",
+        "screening_token_unit": "local_stable_message_content_prefix_tokens_not_provider_billed_usage",
         "selection_timing": "after_zero_call_structural_screening_before_provider_inference",
         "primary_estimand": "same_task_condition_reuse_effect_structurally_eligible_tasks_only",
         "ineligible_cache_result": "not_applicable",
@@ -390,6 +388,12 @@ class RuntimeDoctorTests(unittest.TestCase):
         mutations.append(changed)
         changed = deepcopy(contract)
         changed["provider_cache_threshold_tokens"] = 1_025
+        mutations.append(changed)
+        changed = deepcopy(contract)
+        changed["decision_version"] = 1
+        mutations.append(changed)
+        changed = deepcopy(contract)
+        changed["screening_token_unit"] = "local_content_tokens_not_provider_billed_usage"
         mutations.append(changed)
         changed = deepcopy(contract)
         changed["rows"][0]["local_screening_prefix_tokens"] = [1_024, 1_024]

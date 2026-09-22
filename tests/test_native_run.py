@@ -39,9 +39,7 @@ def synthetic_eligibility_contract():
     rows = []
     for task_id in TASKS:
         for request_ordinal in SCREENING_REQUEST_ORDINALS:
-            expected_tokens = STRUCTURAL_SCREENING_TOKENS[task_id][
-                request_ordinal - 1
-            ]
+            expected_tokens = STRUCTURAL_SCREENING_TOKENS[task_id]
             eligibility = (
                 "eligible"
                 if expected_tokens >= CACHE_THRESHOLD_TOKENS
@@ -64,13 +62,13 @@ def synthetic_eligibility_contract():
     contract = {
         "schema_version": 1,
         "kind": "cache_reuse_structural_eligibility_decision",
-        "decision_version": 1,
+        "decision_version": 2,
         "decided_at_utc": "2026-09-22T00:00:00Z",
         "screening_source_commit": "a" * 40,
         "screening_evidence_sha256": "b" * 64,
         "screening_launches": 2,
         "provider_cache_threshold_tokens": 1_024,
-        "screening_token_unit": "local_content_tokens_not_provider_billed_usage",
+        "screening_token_unit": "local_stable_message_content_prefix_tokens_not_provider_billed_usage",
         "selection_timing": "after_zero_call_structural_screening_before_provider_inference",
         "primary_estimand": "same_task_condition_reuse_effect_structurally_eligible_tasks_only",
         "ineligible_cache_result": "not_applicable",

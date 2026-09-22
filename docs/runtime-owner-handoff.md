@@ -106,14 +106,16 @@ top-level fields are `schema_version`, `kind`, `decision_version`,
 `external_validity_limit`, `task_denominators`, `raw_content_stored`,
 `provider_model_api_calls`, `rows`, and `decision_sha256`.
 
-The object contains exactly ten rows: the five fixed tasks crossed with request
+Decision version 2 contains exactly ten rows: the five fixed tasks crossed with request
 ordinals one and two. Each row contains `task_id`, `request_ordinal`,
 `local_screening_prefix_tokens`, `stable_serialized_prefix_bytes`,
 `capture_serialized_prefix_sha256`, `capture_request_sha256`,
 `cache_eligibility`, `execution_bundle_included`, and
 `primary_cache_estimand_included`. Both captures must have the same serialized
-prefix hash within a task and ordinal. Raw request content, endpoint values,
-credentials, and private paths are not allowed.
+prefix hash within a task and ordinal. `local_screening_prefix_tokens` counts
+only the common message-content prefix before the first launch-specific
+terminal-state divergence, not the full dynamic message. Raw request content,
+endpoint values, credentials, and private paths are not allowed.
 
 The threshold is 1,024 local content tokens. The decision fixes two tasks in
 the primary eligible stratum and three as `not_applicable`; all five remain in the
