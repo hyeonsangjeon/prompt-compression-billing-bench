@@ -24,6 +24,7 @@ from .harbor_no_time_limits import apply_no_time_limit_policy, command as harbor
 from .live_observations import POLICY
 from .execution_safety import SafetyLimitReached, safety_policy_record
 from .live_transport import (
+    cache_namespace_message,
     DeploymentQueue,
     FoundrySender,
     LiveRecorder,
@@ -693,6 +694,10 @@ def execute_native(
             directory / "transport", ledger, source_commit, compressor, setup["encoder"], queue,
             setup["sender"], condition=condition, evidence_kind=summary["kind"],
             request_observer=request_observer,
+            request_prefix_message=(
+                cache_namespace_message(cache_context["isolation_evidence_sha256"])
+                if cache_mode else None
+            ),
         )
         key = secrets.token_urlsafe(32)
         server = start_live_proxy(recorder, key)

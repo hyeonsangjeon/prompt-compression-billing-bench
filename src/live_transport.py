@@ -29,6 +29,20 @@ from .measurement import counts, token_count
 from .protection import FrozenRequestGuard, ProtectionViolation, canonical, digest, parse_request
 
 
+CACHE_NAMESPACE_PREFIX = "cache-reuse-namespace-v1:"
+
+
+def cache_namespace_message(isolation_evidence_sha256: str) -> dict[str, str]:
+    if not isinstance(isolation_evidence_sha256, str) or not re.fullmatch(
+        r"[0-9a-f]{64}", isolation_evidence_sha256
+    ):
+        raise ValueError("Cache namespace evidence requires SHA-256")
+    return {
+        "role": "system",
+        "content": CACHE_NAMESPACE_PREFIX + isolation_evidence_sha256,
+    }
+
+
 def write_json(path: Path, payload) -> None:
     with path.open("x", encoding="utf-8") as handle:
         json.dump(payload, handle, ensure_ascii=False, indent=2, allow_nan=False)
@@ -375,7 +389,7 @@ class ManagedIdentity:
 class LiveRecorder:
     def __init__(self, directory: Path, ledger: dict, source_commit: str, compressor, encoder, queue, sender,
                  *, condition="none", evidence_kind="native_measurement", request_error_scope="run",
-                 request_observer=None):
+                 request_observer=None, request_prefix_message=None):
         self.directory, self.ledger, self.source_commit = directory, ledger, source_commit
         self.compressor, self.encoder, self.queue, self.sender = compressor, encoder, queue, sender
         self.condition, self.evidence_kind = condition, evidence_kind
@@ -383,6 +397,27 @@ class LiveRecorder:
             raise ValueError("Request error scope must be run or trial")
         self.request_error_scope = request_error_scope
         self.request_observer = request_observer
+        if request_prefix_message is not None:
+            if (
+                not isinstance(request_prefix_message, dict)
+                or set(request_prefix_message) != {"role", "content"}
+                or request_prefix_message.get("role") != "system"
+                or not isinstance(request_prefix_message.get("content"), str)
+            ):
+                raise ValueError("Cache request prefix differs from the namespace contract")
+            content = request_prefix_message["content"]
+            try:
+                expected_prefix = cache_namespace_message(
+                    content.removeprefix(CACHE_NAMESPACE_PREFIX)
+                )
+            except ValueError as error:
+                raise ValueError(
+                    "Cache request prefix differs from the namespace contract"
+                ) from error
+            if request_observer is None or request_prefix_message != expected_prefix:
+                raise ValueError("Cache request prefix differs from the namespace contract")
+            request_prefix_message = dict(request_prefix_message)
+        self.request_prefix_message = request_prefix_message
         directory.mkdir(parents=True, exist_ok=False)
         self.lock = threading.RLock()
         self.event_lock = threading.Lock()
@@ -855,9 +890,17 @@ class LiveRecorder:
                     "task": task, "repetition": repetition, "request_sha256": digest(source)})
         directory = self.directory / f"request-{request_number:05d}"
         directory.mkdir()
-        (directory / "before.json").write_bytes(source)
+        received = source
         payload = parse_request(source)
         self.request_contract(payload)
+        if self.request_prefix_message is not None:
+            payload = {
+                **payload,
+                "messages": [dict(self.request_prefix_message), *payload["messages"]],
+            }
+            source = canonical(payload)
+            (directory / "received.json").write_bytes(received)
+        (directory / "before.json").write_bytes(source)
         self._record_progress(trial_id, payload)
         segments = partition(payload, assistant_hashes)
         write_json(directory / "manifest.json", {"source_sha256": digest(source), "segments": segments,

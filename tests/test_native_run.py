@@ -13,6 +13,7 @@ from unittest.mock import patch
 from native_helpers import FixtureEncoder, ledger_fixture_document, request_fixture, response_fixture
 from src.cache_reuse import summarize_native_bundle
 from src.execution_safety import safety_policy_record
+from src.live_transport import cache_namespace_message
 from src.native_contract import TASKS
 from src.native_run import (
     _cache_bundle_context,
@@ -240,6 +241,10 @@ class NativeRunTests(unittest.TestCase):
         self.assertEqual(summary["concurrency"], 1)
         self.assertEqual(len(summary["trials"]), 5)
         self.assertEqual(len(self.sent), 5)
+        self.assertTrue(all(
+            json.loads(body)["messages"][0] == cache_namespace_message("d" * 64)
+            for body in self.sent
+        ))
         self.assertEqual(self.maximum_active_supervisors, 1)
         with patch("src.native_run.verify_snapshot", return_value=provenance):
             checked = verify_cache_bundle_run(directory)

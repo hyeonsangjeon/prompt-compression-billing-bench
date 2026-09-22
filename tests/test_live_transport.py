@@ -14,6 +14,7 @@ from unittest.mock import patch
 from native_helpers import FixtureEncoder, ImmediateQueue, ledger_fixture, request_fixture, response_fixture
 from src.compressors import NoOpCompressor
 from src.live_transport import (
+    cache_namespace_message,
     DeploymentQueue,
     FoundrySender,
     LiveRecorder,
@@ -71,6 +72,70 @@ class LiveTransportTests(unittest.TestCase):
         self.assertEqual(self.sent, [])
         self.assertEqual(self.queue.calls, [])
         self.assertTrue(self.recorder.stopped.is_set())
+
+    def test_cache_namespace_is_injected_and_protected_before_observation(self):
+        namespace = cache_namespace_message("d" * 64)
+        observed = []
+
+        def observe(**arguments):
+            observed.append(arguments)
+            return {"namespace_content_sha256": "d" * 64}
+
+        recorder = LiveRecorder(
+            self.root / "cache-transport",
+            self.ledger,
+            "a" * 40,
+            NoOpCompressor({"options": {}}, self.root),
+            FixtureEncoder(),
+            self.queue,
+            lambda body: (self.sent.append(body), (200, response_fixture(), {}))[1],
+            evidence_kind="synthetic_validation",
+            request_observer=observe,
+            request_prefix_message=namespace,
+        )
+        recorder.register_trial("trial-cache", "synthetic-task", 1)
+        received = canonical(request_fixture())
+        recorder.complete("trial-cache", received)
+
+        sent = json.loads(self.sent[-1])
+        self.assertEqual(sent["messages"][0], namespace)
+        self.assertEqual(sent["messages"][1:], request_fixture()["messages"])
+        self.assertEqual(observed[0]["payload"], sent)
+        self.assertEqual(observed[0]["serialized"], self.sent[-1])
+        directory = self.root / "cache-transport/request-00001"
+        self.assertEqual((directory / "received.json").read_bytes(), received)
+        self.assertEqual((directory / "before.json").read_bytes(), self.sent[-1])
+        manifest = json.loads((directory / "manifest.json").read_text())
+        namespace_segments = [row for row in manifest["segments"] if row["message_index"] == 0]
+        self.assertTrue(namespace_segments)
+        self.assertTrue(all(not row["candidate"] for row in namespace_segments))
+
+    def test_cache_namespace_rejects_invalid_or_unobserved_prefixes(self):
+        with self.assertRaisesRegex(ValueError, "SHA-256"):
+            cache_namespace_message("not-a-digest")
+        with self.assertRaisesRegex(ValueError, "namespace contract"):
+            LiveRecorder(
+                self.root / "invalid-cache-transport",
+                self.ledger,
+                "a" * 40,
+                NoOpCompressor({"options": {}}, self.root),
+                FixtureEncoder(),
+                self.queue,
+                lambda _body: (200, response_fixture(), {}),
+                request_prefix_message=cache_namespace_message("d" * 64),
+            )
+        with self.assertRaisesRegex(ValueError, "namespace contract"):
+            LiveRecorder(
+                self.root / "private-shaped-cache-transport",
+                self.ledger,
+                "a" * 40,
+                NoOpCompressor({"options": {}}, self.root),
+                FixtureEncoder(),
+                self.queue,
+                lambda _body: (200, response_fixture(), {}),
+                request_observer=lambda **_arguments: {},
+                request_prefix_message={"role": "system", "content": "/private/value"},
+            )
 
     def test_candidate_compression_records_hashes_and_timing_before_dispatch(self):
         assistant = json.dumps({"commands": [{"keystrokes": "ls -la /logs\n", "duration": 1}]})
