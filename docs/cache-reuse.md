@@ -24,22 +24,24 @@ cap that the native transport does not enforce.
 The current private runtime facts must also carry a versioned structural
 eligibility decision. It binds two zero-call captures for request ordinals one
 and two for every fixed task. Each row stores only the stable serialized-prefix
-byte boundary, capture hashes, and local content-token diagnostics. The provider
-threshold is 1,024 tokens. Request ordinals one and two have fixed screening
-counts of 1,125/1,123 for `multi-source-data-merger` and 1,101/1,101 for
+byte boundary, capture hashes, and local content-token diagnostics. Decision
+version 2 counts only the common message-content prefix before the first
+launch-specific terminal-state divergence; it does not count the full dynamic
+message. The provider threshold is 1,024 tokens. The fixed stable-prefix counts
+are 1,109 for `multi-source-data-merger` and 1,088 for
 `nginx-request-logging`; these two tasks form the primary eligible stratum.
-The counts are 797/794 for `cancel-async-tasks`, 1,016/1,017 for
-`log-summary-date-ranges`, and 984/983 for `openssl-selfsigned-cert`; their
-cache result is `not_applicable`. Each ordinal count was stable across two
-zero-call captures.
+The counts are 782 for `cancel-async-tasks`, 1,004 for
+`log-summary-date-ranges`, and 970 for `openssl-selfsigned-cert`; their cache
+result is `not_applicable`. Each count is the same for request ordinals one and
+two and was stable across two zero-call captures.
 
 All five tasks remain in every execution bundle. Provider usage, calculated
 total cost, native quality, and negative-control reporting use the complete
 five-task bundle. Cache-effect contrasts use only the two eligible tasks.
 The eligibility decision was made after local structural screening and before
 provider inference, so it favors cache-capable inputs and limits external
-validity. Local screening-token counts are not billed provider usage and do not
-show that a provider cache hit occurred.
+validity. Stable-prefix screening-token counts are not billed provider usage
+and do not show that a provider cache hit occurred.
 
 ## Zero-network planning and doctor
 
