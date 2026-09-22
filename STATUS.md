@@ -26,6 +26,15 @@ and was deferred. Source, catalog, task-row, runtime and image-manifest pins
 matched, but credential, provider-price/revision and isolated-sandbox admission
 did not. No worker, model, provider request, trace or grader started.
 
+The Project 15 Cache path passed its current admission and reached provider
+execution. It stopped during the first attempted cycle after 18 successful
+provider calls because a reuse-1 task reached logical request ordinal 3 while
+its reuse-0 predecessor had only two requests. The cycle was invalid, the valid
+cycle denominator was zero, and no cache comparison or Cache-effect estimate
+was produced. The partial-cycle cached-input value of zero is provider usage,
+not a miss rate. No replacement ran, cleanup survivors were zero, and the VM
+was deallocated.
+
 ## Nine checks
 
 | Check | State | Present contract and remaining gap |

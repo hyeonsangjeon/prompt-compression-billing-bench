@@ -12,6 +12,16 @@ the KT audience.
 - [Ledger guide](../ledgers/README_en.md)
 - [Snapshot provenance and hashes](SNAPSHOT.md)
 
+## Post-snapshot measured results
+
+The following report was added after the preserved English snapshot and is not
+part of its byte-identity inventory:
+
+- [Cache reuse execution result](results/cache-reuse-execution-20260923.md) —
+  actual provider execution reached 18 successful calls, but the attempted
+  cycle was invalid and produced zero valid cycles, so no cache comparison was
+  produced.
+
 Current English-only implementation guides remain at their established paths:
 
 - [Runtime-owner handoff](../docs/runtime-owner-handoff.md)

@@ -225,6 +225,7 @@ have not been validated.
 | Accountless native execution and historical evidence | [Local native runner](docs/local-native.md) |
 | Opt-in Foundry path, workload metrics and proposed baseline rule | [Native contract](docs/native-contract.md) |
 | Hash-bound cache runtime launcher and its still-required owner context | [Cache reuse contract](docs/cache-reuse.md) |
+| Provider-backed Cache execution with zero valid cycles and no comparison | [English execution result](docs_en/results/cache-reuse-execution-20260923.md) |
 | Current protocol, baseline, static compressors and open decisions | [Experiment record](docs/experiment/README.md) |
 | Deferred SWE-Lancer candidate evaluation and no-trace boundary | [SWE-Lancer candidate evaluation](docs/experiment/swe-lancer-candidate-evaluation-20260920.md) |
 | Unsupported paths and readiness gaps | [Status](STATUS.md) |
