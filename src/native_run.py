@@ -24,6 +24,8 @@ from .harbor_no_time_limits import apply_no_time_limit_policy, command as harbor
 from .live_observations import POLICY
 from .execution_safety import SafetyLimitReached, safety_policy_record
 from .live_transport import (
+    CACHE_NAMESPACE_STRATEGY,
+    cache_namespace_message,
     DeploymentQueue,
     FoundrySender,
     LiveRecorder,
@@ -455,8 +457,35 @@ def verify_cache_bundle_run(directory: Path) -> dict:
             context["eligible_predecessor_count"],
         ):
             raise ValueError("Cache request observation differs from the bundle context")
-        if not re.fullmatch(r"[0-9a-f]{64}", observation.get("serialized_prefix_sha256", "")):
-            raise ValueError("Cache request lacks its serialized-prefix hash")
+        request_ordinal = observation.get("request_ordinal_within_task")
+        if (
+            type(request_ordinal) is not int
+            or not 1 <= request_ordinal <= 10_000
+            or observation.get("screening_request_ordinal") != min(request_ordinal, 2)
+        ):
+            raise ValueError("Cache request observation has an invalid logical request ordinal")
+        expected_namespace = cache_namespace_message(
+            context["cycle_id"],
+            context["condition"],
+            event["trial_id"].removeprefix("r01-"),
+            request_ordinal,
+            context["isolation_evidence_sha256"],
+        )
+        if (
+            observation.get("cycle_namespace_strategy") != CACHE_NAMESPACE_STRATEGY
+            or observation.get("cycle_namespace_content_sha256")
+            != digest(expected_namespace["content"].encode())
+        ):
+            raise ValueError("Cache request observation differs from the cycle namespace")
+        if any(
+            not re.fullmatch(r"[0-9a-f]{64}", observation.get(field, ""))
+            for field in (
+                "screening_serialized_prefix_sha256",
+                "serialized_prefix_sha256",
+                "request_sha256",
+            )
+        ):
+            raise ValueError("Cache request lacks complete request-prefix evidence")
     retrieval = json.loads((directory / "retrieval.json").read_bytes())
     if summary.get("retrieval") != retrieval or len(retrieval.get("items", [])) != 1:
         raise ValueError("Cache bundle retrieval must preserve its one completed repetition")
@@ -693,6 +722,15 @@ def execute_native(
             directory / "transport", ledger, source_commit, compressor, setup["encoder"], queue,
             setup["sender"], condition=condition, evidence_kind=summary["kind"],
             request_observer=request_observer,
+            request_prefix_factory=(
+                lambda task, request_ordinal: cache_namespace_message(
+                    cache_context["cycle_id"],
+                    cache_context["condition"],
+                    task,
+                    request_ordinal,
+                    cache_context["isolation_evidence_sha256"],
+                )
+            ) if cache_mode else None,
         )
         key = secrets.token_urlsafe(32)
         server = start_live_proxy(recorder, key)

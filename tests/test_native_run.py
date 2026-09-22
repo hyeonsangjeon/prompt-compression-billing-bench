@@ -19,6 +19,7 @@ from src.cache_reuse import (
     summarize_native_bundle,
 )
 from src.execution_safety import safety_policy_record
+from src.live_transport import CACHE_NAMESPACE_STRATEGY, cache_namespace_message
 from src.native_contract import TASKS
 from src.native_run import (
     _cache_bundle_context,
@@ -228,6 +229,17 @@ class NativeRunTests(unittest.TestCase):
 
                 def observe(**arguments):
                     task_id = arguments["task"]
+                    namespace = cache_namespace_message(
+                        context["cycle_id"],
+                        context["condition"],
+                        task_id,
+                        1,
+                        context["isolation_evidence_sha256"],
+                    )
+                    normalized = {
+                        **arguments["payload"],
+                        "messages": arguments["payload"]["messages"][1:],
+                    }
                     eligibility = next(
                         row["cache_eligibility"]
                         for row in eligibility_contract["rows"]
@@ -236,6 +248,11 @@ class NativeRunTests(unittest.TestCase):
                     return {
                         "cycle_id": context["cycle_id"], "condition": context["condition"],
                         "reuse_level": context["reuse_level"], "eligible_predecessor_count": 0,
+                        "request_ordinal_within_task": 1,
+                        "screening_request_ordinal": 1,
+                        "cycle_namespace_strategy": CACHE_NAMESPACE_STRATEGY,
+                        "cycle_namespace_content_sha256": digest(namespace["content"].encode()),
+                        "screening_serialized_prefix_sha256": digest(canonical(normalized)),
                         "serialized_prefix_sha256": digest(arguments["serialized"]),
                         "request_sha256": digest(arguments["serialized"]),
                         "structural_cache_eligibility": eligibility,
@@ -304,6 +321,15 @@ class NativeRunTests(unittest.TestCase):
         self.assertEqual(summary["concurrency"], 1)
         self.assertEqual(len(summary["trials"]), 5)
         self.assertEqual(len(self.sent), 5)
+        namespaces = {
+            task: cache_namespace_message("cycle-01", "none", task, 1, "d" * 64)
+            for task in TASKS
+        }
+        self.assertTrue(all(
+            json.loads(body)["messages"][0] == namespaces[task]
+            and json.loads(body)["messages"][1:] == request_fixture()["messages"]
+            for task, body in zip(TASKS, self.sent, strict=True)
+        ))
         self.assertEqual(self.maximum_active_supervisors, 1)
         with patch("src.native_run.verify_snapshot", return_value=provenance):
             checked = verify_cache_bundle_run(directory)
@@ -335,6 +361,12 @@ class NativeRunTests(unittest.TestCase):
         self.assertTrue(all(row["flags"]["measured"] for row in bundle["observations"]))
         self.assertTrue(all(row["invoice"]["status"] == "not_measured" for row in bundle["observations"]))
         self.assertTrue(all(row["runtime_facts_sha256"] == "d" * 64 for row in bundle["observations"]))
+        self.assertTrue(all(
+            row["cycle_namespace_strategy"] == CACHE_NAMESPACE_STRATEGY
+            and row["cycle_namespace_content_sha256"]
+            == digest(namespaces[row["task_id"]]["content"].encode())
+            for row in bundle["observations"]
+        ))
 
     def test_cache_bundle_context_requires_every_ledger_hash(self):
         context = {

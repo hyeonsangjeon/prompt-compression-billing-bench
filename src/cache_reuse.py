@@ -15,6 +15,11 @@ import subprocess
 import sys
 
 from accounting import provider_tokens
+from .live_transport import (
+    CACHE_NAMESPACE_CONTENT_HEX_CHARS,
+    CACHE_NAMESPACE_STRATEGY,
+    cache_namespace_message,
+)
 from .native_contract import TASKS, load_native_ledger, parse_native_ledger
 from .protection import canonical, digest
 
@@ -217,6 +222,11 @@ def validate_eligibility_contract(contract: dict) -> dict:
         if len(set(row["capture_serialized_prefix_sha256"])) != 1:
             raise ValueError("Same-task ordinal serialized prefixes differ across screening launches")
         expected_eligibility = "eligible" if expected_tokens >= CACHE_THRESHOLD_TOKENS else "not_applicable"
+        if (
+            expected_eligibility == "not_applicable"
+            and expected_tokens + CACHE_NAMESPACE_CONTENT_HEX_CHARS >= CACHE_THRESHOLD_TOKENS
+        ):
+            raise ValueError("Cycle namespace token budget changes the structural eligibility stratum")
         _require_exact(row["cache_eligibility"], expected_eligibility, "Task cache eligibility differs from the threshold")
         _require_exact(row["execution_bundle_included"], True, "Every fixed task must remain in the execution bundle")
         _require_exact(
@@ -651,15 +661,26 @@ def doctor(
 class PrefixTracker:
     """Hash exact serialized prefixes and require predecessor equality without storing text."""
 
-    def __init__(self, eligibility_contract: dict, cycle_id: str):
+    def __init__(
+        self,
+        eligibility_contract: dict,
+        cycle_id: str,
+        isolation_evidence_sha256: str,
+    ):
         if not SAFE_ID.fullmatch(cycle_id):
             raise ValueError("Cycle ID must be a safe no-clobber identifier")
+        if (
+            not isinstance(isolation_evidence_sha256, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", isolation_evidence_sha256)
+        ):
+            raise ValueError("Cycle namespace isolation evidence requires SHA-256")
         self.eligibility_contract = validate_eligibility_contract(eligibility_contract)
         self.contract_rows = {
             (row["task_id"], row["request_ordinal"]): row
             for row in self.eligibility_contract["rows"]
         }
         self.cycle_id = cycle_id
+        self.isolation_evidence_sha256 = isolation_evidence_sha256
         self.completed: dict[tuple[str, str], list[list[str]]] = {}
         self.pending: dict[tuple[str, int, str], list[str]] = {}
 
@@ -672,20 +693,56 @@ class PrefixTracker:
         if len(history) != reuse_level:
             raise ValueError("Eligible predecessor count differs before provider dispatch")
         pending_key = (condition, reuse_level, task)
-        request_hashes = self.pending.setdefault(pending_key, [])
+        request_hashes = self.pending.get(pending_key, [])
         request_ordinal = len(request_hashes)
+        namespace = cache_namespace_message(
+            self.cycle_id,
+            condition,
+            task,
+            request_ordinal + 1,
+            self.isolation_evidence_sha256,
+        )
+        messages = payload.get("messages")
+        if (
+            not isinstance(messages, list)
+            or len(messages) < 2
+            or messages[0] != namespace
+        ):
+            raise ValueError("Outgoing request differs from the cycle namespace contract")
+        normalized_payload = {**payload, "messages": messages[1:]}
+        normalized_serialized = canonical(normalized_payload)
         screening_ordinal = min(request_ordinal + 1, SCREENING_REQUEST_ORDINALS[-1])
         contract_row = self.contract_rows[(task, screening_ordinal)]
         prefix_bytes = contract_row["stable_serialized_prefix_bytes"]
-        if len(serialized) < prefix_bytes:
+        if len(normalized_serialized) < prefix_bytes:
             raise ValueError("Outgoing request is shorter than the screened serialized prefix")
-        prefix_hash = digest(serialized[:prefix_bytes])
-        if prefix_hash != contract_row["capture_serialized_prefix_sha256"][0]:
+        screening_prefix_hash = digest(normalized_serialized[:prefix_bytes])
+        if screening_prefix_hash != contract_row["capture_serialized_prefix_sha256"][0]:
             raise ValueError("Same-task ordinal serialized prefix differs from the zero-call screening decision")
+        marker = b'"messages":['
+        insertion_offset = normalized_serialized.find(marker)
+        if (
+            insertion_offset < 0
+            or normalized_serialized.find(marker, insertion_offset + 1) >= 0
+        ):
+            raise ValueError("Canonical request has an ambiguous message-list boundary")
+        insertion_offset += len(marker)
+        if prefix_bytes <= insertion_offset:
+            raise ValueError("Screened prefix ends before the cycle namespace boundary")
+        namespace_fragment = canonical(namespace) + b","
+        expected_serialized = (
+            normalized_serialized[:insertion_offset]
+            + namespace_fragment
+            + normalized_serialized[insertion_offset:]
+        )
+        if expected_serialized != serialized:
+            raise ValueError("Cycle namespace serialization differs from the outgoing request")
+        namespaced_prefix_bytes = prefix_bytes + len(namespace_fragment)
+        prefix_hash = digest(serialized[:namespaced_prefix_bytes])
         for predecessor in history:
             if request_ordinal >= len(predecessor) or predecessor[request_ordinal] != prefix_hash:
                 raise ValueError("Cache-key-relevant serialized prefix drifted")
-        request_hashes.append(prefix_hash)
+        self.pending.setdefault(pending_key, []).append(prefix_hash)
         return {
             "cycle_id": self.cycle_id,
             "condition": condition,
@@ -693,8 +750,11 @@ class PrefixTracker:
             "eligible_predecessor_count": len(history),
             "request_ordinal_within_task": request_ordinal + 1,
             "screening_request_ordinal": screening_ordinal,
+            "cycle_namespace_strategy": CACHE_NAMESPACE_STRATEGY,
+            "cycle_namespace_content_sha256": digest(namespace["content"].encode()),
+            "screening_serialized_prefix_sha256": screening_prefix_hash,
             "serialized_prefix_sha256": prefix_hash,
-            "serialized_prefix_bytes": prefix_bytes,
+            "serialized_prefix_bytes": namespaced_prefix_bytes,
             "request_sha256": digest(serialized),
             "structural_cache_eligibility": contract_row["cache_eligibility"],
             "eligibility_decision_sha256": self.eligibility_contract["decision_sha256"],
@@ -997,6 +1057,24 @@ def result_row(
         or request_observation.get("eligibility_decision_sha256") != eligibility_decision_sha256
     ):
         raise ValueError("Result eligibility differs from the admitted prefix observation")
+    request_ordinal = request_observation.get("request_ordinal_within_task")
+    screening_ordinal = request_observation.get("screening_request_ordinal")
+    if (
+        request_observation.get("cycle_namespace_strategy") != CACHE_NAMESPACE_STRATEGY
+        or type(request_ordinal) is not int
+        or not 1 <= request_ordinal <= 10_000
+        or screening_ordinal != min(request_ordinal, SCREENING_REQUEST_ORDINALS[-1])
+        or any(
+            not re.fullmatch(r"[0-9a-f]{64}", request_observation.get(field, ""))
+            for field in (
+                "cycle_namespace_content_sha256",
+                "screening_serialized_prefix_sha256",
+                "serialized_prefix_sha256",
+                "request_sha256",
+            )
+        )
+    ):
+        raise ValueError("Result namespace or prefix evidence is incomplete")
     primary_included = structural_eligibility == "eligible"
     return {
         "schema_version": 1,
@@ -1013,6 +1091,8 @@ def result_row(
         "condition": condition,
         "reuse_level": reuse_level,
         "task_id": task_id,
+        "request_ordinal_within_task": request_ordinal,
+        "screening_request_ordinal": screening_ordinal,
         "denominators": {
             "task": 1,
             "run": 1,
@@ -1022,6 +1102,9 @@ def result_row(
             "full_bundle_descriptive_task": 1,
         },
         "pins": pins,
+        "cycle_namespace_strategy": request_observation["cycle_namespace_strategy"],
+        "cycle_namespace_content_sha256": request_observation["cycle_namespace_content_sha256"],
+        "screening_serialized_prefix_sha256": request_observation["screening_serialized_prefix_sha256"],
         "serialized_prefix_sha256": request_observation["serialized_prefix_sha256"],
         "request_sha256": request_observation["request_sha256"],
         "provider_usage": usage["provider_usage"],
@@ -1292,7 +1375,11 @@ def execute_cycle(
         raise ValueError("Isolation must have hash-bound runtime evidence")
     eligibility_contract = validate_eligibility_contract(facts["eligibility_contract"])
     eligibility_decision_hash = eligibility_contract["decision_sha256"]
-    tracker = PrefixTracker(eligibility_contract, rows[0]["cycle_id"])
+    tracker = PrefixTracker(
+        eligibility_contract,
+        rows[0]["cycle_id"],
+        isolation_hash,
+    )
     run_root.mkdir(parents=True, exist_ok=False)
     output.mkdir(exist_ok=False)
     os.chmod(run_root, 0o700)

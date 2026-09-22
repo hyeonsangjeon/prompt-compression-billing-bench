@@ -43,6 +43,33 @@ provider inference, so it favors cache-capable inputs and limits external
 validity. Stable-prefix screening-token counts are not billed provider usage
 and do not show that a provider cache hit occurred.
 
+### Cycle, condition, task, and request isolation
+
+The provider contract does not assume a native cache-namespace parameter.
+Instead, cache mode inserts one protected system message before prefix
+observation and provider dispatch. Its content is the first 19 lowercase hex
+characters of a SHA-256 over the strategy version, execution cycle ID,
+condition, task ID, logical request ordinal, and hash-bound isolation evidence.
+It is fixed for the three reuse levels of one
+`cycle × condition × task × request ordinal` series and changes when any of
+those four coordinates changes. This prevents reuse-zero observations from
+inheriting a matching prefix produced by another task or request ordinal.
+Generic native execution does not add this message.
+
+The 19 ASCII characters contribute at most 19 tokens under the local
+message-content screening unit. The closest structurally ineligible task has a
+20-token margin below the 1,024-token threshold, so the namespace cannot change
+the declared two-task/three-task strata under that unit. Validation fails if a
+future screening count closes that margin.
+
+The request observer requires the exact derived message, removes only that
+message to verify the decision-v2 screening prefix, and separately hashes the
+actual namespaced provider prefix for predecessor equality. Sanitized result
+rows retain the logical and screening request ordinals, namespace strategy, and
+content hash, not the namespace content. The opaque message is a controlled
+isolation intervention, not proof of semantic neutrality; provider quality
+remains a separate descriptive outcome.
+
 ## Zero-network planning and doctor
 
 The committed templates are intentionally `no_go` and contain environment names

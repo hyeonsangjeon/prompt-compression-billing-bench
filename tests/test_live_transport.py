@@ -14,6 +14,8 @@ from unittest.mock import patch
 from native_helpers import FixtureEncoder, ImmediateQueue, ledger_fixture, request_fixture, response_fixture
 from src.compressors import NoOpCompressor
 from src.live_transport import (
+    CACHE_NAMESPACE_STRATEGY,
+    cache_namespace_message,
     DeploymentQueue,
     FoundrySender,
     LiveRecorder,
@@ -22,7 +24,7 @@ from src.live_transport import (
     start_live_proxy,
 )
 from src.execution_safety import SafetyLimitReached
-from src.protection import FrozenRequestGuard, ProtectionViolation, canonical
+from src.protection import FrozenRequestGuard, ProtectionViolation, canonical, digest
 from src.task_metrics import read_events
 
 
@@ -71,6 +73,83 @@ class LiveTransportTests(unittest.TestCase):
         self.assertEqual(self.sent, [])
         self.assertEqual(self.queue.calls, [])
         self.assertTrue(self.recorder.stopped.is_set())
+
+    def test_cache_namespace_is_injected_and_protected_before_observation(self):
+        namespace = cache_namespace_message(
+            "cycle-01-deadbeef", "none", "synthetic-task", 1, "d" * 64
+        )
+        observed = []
+
+        def observe(**arguments):
+            observed.append(arguments)
+            return {
+                "cycle_namespace_strategy": CACHE_NAMESPACE_STRATEGY,
+                "cycle_namespace_content_sha256": digest(namespace["content"].encode()),
+            }
+
+        recorder = LiveRecorder(
+            self.root / "cache-transport",
+            self.ledger,
+            "a" * 40,
+            NoOpCompressor({"options": {}}, self.root),
+            FixtureEncoder(),
+            self.queue,
+            lambda body: (self.sent.append(body), (200, response_fixture(), {}))[1],
+            evidence_kind="synthetic_validation",
+            request_observer=observe,
+            request_prefix_factory=lambda _task, _ordinal: namespace,
+        )
+        recorder.register_trial("trial-cache", "synthetic-task", 1)
+        received = canonical(request_fixture())
+        recorder.complete("trial-cache", received)
+
+        sent = json.loads(self.sent[-1])
+        self.assertEqual(sent["messages"][0], namespace)
+        self.assertEqual(sent["messages"][1:], request_fixture()["messages"])
+        self.assertEqual(observed[0]["payload"], sent)
+        self.assertEqual(observed[0]["serialized"], self.sent[-1])
+        request_dir = self.root / "cache-transport/request-00001"
+        self.assertEqual((request_dir / "received.json").read_bytes(), received)
+        self.assertEqual((request_dir / "before.json").read_bytes(), self.sent[-1])
+        manifest = json.loads((request_dir / "manifest.json").read_text())
+        namespace_segments = [
+            row for row in manifest["segments"] if row["message_index"] == 0
+        ]
+        self.assertTrue(namespace_segments)
+        self.assertTrue(all(not row["candidate"] for row in namespace_segments))
+
+    def test_cache_namespace_rejects_invalid_or_unobserved_prefixes(self):
+        namespace = cache_namespace_message(
+            "cycle-01-deadbeef", "none", "synthetic-task", 1, "d" * 64
+        )
+        with self.assertRaisesRegex(ValueError, "requires a request observer"):
+            LiveRecorder(
+                self.root / "unobserved-cache-transport",
+                self.ledger,
+                "a" * 40,
+                NoOpCompressor({"options": {}}, self.root),
+                FixtureEncoder(),
+                self.queue,
+                lambda _body: (200, response_fixture(), {}),
+                request_prefix_factory=lambda _task, _ordinal: namespace,
+            )
+        recorder = LiveRecorder(
+            self.root / "invalid-cache-transport",
+            self.ledger,
+            "a" * 40,
+            NoOpCompressor({"options": {}}, self.root),
+            FixtureEncoder(),
+            self.queue,
+            lambda _body: (200, response_fixture(), {}),
+            request_observer=lambda **_arguments: {},
+            request_prefix_factory=lambda _task, _ordinal: {
+                "role": "system",
+                "content": "not-a-namespace",
+            },
+        )
+        recorder.register_trial("trial-invalid-cache", "synthetic-task", 1)
+        with self.assertRaisesRegex(ValueError, "namespace contract"):
+            recorder.complete("trial-invalid-cache", canonical(request_fixture()))
 
     def test_candidate_compression_records_hashes_and_timing_before_dispatch(self):
         assistant = json.dumps({"commands": [{"keystrokes": "ls -la /logs\n", "duration": 1}]})
