@@ -55,19 +55,19 @@ CYCLE_PIN_FIELDS = {
 CACHE_THRESHOLD_TOKENS = 1_024
 SCREENING_REQUEST_ORDINALS = (1, 2)
 STRUCTURAL_SCREENING_TOKENS = {
-    "cancel-async-tasks": 828,
-    "log-summary-date-ranges": 1_050,
-    "multi-source-data-merger": 1_155,
-    "nginx-request-logging": 1_134,
-    "openssl-selfsigned-cert": 1_016,
+    "cancel-async-tasks": (797, 794),
+    "log-summary-date-ranges": (1_016, 1_017),
+    "multi-source-data-merger": (1_125, 1_123),
+    "nginx-request-logging": (1_101, 1_101),
+    "openssl-selfsigned-cert": (984, 983),
 }
 STRUCTURALLY_ELIGIBLE_TASKS = (
-    "log-summary-date-ranges",
     "multi-source-data-merger",
     "nginx-request-logging",
 )
 STRUCTURALLY_INELIGIBLE_TASKS = (
     "cancel-async-tasks",
+    "log-summary-date-ranges",
     "openssl-selfsigned-cert",
 )
 ELIGIBILITY_CONTRACT_FIELDS = {
@@ -176,7 +176,7 @@ def validate_eligibility_contract(contract: dict) -> dict:
     )
     _require_exact(
         contract["task_denominators"],
-        {"execution": 5, "primary_eligible": 3, "not_applicable": 2},
+        {"execution": 5, "primary_eligible": 2, "not_applicable": 3},
         "Eligibility task denominators changed",
     )
     if contract["raw_content_stored"] is not False or contract["provider_model_api_calls"] != 0:
@@ -198,7 +198,9 @@ def validate_eligibility_contract(contract: dict) -> dict:
         actual_keys.append(key)
         if key not in expected_keys:
             raise ValueError("Eligibility decision contains an unknown task or ordinal")
-        expected_tokens = STRUCTURAL_SCREENING_TOKENS[row["task_id"]]
+        expected_tokens = STRUCTURAL_SCREENING_TOKENS[row["task_id"]][
+            row["request_ordinal"] - 1
+        ]
         _require_exact(
             row["local_screening_prefix_tokens"],
             [expected_tokens, expected_tokens],

@@ -76,7 +76,7 @@
         "full_bundle_estimand": {"const": "descriptive_provider_usage_computed_cost_quality_all_five_tasks"},
         "external_validity_limit": {"const": "eligibility_screening_favors_cache_capable_inputs_no_generalization"},
         "task_denominators": {
-          "const": {"execution": 5, "primary_eligible": 3, "not_applicable": 2}
+          "const": {"execution": 5, "primary_eligible": 2, "not_applicable": 3}
         },
         "raw_content_stored": {"const": false},
         "provider_model_api_calls": {"const": 0},
