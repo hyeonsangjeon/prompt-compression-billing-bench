@@ -29,6 +29,75 @@ from .measurement import counts, token_count
 from .protection import FrozenRequestGuard, ProtectionViolation, canonical, digest, parse_request
 
 
+CACHE_NAMESPACE_STRATEGY = "cycle_condition_task_ordinal_isolation_sha256_prefix_19_v1"
+CACHE_NAMESPACE_CONTENT_HEX_CHARS = 19
+CACHE_NAMESPACE_SAFE_ID = re.compile(r"[a-z0-9][a-z0-9-]{0,127}")
+
+
+def cache_namespace_content(
+    cycle_id: str,
+    condition: str,
+    task: str,
+    request_ordinal: int,
+    isolation_evidence_sha256: str,
+) -> str:
+    if not isinstance(cycle_id, str) or not CACHE_NAMESPACE_SAFE_ID.fullmatch(cycle_id):
+        raise ValueError("Cache namespace cycle ID must be safe and bounded")
+    if condition not in {"none", "squeez"}:
+        raise ValueError("Cache namespace condition is invalid")
+    if not isinstance(task, str) or not CACHE_NAMESPACE_SAFE_ID.fullmatch(task):
+        raise ValueError("Cache namespace task ID must be safe and bounded")
+    if type(request_ordinal) is not int or not 1 <= request_ordinal <= 10_000:
+        raise ValueError("Cache namespace request ordinal is invalid")
+    if not isinstance(isolation_evidence_sha256, str) or not re.fullmatch(
+        r"[0-9a-f]{64}", isolation_evidence_sha256
+    ):
+        raise ValueError("Cache namespace isolation evidence requires SHA-256")
+    material = canonical({
+        "condition": condition,
+        "cycle_id": cycle_id,
+        "isolation_evidence_sha256": isolation_evidence_sha256,
+        "request_ordinal": request_ordinal,
+        "strategy": CACHE_NAMESPACE_STRATEGY,
+        "task": task,
+    })
+    return digest(material)[:CACHE_NAMESPACE_CONTENT_HEX_CHARS]
+
+
+def cache_namespace_message(
+    cycle_id: str,
+    condition: str,
+    task: str,
+    request_ordinal: int,
+    isolation_evidence_sha256: str,
+) -> dict[str, str]:
+    return {
+        "role": "system",
+        "content": cache_namespace_content(
+            cycle_id,
+            condition,
+            task,
+            request_ordinal,
+            isolation_evidence_sha256,
+        ),
+    }
+
+
+def validate_cache_namespace_message(message: object) -> dict[str, str]:
+    if (
+        not isinstance(message, dict)
+        or set(message) != {"role", "content"}
+        or message.get("role") != "system"
+        or not isinstance(message.get("content"), str)
+        or not re.fullmatch(
+            rf"[0-9a-f]{{{CACHE_NAMESPACE_CONTENT_HEX_CHARS}}}",
+            message["content"],
+        )
+    ):
+        raise ValueError("Cache request prefix differs from the namespace contract")
+    return {"role": message["role"], "content": message["content"]}
+
+
 def write_json(path: Path, payload) -> None:
     with path.open("x", encoding="utf-8") as handle:
         json.dump(payload, handle, ensure_ascii=False, indent=2, allow_nan=False)
@@ -375,7 +444,7 @@ class ManagedIdentity:
 class LiveRecorder:
     def __init__(self, directory: Path, ledger: dict, source_commit: str, compressor, encoder, queue, sender,
                  *, condition="none", evidence_kind="native_measurement", request_error_scope="run",
-                 request_observer=None):
+                 request_observer=None, request_prefix_factory=None):
         self.directory, self.ledger, self.source_commit = directory, ledger, source_commit
         self.compressor, self.encoder, self.queue, self.sender = compressor, encoder, queue, sender
         self.condition, self.evidence_kind = condition, evidence_kind
@@ -383,6 +452,12 @@ class LiveRecorder:
             raise ValueError("Request error scope must be run or trial")
         self.request_error_scope = request_error_scope
         self.request_observer = request_observer
+        if request_prefix_factory is not None:
+            if request_observer is None:
+                raise ValueError("Cache request prefix requires a request observer")
+            if not callable(request_prefix_factory):
+                raise ValueError("Cache request prefix factory must be callable")
+        self.request_prefix_factory = request_prefix_factory
         directory.mkdir(parents=True, exist_ok=False)
         self.lock = threading.RLock()
         self.event_lock = threading.Lock()
@@ -840,6 +915,7 @@ class LiveRecorder:
             self.sequence += 1
             request_number = self.sequence
             trial["calls"] += 1
+            request_ordinal = trial["calls"]
             task = trial["task"]
             repetition = trial["repetition"]
             assistant_hashes = set(trial["assistant_hashes"])
@@ -855,9 +931,20 @@ class LiveRecorder:
                     "task": task, "repetition": repetition, "request_sha256": digest(source)})
         directory = self.directory / f"request-{request_number:05d}"
         directory.mkdir()
-        (directory / "before.json").write_bytes(source)
+        received = source
         payload = parse_request(source)
         self.request_contract(payload)
+        if self.request_prefix_factory is not None:
+            request_prefix_message = validate_cache_namespace_message(
+                self.request_prefix_factory(task, request_ordinal)
+            )
+            payload = {
+                **payload,
+                "messages": [request_prefix_message, *payload["messages"]],
+            }
+            source = canonical(payload)
+            (directory / "received.json").write_bytes(received)
+        (directory / "before.json").write_bytes(source)
         self._record_progress(trial_id, payload)
         segments = partition(payload, assistant_hashes)
         write_json(directory / "manifest.json", {"source_sha256": digest(source), "segments": segments,

@@ -37,6 +37,11 @@ from src.cache_reuse import (
     write_no_clobber,
 )
 from src.contracts import validate
+from src.live_transport import (
+    CACHE_NAMESPACE_CONTENT_HEX_CHARS,
+    CACHE_NAMESPACE_STRATEGY,
+    cache_namespace_message,
+)
 from src.native_contract import TASKS, load_native_ledger, parse_native_ledger
 from src.protection import canonical, digest
 
@@ -472,6 +477,8 @@ class RuntimeDoctorTests(unittest.TestCase):
 
 class PrefixTrackerTests(unittest.TestCase):
     def setUp(self):
+        self.cycle_id = "cycle-01-deadbeef"
+        self.isolation_evidence_sha256 = "d" * 64
         captures = {}
         for task in TASKS:
             for request_ordinal in SCREENING_REQUEST_ORDINALS:
@@ -500,25 +507,54 @@ class PrefixTrackerTests(unittest.TestCase):
     def complete_level(self, tracker, level, suffix="question", requests=1):
         for task in TASKS:
             for request_index in range(requests):
-                payload = self.payload(task, request_index + 1, f"{suffix}-{request_index}")
+                payload = self.namespaced(
+                    self.payload(task, request_index + 1, f"{suffix}-{request_index}"),
+                    task,
+                    request_index + 1,
+                )
                 tracker.observe(
                     condition="none", reuse_level=level, task=task,
                     payload=payload, serialized=canonical(payload),
                 )
         tracker.finish_bundle("none", level, list(TASKS), successful=True)
 
+    def namespaced(
+        self,
+        payload,
+        task,
+        request_ordinal=1,
+        condition="none",
+        cycle_id=None,
+    ):
+        namespace = cache_namespace_message(
+            cycle_id or self.cycle_id,
+            condition,
+            task,
+            request_ordinal,
+            self.isolation_evidence_sha256,
+        )
+        return {**payload, "messages": [namespace, *payload["messages"]]}
+
+    def tracker(self):
+        return PrefixTracker(
+            self.contract,
+            self.cycle_id,
+            self.isolation_evidence_sha256,
+        )
+
     def test_equal_prefixes_open_exact_zero_one_two_predecessors(self):
-        tracker = PrefixTracker(self.contract, "cycle-01")
+        tracker = self.tracker()
         self.complete_level(tracker, 0, "cold", requests=2)
         self.complete_level(tracker, 1, "warm-one", requests=2)
         self.complete_level(tracker, 2, "warm-two", requests=2)
         self.assertEqual(len(tracker.completed[("none", TASKS[0])]), 3)
 
     def test_prefix_hash_drift_fails_before_dispatch(self):
-        tracker = PrefixTracker(self.contract, "cycle-01")
+        tracker = self.tracker()
         self.complete_level(tracker, 0)
         payload = self.payload(TASKS[0])
         payload["messages"][0]["content"] = "different task prefix"
+        payload = self.namespaced(payload, TASKS[0])
         with self.assertRaisesRegex(ValueError, "zero-call screening"):
             tracker.observe(
                 condition="none", reuse_level=1, task=TASKS[0],
@@ -526,15 +562,16 @@ class PrefixTrackerTests(unittest.TestCase):
             )
 
     def test_missing_predecessor_and_request_width_drift_fail(self):
-        tracker = PrefixTracker(self.contract, "cycle-01")
+        tracker = self.tracker()
+        payload = self.namespaced(self.payload(TASKS[0]), TASKS[0])
         with self.assertRaisesRegex(ValueError, "predecessor"):
             tracker.observe(
                 condition="none", reuse_level=1, task=TASKS[0],
-                payload=self.payload(TASKS[0]), serialized=canonical(self.payload(TASKS[0])),
+                payload=payload, serialized=canonical(payload),
             )
         self.complete_level(tracker, 0, requests=2)
         for task in TASKS:
-            payload = self.payload(task)
+            payload = self.namespaced(self.payload(task), task)
             tracker.observe(
                 condition="none", reuse_level=1, task=task,
                 payload=payload, serialized=canonical(payload),
@@ -543,8 +580,8 @@ class PrefixTrackerTests(unittest.TestCase):
             tracker.finish_bundle("none", 1, list(TASKS), successful=True)
 
     def test_noncanonical_serialization_is_rejected(self):
-        tracker = PrefixTracker(self.contract, "cycle-01")
-        payload = self.payload(TASKS[0])
+        tracker = self.tracker()
+        payload = self.namespaced(self.payload(TASKS[0]), TASKS[0])
         with self.assertRaisesRegex(ValueError, "canonical"):
             tracker.observe(
                 condition="none", reuse_level=0, task=TASKS[0],
@@ -552,10 +589,10 @@ class PrefixTrackerTests(unittest.TestCase):
             )
 
     def test_cross_task_prefixes_may_differ_but_same_task_ordinal_must_match(self):
-        tracker = PrefixTracker(self.contract, "cycle-01")
+        tracker = self.tracker()
         observations = {}
         for task in TASKS:
-            payload = self.payload(task, 1, "cold")
+            payload = self.namespaced(self.payload(task, 1, "cold"), task)
             observations[task] = tracker.observe(
                 condition="none",
                 reuse_level=0,
@@ -564,6 +601,11 @@ class PrefixTrackerTests(unittest.TestCase):
                 serialized=canonical(payload),
             )
         self.assertEqual(len({row["serialized_prefix_sha256"] for row in observations.values()}), len(TASKS))
+        self.assertTrue(all(
+            row["cycle_namespace_strategy"] == CACHE_NAMESPACE_STRATEGY
+            and row["serialized_prefix_sha256"] != row["screening_serialized_prefix_sha256"]
+            for row in observations.values()
+        ))
         self.assertEqual(
             {task_cache_eligibility(self.contract, task) for task in STRUCTURALLY_ELIGIBLE_TASKS},
             {"eligible"},
@@ -572,6 +614,100 @@ class PrefixTrackerTests(unittest.TestCase):
             {task_cache_eligibility(self.contract, task) for task in STRUCTURALLY_INELIGIBLE_TASKS},
             {"not_applicable"},
         )
+
+    def test_namespace_is_fixed_within_series_and_changes_across_scope(self):
+        current = cache_namespace_message(
+            self.cycle_id,
+            "none",
+            TASKS[0],
+            1,
+            self.isolation_evidence_sha256,
+        )
+        self.assertRegex(
+            current["content"],
+            rf"^[0-9a-f]{{{CACHE_NAMESPACE_CONTENT_HEX_CHARS}}}$",
+        )
+        self.assertEqual(
+            current,
+            cache_namespace_message(
+                self.cycle_id,
+                "none",
+                TASKS[0],
+                1,
+                self.isolation_evidence_sha256,
+            ),
+        )
+        self.assertNotEqual(
+            current,
+            cache_namespace_message(
+                self.cycle_id,
+                "squeez",
+                TASKS[0],
+                1,
+                self.isolation_evidence_sha256,
+            ),
+        )
+        self.assertNotEqual(
+            current,
+            cache_namespace_message(
+                "cycle-02-deadbeef",
+                "none",
+                TASKS[0],
+                1,
+                self.isolation_evidence_sha256,
+            ),
+        )
+        self.assertNotEqual(
+            current,
+            cache_namespace_message(
+                self.cycle_id,
+                "none",
+                TASKS[1],
+                1,
+                self.isolation_evidence_sha256,
+            ),
+        )
+        self.assertNotEqual(
+            current,
+            cache_namespace_message(
+                self.cycle_id,
+                "none",
+                TASKS[0],
+                1,
+                "e" * 64,
+            ),
+        )
+        self.assertNotEqual(
+            current,
+            cache_namespace_message(
+                self.cycle_id,
+                "none",
+                TASKS[0],
+                2,
+                self.isolation_evidence_sha256,
+            ),
+        )
+
+    def test_missing_or_wrong_cycle_namespace_fails_before_prefix_acceptance(self):
+        tracker = self.tracker()
+        payload = self.payload(TASKS[0])
+        with self.assertRaisesRegex(ValueError, "cycle namespace"):
+            tracker.observe(
+                condition="none",
+                reuse_level=0,
+                task=TASKS[0],
+                payload=payload,
+                serialized=canonical(payload),
+            )
+        wrong = self.namespaced(payload, TASKS[0], condition="squeez")
+        with self.assertRaisesRegex(ValueError, "cycle namespace"):
+            tracker.observe(
+                condition="none",
+                reuse_level=0,
+                task=TASKS[0],
+                payload=wrong,
+                serialized=canonical(wrong),
+            )
 
 
 class UsageAndVerdictTests(unittest.TestCase):
@@ -603,6 +739,11 @@ class UsageAndVerdictTests(unittest.TestCase):
             eligibility_decision_sha256="e" * 64,
             condition="none", reuse_level=1, task_id=STRUCTURALLY_ELIGIBLE_TASKS[0],
             request_observation={
+                "request_ordinal_within_task": 1,
+                "screening_request_ordinal": 1,
+                "cycle_namespace_strategy": CACHE_NAMESPACE_STRATEGY,
+                "cycle_namespace_content_sha256": "a" * 64,
+                "screening_serialized_prefix_sha256": "b" * 64,
                 "serialized_prefix_sha256": "c" * 64,
                 "request_sha256": "d" * 64,
                 "structural_cache_eligibility": "eligible",
@@ -694,14 +835,13 @@ class UsageAndVerdictTests(unittest.TestCase):
 
 class ExecutionOrchestrationTests(unittest.TestCase):
     def test_fake_native_dispatch_is_serial_exact_order_and_zero_network(self):
-        namespace = "fixed public synthetic namespace"
         ledger = approved_ledger()
         captures = {}
         for task in TASKS:
             payload = {
                 "model": "gpt-5.4", "temperature": 0, "reasoning_effort": "none",
                 "messages": [
-                    {"role": "system", "content": namespace},
+                    {"role": "system", "content": "stable public synthetic prefix"},
                     {"role": "user", "content": f"public synthetic {task}"},
                 ],
             }
@@ -721,12 +861,23 @@ class ExecutionOrchestrationTests(unittest.TestCase):
             try:
                 calls.append((condition, cache_context["reuse_level"], cache_context["bundle_id"]))
                 for task in TASKS:
-                    payload = {
+                    base_payload = {
                         "model": "gpt-5.4", "temperature": 0, "reasoning_effort": "none",
                         "messages": [
-                            {"role": "system", "content": namespace},
+                            {"role": "system", "content": "stable public synthetic prefix"},
                             {"role": "user", "content": f"public synthetic {task}"},
                         ],
+                    }
+                    namespace = cache_namespace_message(
+                        cache_context["cycle_id"],
+                        cache_context["condition"],
+                        task,
+                        1,
+                        cache_context["isolation_evidence_sha256"],
+                    )
+                    payload = {
+                        **base_payload,
+                        "messages": [namespace, *base_payload["messages"]],
                     }
                     request_observer(task=task, payload=payload, serialized=canonical(payload))
                 return Path("synthetic-no-network")

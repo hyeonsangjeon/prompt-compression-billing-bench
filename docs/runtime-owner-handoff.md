@@ -126,6 +126,37 @@ cache hit. Because the stratification follows zero-call structural screening,
 the primary result cannot be generalized to the full five-task bundle or other
 workloads.
 
+### Cache cycle-isolation evidence
+
+When the provider exposes no verified native cache-namespace key, the tracked
+cache path uses
+`cycle_condition_task_ordinal_isolation_sha256_prefix_19_v1`. Before
+observation and dispatch it inserts a protected system message whose content is
+the first 19 lowercase hex characters of a SHA-256 over the strategy version,
+execution cycle ID, condition, task ID, logical request ordinal, and
+`R02_NAMESPACE_ISOLATION` evidence hash. Reuse levels zero, one, and two for the
+same task and ordinal receive the same namespace; another cycle, condition,
+task, or ordinal receives a different namespace.
+
+The runtime owner must bind `R02_NAMESPACE_ISOLATION` to the exact source
+revision that implements this behavior and to current evidence that external
+matching traffic is excluded. A source revision alone does not verify that
+fact. The request observer fails before dispatch if the message is absent,
+misplaced, malformed, or derived from different cycle, condition, task,
+request-ordinal, or evidence inputs. It verifies the screening decision against
+the request with only the exact namespace message removed, then records the
+logical and screening ordinals plus separate SHA-256 values for the screened
+prefix, namespaced provider prefix, and namespace content. Sanitized results do
+not store the content.
+
+Nineteen ASCII hex characters are at most 19 tokens under the declared local
+message-content unit. The decision-v2 validator requires every
+`not_applicable` task to remain below 1,024 after that maximum is added. This
+preserves the two-task primary denominator but does not turn the local
+diagnostic into provider-billed usage or prove that the provider cached a
+request. The opaque message is a controlled intervention and must not be
+described as proven semantically neutral.
+
 ## SWE-Lancer carrier inputs
 
 The project command identity is the `SWE_LANCER_RUNTIME_PYTHON` executable

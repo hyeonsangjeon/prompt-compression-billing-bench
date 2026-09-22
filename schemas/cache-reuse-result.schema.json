@@ -7,8 +7,9 @@
   "required": [
     "schema_version", "kind", "run_id", "cycle_id", "bundle_id", "attempt_id",
     "source_commit", "ledger_sha256", "native_ledger_sha256", "runtime_facts_sha256", "eligibility_decision_sha256",
-    "condition", "reuse_level", "task_id",
-    "denominators", "pins", "serialized_prefix_sha256", "request_sha256",
+    "condition", "reuse_level", "task_id", "request_ordinal_within_task", "screening_request_ordinal",
+    "denominators", "pins", "cycle_namespace_strategy", "cycle_namespace_content_sha256",
+    "screening_serialized_prefix_sha256", "serialized_prefix_sha256", "request_sha256",
     "provider_usage", "local_tokens", "computed_price", "invoice", "native_verdict", "flags"
   ],
   "properties": {
@@ -26,8 +27,13 @@
     "condition": {"enum": ["none", "squeez"]},
     "reuse_level": {"enum": [0, 1, 2]},
     "task_id": {"type": "string"},
+    "request_ordinal_within_task": {"type": "integer", "minimum": 1, "maximum": 10000},
+    "screening_request_ordinal": {"enum": [1, 2]},
     "denominators": {"type": "object"},
     "pins": {"type": "object"},
+    "cycle_namespace_strategy": {"const": "cycle_condition_task_ordinal_isolation_sha256_prefix_19_v1"},
+    "cycle_namespace_content_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "screening_serialized_prefix_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "serialized_prefix_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "request_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "provider_usage": {"type": ["object", "null"]},
