@@ -39,17 +39,20 @@ def synthetic_eligibility_contract():
     rows = []
     for task_id in TASKS:
         for request_ordinal in SCREENING_REQUEST_ORDINALS:
+            expected_tokens = STRUCTURAL_SCREENING_TOKENS[task_id][
+                request_ordinal - 1
+            ]
             eligibility = (
                 "eligible"
-                if STRUCTURAL_SCREENING_TOKENS[task_id] >= CACHE_THRESHOLD_TOKENS
+                if expected_tokens >= CACHE_THRESHOLD_TOKENS
                 else "not_applicable"
             )
             rows.append({
                 "task_id": task_id,
                 "request_ordinal": request_ordinal,
                 "local_screening_prefix_tokens": [
-                    STRUCTURAL_SCREENING_TOKENS[task_id],
-                    STRUCTURAL_SCREENING_TOKENS[task_id],
+                    expected_tokens,
+                    expected_tokens,
                 ],
                 "stable_serialized_prefix_bytes": 1,
                 "capture_serialized_prefix_sha256": ["c" * 64, "c" * 64],
@@ -73,7 +76,7 @@ def synthetic_eligibility_contract():
         "ineligible_cache_result": "not_applicable",
         "full_bundle_estimand": "descriptive_provider_usage_computed_cost_quality_all_five_tasks",
         "external_validity_limit": "eligibility_screening_favors_cache_capable_inputs_no_generalization",
-        "task_denominators": {"execution": 5, "primary_eligible": 3, "not_applicable": 2},
+        "task_denominators": {"execution": 5, "primary_eligible": 2, "not_applicable": 3},
         "raw_content_stored": False,
         "provider_model_api_calls": 0,
         "rows": rows,
@@ -328,8 +331,8 @@ class NativeRunTests(unittest.TestCase):
             )
         self.assertEqual(checked["cache_reuse"]["eligible_predecessor_count"], 0)
         self.assertEqual(bundle["task_denominator"], 5)
-        self.assertEqual(bundle["primary_cache_task_denominator"], 3)
-        self.assertEqual(bundle["not_applicable_cache_task_denominator"], 2)
+        self.assertEqual(bundle["primary_cache_task_denominator"], 2)
+        self.assertEqual(bundle["not_applicable_cache_task_denominator"], 3)
         self.assertEqual(len(bundle["observations"]), 5)
         self.assertTrue(all(row["flags"]["measured"] for row in bundle["observations"]))
         self.assertTrue(all(row["invoice"]["status"] == "not_measured" for row in bundle["observations"]))

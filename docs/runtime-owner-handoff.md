@@ -115,8 +115,8 @@ ordinals one and two. Each row contains `task_id`, `request_ordinal`,
 prefix hash within a task and ordinal. Raw request content, endpoint values,
 credentials, and private paths are not allowed.
 
-The threshold is 1,024 local content tokens. The decision fixes three tasks in
-the primary eligible stratum and two as `not_applicable`; all five remain in the
+The threshold is 1,024 local content tokens. The decision fixes two tasks in
+the primary eligible stratum and three as `not_applicable`; all five remain in the
 execution bundle. The decision SHA-256 is calculated over the canonical object
 without its `decision_sha256` field, and the R02 evidence hash must equal that
 value. These diagnostics are not provider-billed token usage or evidence of a

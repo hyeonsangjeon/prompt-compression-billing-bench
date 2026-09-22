@@ -54,6 +54,9 @@ def synthetic_eligibility_contract(captures=None):
     rows = []
     for task_id in TASKS:
         for request_ordinal in SCREENING_REQUEST_ORDINALS:
+            expected_tokens = STRUCTURAL_SCREENING_TOKENS[task_id][
+                request_ordinal - 1
+            ]
             default_prefix = f"synthetic-stable-{task_id}-{request_ordinal}:".encode()
             first = default_prefix + b"launch-one"
             second = default_prefix + b"launch-two"
@@ -63,15 +66,15 @@ def synthetic_eligibility_contract(captures=None):
             )
             eligibility = (
                 "eligible"
-                if STRUCTURAL_SCREENING_TOKENS[task_id] >= CACHE_THRESHOLD_TOKENS
+                if expected_tokens >= CACHE_THRESHOLD_TOKENS
                 else "not_applicable"
             )
             rows.append({
                 "task_id": task_id,
                 "request_ordinal": request_ordinal,
                 "local_screening_prefix_tokens": [
-                    STRUCTURAL_SCREENING_TOKENS[task_id],
-                    STRUCTURAL_SCREENING_TOKENS[task_id],
+                    expected_tokens,
+                    expected_tokens,
                 ],
                 "stable_serialized_prefix_bytes": prefix_bytes,
                 "capture_serialized_prefix_sha256": [
@@ -98,7 +101,7 @@ def synthetic_eligibility_contract(captures=None):
         "ineligible_cache_result": "not_applicable",
         "full_bundle_estimand": "descriptive_provider_usage_computed_cost_quality_all_five_tasks",
         "external_validity_limit": "eligibility_screening_favors_cache_capable_inputs_no_generalization",
-        "task_denominators": {"execution": 5, "primary_eligible": 3, "not_applicable": 2},
+        "task_denominators": {"execution": 5, "primary_eligible": 2, "not_applicable": 3},
         "raw_content_stored": False,
         "provider_model_api_calls": 0,
         "rows": rows,
@@ -733,15 +736,15 @@ class ExecutionOrchestrationTests(unittest.TestCase):
                 "condition": row["condition"], "reuse_level": level,
                 "eligible_predecessor_count": level,
                 "task_denominator": 5, "run_denominator": 1, "request_denominator": 5,
-                "primary_cache_task_denominator": 3,
-                "not_applicable_cache_task_denominator": 2,
+                "primary_cache_task_denominator": 2,
+                "not_applicable_cache_task_denominator": 3,
                 "provider_http_attempt_denominator": 5, "provider_http_429": 0,
                 "metrics": {
                     "valid": True,
                     "provider_cache_share": level * 0.1,
                     "computed_input_cost_usd": 1 - level * 0.1,
-                    "eligible_request_denominator": 3,
-                    "not_applicable_request_denominator": 2,
+                    "eligible_request_denominator": 2,
+                    "not_applicable_request_denominator": 3,
                     "full_bundle_descriptive": {
                         "kind": "calculated_from_unique_measured_provider_responses",
                         "request_denominator": 5,
@@ -792,11 +795,11 @@ class ExecutionOrchestrationTests(unittest.TestCase):
             self.assertEqual(network_calls, 0)
             self.assertEqual(cycle["bundle_denominator"], 6)
             self.assertEqual(cycle["task_denominator"], 30)
-            self.assertEqual(cycle["primary_cache_task_denominator"], 18)
-            self.assertEqual(cycle["not_applicable_cache_task_denominator"], 12)
+            self.assertEqual(cycle["primary_cache_task_denominator"], 12)
+            self.assertEqual(cycle["not_applicable_cache_task_denominator"], 18)
             self.assertEqual(cycle["request_denominator"], 30)
-            self.assertEqual(cycle["primary_cache_request_denominator"], 18)
-            self.assertEqual(cycle["not_applicable_cache_request_denominator"], 12)
+            self.assertEqual(cycle["primary_cache_request_denominator"], 12)
+            self.assertEqual(cycle["not_applicable_cache_request_denominator"], 18)
             self.assertEqual(cycle["cycle_id"], cycle_id)
             self.assertEqual(cycle["cycle_number"], 1)
             self.assertEqual(cycle["cache_ledger_sha256"], digest(cache_path.read_bytes()))
