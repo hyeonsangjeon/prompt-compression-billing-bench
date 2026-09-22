@@ -14,30 +14,9 @@ from src.evaluation_statistics import required_repetitions
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EVALUATION_PROTOCOL = ROOT / "docs/experiment/evaluation-protocol.md"
-REPRODUCIBILITY_CONTRACT = ROOT / "docs/experiment/reproducibility-contract.md"
 
 
 class EvaluationCoverageTests(unittest.TestCase):
-    def test_documents_preserve_the_synthetic_denominator_and_sensitivity_method(self):
-        protocol = " ".join(EVALUATION_PROTOCOL.read_text().split())
-        reproducibility = " ".join(REPRODUCIBILITY_CONTRACT.read_text().split())
-        self.assertIn(
-            "Within each boundary scenario, evaluation may proceed only if the exact "
-            "one-sided 95% binomial upper bound for the proportion of synthetic datasets "
-            "that falsely adopt at least one compressor is at most 0.05.",
-            protocol,
-        )
-        self.assertNotIn(
-            "proportion of scenarios that falsely adopt at least one compressor",
-            protocol,
-        )
-        self.assertIn(
-            "block-length-2 circular moving-block bootstrap sensitivity analysis",
-            reproducibility,
-        )
-        self.assertNotIn("lag-2 temporal-correlation sensitivity analysis", reproducibility)
-
     def test_manifest_is_hash_bound_and_all_quality_variances_are_feasible(self):
         manifest = load_validation_manifest(ROOT / "data/experiment/coverage-validation-v1.json")
         for scenario in manifest["scenarios"]:

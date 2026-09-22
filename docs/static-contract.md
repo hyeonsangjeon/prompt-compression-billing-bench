@@ -40,8 +40,8 @@ must be designed explicitly rather than concealed behind an empty implementation
 options for both tools already exist in the same ledger, so changing the name
 does not also require changing a version field. Each result resolves the selected
 specification into `compressor.name`, `version`, `target`, `options` and binary hash.
-`unavailable` means **no independent tool version exists** for the built-in no-op;
-the source commit identifies its implementation. It does not mean
+`unavailable` means **no independent tool version exists** for the built-in no-op
+(한국어: 없음); the source commit identifies its implementation. It does not mean
 an unknown squeez version was accepted.
 
 The squeez adapter uses the checked Linux x86-64 1.48.4 executable and

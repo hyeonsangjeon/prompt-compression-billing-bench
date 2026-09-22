@@ -359,15 +359,15 @@ class SweLancerAdmissionTests(unittest.TestCase):
     def test_sanitized_report_preserves_outcome_counts_and_limits(self):
         report = REPORT.read_text(encoding="utf-8")
         for required in (
-            "**deferred**",
-            "4.417423510 seconds",
+            "**보류**",
+            "4.417423510초",
             "exit 2",
-            "Logical model requests | 0",
-            "Provider HTTP attempts | 0",
-            "Tool calls / results | 0 / 0",
-            "Trace events | 0",
-            "Provider usage records | 0",
-            "There is no actual trace or grader result",
+            "logical model request | 0",
+            "provider HTTP attempt | 0",
+            "tool call / result | 0 / 0",
+            "trace event | 0",
+            "provider usage record | 0",
+            "실제 trace와 grader 결과는 없다",
             "USD 20.00",
             "18/18",
             "4/4",

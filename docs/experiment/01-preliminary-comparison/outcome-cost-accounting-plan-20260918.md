@@ -1,258 +1,219 @@
-# Plan for Accounting Pass, Non-Pass, and Quality-Unknown Cost (As Recorded)
+# 통과·미통과·품질 미확정 비용 집계 계획(기록 당시)
 
-This plan was written before aggregation to connect AI execution cost not only to total
-tokens, but also to **the number of verified passing results obtained**. A pass here is a
-`pass` from the Terminal-Bench 2.1 built-in grader, not customer acceptance. It is not
-claimed as a proxy for customer value or contractual acceptance.
+이 문서는 AI 실행 비용을 토큰 총량만으로 보지 않고, **검증 통과 결과를 몇 건
+얻었는지**와 연결하기 위해 집계 전에 세운 계획이다. 여기서 통과는 고객 수락이
+아니라 Terminal-Bench 2.1 과제 내장 채점의 `pass`다. 고객 가치나 계약 수락을
+대신한다고 주장하지 않는다.
 
-> **Document status.** The original classifications, formulas, and completion conditions
-> remain as a historical plan. Aggregation for the publishable scope was later completed.
-> Confirmed results and the still-unallocated scope appear in
-> [Cost Accounting by Outcome](outcome-cost-accounting-20260918.md). Do not cite this plan
-> as though it were the current result.
+> **문서 상태.** 계획의 분류·계산식·완료 조건은 당시 기록으로 보존한다. 이후
+> 공개 가능한 범위의 집계를 마쳤다. 확인된 결과와 아직 미배분인 범위는
+> [결과별 비용 집계](outcome-cost-accounting-20260918.md)에 정리했다. 이 계획을
+> 현재 결과처럼 인용하지 않는다.
 
-## 30-Second Summary
+## 30초 요약
 
-- The **completed cohort** containing all four conditions has 26 tasks and 104 conditions:
-  40 `pass`, 64 `wrong_answer`, and `$22.3333885` in calculated API cost.
-- **Total calculated cost per passing condition** in this scope is
-  `$22.3333885 ÷ 40 = $0.5583347125`. A presentation may show `$0.5583`, but retains
-  the source value and formula.
-- Its numerator includes both passing and wrong-answer costs in the completed cohort. It
-  is not program-wide cost including every separately ended technically incomplete or
-  operator-stopped attempt.
-- Confirmed calculated API cost of `$87.771254` from five long-running attempts is cost
-  before quality judgment. It is not combined with `wrong_answer` or the 104-condition
-  quality denominator.
-- At planning time, exact pass and wrong-answer costs required rejoining outcome-level
-  costs in the private ledger. Three-decimal rounded costs in public tables are not summed
-  and presented as precise values.
+- 네 조건이 모두 끝난 묶음인 **완결 코호트** 26과제·104조건에서는 `pass` 40조건, `wrong_answer` 64조건과 API 계산 비용 `$22.3333885`를 확인했다.
+- 이 범위의 **통과 조건 1건당 총 계산 비용**은 `$22.3333885 ÷ 40 = $0.5583347125`다. 발표에서는 `$0.5583`으로 표시하되 원본 값과 계산식을 함께 남긴다.
+- 이 값의 분자에는 완결 코호트의 통과와 오답 비용이 함께 들어간다. 별도로 끝난 기술 미완료·운영자 중도 종료 attempt까지 모두 포함한 프로그램 전체 비용은 아니다.
+- 장기 5개 실행 시도(`attempt`)의 확인된 API 계산 비용 `$87.771254`는 품질 판정 전 비용이다. `wrong_answer`나 104조건 품질 분모에 합치지 않는다.
+- 계획 당시 통과 비용과 오답 비용을 정확히 나누려면 결과별 정확한 비용을 비공개 원장에서 다시 결합해야 했다. 공개 표의 3자리 반올림 비용을 더해 정밀 수치처럼 쓰지 않는다.
 
-Aggregation under this plan made no new model calls. Its scope was limited to existing
-ledgers and retained evidence.
+이 계획에 따른 집계에서는 새 모델을 호출하지 않았다. 기존 원장과 보존 증거만
+읽도록 범위를 고정했다.
 
-## Why Measure This Value
+## 왜 이 값을 보는가
 
-Even if input tokens fall, total cost can rise when request count, retries, execution path,
-or cache state changes. Conversely, total cost alone does not show how much produced
-passes and how much was spent on wrong answers or technical incompletion.
+입력 token이 줄어도 요청 수, 재시도, 실행 경로와 캐시가 달라지면 전체 비용은 늘 수 있다. 반대로 총비용만 보면 얼마가 통과 결과를 만들었고 얼마가 오답이나 기술 미완료에 쓰였는지 알 수 없다.
 
-The aggregation was designed to answer:
+이 집계는 다음 두 질문에 답하기 위한 것이다.
 
-1. How much calculated cost produced one condition that passed verification?
-2. How much was spent on normal non-passes after grading and on endings before quality
-   judgment?
+1. 검증 통과 조건 1건을 얻는 데 계산 비용이 얼마 들었는가.
+2. 정상 채점 후 미통과와 품질 판정 전 종료에 각각 얼마를 썼는가.
 
-For presales and fixed-price work, these values can identify operating cost lost to retries
-and incompletion. They do not turn benchmark passes into customer acceptance or generalize
-the value to actual contract margin.
+프리세일즈와 고정가 계약에서 이 값은 재시도와 미완료로 빠지는 비용을 찾는 운영 자료가 될 수 있다. 다만 현재 benchmark 통과를 고객 수락으로 바꾸거나, 이 값을 실제 계약 마진으로 일반화하지 않는다.
 
-## Outcome Categories
+## 먼저 구분할 결과
 
-| Outcome | Plain meaning | Quality denominator | Cost treatment |
+| 결과 | 쉬운 뜻 | 품질 분모 | 비용 처리 |
 |---|---|---:|---|
-| `pass` | Execution, evidence retention, and grading completed; built-in grader passed | Included | Included in pass-attributed cost |
-| `wrong_answer` | Normal grading completed but result was below criteria | Included | Included in normal non-pass cost |
-| `wrong_format` | Normal grading completed but format was below criteria | Included | Included in normal non-pass cost |
-| Technical incompletion | Communication, execution, or evidence retention did not finish before grading | Excluded | Included in pre-quality-judgment cost |
-| Operator stop | Operator stopped an active run before quality could be determined | Excluded | Included in pre-quality-judgment cost |
-| Cancelled before start | No actual attempt began | Excluded | Excluded from cost |
+| `pass` | 실행·증거 저장·채점이 끝나고 내장 채점 통과 | 포함 | 통과 귀속 비용에 포함 |
+| `wrong_answer` | 정상 채점까지 끝났지만 기준 미달 | 포함 | 정상 채점 후 미통과 비용에 포함 |
+| `wrong_format` | 정상 채점까지 끝났지만 형식 기준 미달 | 포함 | 정상 채점 후 미통과 비용에 포함 |
+| 기술 미완료 | 채점 전에 통신·실행·증거 저장이 끝나지 않음 | 제외 | 품질 판정 전 비용에 포함 |
+| 운영자 중도 종료 | 운영자가 실행 중 멈춰 품질을 정할 수 없음 | 제외 | 품질 판정 전 비용에 포함 |
+| 시작 전 취소 | 실제 attempt를 시작하지 않음 | 제외 | 비용에서도 제외 |
 
-Technical incompletion and operator stops do not become wrong answers. Confirmed usage from
-a late response remains in cost without creating a retrospective quality judgment.
+기술 미완료와 운영자 중도 종료를 오답으로 바꾸지 않는다. 늦게 도착한 응답의 확인된 사용량은 비용에 남기더라도 품질 판정을 사후에 만들지 않는다.
 
-In this document, a `trial` is one quality result defined by task, repetition, and
-condition, while an `attempt` is an execution that actually runs that trial. Retries do
-not add quality results, but every attempt that starts retains its cost.
+이 문서에서 `trial`은 과제·반복·조건으로 정한 품질 결과 1건이고, `attempt`는 그 `trial`을 실제로 실행한 시도다. 재시도가 생겨도 품질 결과는 `trial`마다 한 번만 세지만, 실제로 시작한 `attempt`의 비용은 모두 남긴다.
 
-## Values Already Fixed
+## 현재 확정된 값
 
-### Completed Cohort
+### 완결 코호트
 
-| Item | Value | Condition |
+| 항목 | 값 | 조건 |
 |---|---:|---|
-| Tasks | 26 | Tasks for which all four conditions completed |
-| Conditions | 104 | 26 tasks × 4 conditions, not 104 independent tasks |
-| Passes | 40 conditions | Built-in task-grader `pass` |
-| Normal non-passes | 64 conditions | All `wrong_answer` |
-| Calculated API cost | `$22.3333885` | Provider usage × fixed price table; not invoice reconciliation |
-| Total calculated cost per passing condition | `$0.5583347125` | `$22.3333885 ÷ 40` |
+| 과제 | 26과제 | 네 조건이 모두 완결된 과제 |
+| 조건 | 104조건 | 26과제 × 4조건, 104개 독립 과제가 아님 |
+| 통과 | 40조건 | 과제 내장 채점 `pass` |
+| 정상 채점 후 미통과 | 64조건 | 모두 `wrong_answer` |
+| API 계산 비용 | `$22.3333885` | provider 사용량 × 고정 가격표, 청구서 대사 아님 |
+| 통과 조건 1건당 총 계산 비용 | `$0.5583347125` | `$22.3333885 ÷ 40` |
 
-Recheck that condition-level calculated API costs `$5.61866`, `$6.663187`,
-`$5.3620835`, and `$4.689458` sum to `$22.3333885`. This total and the 40 passes are
-pinned in the [public aggregate JSON](../../../data/experiment/preliminary-comparison-summary.json).
+조건별 API 계산 비용 `$5.61866`, `$6.663187`, `$5.3620835`, `$4.689458`의 합이 `$22.3333885`인지 다시 확인한다. 이 합계와 40개 통과는 [공개 집계 JSON](../../../data/experiment/preliminary-comparison-summary.json)에 고정돼 있다.
 
-### Long-Running Attempts Before Quality Judgment
+### 품질 판정 전 장기 attempt
 
-| Item | Value | Treatment |
+| 항목 | 값 | 처리 |
 |---|---:|---|
-| Long-running attempts | 5 | 4 operator stops and 1 HTTP response stall |
-| Confirmed calculated API cost | `$87.771254` | Pre-quality-judgment cost |
-| Separate estimate for request without usage | `$0.1294175` | Excluded from confirmed total |
-| Quality | Unknown | Not counted as `pass` or `wrong_answer` |
+| 장기 attempt | 5개 | 4개 운영자 중도 종료, 1개 HTTP 응답 정체 |
+| 확인된 API 계산 비용 | `$87.771254` | 품질 판정 전 비용 |
+| 사용량이 없는 요청의 별도 추정 | `$0.1294175` | 확인 합계에서 제외 |
+| 품질 | 미확정 | `pass`·`wrong_answer`로 세지 않음 |
 
-`$87.771254` is not the program-wide sum of all pre-quality-judgment costs. Public
-technical evidence contains additional separately classified technically incomplete
-attempts. It is not called program-wide cost until every attempt is combined without
-duplicates.
+`$87.771254`는 프로그램 전체의 품질 판정 전 비용 합계가 아니다. 공개 기술 증거에는 이 다섯 건 외에도 별도로 분리한 기술 미완료 attempt가 있다. 모든 attempt를 중복 없이 결합하기 전에는 프로그램 전체 비용이라고 쓰지 않는다.
 
-## Metrics Defined by the Plan
+## 계획에서 정의한 지표
 
-### 1. Total Calculated Cost per Pass in the Completed Cohort
+### 1. 완결 코호트 통과 1건당 총 계산 비용
 
 ```text
-total calculated cost per pass in the completed cohort
-= total calculated API cost of the 104 completed conditions
-  ÷ number of passes in the 104 completed conditions
+완결 코호트 통과 1건당 총 계산 비용
+= 완결된 104조건의 API 계산 비용 합
+  ÷ 완결된 104조건의 pass 수
 = $22.3333885 ÷ 40
 = $0.5583347125
 ```
 
-This metric can be published. It does not remove `wrong_answer` cost from the numerator.
-It must state alongside the value that separate technically incomplete attempts are
-outside the numerator.
+이 지표는 현재 공개할 수 있다. `wrong_answer` 비용을 분자에서 빼지 않는다. 다만 별도 기술 미완료 attempt는 이 분자 밖에 있다는 조건을 바로 옆에 적는다.
 
-### 2. Pass-Attributed Cost
+### 2. 통과 귀속 비용
 
 ```text
-pass-attributed cost
-= exact calculated API cost of completed conditions
-  whose quality_result is pass
+통과 귀속 비용
+= quality_result가 pass인 완결 condition의 정확한 API 계산 비용 합
 ```
 
-This value was not fixed at planning time. Three-decimal condition costs in public
-technical tables are not precise aggregation inputs. The [aggregation result](outcome-cost-accounting-20260918.md)
-separates the subset later linked exactly from the remaining unallocated scope.
+계획 당시 이 값은 확정하지 않았다. 공개 기술 표의 조건별 비용은 3자리로
+반올림돼 있으므로 정밀 집계 원본으로 사용하지 않는다. 이후 정확히 연결할 수
+있었던 일부 범위와 남은 미배분 범위는 [집계 결과](outcome-cost-accounting-20260918.md)에
+분리해 두었다.
 
-### 3. Normal Non-Pass Cost After Grading
+### 3. 정상 채점 후 미통과 비용
 
 ```text
-normal non-pass cost after grading
-= exact calculated API cost of completed conditions
-  whose quality_result is wrong_answer or wrong_format
+정상 채점 후 미통과 비용
+= quality_result가 wrong_answer 또는 wrong_format인
+   완결 condition의 정확한 API 계산 비용 합
 ```
 
-This cost remains visible rather than hiding failures. It is not combined with technical
-incompletion cost.
+이 비용은 실패를 숨기지 않기 위해 그대로 남긴다. 기술 미완료 비용과 합치지 않는다.
 
-### 4. Cost Before Quality Judgment
+### 4. 품질 판정 전 비용
 
 ```text
-confirmed cost before quality judgment
-= confirmed provider + directly attributable VM + Blob and network cost
-  of attempts that actually started but did not enter the quality denominator
+품질 판정 전 확인 비용
+= 실제로 시작한 attempt 중 품질 분모에 들어가지 못한 attempt의
+   확인된 provider + 직접 귀속 VM + Blob·network 비용 합
 ```
 
-When some cost is unresolved, report the confirmed subtotal and unresolved count together.
-Do not convert unresolved values to zero.
+비용이 일부 미확정이면 확인된 소계와 미확정 건수를 함께 쓴다. 미확정 값을 0으로 바꾸지 않는다.
 
-### 5. Program-Wide Cost per Pass
+### 5. 프로그램 전체 통과 1건당 비용
 
 ```text
-program-wide cost per pass
-= confirmed cost of every attempt actually started within a fixed period
-  ÷ deduplicated passing trials
+프로그램 전체 통과 1건당 비용
+= 정한 기간 안에 실제로 시작한 모든 attempt의 확인 비용
+  ÷ 중복 제거한 pass trial 수
 ```
 
-This value is not calculated now. The numerator must combine the completed cohort,
-retries, technical incompletions, and operator stops under one time and deduplication rule.
-Dividing long-running cost outside the quality denominator directly by the 40 passes would
-mix scopes.
+이 값은 지금 계산하지 않는다. 분자에 완결 코호트, 재시도, 기술 미완료와 운영자 중도 종료를 같은 기간·중복 규칙으로 결합해야 한다. 품질 분모 밖 장기 비용을 40개 통과와 바로 나누면 범위가 다른 수치를 섞게 된다.
 
-## Fields to Join
+## 결합할 필드
 
-In an environment with private-ledger access, join these fields at attempt level:
+비공개 원장 접근이 가능한 환경에서 다음 필드를 attempt 단위로 결합한다.
 
-| Field | Purpose |
+| 필드 | 용도 |
 |---|---|
-| `task_id`, `condition`, `trial_id`, `attempt_id` | Deduplication and attribution |
-| `quality_result`, `evidence_disposition` | Pass, non-pass, and unknown-quality classification |
-| `included_in_quality_denominator` | Quality-denominator membership |
-| Confirmed provider cost and unresolved status | Calculated API cost |
-| Directly attributable VM cost | Avoid double-counting overlapping runs |
-| Confirmed Blob and network cost | Direct execution cost |
-| Start, finish, and operator-stop status | Distinguish pre-start cancellation from an actual attempt |
-| Price-table revision and `invoice_reconciled` | Separate calculated cost from an actual invoice |
+| `task_id`, `condition`, `trial_id`, `attempt_id` | 중복 방지와 귀속 |
+| `quality_result`, `evidence_disposition` | 통과·미통과·품질 미확정 분류 |
+| `included_in_quality_denominator` | 품질 분모 포함 여부 |
+| provider 확인 비용과 미확정 여부 | API 계산 비용 |
+| 직접 귀속 VM 비용 | 겹친 실행의 중복 합 방지 |
+| Blob·network 확인 비용 | 실행 직접 비용 |
+| 시작·종료·운영자 종료 상태 | 시작 전 취소와 실제 attempt 구분 |
+| 가격표 revision과 `invoice_reconciled` | 계산 비용과 실제 청구서 구분 |
 
-Do not parse Markdown tables as source data. Aggregate from validated structured ledgers
-and attempt evidence, then produce public JSON and documentation as presentation outputs.
+Markdown 표를 데이터 원본으로 파싱하지 않는다. 검증된 구조화 원장과 attempt 증거에서 집계하고, 공개 JSON과 문서는 그 결과를 전달하는 산출물로 만든다.
 
-## Aggregation Order
+## 집계 순서
 
-1. Fix the aggregation period and included execution revisions.
-2. Link each `(task, repetition, condition)` trial to its attempts.
-3. Exclude plans that never started.
-4. Include confirmed cost from every attempt that started, regardless of outcome.
-5. Count quality once for every evidence-complete trial.
-6. Partition cost into `pass`, normal non-pass after grading, and before quality judgment.
-7. Confirm that those three costs equal confirmed cost across included started attempts.
-8. Keep calculated API cost, VM and Blob and network cost, and actual invoices in separate columns.
-9. Exclude raw requests, responses, endpoints, credentials, and personal paths from public aggregates.
+1. 집계 기간과 포함할 실행 revision을 먼저 고정한다.
+2. `(task, repetition, condition)`별 trial과 그 아래 attempt를 연결한다.
+3. 실제로 시작하지 않은 계획은 제외한다.
+4. 실제로 시작한 attempt의 확인 비용은 결과와 무관하게 포함한다.
+5. 품질 결과는 증거가 완결된 trial마다 한 번만 센다.
+6. `pass`, 정상 채점 후 미통과, 품질 판정 전 상태로 비용을 나눈다.
+7. 세 비용 합과 전체 started-attempt 비용이 일치하는지 확인한다.
+8. API 계산 비용, VM·Blob·network 비용, 실제 청구서를 별도 열로 남긴다.
+9. 공개 집계에는 원본 요청, 응답, endpoint, credential과 개인 경로를 넣지 않는다.
 
-## Machine Validation
+## 기계 검증
 
-- The completed cohort must contain 26 tasks, 104 conditions, 40 `pass`, and 64 `wrong_answer`.
-- Condition-level calculated API costs must sum exactly to `$22.3333885`.
-- `$22.3333885 ÷ 40` must equal exactly `$0.5583347125`.
-- Classified cost totals must equal confirmed cost of included started attempts.
-- Do not count one trial's quality result once per attempt.
-- Late-response usage may enter cost but cannot change the quality denominator.
-- Keep unresolved cost, overlapping VM allocation, and unreconciled invoices as distinct states.
-- Do not recreate exact totals from rounded public-table values.
+- 완결 코호트는 26과제·104조건, `pass` 40·`wrong_answer` 64여야 한다.
+- 조건별 API 계산 비용 합은 정확히 `$22.3333885`여야 한다.
+- `$22.3333885 ÷ 40`은 정확히 `$0.5583347125`여야 한다.
+- 비용 분류 합은 포함한 started attempt의 확인 비용 합과 일치해야 한다.
+- 하나의 trial 품질 결과를 attempt 수만큼 중복해서 세지 않는다.
+- 늦게 도착한 응답 사용량은 비용에 포함할 수 있지만 품질 분모를 바꾸지 않는다.
+- 미확정 비용, VM 중복 배분과 청구서 미대사를 별도 상태로 유지한다.
+- 공개 표의 반올림값으로 정확 합계를 다시 만들지 않는다.
 
-If any check fails, do not publish cost by outcome. Retain only confirmed subtotals and the
-blocking reason.
+검증 하나라도 실패하면 결과별 비용을 공개하지 않는다. 확인된 소계와 막힌 이유만 남긴다.
 
-## Ten Experiment-Design Questions
+## 실험 설계 10문항
 
-| Question | Current answer | Gap |
+| 질문 | 현재 답 | 빈자리 |
 |---|---|---|
-| What decision does the result support? | Shows where operating cost went among passes, non-passes, and unknown outcomes | Contract-pricing criterion is separate |
-| What would falsify the hypothesis? | Reject aggregation if classified costs do not reconcile to total cost | Before invoice reconciliation |
-| How many axes moved? | Request count, cache, path, and concurrency varied in addition to compression | Cannot isolate compression causality |
-| Was variability measured first? | Completed comparison ran once per condition | Repeated variance unmeasured |
-| Was the judge validated? | Built-in grading is linked to restore and regrading | Known false-failure effect |
-| Was configuration controlled? | Settings and provider-reported model were recorded | No guarantee of determinism |
-| What is measured? | Links calculated cost to quality judgment | Not actual invoice or customer value |
-| Does input favor one side? | Tasks were purpose- and candidate-focused | Not representative of a customer population |
-| When does it stop? | Use existing evidence only; stop if join validation fails | No new model calls |
-| Is it tied to a customer environment? | Public-benchmark grader pass | Not validated as a proxy for customer acceptance |
+| 결과로 무엇을 정하나 | 운영비가 통과·미통과·미확정 중 어디에 쓰였는지 본다 | 계약 가격 결정 기준은 별도 |
+| 무엇이 가설을 틀렸다고 하나 | 분류별 비용 합이 전체 비용과 맞지 않으면 집계를 채택하지 않는다 | 실제 청구서 대사 전 |
+| 몇 축이 움직였나 | 압축 조건 외 요청 수·캐시·경로·동시성이 달랐다 | 압축 인과 분리 불가 |
+| 흔들림을 먼저 쟀나 | 완결 비교는 조건당 1회다 | 반복 분산 미측정 |
+| 판정자를 검증했나 | 내장 채점과 복원 재채점을 연결했다 | 알려진 거짓 실패 영향 |
+| 설정이 통제됐나 | 설정과 provider 보고 모델을 기록했다 | 결정성 보장 없음 |
+| 무엇을 재나 | 계산 비용과 품질 판정을 연결한다 | 실제 청구서·고객 가치 아님 |
+| 입력이 한쪽에 유리한가 | 목적·후보 중심 과제다 | 고객 모집단 대표성 없음 |
+| 언제 멈추나 | 기존 증거만 사용하고 결합 검사가 실패하면 중단한다 | 새 모델 호출 없음 |
+| 고객 환경에 묶였나 | 공개 benchmark의 채점 통과다 | 고객 수락 대리 지표로 검증되지 않음 |
 
-## Presentation Language
+## 발표에서 쓸 문장
 
-> Across 104 completed conditions, `$22.33` in calculated cost from API usage and a fixed
-> price table produced 40 passes. Because costs from normal non-passes after grading were
-> not removed, total calculated cost per passing condition in this scope was `$0.5583`.
-> Separately, `$87.77` in confirmed calculated cost from five long-running executions
-> that never reached quality judgment was not combined with wrong answers or the
-> 104-condition quality denominator.
+> 완결된 104개 조건에서는 API 사용량에 가격표를 적용한 계산 비용 22.33달러로 40개 통과를 얻었습니다. 정상 채점 후 미통과 비용을 빼지 않았기 때문에, 이 범위의 통과 조건 1건당 총 계산 비용은 0.5583달러입니다. 별도로 품질 판정에 도달하지 못한 장기 실행 5건에서 확인된 계산 비용 87.77달러는 오답이나 104조건 품질 분모에 합치지 않았습니다.
 
-When asked, immediately add:
+질문을 받으면 다음 조건을 바로 밝힌다.
 
-> A pass here is a Terminal-Bench built-in-grader pass, not customer acceptance, and cost
-> is calculated by applying a price table to API usage rather than an actual invoice.
+> 여기서 통과는 고객 수락이 아니라 Terminal-Bench 내장 채점 통과이고, 비용은 실제 청구서가 아니라 API 사용량에 가격표를 적용한 계산값입니다.
 
-## Planning-Time Blocker and Current Status
+## 계획 당시 막힌 자리와 현재 상태
 
-At planning time, the external environment did not access the private attempt ledger. The
-plan was to aggregate outcome-level cost in an approved internal environment using only
-existing evidence. It explicitly avoided remote login or model execution before the
-private connection was restored. A publishable partial aggregation and two-way
-reconciliation were later completed, but the linkage needed for program-wide metrics
-remains incomplete.
+계획 당시 외부 환경에서는 비공개 attempt 원장에 접근하지 않았다. 내부 승인
+환경에서 기존 증거만 읽어 결과별 비용을 집계하기로 했다. NAS 연결을 복구하기
+전에는 원격 로그인이나 모델 실행을 시도하지 않기로 했다. 이후 공개 가능한 일부
+범위의 집계와 양방향 검사는 완료했다. 다만 프로그램 전체 지표에 필요한 결합은
+여전히 완결되지 않았다.
 
-The plan's completion criteria were:
+계획에서 정한 완료 조건은 다음과 같다.
 
-- Preserve exact outcome-level cost and included and excluded attempt lists in structured JSON.
-- Make aggregation JSON, calculation code, and documentation pass two-way reconciliation.
-- Separate publishable values from private-ledger values.
-- Place unreconciled invoices, one run per condition, and known confounding beside the relevant numbers.
-- Use only existing evidence, without a new model call.
+- 결과별 정확 비용과 포함·제외 attempt 목록을 구조화 JSON으로 보존한다.
+- 집계 JSON, 계산 코드와 문서가 양방향 검사를 통과한다.
+- 공개 가능한 값과 비공개 원장 값을 분리한다.
+- 실제 청구서 미대사, 조건당 1회와 알려진 교란을 수치 바로 옆에 둔다.
+- 새 모델 호출 없이 기존 증거만 사용한다.
 
-## Evidence
+## 근거
 
-- [Experiment-design review appendix](experiment-briefing-20260919.md)
-- [Technical preliminary-comparison evidence](preliminary-comparison-20260916.md)
-- [Public aggregate JSON](../../../data/experiment/preliminary-comparison-summary.json)
-- [Evaluation protocol](../evaluation-protocol.md)
-- [Reproducibility contract](../reproducibility-contract.md)
+- [실험 설계 검토 부록](experiment-briefing-20260919.md)
+- [예비 비교 기술 증거](preliminary-comparison-20260916.md)
+- [공개 집계 JSON](../../../data/experiment/preliminary-comparison-summary.json)
+- [평가 규약](../evaluation-protocol.md)
+- [재현 계약](../reproducibility-contract.md)

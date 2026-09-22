@@ -107,7 +107,7 @@ cp -a "$PAGES_RUN/first/site/." \
 
 The browser check visits all four routes at 1,365 x 900 and 390 x 844. It checks
 page overflow, image behavior, the skip link, keyboard scrolling of the
-publication table at the narrow viewport, and the `Publication scope`
+publication table at the narrow viewport, and the percent-encoded `공개 범위`
 homepage fragment. It makes no external request.
 
 ## Deployment boundary

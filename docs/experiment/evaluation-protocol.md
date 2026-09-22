@@ -1,150 +1,150 @@
-# Preregistered Compression Evaluation Protocol
+# 압축 평가 사전 규약
 
-**Status:** This protocol records the statistical rules and policy thresholds fixed on 2026-09-15 UTC. The preregistered repeated evaluation was not run. If it is resumed separately, the task set, repetition count, and manifest must be frozen before results are viewed, together with the [schema version 4 safety policy](execution-safety-policy.md).
+**상태:** 2026-09-15 UTC에 통계 규칙과 정책 문턱을 고정한 당시 사전 규약이다. 이 규약의 사전 고정 반복 평가는 실행하지 않았다. 향후 별도로 재개하면 결과를 보기 전에 과제 집합·반복 수·manifest를 동결하고 [schema version 4 안전 정책](execution-safety-policy.md)을 함께 적용한다.
 
-## Evaluation Question
+## 평가가 답할 질문
 
-For the exact Terminal-Bench 2.1 tasks that pass screening, is there a compressor that reduces directly attributable execution cost by more than 10% while limiting quality degradation to no more than 5 percentage points when only harness-identified log-like command output is compressed?
+선별을 통과한 정확한 Terminal-Bench 2.1 과제에서, harness가 식별한 로그 성격의 명령 출력만 압축할 때 품질 저하를 5퍼센트포인트 이내로 제한하면서 직접 귀속할 수 있는 실행 비용을 10% 넘게 줄이는 압축기가 있는지 묻는다.
 
-The 5-percentage-point and 10% values are policy thresholds preregistered for this study. They are not customer-agreed values and are not relaxed to fit results or schedule. If no compressor satisfies both, the record will state that adoption evidence was not established for this set of task IDs, model, price table, and profiles.
+5퍼센트포인트와 10%는 이번 연구가 사전에 정한 정책 문턱이다. 고객과 합의한 값으로 쓰지 않는다. 결과나 일정에 맞춰 완화하지 않는다. 어느 압축기도 두 조건을 함께 충족하지 못하면 이 과제 ID 집합, 모델, 가격표와 프로필에서 도입 근거가 확립되지 않았다고 기록한다.
 
-## Comparison Conditions
+## 비교 조건
 
-All four conditions use the same tasks, model, runner, concurrency, and application location. Code, instructions, noncandidate spans of user messages, and assistant history remain unchanged.
+네 조건 모두 같은 과제, 모델, runner, 병렬도와 적용 위치를 쓴다. 코드, 지시문, 사용자 메시지의 비후보 구간과 assistant 이력은 바꾸지 않는다.
 
-| Condition | Tool and version | Fixed profile | Actual intervention |
+| 조건 | 도구·버전 | 고정 프로필 | 실제 개입 |
 | --- | --- | --- | --- |
-| `none` | In-house adapter | Same identification and protection checks; pass candidate text unchanged | No additional compression |
-| `squeez` | squeez `1.48.4` | Fresh state; delete content after the first 30 content lines | Lossy compression that discards trailing content |
-| `headroom` | Headroom `0.36.5` | Paths-only profile revision 2 with reverse-transformation check | Notational compression that groups common path prefixes |
-| `llmlingua2` | LLMLingua-2 `0.2.2` | `rate=0.5`, revision `ebaba9b0e874dadd3003ffcff828e4397e568089`, CPU float32, no adapter character cap | Token-selection-based lossy compression |
+| `none` | 자체 adapter | 식별과 보호 검사는 같고 후보 문자열을 그대로 전달 | 추가 압축 없음 |
+| `squeez` | squeez `1.48.4` | fresh state, 앞 30개 내용 줄 뒤 삭제 | 뒤쪽 내용을 버리는 손실 압축 |
+| `headroom` | Headroom `0.36.5` | paths-only profile revision 2, 역변환 확인 | 공통 경로 접두어를 묶는 표기 압축 |
+| `llmlingua2` | LLMLingua-2 `0.2.2` | `rate=0.5`, revision `ebaba9b0e874dadd3003ffcff828e4397e568089`, CPU float32, adapter 문자 상한 없음 | token 선택 기반 손실 압축 |
 
-Application remains fixed to command output classified by the current classifier as log-like. Structured output, file reads, and code are not added to this matrix. DeepSWE, protection-bypass tests, compression-intensity changes, and Headroom `0.37.0`'s `coding` profile are separate questions and are not mixed into this comparison.
+적용 위치는 현재 분류기가 식별한 로그 성격의 명령 출력으로 고정한다. 구조화 출력, 파일 읽기와 코드는 이번 행렬에 추가하지 않는다. DeepSWE, 보호 우회 검사, 압축 강도 변화와 Headroom `0.37.0` `coding` 프로필도 별도 질문이므로 섞지 않는다.
 
-Since 2026-09-15 22:40 KST, the LLMLingua-2 adapter passes each identified candidate string in full rather than truncating it at 5,000 characters. The observation that 31 of 79 candidate occurrences in the existing 100 uncompressed runs exceeded 5,000 characters describes only the reach of the removed adapter boundary. Historical static reduction and latency values are not transferred to the current uncapped profile.
+2026-09-15 22:40 KST 이후 LLMLingua-2 adapter는 식별된 후보 문자열 전체를 한 번에 전달하며 5,000자에서 자르지 않는다. 기존 추가 압축 없는 100개 실행에서 후보 79출현 중 31출현이 5,000자를 넘었다는 값은 제거한 옛 adapter 경계의 영향 범위를 설명하는 관측으로만 남긴다. 옛 정적 감소율과 지연을 현재 문자 상한 없는 프로필의 결과로 옮겨 쓰지 않는다.
 
-## Shared Execution Conditions
+## 공통 실행 조건
 
-| Item | Value |
+| 항목 | 값 |
 | --- | --- |
-| Model | `gpt-5.4`; verify the provider-returned revision for every request |
-| Request settings | temperature `0`, reasoning effort `none`; output limit 2,048 tokens |
-| Runner | Harbor `0.22.0`, instrumented Terminus 2 |
-| Concurrency and provider constraints | 8; record provider throughput limits and service errors separately from schema version 4 safety limits |
-| Tasks | All of the exact `K` task IDs that pass screening |
-| Location | Identified log-like command output |
-| Local token calculation | tiktoken `0.14.0`, `o200k_base` |
-| Prices | Price table in one currency and at one point in time, fixed in the execution manifest |
+| 모델 | `gpt-5.4`; provider가 돌려준 revision을 요청마다 확인 |
+| 요청 설정 | temperature `0`, reasoning effort `none`; 출력 상한 2,048 token |
+| 실행기 | Harbor `0.22.0`, 계측한 Terminus 2 |
+| 병렬도와 provider 제약 | 8, provider 처리량 제한·서비스 오류와 schema version 4 안전 상한을 분리 기록 |
+| 과제 | 선별에서 통과한 정확한 `K`개 과제 ID 전부 |
+| 위치 | 식별된 로그 성격의 명령 출력 |
+| 로컬 token 계산 | tiktoken `0.14.0`, `o200k_base` |
+| 가격 | 실행 manifest에 고정한 같은 통화와 같은 시점의 가격표 |
 
-temperature and reasoning effort are recorded without claiming provider determinism. Cached-input tokens are observed but not claimed as a controlled factor.
+temperature와 reasoning effort를 기록하지만 provider 결정론을 주장하지 않는다. 캐시 읽기 token은 관측하며 통제했다고 주장하지 않는다.
 
-## Condition Order
+## 조건 순서
 
-Each repetition of each task contains `none`, `squeez`, `headroom`, and `llmlingua2` once. Their order is determined by a SHA-256 sort over fixed seed `20260915`, task ID, repetition number, and condition name. Condition counts remain balanced within every task and repetition, and both planned and actual start order are recorded.
+한 과제의 한 반복 실행에는 `none`, `squeez`, `headroom`, `llmlingua2`가 각각 한 번 들어간다. 네 조건의 순서는 고정 seed `20260915`, 과제 ID, 반복 번호와 조건 이름으로 만든 SHA-256 정렬로 정한다. 과제와 반복 안에서 조건 수가 같도록 유지하고 계획 순서와 실제 시작 순서를 모두 기록한다.
 
-At concurrency 8, conditions with different durations may have different numbers of concurrent executions. A balanced planned order makes this observable but does not remove provider-state or temporal correlation.
+동시성 8에서 처리 시간이 다른 조건은 동시에 실행 중인 수가 달라질 수 있다. 균형 잡힌 계획 순서는 이를 기록 가능하게 하지만 provider 상태나 시간 상관을 제거하지 않는다.
 
-## Quality and Cost Effects
+## 품질과 비용 효과
 
-The sign of the quality effect is `compression-condition pass rate - none pass rate in the same repetition`. The unit is percentage points; a positive value means higher quality. First compute each task's mean across repetitions, then weight each of the `K` tasks by `1/K`.
+품질 효과의 부호는 `압축 조건 통과율 - 같은 반복의 none 통과율`이다. 단위는 퍼센트포인트이며 양수가 품질 증가다. 과제마다 반복 평균을 먼저 구하고 `K`개 과제에 각각 `1/K` 가중치를 둔다.
 
-The sign of the cost effect is `1 - compression-condition cost ÷ none cost`. A positive value means cost savings. For each task, compute the mean repetition-level cost ratio, then weight each of the `K` tasks by `1/K`. A 10% saving means that end-to-end directly attributable cost is 10% lower than `none`.
+비용 효과의 부호는 `1 - 압축 조건 비용 ÷ none 비용`이다. 양수가 비용 절감이다. 과제마다 반복 실행의 평균 비용비를 구한 뒤 `K`개 과제에 각각 `1/K` 가중치를 둔다. 10% 절감은 end-to-end 직접 귀속 비용이 `none`보다 10% 낮다는 뜻이다.
 
-Apply the same cost contract to all four conditions:
+비용에는 다음을 같은 계약으로 네 조건 모두에 적용한다.
 
-- Provider usage multiplied by fixed prices
-- Directly attributable shares of VM and worker time while actually active
-- Measurable Blob writes, verification reads, and network transfer
-- Costs from quality failures and all permitted retries
+- provider 사용량에 고정 가격을 곱한 비용
+- 실제로 활성 상태였던 VM과 worker의 직접 귀속분
+- 계측 가능한 Blob 쓰기, 검증 읽기와 network 전송
+- 품질 실패와 모든 허용된 재시도에서 발생한 비용
 
-Do not multiply the full VM rate by every worker. Divide VM time among concurrently active executions and reconcile allocations to the total. Shared idle time, approval waits, and one-time preparation are recorded separately and excluded from the primary cost effect.
+worker마다 VM 전체 단가를 곱하지 않는다. 동시에 활성 상태인 실행끼리 VM 시간을 나눠 총액과 대사한다. 공유 idle, 승인 대기와 일회성 준비 비용은 별도 항목으로 기록하며 주 비용 효과에 넣지 않는다.
 
-Provider cost is calculated from response usage and the fixed price table; it is not invoice reconciliation. Input tokens, cached-input tokens, output tokens, and local tiktoken counts remain separate.
+provider 사용료는 청구서 대사가 아니라 응답 usage와 고정 가격표의 계산값이다. 입력 token, cache 읽기 token, 출력 token과 로컬 tiktoken 값은 섞지 않고 따로 남긴다.
 
-## Repetition Count
+## 반복 수
 
-The plan uses a quality tolerance of 0.05, a one-sided significance level of `0.05/3` per compressor for three compressor comparisons, target power 0.8, and quality-difference variance 0.40.
+품질 허용폭 0.05, 세 압축기 비교의 압축기별 단측 유의수준 `0.05/3`, 목표 검정력 0.8과 품질 차이 분산 0.40을 사용한다.
 
 ```text
-Target number of required quality pairs
+필요한 품질 쌍 목표
 = ceil[0.40 × {z(1 - 0.05/3) + z(0.8)}² ÷ 0.05²]
 = 1,412
 
-Repetitions per task R(K) = ceil(1,412 ÷ K)
-Actual pairs per comparison = K × R(K)
-Planned logical trials = 4 × K × R(K)
+과제당 반복 수 R(K) = ceil(1,412 ÷ K)
+비교당 실제 쌍 수 = K × R(K)
+계획 logical trial 수 = 4 × K × R(K)
 ```
 
-`z(p)` is the p quantile of the standard normal distribution. Variance 0.40 is a stress assumption for planning, not an observation, upper bound, or guarantee of power. The 1,129-pair value from variance 0.32 remains only a sensitivity reference.
+`z(p)`는 표준정규분포의 p 분위수다. 분산 0.40은 계획을 위한 스트레스 가정이지 관측값, 상한 또는 검정력 보장이 아니다. 분산 0.32를 넣은 1,129쌍은 민감도 참고값으로만 남긴다.
 
-Evaluation is impossible when `K=0`. After screening, substitute only `K` into the formula; do not change 0.40, 1,412, the quality and cost thresholds, or the calculation method. Because repetition count was planned for quality, it does not guarantee cost power. If the cost confidence interval is too wide to decide, repetitions are not added after evaluation.
+`K=0`이면 평가할 수 없다. `K`만 선별 뒤 공식에 넣으며 0.40, 1,412, 품질·비용 문턱과 계산법은 바꾸지 않는다. 이 반복 수는 품질 계획에서 정했으므로 비용 검정력을 보장하지 않는다. 비용 신뢰구간이 넓어 판정하지 못해도 평가 뒤 반복을 추가하지 않는다.
 
-## Confidence Intervals and Adoption Decision
+## 신뢰구간과 도입 판정
 
-The primary analysis uses 50,000 percentile-bootstrap draws. The resampling unit is one complete repetition containing all `K` tasks and all four conditions. Move `none` and the three compression conditions together within a repetition to preserve pairing and shared-`none` correlation. Tasks are not resampled, so the conclusion is conditional on the exact selected task-ID set.
+주 분석은 percentile bootstrap 50,000회다. 재표집 단위는 `K`개 과제와 네 조건이 모두 들어 있는 완전한 반복 실행 전체다. 같은 반복 실행의 `none`과 세 압축 조건을 함께 옮겨 짝 구조와 공유 `none` 상관을 보존한다. 과제를 재표집하지 않으므로 결론은 선별된 정확한 과제 ID 집합에만 조건부다.
 
-The one-sided significance level is `0.05/3` for each compressor. A compressor meets the adoption criterion only if both lower bounds strictly exceed their thresholds:
+각 압축기의 단측 유의수준은 `0.05/3`이다. 세 압축기 각각에 대해 다음 두 하한을 모두 엄격히 넘어야 도입 기준을 충족한다.
 
 ```text
-One-sided 98.333% lower bound for quality difference > -0.05
-One-sided 98.333% lower bound for cost savings > 0.10
+품질 차이의 단측 98.333% 하한 > -0.05
+비용 절감률의 단측 98.333% 하한 > 0.10
 ```
 
-Quality and cost form an intersection decision for one compressor, so significance is not split again between them. Under the chosen correction and valid component confidence-interval assumptions, this rule places the nominal family-wise error rate for all three compressor-adoption claims at no more than 5%. It does not establish the bootstrap's actual coverage.
+품질과 비용은 한 압축기의 교집합 판정이므로 둘 사이에 유의수준을 다시 나누지 않는다. 선택한 보정법과 유효한 component 신뢰구간 가정 아래에서 세 압축기 도입 주장 전체의 명목 family-wise error rate를 5% 이하로 두는 규칙이다. bootstrap의 실제 coverage를 이미 증명했다는 뜻은 아니다.
 
-A lower bound equal to or below its threshold means the adoption criterion was not established; it does not establish quality degradation. Two-sided 98.333% intervals are also reported for description. Because they allocate `(0.05/3)/2` to each tail, they are more conservative than the adoption decision and are not called simultaneous 95% intervals for all six effects.
+하한이 문턱과 같거나 낮으면 도입 기준이 확립되지 않은 것이다. 품질 열화가 입증됐다는 뜻은 아니다. 설명용으로 양측 98.333% 구간도 별도 보고한다. 이 양측 구간은 각 꼬리에 `(0.05/3)/2`를 쓰므로 도입 판정보다 보수적이며 여섯 효과 전체의 동시 95% 구간으로 부르지 않는다.
 
-If a bootstrap distribution has zero width or contains nonfinite values, the result is indeterminate. With few repetitions and identical outcomes in every repetition, a percentile bootstrap can degenerate or have inadequate coverage. Do not automatically substitute another interval or add repetitions after the fact.
+bootstrap 분포의 폭이 0이거나 비유한 값이 있으면 판정 불가다. 작은 반복 수와 모든 반복의 같은 결과에서는 percentile bootstrap이 퇴화하거나 coverage가 부족할 수 있다. 이 경우 다른 구간으로 자동 교체하거나 반복을 사후 추가하지 않는다.
 
-## Temporal-Correlation Sensitivity
+## 시간 상관 민감도
 
-The primary analysis assumes complete repetitions are mutually independent. Residual correlation from provider state and time of day has not been estimated from current data.
+주 분석은 완전한 반복 실행이 서로 독립이라고 가정한다. provider 상태와 시간대가 만든 잔여 상관은 현재 자료로 추정하지 않았다.
 
-The sensitivity analysis uses a circular moving-block bootstrap of length 2. Sample repetition starting positions uniformly, wrap consecutive pairs circularly, and truncate at `R`. If the primary and sensitivity adoption decisions differ, report the difference and do not claim robust adoption. The sensitivity result does not change the primary rule.
+민감도 분석은 길이 2의 circular moving-block bootstrap을 쓴다. 반복 시작점을 균등하게 뽑고 연속한 두 반복을 원형으로 이어 `R`개가 될 때까지 자른다. 주 분석과 민감도 분석의 도입 판정이 다르면 강건한 도입으로 주장하지 않고 차이를 보고한다. 민감도 결과로 주 분석 규칙을 바꾸지 않는다.
 
-## Missing and Near-Zero Cost
+## 결측과 0에 가까운 비용
 
-A mean `none` task cost of `0.00000025 USD` or less is classified as a near-zero cost denominator. This value is the calculated price of one cached-input token under the fixed price table, not a universal statistical constant.
+`none` 과제 평균 비용이 `0.00000025 USD` 이하이면 비용 분모가 0에 가깝다고 판정한다. 이 값은 고정 가격표에서 cache 입력 token 한 개의 계산 단가이며, 보편적인 통계 상수가 아니다.
 
-Record actual zero spend, missing instrumentation, unresolved provider cost, missing Blob-operation responses, and a missing price table as distinct states. Do not delete required missing costs or zero or near-zero denominators, and do not replace them with zero. The affected compressor-versus-`none` comparison is indeterminate; stop the full evaluation if a common cause damages all four conditions.
+실제 지출 0, 계측 누락, provider 비용 미확정, Blob 연산 응답 누락과 가격표 누락을 서로 다른 상태로 기록한다. 필수 비용 결측, 분모 0 또는 근접 0을 삭제하거나 0으로 대체하지 않는다. 해당 압축기와 `none` 비교는 판정 불가이며, 공통 원인이 네 조건 전체를 손상하면 평가 전체를 중단한다.
 
-## Error-Rate Check With Synthetic Data
+## 합성 자료를 이용한 오류율 확인
 
-Run screening after environment and instrumentation verification inputs pass. After screening determines `K`, and before evaluation results are viewed, calculate `R(K)` and run the following synthetic-data checks:
+환경·계측 검증용 입력을 통과한 뒤 선별을 실행한다. 선별에서 `K`를 확인한 뒤 평가 결과를 보기 전에 `R(K)`와 아래 합성 자료 검사를 실행한다.
 
-- Quality exactly at its tolerance boundary while cost passes
-- Cost exactly at its 10% boundary while quality passes
-- Both quality and cost exactly at their boundaries
-- Shared `none`, temporal shocks, and heavy-tailed cost distributions
-- Only valid joint distributions, with quality-difference variance 0.10, 0.32, and 0.40 and temporal-copy probability 0, 0.025, and 0.05
+- 품질만 허용 경계이고 비용은 충족하는 경우
+- 비용만 10% 경계이고 품질은 충족하는 경우
+- 품질과 비용이 모두 경계인 경우
+- 공유 `none`, 시간 충격과 꼬리가 긴 비용 분포
+- 유효한 결합분포에서만 품질 차이 분산 0.10, 0.32, 0.40과 시간 복사 확률 0, 0.025, 0.05
 
-Generate 2,000 synthetic datasets per scenario and apply 50,000 bootstrap draws to each. Independent validation seed is `2026091501`. Record the execution source commit, NumPy version, quantile method, and purpose-specific child seeds.
+시나리오마다 합성 자료 2,000개를 만들고 각 자료에 bootstrap 50,000회를 적용한다. 독립 검증 seed는 `2026091501`이며 실행 source commit, numpy 버전, 분위수 계산법과 용도별 하위 seed를 결과에 기록한다.
 
-Within each boundary scenario, evaluation may proceed only if the exact one-sided 95% binomial upper bound for the proportion of synthetic datasets that falsely adopt at least one compressor is at most 0.05. This is a strict operating criterion for the specified synthetic scenarios, not a universal coverage proof. If it fails, do not repeatedly tune the method on the same synthetic data. Record the cause, corrected revision, and separate validation seed. Recalculate the 1,412-pair plan if the significance level or method changes.
+경계에서 압축기 하나라도 잘못 도입한 비율의 정확 이항 단측 95% 상한이 0.05 이하여야 평가에 진입한다. 이는 정한 합성 시나리오에 대한 엄격한 운영 조건이며 보편적인 coverage 증명이 아니다. 실패하면 같은 합성 자료에 방법을 반복해서 맞추지 않고 원인, 수정 revision과 별도 검증 seed를 기록한다. 유의수준이나 방법을 바꾸면 1,412쌍 계획도 다시 계산한다.
 
-## Schedule Calculation
+## 일정 계산
 
-The P50 and P90 values below are projections using individual-trial durations of 76.145 and 93.559 seconds from the existing 100 `none` runs. They are not observed P50 and P90 values for the full evaluation.
+다음 식의 P50·P90은 기존 100개 `none` 실행의 개별 `trial` 시간 76.145초·93.559초를 입력으로 쓴 투영이다. 전체 평가 시간의 관측 P50·P90이 아니다.
 
 ```text
-native time(q) = ceil(4 × K × R ÷ 8) × none trial time(q) × 1.4345
-additional LLMLingua-2 latency(q) = parallel execution interval of actual uncapped per-candidate compression wall times
+native 시간(q) = ceil(4 × K × R ÷ 8) × none trial 시간(q) × 1.4345
+LLMLingua-2 추가 지연(q) = 문자 상한 없는 실제 후보별 압축 벽시계의 병렬 실행 구간
 ```
 
-The factor 1.4345 is the observed interval for the prior 100 runs divided by `sum of individual durations ÷ 8`. The value 0.79 is not a probability; it extrapolates 79 identified candidate occurrences per 100 logical trials to the new evaluation. Under the removed 5,000-character cap, 8 concurrent LLMLingua-2 calls had P50 260.668 seconds and P90 260.912 seconds. This measurement excludes uncapped candidate lengths, worker initialization, first image preparation, preparation retries, candidate-arrival spacing, and different candidate distributions in new tasks, so it is not used as the current LLMLingua-2 schedule value.
+1.4345는 과거 100개 실행의 실제 구간을 `개별 시간 합계÷8`로 나눈 값이다. 0.79는 확률이 아니라 100개 logical trial에서 식별된 후보 79출현을 새 평가에 외삽한 호출 수다. 제거한 옛 5,000자 입력에서 LLMLingua-2 동시 8호출은 P50 260.668초, P90 260.912초였다. 이 측정은 문자 상한 없는 후보 길이, worker 초기화, 이미지 최초 준비, 준비 재시도, 후보 도착 간격과 새 과제의 다른 후보 분포를 포함하지 않으므로 현재 LLMLingua-2 일정값으로 사용하지 않는다.
 
-Software preflight showed that the processing interval for 8 candidate occurrences did not exceed 0.21 seconds for either squeez or Headroom. This is calculated as separate added latency rather than converted to zero. Preparation-retry time has not been measured, so it remains symbolic in the worst-case expression.
+squeez와 Headroom은 각각 후보 8출현 처리 구간이 0.21초를 넘지 않은 software preflight가 있다. 이를 0으로 바꾸지 않고 별도 추가 지연으로 계산한다. 준비 재시도 시간은 아직 측정하지 않았으므로 최악값에는 식으로만 남긴다.
 
-The reporting target at the time was `2026-09-16 23:59 KST`; it was not a task-process termination timer. A future schema version 4 run uses an approved UTC deadline independent of the reporting schedule. If the full `K`-task evaluation does not fit the target, do not automatically select a subset or lower thresholds; record the smallest feasible design revision instead.
+당시 보고 목표는 `2026-09-16 23:59 KST`였고 과제 process 종료 타이머가 아니었다. 향후 schema version 4 실행은 보고 일정과 별도로 승인한 UTC deadline을 적용한다. 목표 안에 전체 `K`개 평가가 들어오지 않아도 일부 과제를 자동 선택하거나 문턱을 낮추지 않고 가장 작은 실행 가능한 수정안을 기록한다.
 
-## Entry Criteria
+## 평가 시작 진행 조건
 
-- The exact screened task-ID set and `K` are hash-pinned.
-- `R(K)`, four-condition order, and every trial ID are frozen in the execution manifest.
-- Cost-verification inputs pass under the same source commit and price table.
-- Per-attempt and full-run calculated API cost limits and a future UTC deadline are approved, and safety-policy checks pass.
-- The synthetic-data error-rate check using `K` and `R(K)` meets the entry criterion.
-- The P90-input projection includes preparation, retries, and compressor latency and is checked against the execution deadline.
-- A coordinator reviews screening results, validation results, and schedule records and records whether evaluation may begin.
+- 선별에서 통과한 정확한 과제 ID 집합과 `K`가 hash로 고정된다.
+- `R(K)`, 네 조건의 순서와 모든 `trial` ID가 실행 manifest에 동결된다.
+- 같은 source commit과 가격표로 비용 검증용 입력이 통과한다.
+- attempt·전체 실행 API 계산 비용 상한과 미래 UTC deadline이 승인되고 안전 정책 검사가 통과한다.
+- `K`와 `R(K)`를 사용한 합성 자료 오류율 확인이 진행 조건을 충족한다.
+- P90 입력 기반 투영에 준비, 재시도와 압축기 지연을 포함해 실행 종료 목표를 확인한다.
+- 조율자가 선별 결과, 검증 결과와 일정 기록을 검토하고 평가 진입 여부를 남긴다.
 
-Do not change tasks, repetition count, seed, confidence interval, cost contract, or thresholds after evaluation results are viewed.
+평가 결과를 본 뒤 과제, 반복 수, seed, 신뢰구간, 비용 계약이나 문턱을 바꾸지 않는다.

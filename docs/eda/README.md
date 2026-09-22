@@ -1,112 +1,112 @@
-# Input Composition of Two Benchmarks — EDA
+# 두 벤치마크의 입력 구성 — EDA
 
-Round 1 analysis: 2026-09-10 · Round 2 analysis: 2026-09-11.
+1차 분석: 2026-09-10 · 2차 분석: 2026-09-11.
 
-- Instruction: the task's `instruction.md` body. It excludes the repository's full code and tool output produced during a run.
-- Actual request: the message body sent to the API. Earlier conversation is counted again when it is included in a later request.
-- Tool result: content returned by file reads, command execution, and similar operations. In this Terminal sample, it was delivered as a `user`-role message rather than through a separate `tool_result` field or `tool` role.
-- Bytes: UTF-8 body size. Local tokens: body tokens counted with `tiktoken o200k_base`. API usage and invoice-reconciled amounts are distinct.
-- Compression candidates: log segments identified after excluding protected code, code-containing mixed content, instructions, data, and uncertain segments. **This is an identified candidate range, not a validated upper bound.**
-- Classification judgment: results divided under human-defined rules. Different rules would produce different values, and some boundaries are ambiguous.
+- 지시문: 과제의 `instruction.md` 본문. 저장소 전체 코드나 실행 중 도구 출력은 포함하지 않는다.
+- 실제 요청: API에 전달한 메시지 본문. 이전 대화가 다음 요청에 다시 담기면 다시 센다.
+- 도구 실행 결과(tool result): 파일 읽기·명령 실행 등이 돌려준 내용. 이 Terminal 표본에서는 별도 `tool_result` 필드나 `tool` 역할이 아니라 `user` 역할 메시지로 전달됐다.
+- 바이트: UTF-8 본문 크기. 로컬 토큰: `tiktoken o200k_base`로 센 본문 토큰. API usage와 청구서 대사액은 구분한다.
+- 압축 후보: 보호한 코드·코드 포함 혼합·지시·자료·불확실한 구간을 제외하고 식별한 로그 구간. **식별된 후보 범위이지 검증된 상한이 아니다.**
+- 분류 판단: 사람이 정한 규칙으로 나눈 결과. 규칙이 달라지면 값도 달라진다. 경계가 애매한 항목이 있다.
 
-[Two benchmarks](#benchmarks) · [Task input composition](#composition) · [Compression candidates](#candidates) · [What this analysis does not show](#limits)
+[두 벤치마크](#benchmarks) · [과제 입력 구성](#composition) · [압축 후보](#candidates) · [이 분석이 말하지 않는 것](#limits)
 
 <details>
-<summary>How these values were counted</summary>
+<summary>이 값들을 어떻게 셌는가</summary>
 
-- **Dates:** Historical actual requests were generated on 2026-09-09. Official instructions and historical requests were aggregated on 2026-09-10; task types and unclassified segments were classified on 2026-09-11.
-- **Sample:** Official English instructions and metadata cover 113/113 DeepSWE tasks and 89/89 Terminal-Bench 2.1 tasks. Historical actual requests comprise 56 successful HTTP requests from 5 purpose-selected Terminal tasks × 3 runs and are not a random sample.
-- **Model:** The 56 historical actual requests were generated with `gpt-5.4-2026-03-05`.
-- **UTF-8 bytes:** Body size after encoding the source string as UTF-8, distinct from HTTP JSON body size or on-disk file size.
-- **Local tokens:** Body tokens counted with `o200k_base` from `tiktoken 0.14.0`. Static instructions use the full string; actual requests use the sum of message-body tokens and exclude service serialization overhead.
-- **Billing tokens:** Input, output, and cached-input tokens recorded in API-response `usage` for the 56 historical actual requests. Cached input is a subset of input, and these values are not invoice-reconciled amounts.
-- **All-candidate-deletion calculation:** A hypothetical calculation that deletes identified candidates and recounts with the same local tokenizer. It does not measure compression-tool performance, quality, or cost savings.
+- **날짜:** 과거 실제 요청 생성일은 2026-09-09다. 공식 지시문과 기존 요청 집계일은 2026-09-10이며, 과제 종류와 미분류 구간 분류일은 2026-09-11이다.
+- **표본:** 공식 영어 지시문·메타데이터는 DeepSWE 113/113과제와 Terminal-Bench 2.1 89/89과제다. 과거 실제 요청은 미리 목적에 맞춰 고른 Terminal 5과제 × 3실행의 성공 HTTP 56요청이며 무작위 표본이 아니다.
+- **모델:** 과거 실제 요청 56건은 `gpt-5.4-2026-03-05`로 생성됐다.
+- **UTF-8 바이트:** 원문 문자열을 UTF-8로 인코딩한 본문 크기다. HTTP JSON 본문이나 디스크 파일 크기와 구분한다.
+- **로컬 토큰:** `tiktoken 0.14.0`의 `o200k_base`로 센 본문 토큰이다. 정적 지시문은 전체 문자열, 실제 요청은 메시지 본문별 토큰의 합이며 서비스 직렬화 비용은 포함하지 않는다.
+- **청구 토큰:** 과거 실제 요청 56건의 API 응답 `usage`에 기록된 입력·출력·캐시 읽기 토큰이다. 캐시 읽기는 입력의 부분집합이며 청구서 대사액은 아니다.
+- **후보 전부 삭제 계산:** 식별 후보를 삭제한 뒤 같은 로컬 토크나이저로 다시 센 가정 계산이다. 압축 도구의 성능·품질·비용 절감이 아니다.
 
 </details>
 
 <a id="benchmarks"></a>
 
-## Two Benchmarks — Task Counts, Type Distribution, and Repository Concentration
+## 두 벤치마크 — 과제 수 · 종류 분포 · 저장소 편중
 
 <a id="figure-1"></a>
 
-### Round 2 · Common Primary-Type Distribution and Ambiguity in the 113 and 89 Official Tasks
+### 2차 · 공식 113·89과제의 공통 주 종류 분포와 모호함
 
-![Primary-type distribution for the official English instructions: DeepSWE n=113 and Terminal n=89. Each task contributes one primary type; one mixed review-and-repair task remains in a secondary label.](figures/round2/01-task-types.svg)
+![주 종류 분포. 공식 영어 지시문 DeepSWE n=113, Terminal n=89. 주 종류 하나로 집계하며 리뷰·수정 혼합 한 과제는 보조 라벨에 남긴다.](figures/round2/01-task-types.svg)
 
-Common primary-type distribution and ambiguity in the 113 and 89 official tasks
+공식 113·89과제의 공통 주 종류 분포와 모호함
 
-Each task contributes one primary type.
+주 종류는 하나만 센다.
 
-**Observation.** Task types were reclassified by the primary deliverable requested in the instruction rather than by directly pooling author labels.
+**관측.** 과제 종류는 작성자 태그를 그대로 합친 것이 아니라, 지시문이 요구하는 주된 산출물을 기준으로 다시 분류한 것이다.
 
-DeepSWE was already weighted toward feature requests in its source metadata. After applying a shared distinction between restoring existing behavior and extending functionality, 105/113 tasks still remained feature requests.
+DeepSWE는 원본 메타데이터부터 기능 요청에 치우쳐 있었고, 기존 동작 복구와 기능 확장을 공통 기준으로 나눈 뒤에도 기능 요청 105/113이 남았다.
 
-**Interpretation.** The small debugging sample reflects the original task composition rather than compression-oriented exclusion in this analysis. Combined totals from the two sets must not be read as debugging or code-review performance.
+**해석.** 디버깅 표본이 적은 것은 이 분석에서 압축에 맞춰 빼놓았기 때문이 아니라 원래 과제 구성과 관련되므로, 두 집합의 합산을 디버깅·코드 리뷰 성능으로 읽으면 안 된다.
 
-**Limitation.** This analysis did not establish why the dataset creators chose this composition or independently validate agreement against a classification ground truth.
+**한계.** 수집자가 왜 그런 구성을 택했는지나 이 분류의 독립적인 정답 일치도까지 확인한 것은 아니다.
 
-- **Sample:** DeepSWE n=113 · Terminal n=89
-- **Denominator · unit:** Task count in each benchmark · tasks / %
-- **Kind:** Classification judgment · aggregation
+- **표본:** DeepSWE n=113 · Terminal n=89
+- **분모 · 단위:** 각 벤치마크 과제 수 · 과제 / %
+- **성격:** 분류 판단·집계
 
-Source figure basis: Round 2 README table 2.
+원문 그림의 근거: 2차 README 표 2.
 
 <a id="table-5"></a>
 
-#### Round 2 · 1. Complete Task-Type Inventory
+#### 2차 · 1. 과제 종류 전수
 
-| Primary type | DeepSWE, n=113 | Terminal, n=89 |
+| 주 종류 | DeepSWE, n=113 | Terminal, n=89 |
 | --- | --- | --- |
-| Feature request | 105 | 31 |
-| Bug fix / debugging | 8 | 5 |
-| Code review | 0 | 0 |
-| Refactoring / migration | 0 | 6 |
-| Test authoring | 0 | 0 |
-| Environment / build | 0 | 16 |
-| Other | 0 | 31 |
+| 기능 요청 | 105 | 31 |
+| 버그 수정·디버깅 | 8 | 5 |
+| 코드 리뷰 | 0 | 0 |
+| 리팩터링 | 0 | 6 |
+| 테스트 작성 | 0 | 0 |
+| 환경 설정·빌드 | 0 | 16 |
+| 그 밖에 | 0 | 31 |
 
-- **Sample:** DeepSWE n=113 · Terminal n=89
-- **Denominator · unit:** Task count in each benchmark · tasks / %
-- **Kind:** Classification judgment · aggregation
+- **표본:** DeepSWE n=113 · Terminal n=89
+- **분모 · 단위:** 각 벤치마크 과제 수 · 과제 / %
+- **성격:** 분류 판단·집계
 
-Source table: Round 2 analysis · table 2.
+원문 표: 2차 분석 · 표 2.
 
-Neither set has a review-only task. Tasks that include review number 0/113 in DeepSWE and 1/89 in Terminal.
+코드 리뷰 단독 과제는 두 집합 모두 없다. 리뷰 포함 과제는 DeepSWE 0/113, Terminal 1/89다.
 
-No independent human-label validation was performed.
+독립적인 사람 라벨 검증은 하지 않았다.
 
 <a id="figure-2"></a>
 
-### Round 1 · DeepSWE Repositories and Languages; Terminal Author Category and Difficulty
+### 1차 · DeepSWE 저장소·언어와 Terminal 작성자 category·난이도 분포
 
-![Repository and primary-language distribution for 113 DeepSWE tasks, and type and difficulty distribution for 89 Terminal tasks. Difficulty is author metadata, not a performance measurement for this model.](figures/round1/05-corpus-bias.svg)
+![DeepSWE 113과제의 저장소·주 언어와 Terminal 89과제의 종류·난이도 분포. 난이도는 저자 메타데이터이지 이번 모델의 성능 측정이 아니다.](figures/round1/05-corpus-bias.svg)
 
-DeepSWE repositories and languages; Terminal author category and difficulty
+DeepSWE 저장소·언어와 Terminal 작성자 category·난이도 분포
 
-Difficulty is author metadata, not a performance measurement for this model.
+난이도는 저자 메타데이터이지 이번 모델의 성능 측정이 아니다.
 
-**Observation.** Repositories, languages, and difficulty values count task metadata; they do not measure the model's answer accuracy.
+**관측.** 저장소와 언어·난이도는 과제 메타데이터를 센 것이며, 모델의 정답률을 잰 값이 아니다.
 
-Because one repository can contribute multiple tasks, task count differs from distinct-codebase count, and URL variants for the same repository must first be normalized.
+한 저장소에서 여러 과제가 들어오므로 과제 수와 서로 다른 코드베이스 수가 같지 않고, 같은 저장소의 URL 표기도 먼저 정규화해야 한다.
 
-**Interpretation.** Comparisons between the benchmarks must account for this composition; missing language or difficulty fields in one set must not be filled from the other set's distribution.
+**해석.** 두 벤치마크를 비교할 때는 이 구성을 함께 봐야 하며, 언어·난이도 필드가 없는 쪽을 다른 쪽의 분포로 채우면 안 된다.
 
-**Limitation.** This analysis cannot determine whether the concentration shown here causes model-performance differences.
+**한계.** 여기서 보이는 편중이 모델 성능 차이의 원인인지는 이 분석으로 판정할 수 없다.
 
-- **Sample:** DeepSWE n=113 · Terminal n=89
-- **Denominator · unit:** Task count in each benchmark · tasks / %
-- **Kind:** Calculation · metadata aggregation
+- **표본:** DeepSWE n=113 · Terminal n=89
+- **분모 · 단위:** 각 벤치마크 과제 수 · 과제 / %
+- **성격:** 계산 · 메타데이터 집계
 
-Source figure basis: Round 1 measurement tables 8–14.
+원문 그림의 근거: 1차 측정표 표 8~14.
 
-Round 1 metadata's 106/113 `feature_request` count and Round 2's shared-taxonomy 105/113 feature-request count use **different criteria**.
+1차 metadata feature_request 106/113과 2차 공통 분류 기능 요청 105/113은 **기준이 다르다**.
 
 <a id="table-6"></a>
 
-#### Round 1 · Top DeepSWE repositories
+#### 1차 · DeepSWE 상위 저장소
 
-| Top DeepSWE repositories | Task count | Task share |
+| DeepSWE 상위 저장소 | 과제 수 | 과제 비중 |
 | --- | --- | --- |
 | pmndrs/koota | 5 | 4.42% |
 | PyCQA/bandit | 3 | 2.65% |
@@ -119,17 +119,17 @@ Round 1 metadata's 106/113 `feature_request` count and Round 2's shared-taxonomy
 | capricorn86/happy-dom | 2 | 1.77% |
 | helm/helm | 2 | 1.77% |
 
-- **Sample:** DeepSWE n=113 tasks · 91 repositories
-- **Denominator · unit:** 113 tasks · tasks / %
-- **Kind:** Calculation · metadata aggregation
+- **표본:** DeepSWE n=113과제 · 91개 저장소
+- **분모 · 단위:** 113과제 · 과제 / %
+- **성격:** 계산 · 메타데이터 집계
 
-Source table: Round 1 measurement table · table 14.
+원문 표: 1차 측정표 · 표 14.
 
 <a id="table-7"></a>
 
-#### Round 1 · DeepSWE (n=113) — language
+#### 1차 · DeepSWE (n=113) — language
 
-| Metadata value | Task count | Task share |
+| 메타데이터 값 | 과제 수 | 과제 비중 |
 | --- | --- | --- |
 | typescript | 35 | 30.97% |
 | go | 34 | 30.09% |
@@ -137,17 +137,17 @@ Source table: Round 1 measurement table · table 14.
 | rust | 5 | 4.42% |
 | javascript | 5 | 4.42% |
 
-- **Sample:** DeepSWE n=113 tasks
-- **Denominator · unit:** 113 tasks · tasks / %
-- **Kind:** Calculation · metadata aggregation
+- **표본:** DeepSWE n=113과제
+- **분모 · 단위:** 113과제 · 과제 / %
+- **성격:** 계산 · 메타데이터 집계
 
-Source table: Round 1 measurement table · table 8.
+원문 표: 1차 측정표 · 표 8.
 
 <a id="table-8"></a>
 
-#### Round 1 · Terminal-Bench 2.1 (n=89) — category
+#### 1차 · Terminal-Bench 2.1 (n=89) — category
 
-| Metadata value | Task count | Task share |
+| 메타데이터 값 | 과제 수 | 과제 비중 |
 | --- | --- | --- |
 | software-engineering | 26 | 29.21% |
 | system-administration | 9 | 10.11% |
@@ -166,367 +166,367 @@ Source table: Round 1 measurement table · table 8.
 | data-querying | 1 | 1.12% |
 | video-processing | 1 | 1.12% |
 
-- **Sample:** Terminal n=89 tasks
-- **Denominator · unit:** 89 tasks · tasks / %
-- **Kind:** Calculation · metadata aggregation
+- **표본:** Terminal n=89과제
+- **분모 · 단위:** 89과제 · 과제 / %
+- **성격:** 계산 · 메타데이터 집계
 
-Source table: Round 1 measurement table · table 12.
+원문 표: 1차 측정표 · 표 12.
 
 <a id="table-9"></a>
 
-#### Round 1 · Terminal-Bench 2.1 (n=89) — difficulty
+#### 1차 · Terminal-Bench 2.1 (n=89) — difficulty
 
-| Metadata value | Task count | Task share |
+| 메타데이터 값 | 과제 수 | 과제 비중 |
 | --- | --- | --- |
 | medium | 55 | 61.80% |
 | hard | 30 | 33.71% |
 | easy | 4 | 4.49% |
 
-- **Sample:** Terminal n=89 tasks
-- **Denominator · unit:** 89 tasks · tasks / %
-- **Kind:** Calculation · author-metadata aggregation
+- **표본:** Terminal n=89과제
+- **분모 · 단위:** 89과제 · 과제 / %
+- **성격:** 계산 · 저자 메타데이터 집계
 
-Source table: Round 1 measurement table · table 13.
+원문 표: 1차 측정표 · 표 13.
 
 <details>
-<summary>Concentration and language</summary>
+<summary>편중과 언어</summary>
 
 <a id="table-10"></a>
 
-#### Round 1 · DeepSWE (n=113) — category
+#### 1차 · DeepSWE (n=113) — category
 
-| Metadata value | Task count | Task share |
+| 메타데이터 값 | 과제 수 | 과제 비중 |
 | --- | --- | --- |
 | feature_request | 106 | 93.81% |
 | bugfix | 4 | 3.54% |
 | enhancement | 3 | 2.65% |
 
-- **Sample:** DeepSWE n=113 · Terminal n=89
-- **Denominator · unit:** Task count in each benchmark · tasks / %
-- **Kind:** Calculation · metadata aggregation
+- **표본:** DeepSWE n=113 · Terminal n=89
+- **분모 · 단위:** 각 벤치마크 과제 수 · 과제 / %
+- **성격:** 계산 · 메타데이터 집계
 
-Source table: Round 1 measurement table · table 9.
+원문 표: 1차 측정표 · 표 9.
 
 <a id="table-11"></a>
 
-#### Round 1 · DeepSWE (n=113) — difficulty
+#### 1차 · DeepSWE (n=113) — difficulty
 
-| Metadata value | Task count | Task share |
+| 메타데이터 값 | 과제 수 | 과제 비중 |
 | --- | --- | --- |
 | not_declared | 113 | 100.00% |
 
-- **Sample:** DeepSWE n=113 · Terminal n=89
-- **Denominator · unit:** Task count in each benchmark · tasks / %
-- **Kind:** Calculation · metadata aggregation
+- **표본:** DeepSWE n=113 · Terminal n=89
+- **분모 · 단위:** 각 벤치마크 과제 수 · 과제 / %
+- **성격:** 계산 · 메타데이터 집계
 
-Source table: Round 1 measurement table · table 10.
+원문 표: 1차 측정표 · 표 10.
 
 <a id="table-12"></a>
 
-#### Round 1 · Terminal-Bench 2.1 (n=89) — language
+#### 1차 · Terminal-Bench 2.1 (n=89) — language
 
-| Metadata value | Task count | Task share |
+| 메타데이터 값 | 과제 수 | 과제 비중 |
 | --- | --- | --- |
 | not_declared | 89 | 100.00% |
 
-- **Sample:** DeepSWE n=113 · Terminal n=89
-- **Denominator · unit:** Task count in each benchmark · tasks / %
-- **Kind:** Calculation · metadata aggregation
+- **표본:** DeepSWE n=113 · Terminal n=89
+- **분모 · 단위:** 각 벤치마크 과제 수 · 과제 / %
+- **성격:** 계산 · 메타데이터 집계
 
-Source table: Round 1 measurement table · table 11.
+원문 표: 1차 측정표 · 표 11.
 
 </details>
 
 <a id="composition"></a>
 
-## Task Input Composition — Share by Segment
+## 과제 입력 구성 — 구간별 비중
 
 <a id="figure-3"></a>
 
-### Round 1 · UTF-8 Byte and Local-Token Histograms for the Official 113 DeepSWE and 89 Terminal Instructions
+### 1차 · 공식 DeepSWE 113·Terminal 89 지시문의 UTF-8 바이트와 로컬 토큰 히스토그램
 
-![UTF-8 byte and local-token distributions for instructions from 113 official DeepSWE tasks and 89 official Terminal tasks. These are not API billing tokens.](figures/round1/01-input-size.svg)
+![공식 DeepSWE 113과제와 Terminal 89과제의 지시문 UTF-8 바이트 및 로컬 토큰 분포. API 청구 토큰이 아니다.](figures/round1/01-input-size.svg)
 
-UTF-8 byte and local-token histograms for the official instructions from 113 DeepSWE and 89 Terminal tasks
+공식 DeepSWE 113·Terminal 89 지시문의 UTF-8 바이트와 로컬 토큰 히스토그램
 
-Both sets begin by specifying the work to perform; the agent then expands its observations by reading files and running commands in the environment.
+두 집합은 “해야 할 일”을 먼저 주고, agent가 환경에서 파일을 읽거나 명령을 실행하면서 관측을 늘리는 구조다.
 
-**Observation.** Here, an instruction is the task's `instruction.md` file. It excludes the full repository and conversation history accumulated during a run.
+**관측.** 여기서 지시문은 과제의 `instruction.md` 파일이며, 저장소 전체나 실행 중에 늘어나는 대화 이력은 포함하지 않는다.
 
-**Possible explanation.** Because code and data remain in the run environment for the agent to read as needed, the medians of 418 local tokens for DeepSWE and 165 for Terminal primarily describe instructions that communicate the work to perform.
+**가능한 설명.** 코드와 자료는 실행 환경에 두고 에이전트가 필요할 때 읽는 구조이므로, DeepSWE 418·Terminal 165 로컬 토큰이라는 중앙값은 주로 해야 할 일을 전하는 지시문의 길이로 이해해야 한다.
 
-**Interpretation.** File-read and command-execution results accumulate in later inputs, so content passed during execution is a more relevant place to look for compression candidates than the short instruction itself.
+**해석.** 후속 입력에는 파일 읽기·명령 실행의 결과가 쌓이므로, 압축 후보를 찾을 곳은 짧은 지시문 자체보다 실행 중 전달되는 내용이다.
 
-**Limitation.** This does not establish that most actual input consists of tool results; DeepSWE run-request composition has not yet been measured.
+**한계.** 이를 실제 입력 대부분이 도구 실행 결과라는 주장으로 바꾸지는 않으며, DeepSWE의 실행 요청 구성은 아직 측정하지 않았다.
 
-- **Sample:** Official DeepSWE n=113 · Terminal n=89
-- **Denominator · unit:** Official instruction files · UTF-8 bytes / local `o200k_base` tokens
-- **Kind:** Measurement · quantile calculation
+- **표본:** 공식 DeepSWE n=113 · Terminal n=89
+- **분모 · 단위:** 공식 지시문 파일 · UTF-8 바이트 / 로컬 o200k_base 토큰
+- **성격:** 측정 · 분위수 계산
 
-Source figure basis: Round 1 measurement table 1.
+원문 그림의 근거: 1차 측정표 표 1.
 
 <a id="table-13"></a>
 
-#### Round 1 · 1. Instruction Size
+#### 1차 · 1. 지시문 크기
 
-| Input layer | Sample tasks | UTF-8 bytes | local o200k_base tokens |
+| 입력층 | 표본 과제 | UTF-8 바이트 | 로컬 o200k_base 토큰 |
 | --- | --- | --- | --- |
 | DeepSWE (n=113) | 113 | 471 / 1,975 / 4,198.4 / 5,385 | 98 / 418 / 906.4 / 1,276 |
 | Terminal-Bench 2.1 (n=89) | 89 | 123 / 716 / 2,491.2 / 4,365 | 33 / 165 / 575.4 / 1,153 |
 | Imported English + appendix (n=113) | 113 | 570 / 2,074 / 4,295.6 / 5,483 | 118 / 438 / 926.4 / 1,296 |
 | Imported Korean translation (n=113) | 113 | 748 / 2,550 / 5,069.0 / 6,170 | 174 / 614 / 1,205.8 / 1,520 |
 
-- **Sample:** Official DeepSWE 113 · Terminal 89 · imported English/Korean, 113 each
-- **Denominator · unit:** Each instruction file · bytes / local o200k_base tokens
-- **Kind:** Measurement · quantile calculation
+- **표본:** 공식 DeepSWE 113 · Terminal 89 · 이관 영어/한국어 각 113
+- **분모 · 단위:** 각 지시문 파일 · 바이트 / 로컬 o200k_base 토큰
+- **성격:** 측정 · 분위수 계산
 
-Source table: Round 1 measurement table · table 1.
+원문 표: 1차 측정표 · 표 1.
 
-Minimum / median / P95 / maximum by unit. P95 uses linear interpolation and need not be an observed value.
+단위별 최소 / 중앙값 / P95 / 최대. P95는 선형 보간이며 관측값 자체일 필요는 없다.
 
-Official source text and migrated translations are separate.
+공식 원문과 이관 번역은 별개다.
 
 <a id="figure-4"></a>
 
-### Round 2 · Byte and Local-Token Box-and-Point Plots by Type for Both Official Sets and 56 Terminal Requests
+### 2차 · 공식 두 집합과 Terminal 56요청을 나눈 종류별 바이트/로컬 토큰 상자·개별점
 
-![Input-size distributions separated into static DeepSWE n=113 tasks, Terminal n=89 tasks, and historical Terminal n=56 requests. Units are UTF-8 bytes and local o200k_base tokens, not API tokens.](figures/round2/03-input-size-by-type.svg)
+![입력 크기 분포. 정적 DeepSWE n=113과제와 Terminal n=89과제, 과거 Terminal n=56요청을 분리했다. UTF-8 바이트와 로컬 o200k_base 토큰이며 API 토큰이 아니다.](figures/round2/03-input-size-by-type.svg)
 
-Byte and local-token box-and-point plots by type for both official sets and 56 Terminal requests
+공식 두 집합과 Terminal 56요청을 나눈 종류별 바이트/로컬 토큰 상자·개별점
 
-Units are UTF-8 bytes and local `o200k_base` tokens, not API tokens.
+UTF-8 바이트와 로컬 o200k_base 토큰이며 API 토큰이 아니다.
 
-**Observation.** Official instructions count one file per task; historical runs count each successive request from the same task.
+**관측.** 공식 지시문은 과제마다 한 파일을 세지만, 과거 실행 쪽은 같은 과제에서 이어진 요청을 각각 센다.
 
-**Possible explanation.** Later requests include earlier command results and conversation history, so the difference between instruction size and request size is consistent with this input structure.
+**가능한 설명.** 후속 요청에는 이전 명령 결과와 대화 이력이 함께 들어가므로, 지시문 크기와 요청 크기가 달라지는 것은 이 입력 구조와 맞는다.
 
-**Interpretation.** Size comparisons by type must account for the input layer and counts of tasks, runs, and requests. A task with many requests must not be treated as many independent tasks.
+**해석.** 종류별 크기를 비교할 때도 입력층과 과제·실행·요청 수를 함께 봐야 하며, 요청이 많은 과제를 독립 과제 여러 개처럼 취급하면 안 된다.
 
-**Limitation.** Instruction distributions cannot substitute for request sizes in debugging and review categories absent from the historical runs.
+**한계.** 기존 실행에 없는 디버깅·리뷰의 요청 크기를 지시문 분포로 대신할 수는 없다.
 
-- **Sample:** Official DeepSWE 113 · Terminal 89 · historical Terminal 56 requests
-- **Denominator · unit:** Instructions / request bodies · UTF-8 bytes / local tokens
-- **Kind:** Measurement · quantile calculation
+- **표본:** 공식 DeepSWE 113 · Terminal 89 · 과거 Terminal 56요청
+- **분모 · 단위:** 지시문 / 요청 본문 · UTF-8 바이트 / 로컬 토큰
+- **성격:** 측정 · 분위수 계산
 
-Source figure basis: Round 2 measurement tables 1, 3, and 6.
+원문 그림의 근거: 2차 측정표 표 1·3·6.
 
 <a id="table-14"></a>
 
-#### Round 2 · deep-swe
+#### 2차 · deep-swe
 
-| Primary type | n tasks | Minimum bytes | p25 bytes | Median bytes | p75 bytes | Maximum bytes | Median local tokens | p95 local tokens | Instruction candidate share |
+| 주 종류 | n 과제 | 최소 바이트 | p25 바이트 | 중앙 바이트 | p75 바이트 | 최대 바이트 | 중앙 로컬 토큰 | p95 로컬 토큰 | 지시문 후보 비중 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Feature request | 105 | 471 | 1,508 | 2,097 | 2,849 | 5,385 | 448 | 908.8 | 0.00% |
-| Bug fix / debugging | 8 | 665 | 970.75 | 1,387.5 | 1,560.25 | 2,835 | 246 | 430.65 | 0.00% |
-| Code review | 0 | — | — | — | — | — | — | — | Not measured |
-| Refactoring / migration | 0 | — | — | — | — | — | — | — | Not measured |
-| Test authoring | 0 | — | — | — | — | — | — | — | Not measured |
-| Environment / build | 0 | — | — | — | — | — | — | — | Not measured |
-| Other | 0 | — | — | — | — | — | — | — | Not measured |
+| 기능 요청 | 105 | 471 | 1,508 | 2,097 | 2,849 | 5,385 | 448 | 908.8 | 0.00% |
+| 버그 수정·디버깅 | 8 | 665 | 970.75 | 1,387.5 | 1,560.25 | 2,835 | 246 | 430.65 | 0.00% |
+| 코드 리뷰 | 0 | — | — | — | — | — | — | — | 미측정 |
+| 리팩터링 | 0 | — | — | — | — | — | — | — | 미측정 |
+| 테스트 작성 | 0 | — | — | — | — | — | — | — | 미측정 |
+| 환경 설정·빌드 | 0 | — | — | — | — | — | — | — | 미측정 |
+| 그 밖에 | 0 | — | — | — | — | — | — | — | 미측정 |
 
-- **Sample:** DeepSWE n=113 tasks
-- **Denominator · unit:** Each official instruction · UTF-8 bytes / local tokens
-- **Kind:** Measurement · quantile calculation
+- **표본:** DeepSWE n=113과제
+- **분모 · 단위:** 각 공식 지시문 · UTF-8 바이트 / 로컬 토큰
+- **성격:** 측정 · 분위수 계산
 
-Source table: Round 2 measurement table · table 1.
+원문 표: 2차 측정표 · 표 1.
 
 <a id="table-15"></a>
 
-#### Round 2 · terminal-bench-2.1
+#### 2차 · terminal-bench-2.1
 
-| Primary type | n tasks | Minimum bytes | p25 bytes | Median bytes | p75 bytes | Maximum bytes | Median local tokens | p95 local tokens | Instruction candidate share |
+| 주 종류 | n 과제 | 최소 바이트 | p25 바이트 | 중앙 바이트 | p75 바이트 | 최대 바이트 | 중앙 로컬 토큰 | p95 로컬 토큰 | 지시문 후보 비중 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Feature request | 31 | 339 | 562 | 851 | 1,280 | 4,365 | 233 | 587.5 | 0.00% |
-| Bug fix / debugging | 5 | 366 | 471 | 975 | 1,629 | 3,873 | 267 | 766.8 | 0.00% |
-| Code review | 0 | — | — | — | — | — | — | — | Not measured |
-| Refactoring / migration | 6 | 584 | 703.5 | 1,049 | 1,208.5 | 1,788 | 247 | 402.75 | 0.00% |
-| Test authoring | 0 | — | — | — | — | — | — | — | Not measured |
-| Environment / build | 16 | 232 | 419.5 | 717.5 | 1,135.75 | 1,882 | 174.5 | 408.5 | 0.00% |
-| Other | 31 | 123 | 347 | 559 | 1,182 | 2,655 | 126 | 511 | 0.00% |
+| 기능 요청 | 31 | 339 | 562 | 851 | 1,280 | 4,365 | 233 | 587.5 | 0.00% |
+| 버그 수정·디버깅 | 5 | 366 | 471 | 975 | 1,629 | 3,873 | 267 | 766.8 | 0.00% |
+| 코드 리뷰 | 0 | — | — | — | — | — | — | — | 미측정 |
+| 리팩터링 | 6 | 584 | 703.5 | 1,049 | 1,208.5 | 1,788 | 247 | 402.75 | 0.00% |
+| 테스트 작성 | 0 | — | — | — | — | — | — | — | 미측정 |
+| 환경 설정·빌드 | 16 | 232 | 419.5 | 717.5 | 1,135.75 | 1,882 | 174.5 | 408.5 | 0.00% |
+| 그 밖에 | 31 | 123 | 347 | 559 | 1,182 | 2,655 | 126 | 511 | 0.00% |
 
-- **Sample:** Terminal n=89 tasks
-- **Denominator · unit:** Each official instruction · UTF-8 bytes / local tokens
-- **Kind:** Measurement · quantile calculation
+- **표본:** Terminal n=89과제
+- **분모 · 단위:** 각 공식 지시문 · UTF-8 바이트 / 로컬 토큰
+- **성격:** 측정 · 분위수 계산
 
-Source table: Round 2 measurement table · table 3.
+원문 표: 2차 측정표 · 표 3.
 
 <details>
-<summary>Request-size distribution</summary>
+<summary>요청별 크기 분포</summary>
 
 <a id="table-16"></a>
 
-#### Round 2 · Request-Size Distribution
+#### 2차 · 요청별 크기 분포
 
-| Primary type | n requests | Minimum bytes | p25 bytes | Median bytes | p75 bytes | Maximum bytes | Minimum local tokens | Median local tokens | Maximum local tokens |
+| 주 종류 | n 요청 | 최소 바이트 | p25 바이트 | 중앙 바이트 | p75 바이트 | 최대 바이트 | 최소 로컬 토큰 | 중앙 로컬 토큰 | 최대 로컬 토큰 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Feature request | 9 | 3,504 | 3,504 | 7,466 | 8,361 | 10,606 | 794 | 1,865 | 2,570 |
-| Bug fix / debugging | 0 | — | — | — | — | — | — | — | — |
-| Code review | 0 | — | — | — | — | — | — | — | — |
-| Refactoring / migration | 0 | — | — | — | — | — | — | — | — |
-| Test authoring | 0 | — | — | — | — | — | — | — | — |
-| Environment / build | 19 | 4,348 | 4,849 | 10,994 | 16,152.5 | 18,196 | 983 | 3,051 | 5,221 |
-| Other | 28 | 4,358 | 9,691.75 | 19,284.5 | 27,677.5 | 49,720 | 1,017 | 6,586 | 13,661 |
+| 기능 요청 | 9 | 3,504 | 3,504 | 7,466 | 8,361 | 10,606 | 794 | 1,865 | 2,570 |
+| 버그 수정·디버깅 | 0 | — | — | — | — | — | — | — | — |
+| 코드 리뷰 | 0 | — | — | — | — | — | — | — | — |
+| 리팩터링 | 0 | — | — | — | — | — | — | — | — |
+| 테스트 작성 | 0 | — | — | — | — | — | — | — | — |
+| 환경 설정·빌드 | 19 | 4,348 | 4,849 | 10,994 | 16,152.5 | 18,196 | 983 | 3,051 | 5,221 |
+| 그 밖에 | 28 | 4,358 | 9,691.75 | 19,284.5 | 27,677.5 | 49,720 | 1,017 | 6,586 | 13,661 |
 
-- **Sample:** Terminal 5 tasks · 56 requests
-- **Denominator · unit:** Each request body · UTF-8 bytes / local tokens
-- **Kind:** Measurement · quantile calculation
+- **표본:** Terminal 5과제 · 56요청
+- **분모 · 단위:** 각 요청 본문 · UTF-8 바이트 / 로컬 토큰
+- **성격:** 측정 · 분위수 계산
 
-Source table: Round 2 measurement table · table 6.
+원문 표: 2차 측정표 · 표 6.
 
 </details>
 
 <a id="figure-5"></a>
 
-### Round 1 · Body Composition of Both Official Sets and 56 Historical Terminal Requests
+### 1차 · 공식 두 집합과 과거 Terminal 56요청의 본문 구성
 
-![Body-segment shares for 113 and 89 static instructions and 56 historical Terminal actual requests. Each layer uses total UTF-8 body bytes as its denominator and shows unclassified content separately.](figures/round1/02-input-composition.svg)
+![정적 지시문 113개·89개와 기존 Terminal 실제 요청 56개의 본문 구간 비중. 각 층의 UTF-8 바이트 합계를 분모로 하며 미분류도 별도 표시한다.](figures/round1/02-input-composition.svg)
 
-Body composition of both official sets and 56 historical Terminal requests
+공식 두 집합과 과거 Terminal 56요청의 본문 구성
 
-This is neither the average per-request share nor a share of API tokens.
+요청별 비중의 평균이나 API 토큰의 비중이 아니다.
 
-**Observation.** Body segmentation considers provenance and protection policy as well as content format; command output is not automatically a log candidate.
+**관측.** 본문을 나눈 기준에는 내용의 형식뿐 아니라 출처와 보호 정책이 들어가며, 명령이 출력했다는 이유만으로 모두 로그 후보가 되지는 않는다.
 
-Code-read results and commands written by the assistant are also protected, so increased input length during a run does not imply an equal amount is compressible.
+코드 읽기 결과와 assistant가 작성한 명령도 보호하므로, 실행 중 입력이 길어졌다는 사실만으로 그만큼 압축할 수 있다고 읽을 수 없다.
 
-**Interpretation.** Because conversation history is counted again when included in the next request, these shares also differ from shares of unique files or outputs.
+**해석.** 대화 이력이 다음 요청에 다시 담기면 다시 세는 구성이라, 이 비중은 고유한 파일·출력의 비중과도 다르다.
 
-**Limitation.** Segments not identified by automated rules remain protected; the next section reclassifies that unclassified content from the same source text.
+**한계.** 자동 규칙으로 식별하지 못한 구간은 보호한 채 남겼고, 다음 절의 재검토는 그 미분류를 같은 원문에서 다시 나눈 것이다.
 
-- **Sample:** Official instructions 113 and 89 · Terminal actual requests 56
-- **Denominator · unit:** Total UTF-8 body bytes in each input layer · %
-- **Kind:** Classification judgment · byte aggregation
+- **표본:** 공식 지시문 113개·89개 · Terminal 실제 요청 56개
+- **분모 · 단위:** 각 입력층의 본문 UTF-8 바이트 합계 · %
+- **성격:** 분류 판단·바이트 집계
 
-Source figure basis: Round 1 measurement table 2.
+원문 그림의 근거: 1차 측정표 표 2.
 
 <a id="table-17"></a>
 
-#### Round 1 · 2. Segment Shares
+#### 1차 · 2. 구간 비중
 
-| Segment | DeepSWE instructions n=113 | Terminal instructions n=89 | Terminal actual requests n=56 |
+| 구간 | DeepSWE 지시문 n=113 | Terminal 지시문 n=89 | Terminal 실제 요청 n=56 |
 | --- | --- | --- | --- |
-| system role | 0.00% | 0.00% | 0.00% |
-| Harness instructions and initial state | 0.00% | 0.00% | 20.16% |
-| Task-instruction prose | 83.92% | 93.77% | 8.91% |
-| Inline identifiers and code | 14.94% | 4.86% | 0.64% |
-| Code, shell commands, and code echo | 0.72% | 0.75% | 26.58% |
-| Structured data such as JSON, YAML, and CSV | 0.42% | 0.62% | 1.25% |
-| Identified command logs | 0.00% | 0.00% | 9.05% |
-| Test output | 0.00% | 0.00% | 0.00% |
-| Stack trace | 0.00% | 0.00% | 0.00% |
+| system 역할 | 0.00% | 0.00% | 0.00% |
+| harness 지시·초기 상태 | 0.00% | 0.00% | 20.16% |
+| 과제 지시 산문 | 83.92% | 93.77% | 8.91% |
+| 인라인 식별자·코드 | 14.94% | 4.86% | 0.64% |
+| 코드·셸 명령·코드 echo | 0.72% | 0.75% | 26.58% |
+| JSON·YAML·CSV 등 구조화 자료 | 0.42% | 0.62% | 1.25% |
+| 식별된 명령 로그 | 0.00% | 0.00% | 9.05% |
+| 테스트 출력 | 0.00% | 0.00% | 0.00% |
+| 스택 트레이스 | 0.00% | 0.00% | 0.00% |
 | diff | 0.00% | 0.00% | 0.00% |
-| PR comment | 0.00% | 0.00% | 0.00% |
-| Assistant plan and JSON envelope | 0.00% | 0.00% | 12.74% |
-| Terminal envelope | 0.00% | 0.00% | 1.48% |
-| Unclassified and protected | 0.00% | 0.00% | 19.20% |
+| PR 코멘트 | 0.00% | 0.00% | 0.00% |
+| assistant 계획·JSON 외피 | 0.00% | 0.00% | 12.74% |
+| 터미널 외피 | 0.00% | 0.00% | 1.48% |
+| 미분류·보호 | 0.00% | 0.00% | 19.20% |
 
-- **Sample:** Official instructions 113 and 89 · Terminal actual requests 56
-- **Denominator · unit:** Total UTF-8 body bytes in each input layer · %
-- **Kind:** Classification judgment · byte aggregation
+- **표본:** 공식 지시문 113개·89개 · Terminal 실제 요청 56개
+- **분모 · 단위:** 각 입력층의 본문 UTF-8 바이트 합계 · %
+- **성격:** 분류 판단·바이트 집계
 
-Source table: Round 1 measurement table · table 2.
+원문 표: 1차 측정표 · 표 2.
 
-Not all stdout is counted as logs.
+stdout이라고 전부 로그로 세지 않는다.
 
 <details>
-<summary>Distribution of segment shares by task and request</summary>
+<summary>과제·요청별 구간 비중의 분포</summary>
 
-Each cell shows median / P95 / maximum byte share.
+각 셀은 바이트 비중의 중앙값 / P95 / 최대.
 
 <a id="table-18"></a>
 
-#### Round 1 · Distribution of Segment Shares by Task and Request
+#### 1차 · 과제·요청별 구간 비중의 분포
 
-| Segment | DeepSWE n=113 | Static Terminal n=89 | Terminal requests n=56 |
+| 구간 | DeepSWE n=113 | Terminal 정적 n=89 | Terminal 요청 n=56 |
 | --- | --- | --- | --- |
-| Harness instructions and initial state | 0.00% / 0.00% / 0.00% | 0.00% / 0.00% / 0.00% | 24.35% / 72.35% / 84.67% |
-| Task-instruction prose | 87.87% / 100.00% / 100.00% | 100.00% / 100.00% / 100.00% | 9.65% / 32.92% / 33.22% |
-| Inline identifiers and code | 12.09% / 37.84% / 51.70% | 0.00% / 21.90% / 36.59% | 0.50% / 4.52% / 5.59% |
-| Code, shell commands, and code echo | 0.00% / 0.00% / 51.29% | 0.00% / 0.00% / 15.92% | 21.14% / 38.50% / 40.54% |
-| Structured data such as JSON, YAML, and CSV | 0.00% / 0.00% / 23.96% | 0.00% / 0.00% / 16.27% | 0.00% / 4.82% / 6.37% |
-| Identified command logs | 0.00% / 0.00% / 0.00% | 0.00% / 0.00% / 0.00% | 0.77% / 33.66% / 44.64% |
-| Assistant plan and JSON envelope | 0.00% / 0.00% / 0.00% | 0.00% / 0.00% / 0.00% | 9.14% / 31.62% / 57.90% |
-| Terminal envelope | 0.00% / 0.00% / 0.00% | 0.00% / 0.00% / 0.00% | 1.20% / 2.95% / 3.83% |
-| Unclassified and protected | 0.00% / 0.00% / 0.00% | 0.00% / 0.00% / 0.00% | 4.83% / 39.69% / 44.60% |
+| harness 지시·초기 상태 | 0.00% / 0.00% / 0.00% | 0.00% / 0.00% / 0.00% | 24.35% / 72.35% / 84.67% |
+| 과제 지시 산문 | 87.87% / 100.00% / 100.00% | 100.00% / 100.00% / 100.00% | 9.65% / 32.92% / 33.22% |
+| 인라인 식별자·코드 | 12.09% / 37.84% / 51.70% | 0.00% / 21.90% / 36.59% | 0.50% / 4.52% / 5.59% |
+| 코드·셸 명령·코드 echo | 0.00% / 0.00% / 51.29% | 0.00% / 0.00% / 15.92% | 21.14% / 38.50% / 40.54% |
+| JSON·YAML·CSV 등 구조화 자료 | 0.00% / 0.00% / 23.96% | 0.00% / 0.00% / 16.27% | 0.00% / 4.82% / 6.37% |
+| 식별된 명령 로그 | 0.00% / 0.00% / 0.00% | 0.00% / 0.00% / 0.00% | 0.77% / 33.66% / 44.64% |
+| assistant 계획·JSON 외피 | 0.00% / 0.00% / 0.00% | 0.00% / 0.00% / 0.00% | 9.14% / 31.62% / 57.90% |
+| 터미널 외피 | 0.00% / 0.00% / 0.00% | 0.00% / 0.00% / 0.00% | 1.20% / 2.95% / 3.83% |
+| 미분류·보호 | 0.00% / 0.00% / 0.00% | 0.00% / 0.00% / 0.00% | 4.83% / 39.69% / 44.60% |
 
-- **Sample:** Official instructions 113 and 89 · Terminal 56 requests
-- **Denominator · unit:** Each instruction or request body · UTF-8 bytes / %
-- **Kind:** Classification judgment · quantile calculation
+- **표본:** 공식 지시문 113개·89개 · Terminal 56요청
+- **분모 · 단위:** 각 지시문 / 요청 본문 UTF-8 바이트 · %
+- **성격:** 분류 판단 · 분위수 계산
 
-Source table: Round 1 measurement table · table 3.
+원문 표: 1차 측정표 · 표 3.
 
 </details>
 
 <details>
-<summary>Static official instructions — n=202 tasks</summary>
+<summary>정적 공식 지시문 — n=202과제</summary>
 
 <a id="table-19"></a>
 
-#### Round 2 · deep-swe
+#### 2차 · deep-swe
 
-| Primary type | n tasks | Code and inline code byte share | Identified log candidates byte share | Task and runner-instruction byte share | Structured and data-centered segments byte share | Unclassified and protected byte share |
+| 주 종류 | n 과제 | 코드·인라인 코드 바이트 비중 | 식별 로그 후보 바이트 비중 | 과제·실행기 지시 바이트 비중 | 구조화·자료 중심 구간 바이트 비중 | 미분류·보호 바이트 비중 |
 | --- | --- | --- | --- | --- | --- | --- |
-| Feature request | 105 | 16.30% | 0.00% | 83.26% | 0.44% | 0.00% |
-| Bug fix / debugging | 8 | 2.37% | 0.00% | 97.63% | 0.00% | 0.00% |
-| Code review | 0 | Not measured | Not measured | Not measured | Not measured | Not measured |
-| Refactoring / migration | 0 | Not measured | Not measured | Not measured | Not measured | Not measured |
-| Test authoring | 0 | Not measured | Not measured | Not measured | Not measured | Not measured |
-| Environment / build | 0 | Not measured | Not measured | Not measured | Not measured | Not measured |
-| Other | 0 | Not measured | Not measured | Not measured | Not measured | Not measured |
+| 기능 요청 | 105 | 16.30% | 0.00% | 83.26% | 0.44% | 0.00% |
+| 버그 수정·디버깅 | 8 | 2.37% | 0.00% | 97.63% | 0.00% | 0.00% |
+| 코드 리뷰 | 0 | 미측정 | 미측정 | 미측정 | 미측정 | 미측정 |
+| 리팩터링 | 0 | 미측정 | 미측정 | 미측정 | 미측정 | 미측정 |
+| 테스트 작성 | 0 | 미측정 | 미측정 | 미측정 | 미측정 | 미측정 |
+| 환경 설정·빌드 | 0 | 미측정 | 미측정 | 미측정 | 미측정 | 미측정 |
+| 그 밖에 | 0 | 미측정 | 미측정 | 미측정 | 미측정 | 미측정 |
 
-- **Sample:** DeepSWE n=113 tasks
-- **Denominator · unit:** Total UTF-8 bytes in official instructions by type · %
-- **Kind:** Classification judgment · byte aggregation
+- **표본:** DeepSWE n=113과제
+- **분모 · 단위:** 종류별 공식 지시문 UTF-8 바이트 합계 · %
+- **성격:** 분류 판단·바이트 집계
 
-Source table: Round 2 measurement table · table 2.
+원문 표: 2차 측정표 · 표 2.
 
 <a id="table-20"></a>
 
-#### Round 2 · terminal-bench-2.1
+#### 2차 · terminal-bench-2.1
 
-| Primary type | n tasks | Code and inline code byte share | Identified log candidates byte share | Task and runner-instruction byte share | Structured and data-centered segments byte share | Unclassified and protected byte share |
+| 주 종류 | n 과제 | 코드·인라인 코드 바이트 비중 | 식별 로그 후보 바이트 비중 | 과제·실행기 지시 바이트 비중 | 구조화·자료 중심 구간 바이트 비중 | 미분류·보호 바이트 비중 |
 | --- | --- | --- | --- | --- | --- | --- |
-| Feature request | 31 | 7.71% | 0.00% | 91.64% | 0.65% | 0.00% |
-| Bug fix / debugging | 5 | 0.59% | 0.00% | 99.41% | 0.00% | 0.00% |
-| Code review | 0 | Not measured | Not measured | Not measured | Not measured | Not measured |
-| Refactoring / migration | 6 | 4.95% | 0.00% | 95.05% | 0.00% | 0.00% |
-| Test authoring | 0 | Not measured | Not measured | Not measured | Not measured | Not measured |
-| Environment / build | 16 | 10.71% | 0.00% | 89.29% | 0.00% | 0.00% |
-| Other | 31 | 1.70% | 0.00% | 97.08% | 1.23% | 0.00% |
+| 기능 요청 | 31 | 7.71% | 0.00% | 91.64% | 0.65% | 0.00% |
+| 버그 수정·디버깅 | 5 | 0.59% | 0.00% | 99.41% | 0.00% | 0.00% |
+| 코드 리뷰 | 0 | 미측정 | 미측정 | 미측정 | 미측정 | 미측정 |
+| 리팩터링 | 6 | 4.95% | 0.00% | 95.05% | 0.00% | 0.00% |
+| 테스트 작성 | 0 | 미측정 | 미측정 | 미측정 | 미측정 | 미측정 |
+| 환경 설정·빌드 | 16 | 10.71% | 0.00% | 89.29% | 0.00% | 0.00% |
+| 그 밖에 | 31 | 1.70% | 0.00% | 97.08% | 1.23% | 0.00% |
 
-- **Sample:** Terminal n=89 tasks
-- **Denominator · unit:** Total UTF-8 bytes in official instructions by type · %
-- **Kind:** Classification judgment · byte aggregation
+- **표본:** Terminal n=89과제
+- **분모 · 단위:** 종류별 공식 지시문 UTF-8 바이트 합계 · %
+- **성격:** 분류 판단·바이트 집계
 
-Source table: Round 2 measurement table · table 4.
+원문 표: 2차 측정표 · 표 4.
 
 </details>
 
 <a id="candidates"></a>
 
-## Compression Candidates — Overall and by Task
+## 압축 후보 — 전체와 과제별
 
 <a id="figure-6"></a>
 
-### Round 1 · Initially Identified Candidate, Unclassified, and Protected Shares for 5 Terminal Tasks
+### 1차 · Terminal 5과제의 1차 식별 후보·미분류·보호 비중
 
-![Task-level shares of log candidates, unclassified content, and protected segments across 56 requests recorded for 5 Terminal tasks with 3 runs each. This shows body-byte composition, not compression results.](figures/round1/03-compressible-share.svg)
+![Terminal 5과제, 각 3실행에서 기록된 요청 56개의 과제별 로그 후보·미분류·보호 구간 비중. 압축 결과가 아니라 본문 바이트 구성이다.](figures/round1/03-compressible-share.svg)
 
-Initially identified candidate, unclassified, and protected shares for 5 Terminal tasks
+Terminal 5과제의 1차 식별 후보·미분류·보호 비중
 
-This is body-byte composition, not a compression result.
+압축 결과가 아니라 본문 바이트 구성이다.
 
-- **Sample:** 5 tasks · n=3 runs each · 56 requests
-- **Denominator · unit:** Total body UTF-8 bytes by task · %
-- **Kind:** Classification judgment · byte aggregation
+- **표본:** 5과제 · 각 n=3실행 · 56요청
+- **분모 · 단위:** 과제별 본문 UTF-8 바이트 합계 · %
+- **성격:** 분류 판단·바이트 집계
 
-Source figure basis: Round 1 measurement table 4.
+원문 그림의 근거: 1차 측정표 표 4.
 
 <a id="table-21"></a>
 
-#### Round 1 · 3. Compression Candidates in Actual Requests
+#### 1차 · 3. 실제 요청의 압축 후보
 
-| Terminal task | Request count / run count | Candidate byte share | Unclassified byte share |
+| Terminal 과제 | 요청 수 / 실행 수 | 후보 바이트 비중 | 미분류 바이트 비중 |
 | --- | --- | --- | --- |
 | cancel-async-tasks | 9 / 3 | 0.47% | 3.37% |
 | log-summary-date-ranges | 13 / 3 | 25.74% | 10.17% |
@@ -534,185 +534,185 @@ Source figure basis: Round 1 measurement table 4.
 | nginx-request-logging | 11 / 3 | 7.03% | 27.44% |
 | openssl-selfsigned-cert | 8 / 3 | 1.35% | 4.32% |
 
-- **Sample:** 5 tasks · n=3 runs each · 56 requests
-- **Denominator · unit:** Total body UTF-8 bytes by task · %
-- **Kind:** Classification judgment · byte aggregation
+- **표본:** 5과제 · 각 n=3실행 · 56요청
+- **분모 · 단위:** 과제별 본문 UTF-8 바이트 합계 · %
+- **성격:** 분류 판단·바이트 집계
 
-Source table: Round 1 measurement table · table 4.
+원문 표: 1차 측정표 · 표 4.
 
-Across all 56 requests, the candidate share is 9.05% and the unclassified share is 19.20%.
+전체 56요청에서는 후보 9.05%, 미분류 19.20%다.
 
 <a id="figure-7"></a>
 
-### Round 2 · Seven-Category Decomposition of 158,258 Formerly Unclassified Bytes
+### 2차 · 옛 미분류 158,258바이트의 7범주 분해
 
-![Decomposition of unclassified content after complete review of 58 distinct segments and 168 occurrences including retransmission, totaling 158,258 bytes. Historical requests n=56 and tasks n=5; these are neither API tokens nor an actual savings rate.](figures/round2/04-unknown-decomposition.svg)
+![미분류 분해. 서로 다른 58종, 재전송 포함 168회·158,258바이트를 전수 검토했다. 기존 과거 요청 n=56, 과제 n=5이며 API 토큰이나 실제 절감률이 아니다.](figures/round2/04-unknown-decomposition.svg)
 
-Seven-category decomposition of 158,258 formerly unclassified bytes
+옛 미분류 158,258바이트의 7범주 분해
 
-This is a complete review of unclassified content within this historical request set, not an estimate from a random sample.
+이것은 무작위 표본 추정이 아니라 이 과거 요청 집합 안의 미분류 전수 검토다.
 
-- **Sample:** 58 distinct segments · 168 occurrences including retransmission · 56 requests · 5 tasks
-- **Denominator · unit:** Unclassified 158,258 bytes / all request-body 824,301 bytes
-- **Kind:** Classification judgment · byte aggregation
+- **표본:** 58종 · 재전송 포함 168회 · 56요청·5과제
+- **분모 · 단위:** 미분류 158,258바이트 / 전체 본문 824,301바이트
+- **성격:** 분류 판단·바이트 집계
 
-Source figure basis: Round 2 UNKNOWN_REVIEW table 1.
+원문 그림의 근거: 2차 UNKNOWN_REVIEW 표 1.
 
 <a id="table-22"></a>
 
-#### Round 2 · Review and Actual Examples of Round 1 Unclassified Segments
+#### 2차 · 1차 미분류 구간 검토와 실제 예시
 
-| Reclassification | Distinct-segment count | Occurrences including retransmission | Bytes excluding duplicates | Bytes including retransmission | Share of formerly unclassified bytes | Share of all request bytes |
+| 재분류 | 서로 다른 구간 수 | 재전송 포함 등장 수 | 중복 제외 바이트 | 재전송 포함 바이트 | 기존 미분류 중 비중 | 전체 요청 중 비중 |
 | --- | --- | --- | --- | --- | --- | --- |
-| Code-containing mixed content | 13 | 31 | 30,830 | 77,798 | 49.16% | 9.44% |
-| Identified log candidates | 14 | 51 | 19,598 | 52,522 | 33.19% | 6.37% |
-| Structured and data-centered segments | 14 | 32 | 9,122 | 19,844 | 12.54% | 2.41% |
-| Runner instructions and protected content | 2 | 19 | 527 | 4,517 | 2.85% | 0.55% |
-| Code and inline code | 4 | 10 | 973 | 2,682 | 1.69% | 0.33% |
-| Delimiters and other protected content | 10 | 24 | 346 | 847 | 0.54% | 0.10% |
-| Unclassified and protected | 1 | 1 | 48 | 48 | 0.03% | 0.01% |
+| 코드 포함 혼합 | 13 | 31 | 30,830 | 77,798 | 49.16% | 9.44% |
+| 식별 로그 후보 | 14 | 51 | 19,598 | 52,522 | 33.19% | 6.37% |
+| 구조화·자료 중심 구간 | 14 | 32 | 9,122 | 19,844 | 12.54% | 2.41% |
+| 실행기 지시·보호 | 2 | 19 | 527 | 4,517 | 2.85% | 0.55% |
+| 코드·인라인 코드 | 4 | 10 | 973 | 2,682 | 1.69% | 0.33% |
+| 구분자·기타 보호 | 10 | 24 | 346 | 847 | 0.54% | 0.10% |
+| 미분류·보호 | 1 | 1 | 48 | 48 | 0.03% | 0.01% |
 
-- **Sample:** 58 distinct segments · 168 occurrences including retransmission · 56 requests · 5 tasks
-- **Denominator · unit:** Unclassified 158,258 bytes / all request-body 824,301 bytes
-- **Kind:** Classification judgment · byte aggregation
+- **표본:** 58종 · 재전송 포함 168회 · 56요청·5과제
+- **분모 · 단위:** 미분류 158,258바이트 / 전체 본문 824,301바이트
+- **성격:** 분류 판단·바이트 집계
 
-Source table: unknown-segment review · table 1.
+원문 표: 미분류 검토 · 표 1.
 
-The 6.37% additional-log share uses the **entire request body** as its denominator (+6.37 percentage points). Its share within the formerly unclassified 19.20% is 33.19%.
+추가 로그의 6.37%는 **전체 요청 본문** 기준(+6.37%p)이다. 옛 미분류 19.20% 안에서의 비중은 33.19%다.
 
 <details>
-<summary>How to read these values</summary>
+<summary>읽는 기준</summary>
 
-The 9.44% protected-whole share is 77,798 bytes of code-containing mixed content + 48 remaining unclassified bytes = 77,846 bytes. The 77,798 mixed-content bytes alone also round to 9.44%, so exact bytes are retained. This is not the sum of all protected segments.
+통째 보호 9.44%는 코드 포함 혼합 77,798 + 잔여 미분류 48 = 77,846바이트다. 혼합만의 77,798바이트도 반올림하면 9.44%여서 정확한 바이트를 함께 남긴다. 모든 보호 구간 합계를 뜻하지 않는다.
 
 </details>
 
 <a id="figure-8"></a>
 
-### Round 2 · Terminal Candidate and Full Protected-Composition View by Type, from Round 1 to Round 2
+### 2차 · Terminal 종류별 1차→2차 후보와 코드 혼합을 보호한 전체 구성
 
-![Candidate and body composition by type for historical Terminal data: n=5 tasks, 15 runs, and 56 requests. Units are UTF-8 bytes; types without samples, such as debugging and review, are not measured.](figures/round2/02-candidate-share-by-type.svg)
+![종류별 후보와 본문 구성. 과거 Terminal n=5과제, 15실행, 56요청. UTF-8 바이트 기준이며 디버깅·리뷰 등 무표본 종류는 미측정이다.](figures/round2/02-candidate-share-by-type.svg)
 
-Terminal candidate and full protected-composition view by type, from Round 1 to Round 2
+Terminal 종류별 1차→2차 후보와 코드 혼합을 보호한 전체 구성
 
-Units are UTF-8 bytes; types without samples, such as debugging and review, are not measured.
+UTF-8 바이트 기준이며 디버깅·리뷰 등 무표본 종류는 미측정이다.
 
-**Observation.** In the historical sample, log-file listings and excerpts formed large candidates in `log-summary-date-ranges`, while installation output formed large candidates in `nginx-request-logging`.
+**관측.** 기존 표본의 `log-summary-date-ranges`에서는 로그 파일 목록·발췌가, `nginx-request-logging`에서는 설치 출력이 큰 후보를 만들었다.
 
-**Possible explanation.** The 0.48%–35.29% task-level spread is consistent with input differences between these two log-heavy tasks and tasks whose inputs mostly protected code and structured data.
+**가능한 설명.** 0.48%~35.29%의 과제별 차이는 로그를 많이 다루는 이 두 과제와 코드·구조화 자료를 주로 보호한 과제의 입력 차이로 설명할 수 있다.
 
-**Limitation.** Variation remains large within a type, and runner-output behavior also contributes; this analysis does not isolate a causal effect of task type.
+**한계.** 같은 종류 안에서도 차이가 크고 실행기 출력 방식도 함께 작용하므로, 과제 종류만의 인과 효과를 분리해 잰 것은 아니다.
 
-**Interpretation.** For this purpose-selected sample, task-level inputs should be read alongside any overall share. Candidate shares cannot be converted into actual token or billing savings.
+**해석.** 따라서 이 목적 표본에서는 전체 비중 하나보다 과제별 입력을 함께 봐야 하며, 후보 비중을 실제 토큰·청구 절감률로 옮길 수 없다.
 
-- **Sample:** Terminal 5 tasks · 15 runs · 56 requests
-- **Denominator · unit:** Total body UTF-8 bytes by type · %
-- **Kind:** Classification judgment · byte aggregation
+- **표본:** Terminal 5과제 · 15실행 · 56요청
+- **분모 · 단위:** 종류별 본문 UTF-8 바이트 합계 · %
+- **성격:** 분류 판단·바이트 집계
 
-Source figure basis: Round 2 measurement tables 5 and 7.
+원문 그림의 근거: 2차 측정표 표 5·7.
 
-**This is an identified candidate range, not a validated upper bound.**
+**식별된 후보 범위이지 검증된 상한이 아니다.**
 
 <a id="table-23"></a>
 
-#### Round 2 · Input and Candidate Shares by Type
+#### 2차 · 종류별 입력·후보 비중
 
-| Primary type of historical requests | Tasks/runs/requests | body UTF-8 bytes | Candidate byte share | Hypothetical local-token reduction if all candidates were deleted |
+| 기존 요청의 주 종류 | 과제/실행/요청 | 본문 UTF-8 바이트 | 후보 바이트 비중 | 후보 전부 삭제 가정의 로컬 토큰 감소 |
 | --- | --- | --- | --- | --- |
-| Feature request | 1/3/9 | 61,069 | 0.48% | 1.01% |
-| Environment / build | 2/6/19 | 208,299 | 19.53% | 25.39% |
-| Other | 2/6/28 | 554,933 | 15.52% | 23.84% |
-| Debugging, review, refactoring/migration, and test authoring | 0/0/0 | Not measured | Not measured | Not measured |
-| All historical requests | 5/15/56 | 824,301 | 15.42% | 22.83% |
+| 기능 요청 | 1/3/9 | 61,069 | 0.48% | 1.01% |
+| 환경 설정·빌드 | 2/6/19 | 208,299 | 19.53% | 25.39% |
+| 그 밖에 | 2/6/28 | 554,933 | 15.52% | 23.84% |
+| 디버깅·리뷰·리팩터링·테스트 작성 | 0/0/0 | 미측정 | 미측정 | 미측정 |
+| 전체 과거 요청 | 5/15/56 | 824,301 | 15.42% | 22.83% |
 
-- **Sample:** Terminal 5 tasks · 15 runs · 56 requests
-- **Denominator · unit:** Body UTF-8 bytes / 242,937 local body tokens
-- **Kind:** Classification judgment · hypothetical all-candidate deletion calculation
+- **표본:** Terminal 5과제 · 15실행 · 56요청
+- **분모 · 단위:** 본문 UTF-8 바이트 / 로컬 본문 242,937토큰
+- **성격:** 분류 판단 · 후보 전부 삭제 가정 계산
 
-Source table: Round 2 analysis · table 3.
+원문 표: 2차 분석 · 표 3.
 
-This is neither a compressor result, actual billing savings, nor a recommendation that deletion is safe.
+압축기를 돌린 결과도, 실제 청구 절감도, 안전한 삭제 권고도 아니다.
 
 <a id="table-24"></a>
 
-#### Round 2 · By Task — n=3 Runs Each
+#### 2차 · 과제별 — 각 n=3실행
 
-| Task | Primary type | n requests | Body bytes | Round 1 candidate share | Round 2 candidate share | Local-token reduction if all candidates were deleted |
+| 과제 | 주 종류 | n 요청 | 본문 바이트 | 1차 후보 비중 | 2차 후보 비중 | 전부 삭제 시 로컬 토큰 감소 |
 | --- | --- | --- | --- | --- | --- | --- |
-| cancel-async-tasks | Feature request | 9 | 61,069 | 0.47% | 0.48% | 1.01% |
-| log-summary-date-ranges | Other | 13 | 228,178 | 25.74% | 35.29% | 46.89% |
-| multi-source-data-merger | Other | 15 | 326,755 | 1.42% | 1.72% | 2.63% |
-| nginx-request-logging | Environment / build | 11 | 143,010 | 7.03% | 27.83% | 35.18% |
-| openssl-selfsigned-cert | Environment / build | 8 | 65,289 | 1.35% | 1.35% | 2.25% |
+| cancel-async-tasks | 기능 요청 | 9 | 61,069 | 0.47% | 0.48% | 1.01% |
+| log-summary-date-ranges | 그 밖에 | 13 | 228,178 | 25.74% | 35.29% | 46.89% |
+| multi-source-data-merger | 그 밖에 | 15 | 326,755 | 1.42% | 1.72% | 2.63% |
+| nginx-request-logging | 환경 설정·빌드 | 11 | 143,010 | 7.03% | 27.83% | 35.18% |
+| openssl-selfsigned-cert | 환경 설정·빌드 | 8 | 65,289 | 1.35% | 1.35% | 2.25% |
 
-- **Sample:** 5 tasks · n=3 runs each · 56 requests
-- **Denominator · unit:** Body bytes by task / local tokens · %
-- **Kind:** Classification judgment · hypothetical deletion calculation
+- **표본:** 5과제 · 각 n=3실행 · 56요청
+- **분모 · 단위:** 과제별 본문 바이트 / 로컬 토큰 · %
+- **성격:** 분류 판단 · 삭제 가정 계산
 
-Source table: Round 2 measurement table · table 8.
+원문 표: 2차 측정표 · 표 8.
 
-This is not interpreted as a causal effect of type or a representative value for the full benchmark.
+이를 종류의 인과 효과나 전체 benchmark 대표값으로 해석하지 않는다.
 
-The 9.05% Round 1 candidate share and 15.42% Round 2 share reflect reclassification of the same input, not a comparison of compression effects.
+1차 후보 9.05%와 2차 15.42%도 같은 입력을 재분류한 결과이지 압축 효과 비교가 아니다.
 
 <details>
-<summary>Candidates and hypothetical calculation by type</summary>
+<summary>종류별 후보와 가정 계산</summary>
 
 <a id="table-25"></a>
 
-#### Round 2 · Candidates and Hypothetical Calculation by Type
+#### 2차 · 종류별 후보와 가정 계산
 
-| Primary type | n tasks/runs/requests | Total body bytes | Candidate bytes | Round 1 candidates byte share | Round 2 candidates byte share | Local-token reduction if all candidates were deleted |
+| 주 종류 | n 과제/실행/요청 | 전체 본문 바이트 | 후보 바이트 | 1차 후보 바이트 비중 | 2차 후보 바이트 비중 | 후보 전부 삭제 시 로컬 토큰 감소 |
 | --- | --- | --- | --- | --- | --- | --- |
-| Feature request | 1/3/9 | 61,069 | 295 | 0.47% | 0.48% | 1.01% |
-| Bug fix / debugging | 0/0/0 | — | — | Not measured | Not measured | Not measured |
-| Code review | 0/0/0 | — | — | Not measured | Not measured | Not measured |
-| Refactoring / migration | 0/0/0 | — | — | Not measured | Not measured | Not measured |
-| Test authoring | 0/0/0 | — | — | Not measured | Not measured | Not measured |
-| Environment / build | 2/6/19 | 208,299 | 40,682 | 5.25% | 19.53% | 25.39% |
-| Other | 2/6/28 | 554,933 | 86,137 | 11.42% | 15.52% | 23.84% |
+| 기능 요청 | 1/3/9 | 61,069 | 295 | 0.47% | 0.48% | 1.01% |
+| 버그 수정·디버깅 | 0/0/0 | — | — | 미측정 | 미측정 | 미측정 |
+| 코드 리뷰 | 0/0/0 | — | — | 미측정 | 미측정 | 미측정 |
+| 리팩터링 | 0/0/0 | — | — | 미측정 | 미측정 | 미측정 |
+| 테스트 작성 | 0/0/0 | — | — | 미측정 | 미측정 | 미측정 |
+| 환경 설정·빌드 | 2/6/19 | 208,299 | 40,682 | 5.25% | 19.53% | 25.39% |
+| 그 밖에 | 2/6/28 | 554,933 | 86,137 | 11.42% | 15.52% | 23.84% |
 
-- **Sample:** Terminal 5 tasks · 15 runs · 56 requests
-- **Denominator · unit:** Body UTF-8 bytes / 242,937 local body tokens
-- **Kind:** Classification judgment · hypothetical all-candidate deletion calculation
+- **표본:** Terminal 5과제 · 15실행 · 56요청
+- **분모 · 단위:** 본문 UTF-8 바이트 / 로컬 본문 242,937토큰
+- **성격:** 분류 판단 · 후보 전부 삭제 가정 계산
 
-Source table: Round 2 measurement table · table 5.
+원문 표: 2차 측정표 · 표 5.
 
 </details>
 
 <details>
-<summary>Composition by type — same request-body byte denominator</summary>
+<summary>종류별 구성 — 같은 요청 본문 바이트를 분모로</summary>
 
 <a id="table-26"></a>
 
-#### Round 2 · Composition by Type — Same Request-Body Byte Denominator
+#### 2차 · 종류별 구성 — 같은 요청 본문 바이트를 분모로
 
-| Primary type | n requests | Code and inline code | Code-containing mixed content | Identified log candidates | Task and runner instructions | Structured and data-centered segments | Assistant plan and envelope | Terminal envelope and other | Unclassified and protected |
+| 주 종류 | n 요청 | 코드·인라인 코드 | 코드 포함 혼합 | 식별 로그 후보 | 과제·실행기 지시 | 구조화·자료 중심 구간 | assistant 계획·외피 | 터미널 외피·기타 | 미분류·보호 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Feature request | 9 | 30.32% | 2.15% | 0.48% | 50.56% | 0.00% | 14.67% | 1.81% | 0.00% |
-| Bug fix / debugging | 0 | Not measured | Not measured | Not measured | Not measured | Not measured | Not measured | Not measured | Not measured |
-| Code review | 0 | Not measured | Not measured | Not measured | Not measured | Not measured | Not measured | Not measured | Not measured |
-| Refactoring / migration | 0 | Not measured | Not measured | Not measured | Not measured | Not measured | Not measured | Not measured | Not measured |
-| Test authoring | 0 | Not measured | Not measured | Not measured | Not measured | Not measured | Not measured | Not measured | Not measured |
-| Environment / build | 19 | 23.08% | 3.16% | 19.53% | 41.04% | 0.73% | 10.50% | 1.96% | 0.00% |
-| Other | 28 | 28.91% | 12.60% | 15.52% | 23.02% | 5.16% | 13.37% | 1.42% | 0.01% |
+| 기능 요청 | 9 | 30.32% | 2.15% | 0.48% | 50.56% | 0.00% | 14.67% | 1.81% | 0.00% |
+| 버그 수정·디버깅 | 0 | 미측정 | 미측정 | 미측정 | 미측정 | 미측정 | 미측정 | 미측정 | 미측정 |
+| 코드 리뷰 | 0 | 미측정 | 미측정 | 미측정 | 미측정 | 미측정 | 미측정 | 미측정 | 미측정 |
+| 리팩터링 | 0 | 미측정 | 미측정 | 미측정 | 미측정 | 미측정 | 미측정 | 미측정 | 미측정 |
+| 테스트 작성 | 0 | 미측정 | 미측정 | 미측정 | 미측정 | 미측정 | 미측정 | 미측정 | 미측정 |
+| 환경 설정·빌드 | 19 | 23.08% | 3.16% | 19.53% | 41.04% | 0.73% | 10.50% | 1.96% | 0.00% |
+| 그 밖에 | 28 | 28.91% | 12.60% | 15.52% | 23.02% | 5.16% | 13.37% | 1.42% | 0.01% |
 
-- **Sample:** Terminal 5 tasks · 15 runs · 56 requests
-- **Denominator · unit:** Total body UTF-8 bytes by type · %
-- **Kind:** Classification judgment · byte aggregation
+- **표본:** Terminal 5과제 · 15실행 · 56요청
+- **분모 · 단위:** 종류별 본문 UTF-8 바이트 합계 · %
+- **성격:** 분류 판단·바이트 집계
 
-Source table: Round 2 measurement table · table 7.
+원문 표: 2차 측정표 · 표 7.
 
 </details>
 
 <details>
-<summary>Totals by run — n=15 runs</summary>
+<summary>실행별 합계 — n=15실행</summary>
 
 <a id="table-27"></a>
 
-#### Round 2 · Totals by run — n=15 runs
+#### 2차 · 실행별 합계 — n=15실행
 
-| Run | n requests | Body bytes | Candidate byte share | Local-token reduction if all candidates were deleted |
+| 실행 | n 요청 | 본문 바이트 | 후보 바이트 비중 | 전부 삭제 시 로컬 토큰 감소 |
 | --- | --- | --- | --- | --- |
 | terminal-cancel-async-tasks-r1-v2 | 2 | 11,248 | 0.84% | 1.76% |
 | terminal-cancel-async-tasks-r2-v2 | 3 | 19,331 | 1.03% | 2.16% |
@@ -730,127 +730,127 @@ Source table: Round 2 measurement table · table 7.
 | terminal-openssl-selfsigned-cert-r2-v2 | 2 | 14,259 | 2.06% | 3.46% |
 | terminal-openssl-selfsigned-cert-r3-v2 | 3 | 27,394 | 0.00% | 0.00% |
 
-- **Sample:** Terminal n=15 runs
-- **Denominator · unit:** Body bytes by run / local tokens · %
-- **Kind:** Classification judgment · hypothetical deletion calculation
+- **표본:** Terminal n=15실행
+- **분모 · 단위:** 실행별 본문 바이트 / 로컬 토큰 · %
+- **성격:** 분류 판단 · 삭제 가정 계산
 
-Source table: Round 2 measurement table · table 9.
+원문 표: 2차 측정표 · 표 9.
 
 </details>
 
 <details>
-<summary>Repetition and duplication</summary>
+<summary>반복·중복</summary>
 
 <a id="table-28"></a>
 
-#### Round 1 · 6. Repetition and Duplication
+#### 1차 · 6. 반복·중복
 
-| Input layer | Sample | Additional bytes from exact duplicate lines | Date-like strings / repeated path prefixes / repeated key occurrences |
+| 입력층 | 표본 | 정확 중복 줄의 추가 바이트 | 날짜형 문자열 / 반복 경로 접두어 / 반복 키 출현 |
 | --- | --- | --- | --- |
 | DeepSWE (n=113) | 113 | 0 | 0 / 4 / 4 |
 | Terminal-Bench 2.1 (n=89) | 89 | 349 | 4 / 167 / 10 |
 | Terminal actual requests (n=56; 5 tasks x 3 trials) | 56 | 58,627 | 1,587 / 1,600 / 2,396 |
 
-- **Sample:** Official instructions 113 and 89 · Terminal 56 requests
-- **Denominator · unit:** Each document or request · UTF-8 bytes / occurrence count
-- **Kind:** Measurement · pattern counting
+- **표본:** 공식 지시문 113개·89개 · Terminal 56요청
+- **분모 · 단위:** 각 문서 / 요청 · UTF-8 바이트 / 출현 수
+- **성격:** 측정 · 패턴 계수
 
-Source table: Round 1 measurement table · table 7.
+원문 표: 1차 측정표 · 표 7.
 
-Repetition counts exclude the first occurrence within each document or request.
+각 문서/요청 안의 첫 출현을 제외한 반복 횟수다.
 
-Within **candidate segments only** across 56 requests, exact duplicate lines add 1,020 bytes.
+56요청의 **후보 구간 안에서만** 정확 중복 줄의 추가량은 1,020바이트다.
 
 </details>
 
 <a id="limits"></a>
 
-## What This Analysis Does Not Show
+## 이 분석이 말하지 않는 것
 
 <a id="figure-9"></a>
 
-### Round 1 · Comparison and Difference Distribution for API Input and Local Body Tokens in the Same 56 Terminal Requests
+### 1차 · 같은 Terminal 56요청의 API 입력과 로컬 본문 토큰 대조·차이 분포
 
-![Local message-body tokens compared with actual API input tokens for 5 historical Terminal tasks, 15 runs, and 56 requests. The dashed line is the calculated y=x reference; the right panel shows the difference distribution.](figures/round1/06-api-token-calibration.svg)
+![기존 Terminal 5과제·15실행·56요청의 로컬 메시지 본문 토큰과 실제 API 입력 토큰 대조. 점선은 계산상 y=x이며 오른쪽은 차이 분포다.](figures/round1/06-api-token-calibration.svg)
 
-Comparison and difference distribution for API input and local body tokens in the same 56 Terminal requests
+같은 Terminal 56요청의 API 입력과 로컬 본문 토큰 대조·차이 분포
 
-Do not transfer this difference to another agent, model, or tool schema as a correction constant.
+이 차이를 다른 agent·모델·tool schema에 보정 상수로 옮기지 않는다.
 
-- **Sample:** Terminal 5 tasks · 15 runs · 56 requests
-- **Denominator · unit:** Request / run · API usage tokens / local body tokens
-- **Kind:** Historical API and local measurement · statistical calculation
+- **표본:** Terminal 5과제 · 15실행 · 56요청
+- **분모 · 단위:** 요청 / 실행 · API usage 토큰 / 로컬 본문 토큰
+- **성격:** 과거 API·로컬 측정 · 통계 계산
 
-Source figure basis: Round 1 measurement table 5.
+원문 그림의 근거: 1차 측정표 표 5.
 
 <a id="table-34"></a>
 
-#### Round 1 · 4. API Usage Compared with Local Tokens
+#### 1차 · 4. API usage와 로컬 토큰의 대조
 
-| Measure | Sample | Minimum / median / P95 / maximum |
+| 측정값 | 표본 | 최소 / 중앙값 / P95 / 최대 |
 | --- | --- | --- |
-| Per-request API input tokens | 56 requests | 800 / 3,272.5 / 9,975.2 / 13,717 |
-| Per-run API input token total | 15 runs | 2,688 / 13,814 / 45,211.6 / 45,696 |
-| API input − local body tokens | 56 requests | 6 / 16 / 46 / 56 |
+| 요청당 API 입력 토큰 | 56요청 | 800 / 3,272.5 / 9,975.2 / 13,717 |
+| 실행당 API 입력 토큰 합계 | 15실행 | 2,688 / 13,814 / 45,211.6 / 45,696 |
+| API 입력 − 로컬 본문 토큰 | 56요청 | 6 / 16 / 46 / 56 |
 
-- **Sample:** Terminal 5 tasks · 15 runs · 56 requests
-- **Denominator · unit:** Request / run · API usage tokens / local body tokens
-- **Kind:** Historical API and local measurement · statistical calculation
+- **표본:** Terminal 5과제 · 15실행 · 56요청
+- **분모 · 단위:** 요청 / 실행 · API usage 토큰 / 로컬 본문 토큰
+- **성격:** 과거 API·로컬 측정 · 통계 계산
 
-Source table: Round 1 measurement table · table 5.
+원문 표: 1차 측정표 · 표 5.
 
-The API-versus-local difference is 0.24%–1.38%, using API input as the denominator.
+API와 로컬의 차이는 API 입력을 분모로 0.24–1.38%다.
 
-Cached input is a subset of input, not additional input.
+캐시 읽기는 입력에 포함된 부분집합이지 추가 입력이 아니다.
 
 <details>
-<summary>Historical API usage — not current spending</summary>
+<summary>과거 API usage — 이번 지출 아님</summary>
 
 <a id="table-35"></a>
 
-#### Round 2 · Historical API Usage — Not Current Spending
+#### 2차 · 과거 API usage — 이번 지출 아님
 
-| Primary type | n requests | API input tokens | API output tokens | API cached-input tokens |
+| 주 종류 | n 요청 | API 입력 토큰 | API 출력 토큰 | API 캐시 읽기 토큰 |
 | --- | --- | --- | --- | --- |
-| Feature request | 9 | 14,871 | 2,432 | 5,888 |
-| Bug fix / debugging | 0 | — | — | — |
-| Code review | 0 | — | — | — |
-| Refactoring / migration | 0 | — | — | — |
-| Test authoring | 0 | — | — | — |
-| Environment / build | 19 | 58,054 | 7,256 | 29,568 |
-| Other | 28 | 171,218 | 18,915 | 113,408 |
+| 기능 요청 | 9 | 14,871 | 2,432 | 5,888 |
+| 버그 수정·디버깅 | 0 | — | — | — |
+| 코드 리뷰 | 0 | — | — | — |
+| 리팩터링 | 0 | — | — | — |
+| 테스트 작성 | 0 | — | — | — |
+| 환경 설정·빌드 | 19 | 58,054 | 7,256 | 29,568 |
+| 그 밖에 | 28 | 171,218 | 18,915 | 113,408 |
 
-- **Sample:** Terminal 5 tasks · 15 runs · 56 requests
-- **Denominator · unit:** Request / run · API usage tokens / local body tokens
-- **Kind:** Historical API and local measurement · statistical calculation
+- **표본:** Terminal 5과제 · 15실행 · 56요청
+- **분모 · 단위:** 요청 / 실행 · API usage 토큰 / 로컬 본문 토큰
+- **성격:** 과거 API·로컬 측정 · 통계 계산
 
-Source table: Round 2 measurement table · table 10.
+원문 표: 2차 측정표 · 표 10.
 
-Total API usage is 244,143 input tokens, 28,603 output tokens, and 148,864 cached-input tokens (n=56 requests).
+전체 API 입력 244,143토큰·출력 28,603토큰·캐시 읽기 148,864토큰이다(n=56요청).
 
 </details>
 
 <a id="figure-10"></a>
 
-### Round 1 · Cumulative Distribution of Shared Leading Local Token-ID Length for Static Instructions, First Requests, and Adjacent Requests
+### 1차 · 정적 지시문/첫 요청/인접 요청 쌍의 공통 로컬 token ID 길이 누적분포
 
-![Distribution of shared leading local token-ID lengths for official instruction-task pairs and actual Terminal request pairs. The 1,024 dashed line is a reference for the GPT-5.4 service's cache minimum at the time, not a measurement of service cache prefixes.](figures/round1/04-shared-prefix.svg)
+![공식 지시문 과제 쌍과 실제 Terminal 요청 쌍의 공통 선두 로컬 token ID 길이 분포. 1,024 점선은 당시 GPT-5.4 서비스의 캐시 최소 길이 참고선이며 서비스 캐시 접두부 실측이 아니다.](figures/round1/04-shared-prefix.svg)
 
-Cumulative distribution of shared leading local token-ID length for static instructions, first requests, and adjacent requests
+정적 지시문/첫 요청/인접 요청 쌍의 공통 로컬 token ID 길이 누적분포
 
-Task pairs are not mutually independent samples.
+과제 쌍은 서로 독립 표본이 아니다.
 
-- **Sample:** Static instruction pairs 6,328 / 3,916 · historical request pairs 41 / 10 / 15
-- **Denominator · unit:** Pair count by comparison layer · common leading local token-ID length
-- **Kind:** Measurement · statistical calculation
+- **표본:** 정적 지시문 쌍 6,328 / 3,916 · 과거 요청 쌍 41 / 10 / 15
+- **분모 · 단위:** 비교층별 쌍 수 · 공통 선두 로컬 token ID 길이
+- **성격:** 측정 · 통계 계산
 
-Source figure basis: Round 1 measurement table 6.
+원문 그림의 근거: 1차 측정표 표 6.
 
 <a id="table-36"></a>
 
-#### Round 1 · 5. Shared prefix
+#### 1차 · 5. 공통 앞부분
 
-| Comparison layer | Pair count | Local tokens, minimum / median / P95 / maximum | Pairs at or above 1,024 |
+| 비교층 | 쌍 수 | 로컬 토큰 최소 / 중앙값 / P95 / 최대 | 1,024 이상 쌍 |
 | --- | --- | --- | --- |
 | deep-swe-import-ko/instructions | 6,328 | 0 / 0 / 0 / 2 | 0 |
 | deep-swe/instructions | 6,328 | 0 / 0 / 1 / 4 | 0 |
@@ -859,35 +859,35 @@ Source figure basis: Round 1 measurement table 6.
 | terminal-native/cross-task-first | 10 | 650 / 650 / 650 / 650 | 0 |
 | terminal-native/same-task-new-container | 15 | 782 / 1,004 / 1,109 / 1,109 | 6 |
 
-- **Sample:** Pair counts for each comparison layer in the table
-- **Denominator · unit:** Common leading local token ID · tokens / pairs
-- **Kind:** Measurement · statistical calculation
+- **표본:** 표의 각 비교층별 쌍 수
+- **분모 · 단위:** 공통 선두 로컬 token ID · 토큰 / 쌍
+- **성격:** 측정 · 통계 계산
 
-Source table: Round 1 measurement table · table 6.
+원문 표: 1차 측정표 · 표 6.
 
-A local prefix longer than the cache minimum does not by itself guarantee a service cache hit.
+캐시 최소 길이를 넘는 로컬 접두부가 있다는 사실만으로 서비스의 적중을 보장하지 않는다.
 
-- Code and code-containing mixed content are excluded; preservation of log meaning, actual compression rate, quality, and billing savings remain unvalidated.
+- 코드·코드 포함 혼합은 제외하며 로그의 의미 보존·실제 압축률·품질·청구 절감은 미검증이다.
 
-- Actual DeepSWE run history was not collected for this analysis.
+- DeepSWE 실제 실행 이력은 이번에 수집하지 않았다.
 
-- This purpose-selected sample was chosen in advance to inspect files, logs, structured data, and similar content; it was not randomly sampled.
+- 파일·로그·구조화 자료 등을 보기 위해 미리 골랐던 목적 표본이며 무작위 추출이 아님
 
-- Quantiles use linear interpolation, and 56 requests are not 56 independent tasks.
+- 분위수는 선형 보간이며 요청 56개는 독립 과제 56개가 아니다.
 
-- The observed 0 instruction-candidate bytes result from protection rules and do not mean that a full run has zero candidates.
+- 관측된 지시문 후보 0바이트는 보호 규칙의 결과이며 실행 전체의 후보가 0이라는 뜻이 아니다.
 
-- `none` is the condition without an added compressor; it does not guarantee that original terminal output was never truncated.
+- `none`은 추가 압축기를 쓰지 않는 조건이지, 원래 터미널 출력이 전혀 잘리지 않았다는 보장이 아니다.
 
-- Historical generation settings were temperature 0, reasoning effort none, max completion 2,048, and automatic summarization off.
+- 과거 생성 설정은 temperature 0·reasoning effort none·max completion 2,048·자동 요약 끔이다.
 
-- These settings do not guarantee determinism or lossless observation (Round 1 README table 2).
+- 이 설정이 결정론이나 무손실 관측을 보장하지 않는다(1차 README 표 2).
 
-## Sources and Scope
+## 자료와 범위
 
-- [Official DeepSWE dataset](https://huggingface.co/datasets/datacurve/deep-swe/tree/6d6f134460c137e24c6bb7e1e69954116ea9dbb3): official English instructions and task metadata at pinned revision `6d6f134460c137e24c6bb7e1e69954116ea9dbb3`.
-- [Official Terminal-Bench 2.1 tasks](https://github.com/harbor-framework/terminal-bench-2-1/tree/7131e4375048a0e408a8fb404b5f499d726b695b): official English instructions and task metadata at pinned revision `7131e4375048a0e408a8fb404b5f499d726b695b`.
-- Historical actual requests: 2026-09-09, 5 purpose-selected tasks × 3 runs and 56 requests from `gpt-5.4-2026-03-05`. Raw request text is not distributed.
-- The [public task-level candidate aggregate](../../data/eda/task-candidate-share.csv) and its [provenance and conditions](../../data/eda/lineage.json) contain two classification rounds over the same historical sample.
-- Source table numbers follow their order in the original Round 1 and Round 2 measurement documents; they are not section numbers in this document.
-- This is a static analysis of all instructions and a historical run sample, not a new compression, quality, or billing experiment.
+- [DeepSWE 공식 데이터셋](https://huggingface.co/datasets/datacurve/deep-swe/tree/6d6f134460c137e24c6bb7e1e69954116ea9dbb3): 공식 영어 지시문·과제 메타데이터, 고정 revision `6d6f134460c137e24c6bb7e1e69954116ea9dbb3`.
+- [Terminal-Bench 2.1 공식 과제](https://github.com/harbor-framework/terminal-bench-2-1/tree/7131e4375048a0e408a8fb404b5f499d726b695b): 공식 영어 지시문·과제 메타데이터, 고정 revision `7131e4375048a0e408a8fb404b5f499d726b695b`.
+- 과거 실제 요청: 2026-09-09, `gpt-5.4-2026-03-05`의 목적 선정 5과제 × 3실행·56요청. 요청 원문은 배포하지 않는다.
+- [공개 과제별 후보 집계](../../data/eda/task-candidate-share.csv)와 [그 출처·조건](../../data/eda/lineage.json)은 같은 과거 표본의 두 분류 차수를 담는다.
+- 표의 원문 번호는 1차·2차 측정표 등 원래 문서 안에서의 순서이며, 이 문서의 절 번호가 아니다.
+- 지시문 전수와 과거 실행 표본의 정적 분석이다. 새 압축·품질·청구 실험의 결과가 아니다.

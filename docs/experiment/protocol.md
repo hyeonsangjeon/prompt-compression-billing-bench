@@ -1,77 +1,77 @@
-# Preliminary Experiment Protocol
+# 1차 실험 규약
 
-This historical protocol records the fixed conditions and preregistered stopping rules in effect at the time. It is a design decision, not a results document. When the protocol was fixed, only the baseline without additional compression had been measured; the compression comparison had not been run.
+이 문서는 기록 당시 고정한 조건과 사전 중단 규칙을 담은 과거 규약이다. 설계 판단이며 결과 문서가 아니다. 이 규약을 고정한 당시에는 추가 압축 없는 기준선만 측정했고, 압축 비교는 실행하지 않았다.
 
-## Question and Interventions
+## 질문과 개입
 
-The question is how input size, quality, and total call cost change when only identified log candidates are reduced in a code-assistant workload. Code, instructions, and assistant history remain unchanged.
+질문은 코드 어시스턴트 워크로드에서 식별된 로그 후보만 줄였을 때 입력 크기, 품질, 전체 호출 비용이 어떻게 달라지는가이다. 코드, 지시문, assistant 이력은 바꾸지 않는다.
 
-| Condition | Actual intervention | Classification judgment |
+| 조건 | 실제 개입 | 분류 판단 |
 | --- | --- | --- |
-| `none` | No additional compression; Harbor's existing output truncation remains | Baseline |
-| `squeez` | Keep the first 30 content lines and delete the rest of the candidate | Discarding; lossy |
-| `Headroom` | Show repeated path prefixes once and verify reverse transformation | Grouping; byte-restorable |
-| `LLMLingua-2` | Select tokens to retain within the candidate | Token selection; lossy |
+| `none` | 추가 압축 없음. Harbor의 기존 출력 생략은 유지 | 기준선 |
+| `squeez` | 앞 30개 내용 줄을 남기고 후보의 뒤쪽을 삭제 | 버리기·손실 |
+| `Headroom` | 반복 경로의 공통 접두어를 한 번만 표시하고 역변환 검사 | 묶기·바이트 복원 가능 |
+| `LLMLingua-2` | 후보 안에서 남길 token을 선택 | token 선택·손실 |
 
-## Fixed Conditions
+## 고정 조건
 
-| Item | Fixed value | Classification |
+| 항목 | 고정값 | 성격 |
 | --- | --- | --- |
-| Benchmark | Terminal-Bench 2.1, revision `7131e4375048a0e408a8fb404b5f499d726b695b` | Design judgment |
-| Tasks | 5 purposively selected English tasks: `cancel-async-tasks`, `log-summary-date-ranges`, `multi-source-data-merger`, `nginx-request-logging`, `openssl-selfsigned-cert` | Design judgment |
-| One repetition | Run and grade each of the 5 tasks once | Definition |
-| Model | `gpt-5.4`, provider-reported revision `gpt-5.4-2026-03-05` | Fixed condition |
-| Generation settings | temperature `0`, reasoning effort `none`, maximum completion of `2,048` tokens | Fixed condition; not a guarantee of determinism |
-| Execution environment | Cloud VM, Linux kernel `6.17.0-1022-azure`, 8 vCPU | Measurement condition |
-| Runner | Harbor `0.22.0` and its bundled instrumented Terminus 2 `2.0.0` | Fixed condition |
-| Concurrency | 8 native trials | Comparison control |
-| Provider constraints | Only provider throughput limits and service errors apply | Operating value at execution time |
-| Local tokenizer | tiktoken `0.14.0`, `o200k_base` | Calculation condition |
-| Grading | Use each task's built-in native verifier without modification | Fixed condition |
-| Baseline execution source | `2984a3879252d51d1681b9d4f6b3bf4f4871a12e` | Measurement lineage |
-| Schedule limit | 2026-09-17 | Operating condition |
+| 벤치마크 | Terminal-Bench 2.1, revision `7131e4375048a0e408a8fb404b5f499d726b695b` | 설계 판단 |
+| 과제 | 목적 선정 영어 5과제: `cancel-async-tasks`, `log-summary-date-ranges`, `multi-source-data-merger`, `nginx-request-logging`, `openssl-selfsigned-cert` | 설계 판단 |
+| 한 반복 | 5과제를 각각 한 번 실행하고 내장 채점하는 묶음 | 정의 |
+| 모델 | `gpt-5.4`, 제공자 보고 revision `gpt-5.4-2026-03-05` | 고정 조건 |
+| 생성 설정 | temperature `0`, reasoning effort `none`, 최대 completion `2,048` token | 고정 조건·결정론 보장 아님 |
+| 실행 환경 | cloud VM, Linux kernel `6.17.0-1022-azure`, 8 vCPU | 측정 조건 |
+| 실행기 | Harbor `0.22.0`과 그 버전에 포함된 instrumented Terminus 2 `2.0.0` | 고정 조건 |
+| 병렬도 | native trial 8개 | 비교 통제 |
+| provider 제약 | provider 처리량 제한과 서비스 오류만 따른다 | 실행 시점 운영값 |
+| 로컬 tokenizer | tiktoken `0.14.0`, `o200k_base` | 계산 조건 |
+| 채점 | 각 과제의 내장 native verifier를 변경 없이 사용 | 고정 조건 |
+| 기준선 실행 소스 | `2984a3879252d51d1681b9d4f6b3bf4f4871a12e` | 측정 계보 |
+| 일정 상한 | 2026-09-17 | 운영 조건 |
 
-temperature and reasoning effort are request settings. They are not controls that guarantee identical output, determinism, or lossless observation. Cached input tokens are observed but are not claimed as a controlled factor.
+temperature와 reasoning effort는 전송 설정이다. 같은 출력, 결정론, 무손실 관측을 보장하는 통제로 해석하지 않는다. 캐시 읽기 token도 관측하지만 통제했다고 주장하지 않는다.
 
-## Execution Path
+## 실행 경로
 
-Cloud-native execution is orchestrated by [`src/native_run.py`](../../src/native_run.py), and [`src/live_transport.py`](../../src/live_transport.py) sends requests after protection checks. [`accounting.py`](../../accounting.py) aggregates separate local Ollama records; it is not the runner or transport for this cloud baseline.
+cloud native 실행은 [`src/native_run.py`](../../src/native_run.py)가 조정하고 [`src/live_transport.py`](../../src/live_transport.py)가 보호 검사 뒤 요청을 전송한다. [`accounting.py`](../../accounting.py)는 별도의 로컬 Ollama 기록을 집계하는 경로이며, 이번 cloud 기준선의 실행기나 전송기가 아니다.
 
-## Protections and Metrics
+## 보호와 지표
 
-Candidate selection applies only to identified log spans. Code, mixed code output, structured data, instructions, assistant history, roles, and request settings are protected. A protection violation stops the run rather than reverting to the original text and continuing.
+후보 선택은 식별된 로그 구간에만 적용한다. 코드, 코드가 섞인 출력, 구조화 자료, 지시문, assistant 이력, 역할과 요청 설정은 보호한다. 보호 위반은 원문으로 되돌려 계속하지 않고 실행을 중단한다.
 
-The following are recorded in the same units for every condition:
+모든 조건에서 다음을 같은 단위로 기록한다.
 
-- Provider-reported input, output, and cached input tokens
-- Message-content input tokens and visible assistant-output tokens recounted with `o200k_base`
-- Turns per task, logical calls, and total HTTP calls including retries
-- Counts of repeated identical commands and subcommands
-- Built-in pass status and `wrong_answer`, `wrong_format`, `timeout`, `tool_error`, or `other` failure classification
-- `compress_seconds`, `transport_seconds`, and `model_seconds`
-- LLMLingua-2 worker inference, serialization wait, and total compression wall time
+- 제공자 보고 입력 token, 출력 token, cached input token
+- `o200k_base`로 다시 센 message-content 입력 token과 보이는 assistant 출력 token
+- 과제당 turn 수, 논리 호출 수, 재시도를 포함한 총 HTTP 호출 수
+- 같은 명령과 같은 하위 명령의 재실행 횟수
+- 내장 통과 여부와 `wrong_answer`, `wrong_format`, `timeout`, `tool_error`, `other` 실패 분류
+- `compress_seconds`, `transport_seconds`, `model_seconds`
+- LLMLingua-2의 worker inference, serialization wait, 전체 압축 벽시계
 
-A reduction in input tokens is not classified as cost savings if output tokens, call count, repeated work, or cost increase. Failure classifications describe observed forms; they do not diagnose compression as the cause.
+입력 token만 줄고 출력 token, 호출 수, 재실행, 비용이 늘면 비용 절감으로 판정하지 않는다. 실패 분류는 관측된 형태이며 압축이 원인이라는 진단이 아니다.
 
-## Preregistered Stopping Rules
+## 사전 중단 규칙
 
-The primary decision statistic is the observed range of the number of passing tasks in one repetition. Sample standard deviation is only a supporting description.
+주판정은 한 반복에서 통과한 과제 수의 관측 범위다. 표본 표준편차는 보조 설명으로만 쓴다.
 
-| Decision point | Preregistered rule | Next action | Classification |
+| 판단 시점 | 사전 규칙 | 다음 행동 | 성격 |
 | --- | --- | --- | --- |
-| 5 repetitions | Stop if the range width of passing-task counts exceeds `1` | Review verifier, operating path, and design | Operating judgment; not a statistical confidence interval |
-| 5 repetitions | Continue if the width is `0` or `1` | Collect through 10 repetitions; do not call it stable | Operating judgment |
-| 10 repetitions | The minima, maxima, and task-level observation sets match between repetitions 1–5 and 6–10 | End baseline-range collection | Calculation rule |
-| 10 repetitions | The two halves differ | Extend to 20 total repetitions | Calculation rule |
-| 20 repetitions | Repetitions 1–10 and 11–20 still differ | Stop as inconclusive; do not extend to 30 or change tasks | Calculation rule |
+| 5회 | 통과 과제 수 범위의 폭이 `1`을 넘으면 중단 | 판정기·운영 경로·설계를 점검 | 운영 판단. 통계적 신뢰구간 아님 |
+| 5회 | 폭이 `0` 또는 `1`이면 계속 | 10회까지 수집. 안정됐다고 쓰지 않음 | 운영 판단 |
+| 10회 | 1–5회와 6–10회의 최소·최대 및 과제별 관측값 집합이 같음 | 기준선 범위 수집 종료 | 계산 규칙 |
+| 10회 | 두 절반이 다름 | 총 20회까지 연장 | 계산 규칙 |
+| 20회 | 1–10회와 11–20회가 다시 다름 | 판정 불가로 중단. 30회로 늘리거나 과제를 바꾸지 않음 | 계산 규칙 |
 
-Protection violations, missing required records, changes in settings or model revision, and retrieval-verification failures are also stopping reasons. Compression conditions use the same repetition count as the accepted baseline.
+보호 위반, 필수 기록 누락, 설정 또는 model revision 변화, 회수 검증 실패도 중단 사유다. 압축 조건은 받아들인 기준선과 같은 반복 수를 사용한다.
 
-## Execution Order
+## 실행 순서
 
-1. Run the `none` baseline.
-2. Evaluate the baseline stopping rule.
-3. Have a person decide whether to proceed with the compression comparison.
-4. Only if approved, run squeez, Headroom, and LLMLingua-2 under the same protocol.
+1. `none` 기준선을 실행한다.
+2. 기준선 중단 규칙의 결과를 확인한다.
+3. 압축 비교 진행 여부를 사람이 결정한다.
+4. 진행할 때만 squeez, Headroom, LLMLingua-2를 같은 규약으로 실행한다.
 
-No condition deletes a candidate in its entirety. The 2026-09-14 baseline stopped as inconclusive after 20 repetitions, and the three compression conditions had not yet been run.
+후보를 통째로 삭제하는 조건은 없다. 2026-09-14 기준선은 20회에서 판정 불가로 중단됐으며, 세 압축 조건은 아직 실행하지 않았다.
