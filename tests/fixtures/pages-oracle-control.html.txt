@@ -16,8 +16,8 @@
 </ul>
 <pre data-source-block-kind="code"><code>fenced **literal**
 </code></pre>
-<p data-source-block-kind="paragraph"><strong>Strong phrase</strong> follows CommonMark strong syntax.</p>
-<p data-source-block-kind="paragraph"><strong>Strong phrase (example)</strong>uses the project extension.</p>
+<p data-source-block-kind="paragraph"><strong>강조 문구</strong>는 CommonMark strong이다.</p>
+<p data-source-block-kind="paragraph"><strong>강조 문구(예시)</strong>는 project extension이다.</p>
 <p data-source-block-kind="paragraph">2 ** 3</p>
 <p data-source-block-kind="paragraph">2**3</p>
 <p data-source-block-kind="paragraph">**/*.py</p>

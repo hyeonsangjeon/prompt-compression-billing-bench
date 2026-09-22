@@ -1,334 +1,166 @@
-# Decision Log
+# 판단 기록
 
-This document tracks the basis and status of design decisions. Measurements remain in the
-[baseline](baseline.md) and [static compressor measurements](compressors.md).
+이 문서는 설계 판단의 근거와 상태를 관리한다. 측정값은 [기준선](baseline.md)과 [압축기 정적 측정](compressors.md)에 둔다.
 
-## Design Fixed on 2026-09-15
+## 2026-09-15 확정 설계
 
-| Decision | Fixed rule | Reason and limitation |
+| 판단 | 확정한 규칙 | 이유와 한계 |
 | --- | --- | --- |
-| Conclusion scope | Conditional only on the exact screened task-ID set, `gpt-5.4`, and the fixed price table | No sampling frame for similar tasks, so generalization beyond the task set is not established |
-| Evaluation eligibility | At least 18 passes among 20 valid results | Do not translate into a smaller sample with the same percentage |
-| Temporal order | First-half and second-half differences and failure position are diagnostic only | Exclusion by position can create selection bias |
-| Failure kinds | Count both `wrong_answer` and `wrong_format` as quality failures | Record classification and test ID, but do not use them as automatic exclusion rules |
-| Preparation retry | Exactly one retry with the same artifact only for the same preparation error before a provider call | Use a fresh container and workspace; do not retry quality failures |
-| Quality threshold | Lower bound versus `none` must exceed -5 percentage points | Preregistered policy value for this study, not customer-agreed |
-| Cost threshold | Lower bound on directly attributable cost savings must exceed 10% | Preregistered policy value; not lowered to fit the schedule |
-| Repetition count | `R(K)=ceil(1,412/K)` | Planning stress assumption using quality-difference variance 0.40; does not guarantee cost power |
-| Adoption decision | Both one-sided 98.333% quality and cost lower bounds must pass for each compressor | `0.05/3` for three compressors; one failed bound does not establish degradation |
-| Resampling | Jointly sample complete repetitions containing all `K` tasks and four conditions | Preserves pairing and shared `none`; tasks are not resampled |
-| Temporal correlation | Length-2 circular moving-block bootstrap for sensitivity | Do not claim robust adoption when primary and sensitivity decisions differ |
-| Randomness and calculation | Base seed `20260915`, 50,000 bootstrap draws, NumPy `PCG64` | Record purpose-specific child seeds and quantile method in the manifest |
-| Synthetic-data check | 2,000 datasets per boundary scenario; exact one-sided 95% binomial upper bound at most 0.05 | Operating condition for specified scenarios, not a universal coverage proof |
-| Missing cost | No zero substitution or row deletion; required missing and near-zero denominators are indeterminate | Separates actual zero spend from missing instrumentation |
+| 결론 범위 | 선별을 통과한 정확한 과제 ID 집합, `gpt-5.4`, 고정 가격표에만 조건부 | 유사 과제 표집틀이 없어 과제 밖 일반화는 확립되지 않음 |
+| 평가 적격 | 20개 유효 결과 중 18회 이상 통과 | 같은 통과율의 더 작은 표본으로 환산하지 않음 |
+| 시간 순서 | 전후반 차이와 실패 위치는 진단만 | 위치로 과제를 제외하면 선택 편향이 생길 수 있음 |
+| 실패 종류 | `wrong_answer`와 `wrong_format`을 모두 품질 실패로 계산 | 실패 분류와 test ID는 기록하되 자동 탈락에 쓰지 않음 |
+| 준비 재시도 | provider 호출 전 같은 준비 오류만 동일 artifact로 정확히 1회 | 새 컨테이너·workspace를 쓰고 품질 실패는 재시도하지 않음 |
+| 품질 문턱 | `none` 대비 하한이 -5퍼센트포인트보다 큼 | 이번 연구의 사전 정책값이며 고객 합의값이 아님 |
+| 비용 문턱 | 직접 귀속 비용 절감률 하한이 10%보다 큼 | 이번 연구의 사전 정책값이며 일정에 맞춰 낮추지 않음 |
+| 반복 수 | `R(K)=ceil(1,412/K)` | 품질 차이 분산 0.40을 쓴 계획 스트레스 가정; 비용 검정력 보장은 아님 |
+| 도입 판정 | 압축기별 단측 98.333% 품질 하한과 비용 하한을 모두 통과 | 세 압축기 비교에 `0.05/3`; 한 하한 실패는 열화 입증이 아님 |
+| 재표집 | `K`개 과제와 네 조건이 완전한 반복 실행 전체를 함께 뽑음 | 짝 구조와 공유 `none`을 보존하고 과제는 재표집하지 않음 |
+| 시간 상관 | 길이 2 circular moving-block bootstrap을 민감도 분석에 사용 | 주 분석과 판정이 다르면 강건한 도입으로 주장하지 않음 |
+| 난수와 계산 | base seed `20260915`, bootstrap 50,000회, numpy `PCG64` | 용도별 하위 seed와 분위수 방식은 manifest에 기록 |
+| 합성 자료 확인 | 경계 시나리오별 2,000개, 정확 이항 단측 95% 상한 0.05 이하 | 정한 시나리오의 운영 조건이며 보편적인 coverage 증명이 아님 |
+| 비용 결측 | 0 대체·행 삭제 금지, 필수 결측과 근접 0은 판정 불가 | 실제 지출 0과 계측 누락을 분리 |
 
-After screening, only the number `K` of evaluation-eligible tasks is newly inserted into
-the formula. Evaluation is impossible when `K=0`. Do not change tasks, repetition count,
-thresholds, seed, confidence interval, or cost contract after viewing evaluation results.
+선별 뒤 새로 확인해 공식에 넣는 값은 평가 적격 과제 수 `K`뿐이다. `K=0`이면 평가할 수 없다. 평가 결과를 본 뒤 과제, 반복 수, 문턱, seed, 신뢰구간이나 비용 계약을 바꾸지 않는다.
 
-## Consequences of These Choices
+## 이 선택이 바꾼 것
 
-Failure position and kind became diagnostic records rather than task-removal criteria. A
-task with 18/20 is not removed solely because of when or how it failed. Evaluation instead
-reports per-condition failure classifications and test IDs to describe whether failure
-patterns change after compression.
+실패 위치와 실패 종류는 과제를 빼는 조건이 아니라 진단 기록이 됐다. 따라서 같은 18/20 과제가 실패 시점이나 실패 방식만으로 선별에서 제거되지 않는다. 대신 평가에서 조건별 실패 분류와 test ID를 함께 제시해 압축 뒤 실패 양상이 바뀌는지 설명한다.
 
-A preparation error before a provider call can recover once, but not by reusing the same
-failed environment. Because actual attempt count and cost may increase, they remain
-separate from planned trial count.
+provider 호출 전 준비 오류는 한 번 복구할 수 있지만 같은 실패 환경은 재사용하지 않는다. 실제 `attempt` 수와 비용은 늘 수 있으므로 계획 `trial` 수와 따로 기록한다.
 
-Repetition count was set from the quality tolerance. If a wide cost interval leaves the
-10% savings threshold indeterminate, repetitions are not added after results are seen.
-This accepts the risk of an indeterminate cost conclusion in exchange for preventing
-post hoc sample expansion.
+반복 수는 품질 허용폭에서 정했다. 비용 구간이 넓어 10% 절감을 판정하지 못해도 결과 뒤 반복을 추가하지 않는다. 이 선택은 비용 결론이 판정 불가가 될 위험을 받아들이는 대신 사후 표본 확대를 막는다.
 
-## nginx Verifier Correction
+## nginx verifier 수정
 
-The original Terminal-Bench 2.1 verifier accepted `$http_user_agent` but rejected the
-equivalent Nginx form `${http_user_agent}`. Screening uses a minimal correction that
-recognizes both syntaxes for the four required variables.
+Terminal-Bench 2.1 원본 verifier는 Nginx에서 동등한 `$http_user_agent`와 `${http_user_agent}` 중 앞 표기만 통과시켰다. 선별 전에 네 필수 변수를 두 문법으로 인식하는 최소 수정본을 사용한다.
 
-- Original SHA-256: `045cc716c14efde3b0dcff5fc7c85ec5d18bfc6ce66f8b40a418fa2a3a4acda0`
-- Corrected SHA-256: `20812107bc3bfc541728a2d10e3da0552e907d949e1347a03d33aa26954f8902`
-- Validation inputs for source syntax, equivalent syntax, and an obvious wrong answer: 3/3 as expected
-- Corrected-module checks: 6/6 pass
+- 원본 SHA-256: `045cc716c14efde3b0dcff5fc7c85ec5d18bfc6ce66f8b40a418fa2a3a4acda0`
+- 수정본 SHA-256: `20812107bc3bfc541728a2d10e3da0552e907d949e1347a03d33aa26954f8902`
+- 원문, 동등 문법과 명백한 오답 검증용 입력: 3/3 기대대로 판정
+- 수정 모듈 검사: 6/6 통과
 
-The existing nginx baseline value of 18/20 remains unchanged. The corrected 20/20
-calculated from preserved traces is a static counterfactual, not an actual workspace
-replay. The correction applies only to new screening.
+기존 기준선 nginx 18/20을 수정하지 않는다. 보존 trace로 수정본 결과를 계산한 20/20은 실제 workspace 재생이 아닌 정적 반사실 계산이다. 새 수정본은 새 선별에만 적용한다.
 
-## Correction to Headroom Measurement Scope
+## Headroom 측정 범위 정정
 
-No location controls were observed in the measured Headroom `0.36.5` paths-only
-configuration. Headroom `0.37.0`'s `coding` profile, however, includes tool-level
-exclusions, file-read protection, analytical-context protection, and tree-sitter
-AST-based selective compression. Its size, preservation, and quality effects remain
-unmeasured.
+우리가 측정한 Headroom `0.36.5` paths-only 설정에서는 위치 제어가 관측되지 않았다. 다만 Headroom `0.37.0` `coding` 프로필에는 툴 단위 제외, 파일 읽기 보호, 분석 문맥 보호와 tree-sitter AST 기반 선택 압축 설정이 있다. 해당 설정의 크기·보존·품질 변화는 아직 측정하지 않았다.
 
-Therefore, the conclusion “none of the eight reviewed tools distinguishes file types or
-spans internally” is not used. The repository's measured 0.1976% refers only to grouping
-common path prefixes under Headroom `0.36.5` paths-only.
+따라서 “확인한 여덟 도구 모두 파일 종류나 구간을 자체 구분하지 않는다”는 결론은 사용하지 않는다. 이 저장소가 잰 0.1976%는 Headroom `0.36.5` paths-only의 공통 경로 접두어 묶기만 가리킨다.
 
-## Tool-Name Protection and File Reads Through Bash
+## 툴 이름 보호와 bash 파일 읽기
 
-Excluding only by tool name can miss the same file read when it occurs through `bash`
-rather than `Read`. A public issue record includes cases in which lossy compression was
-applied to `view` and bash `nl` or `sed` output and the agent reread the file. A
-separate external observation reported 39% compression of Python source read through
-bash. Its unit and sample denominator were absent from the supplied material, and it is
-not a repository measurement.
+툴 이름만으로 제외하면 같은 파일 읽기가 `Read`가 아니라 `bash`를 통해 들어올 때 보호 경계를 벗어날 수 있다. 공개 문제 기록에는 `view`와 bash의 `nl`·`sed` 출력이 손실 압축되고 에이전트가 파일을 다시 읽은 사례가 있다. 별도의 외부 관측에서는 bash로 읽은 Python 소스가 39% 압축됐다. 39%의 계산 단위와 표본 분모는 전달 자료에 포함되지 않았으며 이 저장소의 측정값이 아니다.
 
-The harness therefore distinguishes input-generation path and content to protect code,
-instructions, and assistant history. This experiment does not claim to validate
-Headroom's internal judgment on the product's behalf.
+따라서 harness가 입력 생성 경로와 내용을 구분해 코드·지시문·assistant 이력을 보호한다. Headroom 제품 내부 판단을 이번 실험이 대신 검증했다고 주장하지 않는다.
 
-## Excluded From This Scope
+## 이번 범위에서 제외한 것
 
-- Headroom `0.37.0` `coding` profile
-- Expansion to structured output and file-read locations
+- Headroom `0.37.0` `coding` 프로필
+- 구조화 출력과 파일 읽기 위치 확대
 - DeepSWE
-- Separate protection-bypass audit
-- Compression-intensity variation
+- 보호 우회 별도 감사
+- 압축 강도 변화
 
-External `r0.95`, `r0.9`, and `r0.5` results for compression intensity are cited only
-after verifying their source model, tasks, repetitions, and denominator. This evaluation
-does not add an intensity axis to tool, location, task, and quality variation.
+압축 강도 외부 자료의 `r0.95`, `r0.9`, `r0.5` 결과는 원 출처의 모델, 과제, 반복과 분모를 확인한 뒤에만 인용한다. 이번 평가에서는 도구, 위치, 과제와 품질 변동에 강도 축을 더하지 않는다.
 
-## Decision to Proceed With Execution
+## 실행 진행 판단
 
-On 2026-09-15, the user delegated coordination of design choices and staged execution.
-That delegation did not remove pre-call entry criteria. Screening begins only after
-isolated environment, full local tests, install-only checks for 89 tasks, actual Docker
-state replay, cost instrumentation, and Blob retrieval are verified.
+사용자는 2026-09-15에 설계 선택과 단계별 실행 진행을 조율자에게 위임했다. 이 위임은 모델 호출 전 진행 조건을 없애지 않는다. 격리 환경, 전체 로컬 검사, 89과제 install-only, 실제 Docker 상태 재생, 비용 계측과 Blob 회수가 확인되면 선별을 시작한다.
 
-After screening, compare `K`, measured throughput, cost, and the synthetic-data error-rate
-check before deciding whether evaluation may begin. If it does not fit the deadline, record
-the smallest feasible design revision rather than lowering policy thresholds or the
-repetition formula.
+선별 뒤에는 `K`, 실측 처리량, 비용과 합성 자료 오류율 확인을 대조해 평가 진입을 판단한다. 마감에 맞지 않으면 정책 문턱이나 반복 공식을 낮추지 않고 가장 작은 실행 가능한 수정안을 기록한다.
 
-## Technical Screening Stops
+## 선별 기술 중단
 
-**Observation:** Three runs started on 2026-09-15 UTC recorded 54, 115, and 67 successful
-provider responses but produced 0 valid quality results. The first stopped because
-screening changed Docker paths took too long. In the second, a response-delivery
-connection closure for one task stopped the full run, and Docker rejected relative
-symlink archives in verifier reruns for two tasks. The third completed all 8 started
-tasks without 429 responses or response-delivery closures, but 8/8 were excluded from the
-quality denominator for state-replay mismatch. For 6/8, first and second judgments both
-ran inside Harbor's 900-second judgment limit, cancelling the second; 2/8 had different
-restored-state hashes. Calculated provider costs were 1.322095 USD, 2.8807495 USD, and
-1.5341365 USD, not invoice-reconciled values.
+**관측:** 2026-09-15 UTC에 시작한 세 실행은 provider 성공 응답을 각각 54건, 115건, 67건 기록했지만 유효한 품질 결과는 모두 0건이었다. 첫 실행은 Docker 변경 경로 선별 시간이 과도해 중단했다. 둘째 실행은 한 과제의 응답 전달 연결 종료가 전체 실행을 멈췄고, 두 과제의 verifier 재실행에서 상대 symlink archive를 Docker가 거부했다. 셋째 실행은 시작한 8과제를 모두 끝냈고 429와 응답 전달 연결 종료는 없었지만, 8/8이 상태 재생 불일치로 품질 분모에서 제외됐다. 6/8은 첫 판정과 두 번째 판정이 Harbor의 판정 제한 900초 안에서 함께 실행돼 두 번째 판정이 취소됐고, 2/8은 복원 상태 hash가 달랐다. 계산한 provider 비용은 각각 1.322095 USD, 2.8807495 USD, 1.5341365 USD이며 청구서 대사값이 아니다.
 
-**Treatment:** The three runs are excluded from screening pass-rate numerator and
-denominator. Connection closure remains a technical failure of the affected task, while a
-correction lets other task requests continue. Changed paths inside a container are
-preserved and restored in one NUL-delimited tar file rather than copied path by path.
-Mounts are ordered by target path. The second judgment runs in the same container after
-the first judgment's 900-second limit has ended and before container removal.
+**처리:** 세 실행은 선별 통과율의 분자나 분모에 넣지 않는다. 연결 종료는 해당 과제의 기술 실패로만 기록하고, 다른 과제의 요청은 계속하도록 수정했다. 컨테이너 안의 변경 경로는 경로마다 복사하지 않고 NUL 문자로 경계를 구분한 한 개의 tar 파일로 보존·복원한다. 마운트는 대상 경로 순서로 고정한다. 두 번째 판정은 첫 판정의 900초 제한이 끝난 뒤, 컨테이너를 내리기 전에 같은 컨테이너에서 실행한다.
 
-**Validation:** In the latest correction, 237 tests with the tokenizer table pinned
-passed; 2 optional integration tests were skipped because execution-environment conditions
-were unavailable. The Harbor-only group passed 57 tests, with 1 actual Docker test skipped
-locally. In a disposable VM container, added, modified, and deleted paths, relative
-symlinks, and mounted files restored to the same state hash. A separate disposable
-container preserved 12,040 changed paths in one tar file; the state hash matched after
-2.132662891 seconds to preserve and 6.850701672 seconds to restore and rehash. This
-validation made 0 model calls.
+**검증:** 최신 수정에서 tokenizer 표를 고정한 검사 237개가 통과했고 선택 통합 검사 2개는 실행 환경 조건이 없어 건너뛰었다. Harbor 전용 검사 묶음은 57개가 통과했고 실제 Docker 검사는 로컬 환경에서 1개를 건너뛰었다. VM의 일회용 컨테이너에서 추가·수정·삭제 경로, 상대 symlink와 마운트 파일을 복원한 뒤 상태 hash가 같았다. 별도 일회용 컨테이너의 변경 경로 12,040개는 tar 파일 1개로 보존했으며, 보존 2.132662891초와 복원·재해시 6.850701672초 뒤 상태 hash가 같았다. 이 검증의 모델 호출은 0회였다.
 
-**Limitation:** This validates the corrected file-state preservation path, not a quality
-result from new screening. Running-process memory is not reconstructed from an archive.
-Rerun is allowed only if process lists before and after judgment and nonarchivable socket
-lists match, but those comparisons do not establish byte equality of process memory. The
-costs and raw sources from the three stopped runs remain private evidence; a new run uses
-a new source commit and execution manifest.
+**한계:** 이 검증은 수정한 파일 상태 보존 경로를 확인한 것이며 새 선별의 품질 결과가 아니다. 실행 중인 process의 메모리 상태는 archive로 재구성하지 않는다. 같은 컨테이너를 유지하면서 판정 전후 process 목록과 archive에 담을 수 없는 소켓 목록이 같아야 재실행을 허용하지만, 이 비교는 process 메모리의 byte 단위 일치를 증명하지 않는다. 세 중단 실행의 비용과 원본은 비공개 증거로 보존하며, 새 실행은 새 source commit과 별도 실행 manifest를 사용한다.
 
-**Cost stopping condition:** Calculated provider cost across the three technical stops was
-5.736981 USD. To retain the 300 USD full-screening provider limit, the new execution
-ledger's limit was 294.263019 USD. Both are provider usage multiplied by a fixed price
-table, not invoice reconciliation.
+**비용 중단 조건:** 세 기술 중단에서 계산한 provider 비용 합계는 5.736981 USD다. 전체 선별 provider 상한 300 USD를 유지하기 위해 새 실행 원장의 상한은 294.263019 USD다. 두 값은 고정 가격표를 provider 사용량에 곱한 계산값이며 청구서 대사값이 아니다.
 
-## Pre-Execution Validation on 2026-09-15
+## 2026-09-15 실행 전 검증
 
-- **Measurement:** Before first screening, 235 static tests with a pinned tokenizer table passed; 2 optional integration tests were skipped because local execution conditions were absent. Historical Harbor-only and actual Docker state-preservation and restoration checks remain separate from the post-correction validation above.
-- **Measurement:** VM install-only checks recorded results for all 89 tasks. On the first run, 88/89 ended without exceptions, while 1/89, `pytorch-model-recovery`, ended at Harbor's internal 120-second installation limit. There were 0 model calls.
-- **Measurement:** Rechecking the same task on a warm-cache VM without changing the ledger's 600-second setup limit completed without exception after 1.34 seconds of environment setup and 9.62 seconds of agent setup.
-- **Classification judgment:** The 89 failures in the initial record were not actual failure count. An aggregation bug added 88 failures by comparing Harbor names with a `terminal-bench/` prefix directly against inventory task IDs. It was corrected by mapping prefixed names one-to-one to inventory IDs.
-- **Measurement:** The 65,935,360-byte actual install-only artifact was uploaded to Blob, SHA-256-verified by remote GET, and downloaded again in a separate collection environment. The VM and collector SHA-256 matched at `f38b3df36e4a25353293825d1900e8ccbf22e8d778960eae49b20115d8a0236f`.
-- **Limitation:** This verifies executability on the current warm-cache VM. It does not guarantee that first installation on a fresh VM finishes within 120 seconds; the screening rule allowing one preparation retry before a provider call remains.
+- **측정:** 첫 선별 전 고정 tokenizer table을 쓴 정적 검사 235개가 통과했고 선택 통합 검사 2개는 로컬 실행 조건에 없어 건너뛰었다. 당시 Harbor 전용 검사와 실제 Docker 상태 보존·복원 검사의 기록은 위 수정 뒤 검증과 구분한다.
+- **측정:** VM의 install-only 검사는 89과제 모두 결과를 남겼다. 첫 실행에서 88/89는 예외가 없었고 `pytorch-model-recovery` 1/89는 Harbor 내부 설치 명령의 120초 제한에서 끝났다. 모델 호출은 0회였다.
+- **측정:** 같은 과제를 캐시가 채워진 VM에서 원장의 600초 setup 제한을 바꾸지 않고 다시 검사하자 environment setup 1.34초와 agent setup 9.62초 뒤 예외 없이 끝났다.
+- **분류 판단:** 최초 기록의 실패 89건은 실제 실패 수가 아니다. Harbor가 보고한 `terminal-bench/` 접두사 포함 이름과 inventory의 과제 ID를 그대로 비교한 집계 오류가 88건을 더했으며, 접두사를 inventory ID에 일대일로 대응하도록 수정했다.
+- **측정:** 실제 install-only 산출물 65,935,360바이트를 Blob에 올려 원격 GET으로 SHA-256을 확인한 뒤 별도 수집 환경에서 다시 내려받았다. VM과 별도 수집 환경의 SHA-256은 `f38b3df36e4a25353293825d1900e8ccbf22e8d778960eae49b20115d8a0236f`로 같았다.
+- **한계:** 이 검증은 현재 캐시가 채워진 VM의 실행 가능성을 확인한다. 새 VM의 빈 캐시에서도 첫 설치가 120초 안에 끝난다는 보장은 아니며, 선별의 provider 호출 전 준비 오류 1회 재시도 규칙은 그대로 유지한다.
 
-## Relationship to the Earlier Experiment
+## 이전 실험과의 관계
 
-The existing purposively selected five-task baseline ended inconclusively after 100 native
-trials. It also did not satisfy the final-workspace replay contract and is not reused for
-new screening. The [original preliminary protocol](protocol.md) and [baseline record](baseline.md)
-remain the original judgments from that execution.
+기존 목적 선정 5과제 기준선은 100개 native `trial`에서 판정 불가로 끝났다. 최종 workspace 재생 계약도 충족하지 않아 새 선별 자료로 재사용하지 않는다. [기존 1차 실험 규약](protocol.md)과 [기준선 기록](baseline.md)은 당시 실행의 원본 판단으로 유지한다.
 
-## Handling the Provider-Call Limit
+## provider 호출 상한 종료 처리
 
-**Observation:** Formal screening for `gpt2-codegolf` ended before first grading when its
-fourth provider request returned HTTP 400 `content_filter`. A new single-task diagnostic
-excluded from the formal denominator received 60 HTTP 200 provider responses, including
-2 with `finish_reason=length`. Terminus 2 used corrective calls after output-length
-limits and skipped the verifier when the 61st call was blocked locally. The two
-executions had different requests and task histories, so they do not establish whether
-the HTTP 400 was reproducible under equal input.
+**관측:** 정식 선별의 `gpt2-codegolf`는 네 번째 provider 요청이 HTTP 400 `content_filter`로 거부되어 첫 채점 전에 끝났다. 정식 분모에서 제외한 새 단일 과제 진단에서는 provider 요청 60건이 모두 HTTP 200이었고, 그중 2건은 `finish_reason=length`였다. Terminus 2는 출력 길이 제한 뒤 보정 호출을 사용했고, 60회 상한 다음 호출이 로컬에서 차단되자 verifier를 실행하지 않았다. 두 실행의 요청 내용과 작업 이력이 달라 HTTP 400의 재현 여부를 같은 입력 비교로 말할 수 없다.
 
-**Treatment at the time:** The system kept only the 60 provider-call limit per task and
-`max_turns=60`, without changing the time or cost policy then in force. At 60 calls it
-ended agent execution without another provider call and graded the current workspace.
-Only results with complete save, restore, regrading, and remote-hash verification entered
-the quality denominator. This is historical, predating the schema version 4 decision
-below, and is not the current operating rule. The two pre-fix `gpt2-codegolf` executions
-remain technical diagnostics rather than retrospective quality results.
+**당시 처리:** 과제당 provider 호출 상한 60회와 `max_turns=60`만 유지하고, 당시
+시간·비용 정책은 바꾸지 않았다. 60회에 닿으면 새 provider 호출 없이 agent 실행을
+끝내고 현재 workspace를 verifier로 채점했다. 저장·복원·재채점과 원격 hash 확인이
+끝난 결과만 품질 분모에 넣었다. 이는 아래 schema version 4 결정 전의 역사 기록이며
+현재 운영 규칙이 아니다. 수정 전 두 `gpt2-codegolf` 실행은 기술 진단으로 남기며 사후
+품질 결과로 바꾸지 않는다.
 
-**Limitation:** This correction fixes an execution path in which Terminus 2 omitted the
-verifier after reaching the call limit. It does not fix why the model failed to interrupt
-a long-running terminal command or an HTTP 400 policy refusal. Full single-task path
-validation runs separately on the corrected source commit.
+**한계:** 이 처리는 Terminus 2가 호출 상한에 닿았을 때 verifier가 생략되는 실행 경로를 고친다. 터미널에서 오래 실행 중인 명령을 모델이 중단하지 못한 원인이나 HTTP 400 정책 거부를 고치지 않는다. 실제 단일 과제 전체 경로 검증은 수정 source commit에서 별도로 수행한다.
 
-## 60-Call Boundary Diagnostic and Read-Only Continuation
+## 60회 경계 진단과 읽기 전용 연속 실행
 
-**Observation:** The latest formal run on 2026-09-15 UTC completed 16 attempts. Ten were
-quality results: 5 `pass` and 5 `wrong_answer`. The other six were technical results
-excluded from the quality denominator: 5 `timeout` and 1 `provider_error`. The formal
-`gpt2-codegolf` provider error ended before first grading after the fourth-request HTTP
-400 refusal. Its raw error and preserved material remain unchanged.
+**관측:** 2026-09-15 UTC의 최신 정식 실행은 `attempt` 16개를 완료했다. 10개는 품질 결과로, 5개가 `pass`, 5개가 `wrong_answer`였다. 나머지 6개는 품질 분모에서 제외한 기술 결과로, 5개가 `timeout`, 1개가 `provider_error`였다. `gpt2-codegolf`의 정식 `provider_error`는 네 번째 요청의 HTTP 400 거부 뒤 첫 채점 전에 끝났으며, 원문 오류와 보존 자료를 바꾸지 않는다.
 
-**Measurement:** A new single-task `gpt2-codegolf` diagnostic outside the formal
-denominator received 60 provider responses, including 2 with `finish_reason=length`.
-There was no 61st external call. After first grading of the current workspace, state save
-took 1.09470895 seconds, restoration 8.157927154 seconds, regrading 21.35600655 seconds,
-and Blob upload and remote verification 2.236660551 seconds. First grading and regrading
-both returned `wrong_answer`, and remote Blob hash verification passed. The diagnostic
-is excluded from the numerator and denominator of formal 89-task screening.
+**측정:** 정식 분모에서 뺀 새 `gpt2-codegolf` 단일 진단은 provider 응답 60건을 받았고 `finish_reason=length`가 2건이었다. 60회 상한에서 61번째 외부 호출은 없었으며, 현재 workspace의 첫 채점 뒤 상태 저장 1.09470895초, 복원 8.157927154초, 재채점 21.35600655초, Blob 업로드·원격 확인 2.236660551초가 각각 기록됐다. 첫 채점과 재채점은 모두 `wrong_answer`였고 Blob 원격 hash 확인을 통과했다. 이 진단은 정식 89과제 선별의 분자·분모에 넣지 않는다.
 
-**Validation:** A model-free integration test connecting actual Harbor `0.22.0`, LiteLLM
-`1.100.0`, and a local fake upstream forwarded exactly 60 external calls including the
-corrective call after the first `length` response. The 61st call did not reach upstream,
-and execution entered the verifier-result collection path. HTTP 400 and other exceptions
-were not converted into 60-call-limit exceptions. This validation does not replace save,
-restore, regrading, and evidence from the paid single-task diagnostic.
+**검증:** 실제 Harbor `0.22.0`과 LiteLLM `1.100.0`, 로컬 가짜 upstream을 연결한 모델 호출 없는 통합 검사에서 첫 `length` 응답의 보정 호출을 포함해 외부 호출 60건만 전달됐다. 61번째 호출은 upstream에 닿지 않았고 이후 verifier 결과 수집 경로에 진입했다. HTTP 400이나 다른 예외는 60회 상한 예외로 바꾸지 않았다. 이 검증은 유료 단일 진단의 저장·복원·재채점 증거를 대신하지 않는다.
 
-**Treatment:** The formal HTTP 400 result remains a technical exclusion and is not replaced
-by the diagnostic's `wrong_answer`. An explicit provider refusal before first grading
-becomes a completed technical exclusion only when raw error, stage-level state, available
-source, remote hash, and confirmed cost or conservative reservation are complete. Times
-for unexecuted grading stages remain not applicable with reasons, not `0`.
+**처리:** 정식 HTTP 400 결과는 기술 제외로 유지하고 단일 진단의 `wrong_answer`로 바꾸지 않는다. 첫 채점 전에 끝난 명시적 provider 거부는 원문 오류·단계별 상태·가용 원본·원격 hash와 확인된 비용 또는 보수적 예약액이 완전할 때 기술 제외가 완료된다. 실행하지 않은 채점 단계의 시간은 `0`이 아니라 `해당 없음`과 사유로 남긴다.
 
-**Continuation:** A changed source commit prevents automatic resume, so the prior 16
-records are linked read-only. Only evidence-complete results that did not cross the
-60-call change boundary are applied once to the same task and repetition. Completed plans
-are not rescheduled. Quality is counted once per trial, while every attempt and diagnostic
-cost remains cumulative.
+**연속 실행:** source commit이 달라 자동 재개할 수 없으므로, 이전 16개 원본은 읽기 전용으로 연결한다. 증거가 완전하고 60회 변경 경계를 밟지 않은 결과만 같은 과제·반복에 한 번 반영하며 완료한 계획은 다시 예약하지 않는다. 품질 결과는 `trial`당 한 번 세고 모든 `attempt`와 진단의 비용은 누적 기록한다.
 
-**Cost:** Before continuation, the provider cost record separates 17.41161 USD confirmed
-from 0.074985 USD unresolved conservative reservation. The confirmed value adds this
-single diagnostic's 0.6759435 USD to the prior 16.7356665 USD. Subtracting both from the
-300 USD provider limit leaves 282.513405 USD. These values are provider usage multiplied
-by a fixed price table, not invoice reconciliation. Prior cost remains in cumulative
-reporting but is not subtracted from the new balance twice.
+**비용:** 연속 실행 전에 고정할 provider 비용 기록은 확인된 17.41161 USD와 미확정 보수 예약액 0.074985 USD를 구분한다. 17.41161 USD는 앞서 확인된 16.7356665 USD에 이번 단일 진단 0.6759435 USD를 더한 계산값이다. 전체 provider 상한 300 USD에서 두 값을 뺀 새 실행 잔액은 282.513405 USD다. 이는 provider 사용량과 고정 가격표로 계산한 값이며 청구서 대사가 아니다. 이전 비용은 누적 보고에는 넣되 새 잔액에서 다시 빼지 않는다.
 
-**Limitation:** The 16 formal results alone do not establish evaluation eligibility for
-any task. No result from a later batch is claimed before read-only linkage checks and
-complete evidence for the first new batch finish.
+**한계:** 정식 16개 결과만으로 과제의 평가 적격 여부는 확정되지 않았다. 읽기 전용 연결 검사와 새 첫 묶음의 전체 증거 확인이 끝나기 전에는 이후 묶음 결과를 주장하지 않는다.
 
-## First Read-Only Continuation Batch
+## 첫 읽기 전용 연속 실행 묶음
 
-**Observation:** On 2026-09-15 UTC, the process linked 16 prior formal attempts read-only
-once and ran 8 previously unstarted tasks at concurrency 8. Two new tasks produced valid
-quality results, both `wrong_answer`. One completed as `provider_error`, four as
-`timeout`, all completed technical exclusions. The remaining `make-doom-for-mips`
-ended before first grading and remained evidence-incomplete under checks at the time.
-The cumulative formal record therefore contains 24 attempts, a quality denominator of 12,
-11 completed technical exclusions, and 1 evidence-incomplete record. It scheduled 0 next
-batch tasks.
+**관측:** 2026-09-15 UTC에 이전 정식 `attempt` 16개를 읽기 전용으로 한 번 연결하고, 아직 실행하지 않은 과제 8개를 병렬도 8로 실행했다. 새 8개 중 2개는 모두 `wrong_answer`인 유효한 품질 결과였다. 1개는 `provider_error`, 4개는 `timeout`으로 완료된 기술 제외였다. 나머지 `make-doom-for-mips` 1개는 첫 채점 전에 끝나 당시 검사에서 증거 불완전으로 남았다. 따라서 누적 정식 `attempt`는 24개이고, 품질 분모는 12개, 완료된 기술 제외는 11개, 증거 불완전은 1개다. 다음 묶음 예약은 0개였다.
 
-**Cause review:** The 19th model-issued command for `make-doom-for-mips` ran
-`exit $rc` after building, and the terminal accepted it. The 20th command in the same
-model response was sent to the ended tmux session and rejected with a `no server running`
-RuntimeError. Task-process wall time was 259.66233909 seconds, state save
-5.996326086 seconds, and Blob upload and remote verification 5.326878152 seconds. First
-grading, restoration, and regrading did not run, so their times are not applicable. The
-task-process wall time includes preparation and agent execution; it is not isolated model
-work time.
+**원인 확인:** `make-doom-for-mips`에서 모델이 보낸 19번째 명령은 빌드 뒤 `exit $rc`를 실행했고 terminal이 이 명령을 수락했다. 같은 모델 응답의 20번째 명령은 종료된 tmux session으로 보내져 `no server running` RuntimeError로 거부됐다. 과제 process 벽시계는 259.66233909초, 상태 저장은 5.996326086초, Blob 업로드와 원격 확인은 5.326878152초였다. 첫 채점·복원·재채점은 실행되지 않아 시간이 `해당 없음`이다. 이는 모델 작업 시간만을 분리해 잰 값이 아니라 준비와 agent 실행을 포함한 과제 process 벽시계다.
 
-**Treatment:** Do not change the pre-fix raw RuntimeError, command trace, native-result and
-trace hashes, state save, remote Blob hash, or cost. When all evidence agrees, link the
-existing result as a technical exclusion without making it a quality result. Later runs
-treat terminal-session termination as the end of the agent loop and pass the current
-workspace to the verifier. Do not apply this handling when the session remains alive or
-the raw RuntimeError differs.
+**처리:** 수정 전 결과의 원문 RuntimeError, 명령 trace, native 결과와 trace hash, 상태 저장, Blob 원격 hash와 비용을 바꾸지 않는다. 이 증거가 모두 일치할 때 기존 결과를 기술 제외로 연결하되 품질 결과로 바꾸지 않는다. 이후 실행에서는 terminal session 종료를 agent loop 종료로 처리하고 현재 workspace를 verifier에 넘긴다. session이 살아 있거나 RuntimeError 원문이 다른 경우에는 이 처리를 적용하지 않는다.
 
-**Cost:** Before this continuation, confirmed provider cost was 17.41161 USD and
-unresolved conservative reservation was 0.074985 USD. The eight new executions added
-3.9968745 USD confirmed and 0.302345 USD reserved. Cumulative confirmed cost is
-21.4084845 USD, cumulative conservative reservation is 0.37733 USD, and 278.2141855 USD
-remains under the 300 USD limit. These are calculated from provider usage and fixed
-prices, not invoice-reconciled values.
+**비용:** 이번 연속 실행 전까지 확인된 provider 비용은 17.41161 USD이고 미확정 보수 예약액은 0.074985 USD였다. 새 8개에서 확인된 provider 비용 3.9968745 USD와 보수 예약액 0.302345 USD가 추가됐다. 누적 확인값은 21.4084845 USD, 누적 보수 예약액은 0.37733 USD이며 300 USD 상한에서 남은 금액은 278.2141855 USD다. 이 값은 provider 사용량에 고정 가격표를 곱한 계산이며 청구서 대사값이 아니다.
 
-**Limitation:** Completed technical exclusions are neither quality passes nor quality
-failures. Four `timeout` and one `provider_error` make the affected tasks ineligible
-without becoming compression-comparison results. The terminal-exit correction passed
-local regression checks and comparison against preserved source. Read-only linkage,
-duplicate, and cost reconciliation repeat before a new continuation under the same final
-source commit.
+**한계:** 완료된 기술 제외는 품질 통과나 실패가 아니다. `timeout` 4개와 `provider_error` 1개는 해당 과제를 부적격으로 처리하지만 압축 비교 결과로 해석하지 않는다. terminal 종료 수정은 로컬 회귀 검사와 기존 원문 대조를 마쳤으며, 같은 최종 source commit으로 새 연속 실행을 시작하기 전에 읽기 전용 연결·중복·비용 대사를 다시 확인한다.
 
-## Removal of User-Defined Execution Limits: Historical Decision on 2026-09-15
+## 사용자 지정 실행 제한 제거 — 2026-09-15 당시 결정
 
-**Decision at the time:** After 2026-09-15 22:40 KST, screening and evaluation did not
-apply the harness-defined 300 USD stop, balance-subtraction block, 2 USD diagnostic limit,
-60 provider calls per task, `max_turns=60`, 2,048-token maximum output, request-byte
-limit, agent, setup, verifier, or task-execution time limits, full-run duration, or
-deadline stop. This paragraph is a historical record of conditions at the time. Future
-paid execution follows schema version 4 below; this decision is not reused as the current
-operating rule.
+**당시 결정:** 2026-09-15 22:40 KST 이후 진행한 선별과 평가에는 harness가 정한 300 USD 중단, 잔액 차감 차단, 2 USD 진단 상한, 과제당 provider 호출 60회, `max_turns=60`, 최대 출력 2,048 token, 요청 byte 상한, agent·setup·verifier·과제 실행 시간, 전체 실행 시간과 deadline 중단을 적용하지 않았다. 이 문단은 당시 실행 조건의 역사 기록이다. 앞으로의 유료 실행에는 아래 schema version 4 정책이 적용되며 이 결정을 현재 운영 규칙으로 재사용하지 않는다.
 
-**Implementation validation at the time:** The execution ledger represented the
-unlimited state as explicit policy values rather than very large numbers. Harbor
-`0.22.0` phase-duration calculations returned `None` through the execution entry
-point, and Terminus 2 did not receive `max_turns` or `max_completion_tokens`. Omitting
-`max_turns` invokes Terminus 2's internal default of 1,000,000, so it was not called
-unlimited. Provider throughput limits and service errors, context length, request size,
-and policy refusal remained external product constraints.
+**당시 구현 확인:** 당시 실행 원장은 제한 없음 상태를 숫자를 크게 바꾸는 방식이 아니라 명시적인 정책 값으로 기록했다. Harbor `0.22.0`의 phase 시간 계산은 `None`을 반환하도록 실행 진입점에서 적용했고, Terminus 2에는 `max_turns`와 `max_completion_tokens`를 전달하지 않았다. `max_turns` 생략 시 Terminus 2 내부 기본값 1,000,000이 적용되므로 이를 무제한이라고 부르지 않았다. provider 처리량 제한과 서비스 오류, context 길이·요청 크기·정책 거부는 외부 제품 제약으로 남겼다.
 
-**Model-free validation:** A test connecting actual Harbor `0.22.0`, LiteLLM
-`1.100.0`, and a local fake upstream forwarded 62 calls, including the corrective call
-after the first `finish_reason=length` response. Calls after the 60th were forwarded,
-`max_completion_tokens` was absent from every request, and the run entered verifier
-result collection. Harbor's agent, agent-setup, environment-setup, and verifier limit
-calculations were all `None`, and the native supervisor had no deadline. This was not
-actual provider execution or a new quality result.
+**모델 호출 없는 검증:** 실제 Harbor `0.22.0`, LiteLLM `1.100.0`과 로컬 가짜 upstream을 연결한 검사에서 첫 응답의 `finish_reason=length` 보정 호출을 포함해 62건이 전달됐다. 61번째 이후 호출도 전달됐고, 모든 요청에서 `max_completion_tokens`가 빠졌으며 이후 verifier 결과 수집 분류에 진입했다. Harbor의 agent·agent setup·environment setup·verifier 제한 계산은 모두 `None`이었고 native supervisor에는 deadline이 없었다. 이 검증은 실제 provider 실행이나 새 품질 결과가 아니다.
 
-**Continuation:** Do not overwrite the 24 existing formal attempts or raw single-task
-diagnostic. A historical result that reached or may have been affected by a call, output,
-or time boundary is not linked as a quality result under the new policy; only the required
-task and repetition reruns under a new execution ID. Evidence-complete unaffected results
-are linked read-only once. Confirmed provider cost of 21.4084845 USD and the then-unresolved
-reservation of 0.37733 USD retain their observation lineage as confirmed and old-policy
-unresolved estimates, respectively, and do not block new execution.
+**연속 실행:** 기존 정식 `attempt` 24개와 단일 진단 원본은 덮어쓰지 않는다. 과거 호출·출력·시간 제한 경계에 닿았거나 그 영향을 배제할 수 없는 결과는 새 정책의 품질 결과로 연결하지 않고, 새 실행 ID에서 필요한 과제·반복만 다시 실행한다. 영향이 없고 증거가 완전한 결과만 읽기 전용으로 한 번 연결한다. 확인된 provider 비용 21.4084845 USD와 당시 미확정 예약액 0.37733 USD는 관측 계보를 보존해 각각 확인값과 옛 정책 기반 미확정 추정값으로 기록하며 새 실행 차단에 쓰지 않는다.
 
-**Schedule:** At the time of this decision, the operating target was to obtain actual
-comparison values and evidence by `2026-09-16 23:59 KST`. This was not a process
-termination timer and replaced the earlier `2026-09-17 09:00 KST` execution-end target
-and `2026-09-17 21:00 KST` reporting target. Actual provider screening under the new
-unlimited policy had not started when the decision was recorded.
+**일정:** 이 결정을 기록한 당시 운영 목표는 `2026-09-16 23:59 KST`까지 실제 비교 수치와 근거를 확보하는 것이었다. 이 시각은 process 종료 타이머가 아니었으며, 이전 `2026-09-17 09:00 KST` 실행 종료 목표와 `2026-09-17 21:00 KST` 보고 목표를 대체했다. 새 제한 정책의 실제 provider 선별은 이 결정 기록 시점에 아직 시작하지 않은 상태였다.
 
-## Safety Limits for Future Paid Execution: Schema Version 4
+## 다음 유료 실행 안전 상한 — schema version 4
 
-**Decision:** Future paid provider execution follows the
-[stopping and cost-safety policy](execution-safety-policy.md). It fixes 60 provider HTTP
-attempts, 2,048 output tokens, 8,000,000 request bytes, 2,400 seconds elapsed, and the
-progress-signal rule per attempt. Per-attempt and full-run calculated API cost limits and a
-future UTC deadline require per-run approval. If any of the three is blank, execution
-fails before a provider call.
+**결정:** 앞으로의 provider 유료 실행은 [종료·비용 안전 정책](execution-safety-policy.md)을
+적용한다. attempt당 provider HTTP 시도 60회, 출력 2,048 token, 요청
+8,000,000 bytes, 경과 시간 2,400초와 진행 신호 규칙을 고정한다. attempt·전체 실행
+API 계산 비용 상한과 미래 UTC deadline은 실행별로 승인해야 한다. 셋 중 하나라도
+비어 있으면 provider 호출 전에 실패한다.
 
-**Classification:** Reaching a limit is `technical_incomplete` with `unknown` quality.
-Call and cost boundaries become `budget_stopped`; time, size, output, and progress-signal
-boundaries become `censored`. Neither becomes `wrong_answer`. Preserve confirmed cost,
-unresolved exposure, final request, response, and usage, workspace and state replay, and
-whether the verifier ran.
+**분류:** 상한 도달은 `technical_incomplete`이고 품질은 `unknown`이다. 호출·비용
+경계는 `budget_stopped`, 시간·크기·출력·진행 신호 경계는 `censored`로 기록하며
+`wrong_answer`로 바꾸지 않는다. 확인 비용, 미확정 노출액, 마지막 요청·응답·usage,
+workspace·상태 재생과 verifier 실행 여부를 함께 보존한다.
 
-**Natural-termination observation:** Not permitted in a general comparison. Only a
-separate pilot with preapproved cost, maximum exposure, and manual stopping conditions
-fixed in an independent contract may be considered. The current runner has no entry point
-for that pilot.
+**자연 종료 관찰:** 일반 비교에서는 허용하지 않는다. 사전 비용 승인, 최대 노출액과
+수동 종료 조건을 독립 계약으로 고정한 별도 파일럿만 검토할 수 있다. 현재 실행기에는
+그 파일럿 진입점이 없다.

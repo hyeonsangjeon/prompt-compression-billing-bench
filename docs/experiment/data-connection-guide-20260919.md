@@ -1,99 +1,74 @@
-# Live-Data Connection Guide
+# 실데이터 연결 가이드
 
-Follow this sequence when KT runs one real task in its own environment without placing
-source data in the public repository. A **no-call preflight** checks configuration and file
-connections without calling an external model provider. The **result JSON** stores
-execution state, usage, judgment, and file fingerprints in machine-readable form. A
-**JSON Schema** defines required fields and value formats.
+KT가 원본 데이터를 공개 저장소에 올리지 않고 자체 환경에서 실제 1과제를 실행하려면 아래 순서대로 진행한다. 여기서 **무호출 확인(preflight)**은 설정과 파일 연결을 검사하되 외부 모델 서비스(provider)의 API를 호출하지 않는 단계다. **결과 JSON**은 실행 상태, 사용량, 판정과 파일 지문을 기계가 읽을 수 있게 남긴 파일이며, **JSON 구조 규칙(Schema)**이 필수 항목과 값의 형식을 정한다.
 
-## 30-Second Summary
+## 30초 요약
 
-1. Do not move source data, endpoints, credentials, or internal paths outside the customer environment.
-2. Public execution YAML contains only environment-variable names, a fixed benchmark task ID, and a JSON output name under `runs/`.
-3. Run the default no-call preflight first. `status=checked` means the connection contract was checked, not that quality passed.
-4. Add `--execute` only after an approved operator has prepared environment variables and a private execution ledger.
-5. After execution, validate the JSON against the result schema and read technical completion separately from quality. `technical_incomplete` is not a wrong answer.
+1. 원본 데이터, 연결 주소(endpoint), 인증 정보와 내부 경로는 고객사 환경 밖으로 내보내지 않는다.
+2. 공개 실행 설정 파일(YAML)에는 환경변수 이름, 고정 벤치마크 과제 ID와 `runs/` 아래 JSON 출력 이름만 둔다.
+3. 먼저 기본 명령으로 무호출 확인을 마친다. `status=checked`는 연결 확인이지 품질 통과가 아니다.
+4. 승인된 운영자가 환경변수와 비공개 실행 원장을 준비한 뒤에만 `--execute`를 붙인다.
+5. 실행 뒤에는 결과 Schema로 JSON 모양을 확인하고, 기술 완료 여부와 품질 판정을 따로 읽는다. `technical_incomplete`는 오답이 아니다.
 
-This documentation work made no model or provider call. It describes only the public
-[one-task YAML](../../examples/experiment/benchmark.yaml), existing
-[connection code](../../src/benchmark_run.py), existing
-[single-task runner](../../src/screening_run.py), and
-[result schema](../../schemas/experiment-result.schema.json).
+이번 문서 작업에서는 모델이나 provider를 호출하지 않았다. 공개된 [실제 1과제 YAML](../../examples/experiment/benchmark.yaml), [기존 실행 연결 코드](../../src/benchmark_run.py), [기존 단일 과제 실행기](../../src/screening_run.py)와 [결과 Schema](../../schemas/experiment-result.schema.json)만 설명한다.
 
-## Supported Scope
+## 먼저 확인할 지원 범위
 
-The current public path is not a generic runner for arbitrary customer-data formats. It
-runs one task from the public index at a pinned Terminal-Bench 2.1 revision using a
-KT-managed private benchmark checkout and execution environment.
+현재 공개 경로는 임의의 고객 데이터 형식을 받는 범용 실행기가 아니다. 고정된 Terminal-Bench 2.1 revision과 공개 과제 색인에 있는 과제 하나를, KT가 관리하는 비공개 벤치마크 소스 사본(checkout)과 실행 환경에서 돌리는 경로다.
 
-- **Supported:** Connect a supported benchmark checkout, private execution inventory and
-  file hashes, and provider settings inside the customer environment without copying them
-  into the public repository.
-- **Unsupported:** Run a customer-specific document or new task merely by naming it in
-  YAML. A task absent from the public index is rejected during no-call preflight.
-- **Requires separate review:** Connecting customer-specific data as a new task first
-  requires design and validation of an input adapter, judge, and ledger contract. This
-  guide does not assume those capabilities exist.
+- **가능:** 고객사 환경에 둔 지원 benchmark checkout, 비공개 실행 대상·파일 해시 목록(inventory)과 provider 설정을 공개 저장소에 복사하지 않고 연결한다.
+- **불가능:** 고객사 고유 문서나 새 과제를 YAML에 적는 것만으로 실행한다. 공개 과제 색인에 없는 과제는 무호출 확인에서 거부된다.
+- **별도 검토 필요:** 고객사 고유 데이터를 새 과제로 연결하려면 입력 연결 코드(adapter), 판정자와 원장 계약을 먼저 설계하고 검증해야 한다. 이 가이드는 그 기능이 이미 있다고 가정하지 않는다.
 
-The first connection succeeds when one pinned real benchmark task runs under the contract
-inside the customer environment and its result JSON validates. One result does not decide
-product adoption, a compression effect, or general quality.
+첫 연결은 고정된 실제 benchmark 과제 하나가 고객사 환경에서 계약대로 실행되고 결과 JSON까지 검증되면 성공이다. 이 한 번의 결과로 제품 도입, 압축 효과나 일반적인 품질을 판단하지 않는다.
 
-## Values KT Supplies and Values the Repository Fixes
+## KT가 준비하는 값과 저장소가 고정하는 값
 
-### Values Supplied Only in the Customer Environment
+### 고객사 환경에서만 준비하는 값
 
-The table lists environment-variable names, not values. Actual addresses, access-granting
-credentials, organizational tenant values, and personal paths remain in a secret manager
-or execution environment. Do not paste them into documentation, YAML, issues, or result
-descriptions.
+아래 표에는 값이 아니라 환경변수 이름만 적었다. 실제 주소, 접근 권한을 주는 인증 정보(credential), 조직 계정 식별값(tenant 값)과 개인 경로는 비밀 저장소나 실행 환경에 두고 문서, YAML, 이슈와 결과 설명에 붙여 넣지 않는다.
 
-| Environment-variable name | Role | Publication |
+| 환경변수 이름 | 값의 역할 | 공개 여부 |
 | --- | --- | --- |
-| `FOUNDRY_ENDPOINT` | KT-approved model endpoint | Value remains private |
-| `SCREENING_OPERATIONAL_LEDGER` | Path to private execution ledger containing approvals | File and path remain private |
-| `TERMINAL_BENCH_ROOT` | Benchmark checkout at the pinned revision | Source and path remain private |
-| `SCREENING_INVENTORY` | Path to hash-calculated execution inventory | Source and path remain private |
-| `FOUNDRY_QUEUE_STATE` | Queue-state path coordinating use of the same deployment | Value remains private |
-| `PROVIDER_RPM_LIMIT`, `PROVIDER_TPM_LIMIT` | Provider-permitted throughput | Values remain private |
-| `TIKTOKEN_CACHE_DIR` | Data path for the pinned tokenizer | Value remains private |
-| `NATIVE_BLOB_ACCOUNT_URL`, `NATIVE_BLOB_SPOOL_ROOT` | Storage and retrieval locations for private execution evidence | Values remain private |
+| `FOUNDRY_ENDPOINT` | KT가 승인한 모델 연결 주소 | 값은 비공개 |
+| `SCREENING_OPERATIONAL_LEDGER` | 승인 내용을 채운 비공개 실행 원장 경로 | 파일과 경로 모두 비공개 |
+| `TERMINAL_BENCH_ROOT` | 고정 revision의 benchmark checkout 경로 | 원본과 경로 모두 비공개 |
+| `SCREENING_INVENTORY` | 해시를 계산한 실행 inventory 경로 | 원본과 경로 모두 비공개 |
+| `FOUNDRY_QUEUE_STATE` | 같은 배포 자원(deployment)을 쓰는 순서를 조정하는 queue 상태 경로 | 값은 비공개 |
+| `PROVIDER_RPM_LIMIT`, `PROVIDER_TPM_LIMIT` | provider가 허용한 처리량 | 값은 비공개 |
+| `TIKTOKEN_CACHE_DIR` | 토큰 수를 세는 고정 도구(tokenizer)의 자료 경로 | 값은 비공개 |
+| `NATIVE_BLOB_ACCOUNT_URL`, `NATIVE_BLOB_SPOOL_ROOT` | 비공개 실행 증거의 저장·회수 위치 | 값은 비공개 |
 
-Authentication is supplied through a KT-approved platform identity or secret-management
-procedure. Do not store keys or tokens in YAML or execution ledgers.
+인증은 KT가 승인한 플랫폼 인증 주체(identity) 또는 비밀 관리 절차로 공급한다. 키와 token을 YAML이나 실행 원장에 기록하지 않는다.
 
-In public YAML, KT may select a task ID from the public index and a result JSON name under
-`runs/`. YAML selecting another task must also be committed in a KT private fork or
-approved source branch and run from a clean `HEAD`.
+KT가 공개 YAML에서 고를 수 있는 것은 공개 색인에 있는 과제 ID와 `runs/` 아래 결과 JSON 이름이다. 다른 과제를 고른 YAML도 source checkout 안에 commit한 뒤 깨끗한 `HEAD`에서 실행해야 한다.
 
-### Values Fixed and Validated by the Repository
+### 저장소가 고정하고 검증하는 값
 
-| Item | Fixed content | Where to check |
+| 항목 | 고정 내용 | 확인 위치 |
 | --- | --- | --- |
-| Benchmark | Terminal-Bench 2.1 name, revision, and public task index | [Public reference ledger](../../ledgers/screening.template.toml) |
-| Model settings | `gpt-5.4`, reported revision, `temperature=0`, reasoning setting | Public reference ledger |
-| Condition | `none`, the reference without additional compression | Public reference ledger and YAML |
-| Execution path | `src.screening_run --diagnose-task` | `resolved_contract.runner` in result JSON |
-| Protection contract | Replay bundle, complete evidence retention, and retry settings | Public reference ledger and result JSON |
-| Safety limits | Call, cost, time, request, and output boundaries and unknown-quality stop classification | [Safety policy](execution-safety-policy.md) |
-| Result shape | State, usage, cost, quality, completion, and artifact hashes | [Result schema](../../schemas/experiment-result.schema.json) |
+| benchmark | Terminal-Bench 2.1 이름, revision, 공개 과제 색인 | [공개 참조 원장](../../ledgers/screening.template.toml) |
+| 모델 설정 | `gpt-5.4`, 보고된 revision, `temperature=0`, reasoning 설정 | 공개 참조 원장 |
+| 조건 | 추가 압축 없는 기준인 `none` | 공개 참조 원장과 YAML |
+| 실행 경로 | `src.screening_run --diagnose-task` | 결과 JSON의 `resolved_contract.runner` |
+| 보호 계약 | 재현 묶음(replay bundle), 완전한 증거 보존, 재시도(retry) 설정 | 공개 참조 원장과 결과 JSON |
+| 안전 상한 | 호출·비용·시간·요청·출력 경계와 품질 미확정 종료 분류 | [안전 정책](execution-safety-policy.md) |
+| 결과 모양 | 상태, 사용량, 비용, 품질, 완료와 산출물 해시 | [결과 Schema](../../schemas/experiment-result.schema.json) |
 
-The wrapper compares the private execution ledger with the public reference ledger. Only
-inventory-file fingerprints, provider-limit and deployment-isolation evidence, approval
-fields, per-attempt and full-run cost limits, and the UTC deadline may differ in the
-private ledger. Changing the model, condition, runner, judgment rules, fixed call, time,
-or size boundaries, or retry behavior is rejected before execution.
+실행 연결 코드(wrapper)는 비공개 실행 원장을 공개 참조 원장과 비교한다. 비공개
+원장에서 바꿀 수 있는 것은 inventory 파일 지문, provider 제한·deployment 분리 근거,
+승인 필드, attempt·전체 실행 비용 상한과 UTC deadline뿐이다. 모델, 조건,
+실행기(runner), 판정 규칙, 고정 호출·시간·크기 경계나 retry를 함께 바꾸면 실행 전에
+거부한다.
 
-## 1. Prepare Source Data Outside the Repository
+## 1. 원본 데이터를 저장소 밖에서 준비한다
 
-A **file fingerprint (SHA-256 hash)** is a 64-character value used to compare file
-contents. It can verify that the same file was used without publishing the source, but the
-hash itself remains private until customer review.
+**파일 지문(SHA-256 해시)**은 파일 내용이 같은지 확인하는 64자리 값이다. 원본을 공개하지 않아도 같은 파일을 썼는지 대조할 수 있지만, 해시 자체도 고객사 검토 전에는 비공개로 취급한다.
 
-1. Place the benchmark checkout at the pinned revision and its inventory in a private location outside the repository.
-2. Calculate the inventory file's SHA-256.
-3. Copy the public reference ledger outside the repository as a private execution ledger.
-4. Fill only the permitted fields below and retain hash records for the source inventory and execution ledger.
+1. 고정 revision의 benchmark checkout과 inventory를 저장소 밖 비공개 위치에 둔다.
+2. inventory 파일의 SHA-256을 계산한다.
+3. 공개 참조 원장을 저장소 밖으로 복사해 비공개 실행 원장으로 쓴다.
+4. 아래 허용 필드만 채우고, 원본 inventory와 실행 원장의 해시 기록을 함께 보관한다.
 
 ```bash
 sha256sum '<private-inventory-file>'
@@ -101,29 +76,26 @@ cp ledgers/screening.template.toml '<private-directory>/screening.operational.to
 sha256sum '<private-directory>/screening.operational.toml'
 ```
 
-Only these private-ledger fields are filled:
+비공개 실행 원장에서 채울 필드는 다음뿐이다.
 
-| section.field | Content |
+| section.field | 넣을 내용 |
 | --- | --- |
-| `benchmark.inventory_sha256` | Inventory SHA-256 calculated above |
-| `queue.limits_source_reference` | Private evidence reference for provider limits |
-| `queue.deployment_isolation_reference` | Private evidence reference for shared-deployment coordination |
-| `approval.preregistered` | Whether the plan was approved before execution |
-| `approval.execution_authorized` | Whether actual paid execution is approved |
-| `approval.cost_limits_approved` | Whether the cost limits and deadline below are approved |
-| `approval.reference` | Approval-record reference |
-| `limits.max_api_cost_usd_per_attempt` | Calculated API cost allowed for one actual task attempt |
-| `limits.max_api_cost_usd_per_run` | Calculated API cost allowed across this new run |
-| `limits.run_deadline_utc` | Future UTC execution deadline |
+| `benchmark.inventory_sha256` | 위에서 계산한 inventory SHA-256 |
+| `queue.limits_source_reference` | provider 제한을 확인한 비공개 근거 참조 |
+| `queue.deployment_isolation_reference` | 공유 deployment 조정 근거 참조 |
+| `approval.preregistered` | 사전 계획 승인 여부 |
+| `approval.execution_authorized` | 실제 유료 실행 승인 여부 |
+| `approval.cost_limits_approved` | 아래 비용 상한과 deadline 승인 여부 |
+| `approval.reference` | 승인 기록 참조 |
+| `limits.max_api_cost_usd_per_attempt` | 한 과제의 한 실제 시도에 허용할 API 계산 비용 |
+| `limits.max_api_cost_usd_per_run` | 이번 새 실행 전체에 허용할 API 계산 비용 |
+| `limits.run_deadline_utc` | 실행을 끝낼 미래 UTC 시각 |
 
-Do not place raw input, prompts, endpoint values, credentials, tenant values, or internal
-paths in this file either. Inject the values corresponding to the environment-variable
-names above at execution time.
+원본 입력, prompt, endpoint 값, credential, tenant 값과 내부 경로는 이 파일에도 넣지 않는다. 환경변수에는 앞 표의 이름에 해당하는 값을 실행 시점에 주입한다.
 
-## 2. Review the One-Task YAML
+## 2. 실제 1과제 YAML을 확인한다
 
-The [public example](../../examples/experiment/benchmark.yaml) points to one real task in
-the pinned benchmark; it is not synthetic input.
+[공개 예제](../../examples/experiment/benchmark.yaml)는 합성 입력이 아니라 고정 벤치마크의 실제 과제 하나를 가리킨다.
 
 ```yaml
 schema_version: 2
@@ -138,15 +110,11 @@ condition: none
 output: runs/readme-benchmark-result.json
 ```
 
-The YAML contains only the endpoint's **environment-variable name**, not its address. It
-also contains no source-data path. Start with this file unchanged. To select another
-supported task, change only `benchmark.task` and a nonconflicting `runs/` JSON name,
-then commit the YAML in KT's private fork or approved source branch. The runner confirms
-that the source checkout is clean, including untracked files.
+YAML에는 endpoint의 **환경변수 이름**만 있고 주소는 없다. 원본 데이터 경로도 없다. 처음에는 이 파일을 그대로 사용한다. 다른 지원 과제를 선택하려면 `benchmark.task`와 충돌하지 않는 새 `runs/` JSON 이름만 바꾸고, 변경한 YAML을 KT의 비공개 fork 또는 승인된 source branch에 commit한다. Runner는 untracked 파일까지 포함해 source checkout이 깨끗한지 확인한다.
 
-## 3. Check Without Calling a Model
+## 3. 모델을 부르지 않고 먼저 확인한다
 
-Run in a clean committed checkout with Python 3.12 or later and `uv`.
+Python 3.12 이상과 `uv`가 있는 깨끗한 commit checkout에서 실행한다.
 
 ```bash
 uv sync --locked
@@ -155,11 +123,9 @@ uv run --locked python run.py experiment \
   --verify-result runs/readme-benchmark-result.json
 ```
 
-The first command checks YAML, the current Git commit, public reference ledger, task index,
-and result contract. Without `--execute`, it makes no provider call. The second command
-checks the generated JSON against the [result schema](../../schemas/experiment-result.schema.json).
+첫 명령은 YAML, 현재 Git commit, 공개 참조 원장, 과제 색인과 결과 계약을 확인한다. `--execute`가 없으므로 provider를 호출하지 않는다. 두 번째 명령은 생성된 JSON이 [결과 Schema](../../schemas/experiment-result.schema.json)에 맞는지 검사한다.
 
-A successful no-call preflight produces:
+무호출 확인이 끝나면 아래 상태가 나온다.
 
 ```text
 status = checked
@@ -170,32 +136,27 @@ quality.status = not_measured
 completion.technical_status = not_run
 ```
 
-`checked` means pre-execution connections satisfy the contract. No model answer, quality,
-or cost has been measured. Passing the schema checks JSON shape, not truthfulness or
-billing.
+`checked`는 “실행 전에 확인할 연결이 맞다”는 뜻이다. 모델 답변, 품질과 비용은 아직 측정하지 않았다. Schema 통과도 JSON 모양을 확인할 뿐, 값의 진실성이나 청구서를 보증하지 않는다.
 
-The current clean-checkout validation scope for the no-call path is recorded in
-[validation evidence](../../data/experiment/readme-benchmark-validation-20260920.json).
-That record also excludes actual provider execution.
+무호출 경로의 현재 clean-checkout 검증 범위는 [검증 기록](../../data/experiment/readme-benchmark-validation-20260920.json)에 있다. 그 기록에도 실제 provider 실행은 포함되지 않았다.
 
-## 4. Execute Only After Approval
+## 4. 승인 뒤에만 실제 실행한다
 
-Before execution, the operator checks:
+실행 전 운영자는 다음을 확인한다.
 
-- Environment-variable values and platform identity are injected only into the execution session.
-- The private execution ledger changes only the permitted fields above.
-- Inventory SHA-256 matches the actual file.
-- Provider throughput limits, shared-deployment coordination, and paid-execution approval are recorded.
-- Per-attempt and full-run calculated API cost limits and a future UTC deadline are approved.
-- Source and execution artifacts remain within the customer-managed boundary.
+- 환경변수 값과 플랫폼 identity가 실행 세션에만 주입됐는가.
+- 비공개 실행 원장이 위 허용 필드만 바꿨는가.
+- inventory SHA-256과 실제 파일이 일치하는가.
+- provider 처리량 제한, deployment 공유 조정과 유료 실행 승인이 기록됐는가.
+- attempt·전체 실행 API 계산 비용 상한과 미래 UTC deadline이 승인됐는가.
+- 원본과 실행 산출물이 고객사 관리 경계를 벗어나지 않는가.
 
-The public reference ledger fixes schema version 4 call, time, request, and output
-boundaries, while intentionally leaving the cost limits and UTC deadline blank. Provider
-execution fails before a call unless all three values and
-`cost_limits_approved=true` appear together in the private ledger. Exact values and stop
-classifications follow the [safety policy](execution-safety-policy.md).
+현재 공개 참조 원장은 schema version 4의 호출·시간·요청·출력 경계를 고정하지만,
+비용 상한과 UTC deadline은 일부러 비워 둔다. 이 세 값과
+`cost_limits_approved=true`를 비공개 원장에 함께 기록하지 않으면 provider 호출 전에
+실패한다. 자세한 값과 종료 분류는 [안전 정책](execution-safety-policy.md)을 따른다.
 
-Only when all values and approvals are ready, run:
+모든 값과 승인이 준비된 경우에만 다음 명령을 사용한다.
 
 ```bash
 uv sync --locked --extra native
@@ -203,141 +164,117 @@ uv run --locked python run.py experiment \
   examples/experiment/benchmark.yaml --execute
 ```
 
-`--execute` revalidates the private execution ledger, then passes one task to the existing
-`screening_run --diagnose-task`. It does not create a new runner or bypass. This
-documentation work did not run that command.
+`--execute`는 비공개 실행 원장을 다시 검사한 다음 기존 `screening_run --diagnose-task`에 과제 하나를 넘긴다. 새 실행기나 우회 경로를 만들지 않는다. 이 문서 작업에서는 위 명령을 실행하지 않았다.
 
-## 5. Validate Result JSON and Read the Judgment
+## 5. 결과 JSON을 검증하고 판정을 읽는다
 
-Use the same validation command whether execution finishes or stops technically:
+실행이 끝났든 중간에 기술적으로 멈췄든 같은 검증 명령을 사용한다.
 
 ```bash
 uv run --locked python run.py experiment \
   --verify-result runs/readme-benchmark-result.json
 ```
 
-| State combination | Plain meaning | Counts as quality? |
+| 상태 조합 | 쉬운 뜻 | 품질로 셀 수 있는가 |
 | --- | --- | --- |
-| `checked` + `preflight_passed` | No-call preflight only | No |
-| `completed` + `measurement_completed` + `quality.status=pass` | Technical execution and grading completed and passed | Yes, only for this one run |
-| `completed` + `measurement_completed` + `quality.status=wrong_answer` | Technical execution and grading completed; answer was wrong | Yes, one wrong answer |
-| `completed` + `measurement_completed` + `quality.status=wrong_format` | Technical execution and grading completed; format was wrong | Yes, one format failure |
-| `failed` + `technical_incomplete` | Execution or evidence collection did not finish | No; do not convert to a wrong answer |
+| `checked` + `preflight_passed` | 무호출 확인만 끝남 | 아니요 |
+| `completed` + `measurement_completed` + `quality.status=pass` | 기술 실행과 채점이 끝났고 통과 | 예, 이 실행 1건에서만 |
+| `completed` + `measurement_completed` + `quality.status=wrong_answer` | 기술 실행과 채점이 끝났고 답이 틀림 | 예, 오답 1건 |
+| `completed` + `measurement_completed` + `quality.status=wrong_format` | 기술 실행과 채점이 끝났고 형식이 틀림 | 예, 형식 오답 1건 |
+| `failed` + `technical_incomplete` | 실행이나 증거 수집이 끝나지 않음 | 아니요. 오답으로 바꾸지 않음 |
 
-`quality.status=unknown` and `not_measured` also indicate unknown quality. Do not convert
-technical incompletion to a wrong answer or unobserved usage to zero.
-`completion.operator_status=stopped` records an operator stop and is independent of a
-quality judgment.
+`quality.status=unknown` 또는 `not_measured`도 품질 미확정이다. 기술 미완료를 오답으로, 관측되지 않은 usage를 0으로 바꾸지 않는다. `completion.operator_status=stopped`는 운영자가 중간에 멈춘 기록이며 품질 판정과 별개다.
 
-One `pass` or `wrong_answer` describes only that task and execution.
-`temperature=0` does not guarantee identical answers, and one run cannot establish
-cross-condition ranking or non-inferiority.
+한 번의 `pass`나 `wrong_answer`는 해당 과제의 해당 실행만 설명한다. `temperature=0`도 같은 답을 보장하지 않으며, 반복 없이 조건 간 순위나 비열등성을 말할 수 없다.
 
-## 6. Preserve the Required Hashes
+## 6. 어떤 해시를 보존할지 확인한다
 
-| Record | Bound content | Location |
+| 기록 | 무엇을 묶는가 | 보관 위치 |
 | --- | --- | --- |
-| `lineage.source_commit` | Public source commit executed | Result JSON |
-| `lineage.config_sha256` | Actual one-task YAML | Result JSON |
-| `lineage.ledger_sha256` | Public reference ledger | Result JSON |
-| `resolved_contract.execution_ledger_sha256` | Approved private execution ledger | Result JSON |
-| `lineage.source_sha256` | Input source retained in evidence | Result JSON when available |
-| SHA-256 values under `artifacts` | Summary, attempt, provenance, and other outputs | Result JSON |
-| Inventory, source, and final-JSON SHA-256 | Customer-retained private files | Customer's private hash record |
+| `lineage.source_commit` | 실행한 공개 source commit | 결과 JSON |
+| `lineage.config_sha256` | 실제 1과제 YAML | 결과 JSON |
+| `lineage.ledger_sha256` | 공개 참조 원장 | 결과 JSON |
+| `resolved_contract.execution_ledger_sha256` | 승인된 비공개 실행 원장 | 결과 JSON |
+| `lineage.source_sha256` | 증거에 남은 입력 출처 | 확보된 경우 결과 JSON |
+| `artifacts`의 SHA-256 | summary, attempt와 provenance 등 산출물 | 결과 JSON |
+| inventory·원본·최종 JSON SHA-256 | 고객사가 보관한 비공개 파일 | 고객사 비공개 해시 기록 |
 
-Hash the final JSON separately:
+최종 JSON도 별도로 해시한다.
 
 ```bash
 sha256sum runs/readme-benchmark-result.json
 ```
 
-When transferring a file, compare both byte count and SHA-256. A matching hash proves only
-that the file is identical; it does not mean quality passed.
+파일을 다른 위치로 전달할 때는 바이트 수와 SHA-256을 함께 대조한다. 해시 일치가 품질 통과를 뜻하지는 않는다. 같은 파일이라는 사실만 확인한다.
 
-## 7. Keep Four Kinds of Numbers Separate
+## 7. 네 종류의 수치를 섞지 않는다
 
-| Value | What it measures | Boundary |
+| 수치 | 무엇을 재는가 | 다른 수치와의 경계 |
 | --- | --- | --- |
-| Local token measurement | Input, output, or actually changed spans counted locally with a fixed tokenizer | Not provider-billed tokens |
-| Full API usage | Input, cached-input, and output tokens reported by the provider across all model requests | Not only changed spans |
-| Calculated cost | USD calculated from complete API usage and ledger rates | Not an actual invoice |
-| Actual invoice | Amount separately billed by the provider | Must be reconciled outside the result JSON |
+| 로컬 토큰 측정 | 고정 tokenizer로 로컬에서 센 입력·출력 또는 실제 변경 구간 | Provider 청구 토큰이 아님 |
+| 전체 API usage | Provider가 보고한 모든 모델 요청의 입력·cache·출력 token | 변경 구간만의 값이 아님 |
+| 계산 비용 | 완결된 API usage와 원장 단가로 계산한 USD | 실제 청구서가 아님 |
+| 실제 청구서 | Provider가 별도 청구한 금액 | 결과 JSON 밖에서 대사해야 함 |
 
-The public one-task YAML uses `condition=none`, so it has no changed-span reduction from
-additional compression. If a compression condition is later compared separately,
-**actually changed-span tokens** remain local values for changed strings only, while
-`provider_usage` covers every model request in one execution.
+공개 1과제 YAML의 `condition=none`은 추가 압축 없는 기준이므로 압축 변경 구간 절감을 만들지 않는다. 나중에 압축 조건을 별도로 비교하더라도 **실제 변경 구간 토큰**은 바뀐 문자열 구간만 센 로컬 값이고, `provider_usage`는 한 실행에서 발생한 모델 요청 전체다.
 
-Even when `cost.calculated_usd` exists, do not call it a billed amount if
-`cost.invoice_reconciled=false`. If `provider_usage.status=requires_review` or a value is
-`null`, leave it unresolved.
+`cost.calculated_usd`가 있어도 `cost.invoice_reconciled=false`라면 계산값을 청구 금액이라고 쓰지 않는다. `provider_usage.status=requires_review`이거나 값이 `null`이면 미확정으로 남긴다.
 
-## 8. Separate Public and Private Outputs
+## 8. 공개와 비공개 산출물을 나눈다
 
-| Material | Default classification | Handling |
+| 자료 | 기본 등급 | 처리 원칙 |
 | --- | --- | --- |
-| Customer source, benchmark checkout, and inventory | Private source | Never place in repository, issue, PR, or public attachment |
-| Endpoint, credential, tenant values, and internal paths | Private operating information | Keep within environment and secret-management tools |
-| Private execution ledger, queue, and raw evidence | Private execution material | Access-restrict under customer retention policy |
-| Results and hash records under `runs/` | Private pending review | Covered by `.gitignore`; never publish automatically |
-| Reviewed aggregates and processed documents | Publishable after approval | Remove raw rows and operating values and pass the public allowlist check |
+| 고객 원본·benchmark checkout·inventory | 비공개 원본 | 저장소, 이슈, PR과 공개 첨부에 올리지 않음 |
+| endpoint·credential·tenant 값·내부 경로 | 비공개 운영 정보 | 환경과 비밀 관리 도구 밖으로 내보내지 않음 |
+| 비공개 실행 원장·queue·원본 증거 | 비공개 실행 자료 | 고객사 보존 정책에 따라 접근 제한 |
+| `runs/` 아래 결과와 해시 기록 | 검토 전 비공개 | `.gitignore` 대상이며 자동 공개하지 않음 |
+| 검토한 집계·가공 문서 | 승인 뒤 공개 가능 | 원본 행과 운영 값을 제거하고 공개 허용 목록 검사를 통과해야 함 |
 
-Follow the [publication-scope contract](../publication.md) for classifications and forbidden
-paths. Passing the result schema does not grant publication approval. The prohibition on
-customer-data egress takes precedence over execution success.
+공개 등급과 금지 경로는 [공개 범위 계약](../publication.md)을 따른다. 결과 JSON이 Schema를 통과했다고 공개 승인이 생기는 것은 아니다. 고객 데이터 반출 금지는 실행 성공보다 우선한다.
 
-## Common Blockers
+## 자주 막히는 경우
 
-| Observed result | First check | Interpretation |
+| 보이는 결과 | 먼저 확인할 것 | 해석 |
 | --- | --- | --- |
-| `preflight_error` with dirty-checkout message | Whether execution uses a committed checkout with no modified or untracked files | Stopped before provider call |
-| `technical_incomplete` with endpoint-environment-variable message | Whether `FOUNDRY_ENDPOINT` is present in the execution session | Not a quality failure |
-| Execution-ledger mismatch | Whether anything outside the six permitted fields changed | Fixed-contract protection stopped execution |
-| `provider_usage.status=requires_review` | Unknown-usage attempt and raw evidence | Do not replace with zero |
-| `wrong_answer` | Terminal-Bench judgment evidence and verifier revision | Technical execution completed; quality was wrong |
-| Result JSON schema failure | Missing field, wrong type, or unknown field | Must be corrected before publication or aggregation |
+| `preflight_error`와 dirty checkout 메시지 | 수정·미추적 파일이 없는 commit checkout인지 | Provider 호출 전 중단 |
+| `technical_incomplete`와 endpoint 환경변수 메시지 | `FOUNDRY_ENDPOINT` 값이 실행 세션에 있는지 | 품질 오답 아님 |
+| 실행 원장 불일치 | 허용된 여섯 필드 외에 바뀐 값이 없는지 | 고정 계약 보호로 중단 |
+| `provider_usage.status=requires_review` | unknown usage attempt와 원본 증거 | 0으로 대체하지 않음 |
+| `wrong_answer` | Terminal-Bench 판정 증거와 verifier revision | 기술 실행은 완료, 품질은 오답 |
+| 결과 JSON Schema 실패 | 누락·잘못된 타입·알 수 없는 필드 | 공개나 집계 전에 수정 필요 |
 
-Do not automatically resend the same error. In particular, if it is unclear whether the
-provider processed a request, preserve the raw request identifier, final response, and
-usage uncertainty before an operator decides whether to rerun.
+같은 오류를 자동 재전송하지 않는다. 특히 provider가 요청을 처리했는지 불명확하면 원본 요청 식별자, 마지막 응답과 usage 불확실성을 보존한 뒤 운영자가 재실행 여부를 결정한다.
 
-## Supported and Unsupported Conclusions
+## 이 절차로 말할 수 있는 것과 없는 것
 
-**Observable**
+**관측할 수 있는 것**
 
-- Which source, YAML, and ledger hashes were used for one pinned task
-- Whether provider usage completed and the technical and quality states
-- Whether calculated cost exists and whether it was invoice-reconciled
+- 고정된 과제 하나가 어떤 source, YAML과 원장 해시로 실행됐는지
+- Provider usage가 완결됐는지, 기술 실행과 품질 판정이 각각 무엇인지
+- 계산 비용이 있는지, 실제 청구서와 대사됐는지
 
-**Possible explanations**
+**가능한 설명**
 
-- Differences in usage or cost may reflect request count, cache, model path, and provider behavior together.
-- Differences in quality may also reflect model nondeterminism, execution environment, or judging.
+- 실행 간 usage나 비용이 다르면 요청 수, cache, 모델이 밟은 경로와 provider 동작이 함께 영향을 줬을 수 있다.
+- 품질이 다르면 모델 비결정성, 실행 환경이나 판정 과정도 가능한 설명이다.
 
-**Not established by this procedure alone**
+**이 절차만으로 말할 수 없는 것**
 
-- A causal claim that compression produced a difference
-- Generalization to other models, tasks, or customer-specific data
-- Compressor ranking, quality non-inferiority, population savings, or actual billed savings
+- 차이가 압축 때문에 생겼다는 인과 관계
+- 다른 모델·과제·고객사 고유 데이터에서도 같은 결과가 난다는 일반화
+- 압축기 순위, 품질 비열등성, 모집단 절감률이나 실제 청구 절감
 
-The current path is appropriate for one-run connection validation. A comparative
-conclusion first requires a separately fixed experimental design covering adapter and
-judge validation, changed axes, repetition count, stopping rules, and invoice
-reconciliation.
+현재 경로는 조건당 1회 연결 확인에 알맞다. 비교 결론이 필요하면 입력 adapter와 판정자를 검증하고, 바뀌는 축, 반복 수, 중단 조건과 청구서 대사 방법을 별도 실험 설계로 먼저 고정한다.
 
-## Final Pre-Execution Checklist
+## 실행 전 마지막 확인
 
-- [ ] Source data and every operating value remain outside the public repository.
-- [ ] Execution source is committed and `git status --porcelain` is empty.
-- [ ] The YAML task is in the public index and output is `runs/*.json`.
-- [ ] The no-call result validates as `checked` + `preflight_passed`.
-- [ ] The private execution ledger fills only the six permitted fields.
-- [ ] Provider limits, shared-deployment coordination, and paid-execution approval exist.
-- [ ] After `--execute`, validate schema, state, usage, quality, and hashes independently.
-- [ ] Before publication, pass the [publication-scope contract](../publication.md) and file allowlist checks.
+- [ ] 원본 데이터와 모든 운영 값은 공개 저장소 밖에 있다.
+- [ ] 실행 source는 commit됐고 `git status --porcelain` 출력이 비어 있다.
+- [ ] YAML의 과제는 공개 색인에 있고 출력은 `runs/*.json`이다.
+- [ ] 무호출 결과가 `checked` + `preflight_passed`로 검증됐다.
+- [ ] 비공개 실행 원장은 허용된 여섯 필드만 채웠다.
+- [ ] Provider 제한, 공유 deployment 조정과 유료 실행 승인이 있다.
+- [ ] `--execute` 뒤 JSON Schema, 상태, usage, 품질과 해시를 각각 확인한다.
+- [ ] 공개 전 [공개 범위 계약](../publication.md)과 파일 허용 목록 검사를 통과한다.
 
-Related evidence is in the [reproducibility contract](reproducibility-contract.md),
-[one-task request schema](../../schemas/benchmark-request.schema.json),
-[result schema](../../schemas/experiment-result.schema.json),
-[public reference ledger](../../ledgers/screening.template.toml), and
-[existing runner](../../src/benchmark_run.py).
+관련 근거는 [재현 계약](reproducibility-contract.md), [실제 1과제 요청 Schema](../../schemas/benchmark-request.schema.json), [결과 Schema](../../schemas/experiment-result.schema.json), [공개 참조 원장](../../ledgers/screening.template.toml)과 [기존 runner](../../src/benchmark_run.py)에서 확인할 수 있다.

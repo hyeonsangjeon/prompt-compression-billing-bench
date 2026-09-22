@@ -1,78 +1,75 @@
-# The 26 Tasks in the Preliminary Experiment
+# 1차 실험의 26과제
 
-This is a lookup guide to the 26 tasks in the [preliminary experiment summary](README.md).
-Task names and public instructions come from the pinned Terminal-Bench 2.1 revision
-`7131e4375048a0e408a8fb404b5f499d726b695b`.
+이 문서는 [1차 실험 한 장 요약](README.md)에 나온 26과제가 어떤 문제였는지
+찾아보는 목록이다. 과제 이름과 공개 지시문은 Terminal-Bench 2.1의 고정 판본
+(revision) `7131e4375048a0e408a8fb404b5f499d726b695b`을 기준으로 정리했다.
 
-## Four Comparison Conditions
+## 네 비교 조건
 
-Each of the 26 tasks ran once under each condition: 4 conditions per task and 104 total.
+26과제를 아래 네 방식으로 각각 한 번 실행했다. 과제당 4조건, 모두 104조건이다.
 
-| Condition | Meaning in this experiment |
+| 조건 | 이번 실험에서 뜻하는 것 |
 |---|---|
-| `none` | Reference condition in which the model solves the task without additional input compression |
-| squeez `1.48.4` | Compression condition that keeps the first 30 content lines of long output and discards the remainder |
-| Headroom `0.36.5` paths-only | Restricted lossless condition that groups repeated path prefixes |
-| LLMLingua-2 `0.2.2` | Lossy condition that selects which within-line tokens to retain |
+| `none` | 모델은 과제를 풀되 입력에 추가 압축을 하지 않은 기준 조건 |
+| squeez `1.48.4` | 긴 출력의 앞 30개 내용 줄을 남기고 뒤를 버리는 압축 조건 |
+| Headroom `0.36.5` paths-only | 반복되는 경로 접두어를 묶는 제한된 무손실 압축 조건 |
+| LLMLingua-2 `0.2.2` | 줄 안의 token 가운데 남길 것을 고르는 손실 압축 조건 |
 
-## How to Read the Table
+## 표를 읽는 방법
 
-- **Public success target** briefly restates the files and behavior required by the official
-  instruction. Actual `pass` and `wrong_answer` values are judgments from the task's
-  built-in grader.
-- **Passes** count how many of the four one-time `none`, squeez, Headroom, and LLMLingua-2
-  conditions passed. This is not a repeated-run pass rate.
-- **Elapsed-time range** is the minimum to maximum full-condition duration across the four
-  conditions. Different concurrency makes it unsuitable for comparing compressor speed.
-- **Logical requests** sum requests received by the model proxy across four conditions.
-  They are not interchangeable with HTTP attempts, successful responses, or responses
-  delivered to the task.
-- **Calculated API cost** sums fixed-price-table calculations from provider usage across
-  four conditions. Per-task values are rounded to three decimal places. The 26 displayed
-  values sum to `$22.333`; the precise source sum is `$22.3333885`. This is not an
-  invoice-reconciled amount.
+- **공개 통과 대상**은 공식 지시문이 요구한 파일과 동작을 짧게 옮긴 것이다.
+  실제 `pass`와 `wrong_answer`는 과제 내장 채점기의 판정이다.
+- **`pass` 수**는 `none`, squeez, Headroom, LLMLingua-2를 각각 한 번 실행한
+  네 조건 가운데 내장 채점을 통과한 수다. 반복 통과율이 아니다.
+- **시간 범위**는 네 조건의 조건 전체 시간 가운데 최소~최대다. 조건 간 동시성이
+  달라 압축기 속도 비교로 읽지 않는다.
+- **논리 요청**은 네 조건에서 모델 프록시가 받은 요청 수의 합이다. HTTP 시도,
+  성공 응답, 작업에 전달한 응답과 같은 사건으로 취급하지 않는다.
+- **API 계산 비용**은 네 조건의 제공자 사용량에 고정 가격표를 적용한 합계다.
+  과제별 값은 소수 셋째 자리까지 반올림했다. 26개 표시값의 합은 `$22.333`이며,
+  정밀 원본 합은 `$22.3333885`다. 실제 청구서와 대사한 금액은 아니다.
 
-## Tasks and Observations
+## 과제와 관측값
 
-The table is an index to task characteristics and observations. It is not reordered by
-passes, time, or cost.
+아래 표는 과제의 성격과 관측값을 찾는 색인이다. 통과 수, 시간이나 비용만으로
+과제를 다시 줄 세우지 않는다.
 
-| Task | Problem and public success target | `pass` / 4 conditions | Full-condition elapsed-time range | Logical requests | Total calculated API cost |
+| 과제 | 무슨 문제이며 무엇을 만들면 되는가 | `pass` / 4조건 | 조건 전체 시간 범위 | 논리 요청 합 | API 계산 비용 합 |
 |---|---|---:|---:|---:|---:|
-| [1. `cancel-async-tasks`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/cancel-async-tasks/instruction.md) | Implement a Python function that limits concurrent asynchronous tasks while running each task's cleanup code when the user cancels midway. It must be callable from `/app/run.py` with the specified name and arguments. | 0/4 | 1 min 23 sec–3 min 28 sec | 10 | `$0.064` |
-| [2. `crack-7z-hash`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/crack-7z-hash/instruction.md) | Open `secret_file.txt` in an encrypted 7z archive, find the word inside, and write it exactly to `/app/solution.txt`. | 4/4 | 4 min 44 sec–14 min 30 sec | 112 | `$1.787` |
-| [3. `dna-assembly`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/dna-assembly/instruction.md) | Design primers for Golden Gate assembly of four DNA fragments. Write the smallest primer set satisfying length, melting-point, and enzyme-cut constraints to `primers.fasta`. | 0/4 | 2 min 39 sec–3 min 55 sec | 30 | `$1.117` |
-| [4. `modernize-scientific-stack`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/modernize-scientific-stack/instruction.md) | Rewrite Python 2 climate-analysis code for Python 3, output two stations' mean temperatures in the specified format, and record required library versions. | 4/4 | 2 min 3 sec–2 min 43 sec | 22 | `$0.256` |
-| [5. `sam-cell-seg`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/sam-cell-seg/instruction.md) | Build a CPU script that uses MobileSAM to replace rectangular cell annotations in tissue images with detailed contours. Update the CSV so every cell is one continuous, nonoverlapping contour. | 4/4 | 4 min 16 sec–5 min 46 sec | 20 | `$0.613` |
-| [6. `torch-tensor-parallelism`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/torch-tensor-parallelism/instruction.md) | Implement two classes that divide PyTorch linear-layer weights by columns or rows across processes. Weight partitions, output, and gradients must match references at multiple process counts. | 0/4 | 6 min 5 sec–10 min 32 sec | 10 | `$0.136` |
-| [7. `extract-elf`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/extract-elf/instruction.md) | Build a JavaScript program that reads memory addresses and integer values from a compiled C executable and exports JSON. All reported values must be correct and cover at least 75% of reference memory values. | 2/4 | 1 min 31 sec–2 min 59 sec | 19 | `$0.364` |
-| [8. `financial-document-processor`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/financial-document-processor/instruction.md) | Classify JPG and PDF files as invoices or other documents, move them into folders, and extract invoice totals and taxes. Produce per-file values and aggregate totals in the required CSV format. | 0/4 | 2 min 38 sec–8 min 27 sec | 43 | `$1.032` |
-| [9. `gcode-to-text`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/gcode-to-text/instruction.md) | Analyze 3D-printer G-code to identify text that will appear on the print surface and write the decoded string to `/app/out.txt`. | 0/4 | 1 min 27 sec–11 min 31 sec | 76 | `$1.587` |
-| [10. `install-windows-3.11`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/install-windows-3.11/instruction.md) | Run Windows 3.11 in QEMU and configure VNC, a web display, and a monitoring socket for keyboard input. Boot to the desktop and accept external input without modifying the source disk. | 0/4 | 3 min 35 sec–4 min 55 sec | 32 | `$0.476` |
-| [11. `kv-store-grpc`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/kv-store-grpc/instruction.md) | Build a gRPC server that stores and retrieves integer values under string keys. Implement the specified proto messages and two RPCs and keep the server running on port 5328. | 4/4 | 1 min 32 sec–2 min 57 sec | 18 | `$0.198` |
-| [12. `log-summary-date-ranges`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/log-summary-date-ranges/instruction.md) | Count `ERROR`, `WARNING`, and `INFO` entries in dated logs for today, the last 7 days, the last 30 days, the current month, and all time. Create `summary.csv` with the required reference date and row order. | 0/4 | 1 min 31 sec–3 min 46 sec | 11 | `$0.160` |
-| [13. `llm-inference-batching-scheduler`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/llm-inference-batching-scheduler/instruction.md) | Create plans that batch model requests of different lengths into fixed-size execution groups. Output two JSONL files that include every request once and satisfy shape-count, cost, empty-space, and latency criteria. | 2/4 | 3 min 38 sec–6 min 58 sec | 38 | `$1.568` |
-| [14. `model-extraction-relu-logits`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/model-extraction-relu-logits/instruction.md) | Repeatedly query a one-layer neural network whose outputs alone are observable to recover its first weight matrix. Save the equivalent matrix, allowing neuron permutation and proportional scaling, as a `.npy` file. | 0/4 | 3 min 3 sec–6 min 48 sec | 18 | `$0.331` |
-| [15. `openssl-selfsigned-cert`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/openssl-selfsigned-cert/instruction.md) | Use OpenSSL to create a development certificate and private key with specified names, validity, and permissions. Place a combined PEM, verification record, and Python certificate-inspection script at the required paths. | 4/4 | 4 min 10 sec–4 min 13 sec | 9 | `$0.100` |
-| [16. `overfull-hbox`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/overfull-hbox/instruction.md) | Replace only permitted synonyms so a LaTeX document builds without line-width overflow warnings. Modify no other files and compile successfully with `pdflatex`. | 1/4 | 4 min 14 sec–7 min 22 sec | 33 | `$0.699` |
-| [17. `prove-plus-comm`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/prove-plus-comm/instruction.md) | Fill the missing step in a Coq proof of addition commutativity. The completed proof must compile with `coqc` and produce a `.vo` file. | 4/4 | 1 min 42 sec–5 min 33 sec | 18 | `$0.120` |
-| [18. `raman-fitting`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/raman-fitting/instruction.md) | Fit the G and 2D peaks of a graphene Raman spectrum and derive position, width, magnitude, and baseline. Store the four values in the required `/app/results.json` structure. | 0/4 | 2 min 17 sec–6 min 48 sec | 37 | `$0.619` |
-| [19. `sqlite-with-gcov`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/sqlite-with-gcov/instruction.md) | Compile the bundled SQLite source with code-coverage instrumentation and place the completed `sqlite` executable on PATH so it can be invoked from anywhere. | 3/4 | 3 min 47 sec–7 min 55 sec | 33 | `$0.642` |
-| [20. `vulnerable-secret`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/vulnerable-secret/instruction.md) | Analyze or interact with an executable to find a secret in `FLAG{...}` form and save it exactly to `/app/results.txt`. | 4/4 | 1 min 33 sec–4 min 46 sec | 22 | `$0.350` |
-| [21. `video-processing`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/video-processing/instruction.md) | Build a script that analyzes a hurdles video to find the frames where the athlete begins a jump and lands. Output both frame numbers in the required TOML fields. | 0/4 | 3 min 8 sec–5 min 40 sec | 29 | `$0.956` |
-| [22. `chess-best-move`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/chess-best-move/instruction.md) | Read a chessboard image and find White's best move. Record source and destination squares, with every winning move on a separate line if several exist. | 0/4 | 2 min 51 sec–9 min 37 sec | 38 | `$0.610` |
-| [23. `schemelike-metacircular-eval`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/schemelike-metacircular-eval/instruction.md) | Write an interpreter for a Scheme-like language in that language itself. It must interpret both the provided programs and the interpreter itself. | 0/4 | 11 min 32 sec–27 min 20 sec | 113 | `$3.023` |
-| [24. `build-pov-ray`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/build-pov-ray/instruction.md) | Obtain and build the old POV-Ray 2.2 source and install it at the required path. Render the provided scene to match the reference image. | 1/4 | 9 min 40 sec–23 min 2 sec | 77 | `$2.290` |
-| [25. `dna-insert`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/dna-insert/instruction.md) | Design Q5 mutagenesis primers that transform circular DNA into the requested result. Write the smallest primer pair satisfying length and melting-point constraints to `primers.fasta`. | 0/4 | 2 min 15 sec–28 min 46 sec | 118 | `$1.993` |
-| [26. `feal-differential-cryptanalysis`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/feal-differential-cryptanalysis/instruction.md) | Implement a chosen-input attack against a FEAL-family cipher to recover the sixth-round key. `attack.py` must return the exact `key[5]` integer within 30 seconds. | 3/4 | 4 min 34 sec–8 min 11 sec | 41 | `$1.242` |
+| [1. `cancel-async-tasks`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/cancel-async-tasks/instruction.md) | 동시에 실행할 비동기 작업 수를 제한하면서, 사용자가 중간에 취소해도 각 작업의 정리 코드가 실행되는 Python 함수를 만든다. `/app/run.py`에서 정해진 이름과 인자로 불러 쓸 수 있어야 한다. | 0/4 | 1분 23초~3분 28초 | 10회 | `$0.064` |
+| [2. `crack-7z-hash`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/crack-7z-hash/instruction.md) | 암호화된 7z 파일 안의 `secret_file.txt`를 열어 그 안의 단어를 찾는다. 찾은 단어를 `/app/solution.txt`에 정확히 쓰면 된다. | 4/4 | 4분 44초~14분 30초 | 112회 | `$1.787` |
+| [3. `dna-assembly`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/dna-assembly/instruction.md) | 네 DNA 조각을 Golden Gate 방식으로 조립할 수 있도록 필요한 프라이머를 설계한다. 길이·녹는점·효소 절단 위치 조건을 만족하는 최소 프라이머 쌍을 `primers.fasta`에 써야 한다. | 0/4 | 2분 39초~3분 55초 | 30회 | `$1.117` |
+| [4. `modernize-scientific-stack`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/modernize-scientific-stack/instruction.md) | Python 2용 기후 분석 코드를 Python 3에서 실행되도록 새로 작성한다. 두 관측소의 평균 온도를 지정 형식으로 출력하고, 필요한 라이브러리 버전도 파일로 남겨야 한다. | 4/4 | 2분 3초~2분 43초 | 22회 | `$0.256` |
+| [5. `sam-cell-seg`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/sam-cell-seg/instruction.md) | 조직 사진의 사각형 세포 표시를 MobileSAM으로 세밀한 외곽선으로 바꾸는 CPU용 스크립트를 만든다. 모든 세포가 겹치지 않는 하나의 연속 외곽선이 되도록 CSV를 갱신해야 한다. | 4/4 | 4분 16초~5분 46초 | 20회 | `$0.613` |
+| [6. `torch-tensor-parallelism`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/torch-tensor-parallelism/instruction.md) | PyTorch 선형 계층의 가중치를 여러 프로세스에 열 또는 행 방향으로 나눠 계산하는 두 클래스를 구현한다. 여러 프로세스 수에서 가중치 분할, 출력과 기울기가 기준값과 맞아야 한다. | 0/4 | 6분 5초~10분 32초 | 10회 | `$0.136` |
+| [7. `extract-elf`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/extract-elf/instruction.md) | 컴파일된 C 실행 파일에서 메모리 주소와 정수 값을 읽어 JSON으로 내보내는 JavaScript 프로그램을 만든다. 출력한 값은 모두 정확해야 하고 기준 메모리 값의 75% 이상을 찾아야 한다. | 2/4 | 1분 31초~2분 59초 | 19회 | `$0.364` |
+| [8. `financial-document-processor`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/financial-document-processor/instruction.md) | JPG와 PDF 문서를 송장과 기타 문서로 나눠 폴더를 옮기고, 송장의 총액과 세금을 추출한다. 파일별 값과 전체 합계를 정해진 CSV 형식으로 만들어야 한다. | 0/4 | 2분 38초~8분 27초 | 43회 | `$1.032` |
+| [9. `gcode-to-text`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/gcode-to-text/instruction.md) | 3D 프린터의 G-code를 분석해 출력물 표면에 나타날 글자를 알아낸다. 해독한 문자열을 `/app/out.txt`에 쓰면 된다. | 0/4 | 1분 27초~11분 31초 | 76회 | `$1.587` |
+| [10. `install-windows-3.11`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/install-windows-3.11/instruction.md) | QEMU에서 Windows 3.11을 실행하고 VNC와 웹 화면, 키보드 입력용 감시 소켓을 설정한다. 원본 디스크를 바꾸지 않은 채 바탕 화면까지 부팅하고 외부 입력을 받을 수 있어야 한다. | 0/4 | 3분 35초~4분 55초 | 32회 | `$0.476` |
+| [11. `kv-store-grpc`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/kv-store-grpc/instruction.md) | 문자열 키에 정수 값을 저장하고 읽는 gRPC 서버를 만든다. 지정된 proto 메시지와 두 RPC를 구현하고 5328번 포트에서 서버를 계속 실행해야 한다. | 4/4 | 1분 32초~2분 57초 | 18회 | `$0.198` |
+| [12. `log-summary-date-ranges`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/log-summary-date-ranges/instruction.md) | 날짜별 로그에서 `ERROR`, `WARNING`, `INFO`가 오늘·최근 7일·최근 30일·이번 달·전체에 각각 몇 번 나오는지 센다. 기준일과 행 순서를 지켜 `summary.csv`를 만들어야 한다. | 0/4 | 1분 31초~3분 46초 | 11회 | `$0.160` |
+| [13. `llm-inference-batching-scheduler`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/llm-inference-batching-scheduler/instruction.md) | 길이가 다른 모델 요청을 고정 크기 실행 묶음으로 배치하는 계획을 만든다. 모든 요청을 한 번씩 포함하고 형태 수·비용·빈 공간·지연시간 기준을 만족하는 두 JSONL 파일을 출력해야 한다. | 2/4 | 3분 38초~6분 58초 | 38회 | `$1.568` |
+| [14. `model-extraction-relu-logits`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/model-extraction-relu-logits/instruction.md) | 입력값을 넣어 결과만 볼 수 있는 한 층 신경망을 여러 번 질의해 첫 번째 가중치 행렬을 복원한다. 뉴런 순서와 비례 배율을 제외하고 같은 행렬을 `.npy` 파일로 저장해야 한다. | 0/4 | 3분 3초~6분 48초 | 18회 | `$0.331` |
+| [15. `openssl-selfsigned-cert`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/openssl-selfsigned-cert/instruction.md) | OpenSSL로 정해진 이름·유효기간·권한의 개발용 인증서와 개인키를 만든다. 결합 PEM, 검증 기록과 인증서를 읽어 확인하는 Python 스크립트까지 지정 위치에 있어야 한다. | 4/4 | 4분 10초~4분 13초 | 9회 | `$0.100` |
+| [16. `overfull-hbox`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/overfull-hbox/instruction.md) | LaTeX 문서가 줄 너비 초과 경고 없이 빌드되도록 허용된 동의어만 골라 바꾼다. 다른 파일을 수정하지 않고 `pdflatex` 컴파일을 성공시켜야 한다. | 1/4 | 4분 14초~7분 22초 | 33회 | `$0.699` |
+| [17. `prove-plus-comm`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/prove-plus-comm/instruction.md) | Coq 파일의 덧셈 교환법칙 증명에서 빠진 단계를 채운다. 완성한 증명이 `coqc`로 컴파일돼 `.vo` 파일이 만들어져야 한다. | 4/4 | 1분 42초~5분 33초 | 18회 | `$0.120` |
+| [18. `raman-fitting`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/raman-fitting/instruction.md) | 그래핀 Raman 스펙트럼의 G와 2D 봉우리를 맞추고 위치·폭·크기·기준값을 구한다. 네 값을 지정된 구조의 `/app/results.json`에 저장해야 한다. | 0/4 | 2분 17초~6분 48초 | 37회 | `$0.619` |
+| [19. `sqlite-with-gcov`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/sqlite-with-gcov/instruction.md) | 저장소에 포함된 SQLite 소스를 코드 실행 범위 측정 기능과 함께 컴파일한다. 완성한 `sqlite` 실행 파일을 어디서나 호출할 수 있도록 PATH에 둬야 한다. | 3/4 | 3분 47초~7분 55초 | 33회 | `$0.642` |
+| [20. `vulnerable-secret`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/vulnerable-secret/instruction.md) | 실행 파일을 분석하거나 상호작용해 `FLAG{...}` 형식의 비밀 값을 찾는다. 찾은 값을 `/app/results.txt`에 정확히 저장하면 된다. | 4/4 | 1분 33초~4분 46초 | 22회 | `$0.350` |
+| [21. `video-processing`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/video-processing/instruction.md) | 허들 경기 영상을 분석해 선수가 점프를 시작한 프레임과 착지한 프레임을 찾는 스크립트를 만든다. 두 프레임 번호를 정해진 TOML 필드로 출력해야 한다. | 0/4 | 3분 8초~5분 40초 | 29회 | `$0.956` |
+| [22. `chess-best-move`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/chess-best-move/instruction.md) | 체스판 그림을 읽고 백이 둘 수 있는 최선의 수를 찾는다. 시작 칸과 도착 칸 형식으로 기록하고, 이기는 수가 여러 개면 모두 한 줄씩 써야 한다. | 0/4 | 2분 51초~9분 37초 | 38회 | `$0.610` |
+| [23. `schemelike-metacircular-eval`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/schemelike-metacircular-eval/instruction.md) | Scheme과 비슷한 언어를 실행하는 해석기를 그 언어 자체로 작성한다. 제공된 프로그램뿐 아니라 해석기 자신도 다시 해석할 수 있어야 한다. | 0/4 | 11분 32초~27분 20초 | 113회 | `$3.023` |
+| [24. `build-pov-ray`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/build-pov-ray/instruction.md) | 오래된 POV-Ray 2.2 소스를 받아 빌드하고 지정 경로에 설치한다. 제공된 장면을 실행해 기준 이미지와 맞는 결과를 렌더링할 수 있어야 한다. | 1/4 | 9분 40초~23분 2초 | 77회 | `$2.290` |
+| [25. `dna-insert`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/dna-insert/instruction.md) | 원형 DNA를 원하는 결과로 바꾸는 Q5 돌연변이 유도 프라이머를 설계한다. 길이와 녹는점 조건을 만족하는 최소 프라이머 쌍을 `primers.fasta`에 써야 한다. | 0/4 | 2분 15초~28분 46초 | 118회 | `$1.993` |
+| [26. `feal-differential-cryptanalysis`](https://github.com/harbor-framework/terminal-bench-2-1/blob/7131e4375048a0e408a8fb404b5f499d726b695b/tasks/feal-differential-cryptanalysis/instruction.md) | FEAL 계열 암호 함수에 선택한 입력을 넣어 보며 여섯 번째 라운드 키를 복구하는 공격을 구현한다. `attack.py`가 30초 안에 정확한 `key[5]` 정수를 반환해야 한다. | 3/4 | 4분 34초~8분 11초 | 41회 | `$1.242` |
 
-## Sources and Limitations
+## 출처와 한계
 
-- Task descriptions and public success targets:
-  [official Terminal-Bench 2.1 tasks](https://github.com/harbor-framework/terminal-bench-2-1/tree/7131e4375048a0e408a8fb404b5f499d726b695b/tasks)
-- Condition-level quality, requests, time, and cost:
-  [technical preliminary-comparison evidence](preliminary-comparison-20260916.md)
-- These 26 tasks are a purposive, candidate-focused preliminary sample, not a random
-  sample representative of all 89 tasks.
-- The guide paraphrases public instructions. It does not reimplement or independently
-  validate every detailed check in the built-in task graders.
+- 과제 설명과 공개 통과 대상:
+  [Terminal-Bench 2.1 공식 과제](https://github.com/harbor-framework/terminal-bench-2-1/tree/7131e4375048a0e408a8fb404b5f499d726b695b/tasks)
+- 조건별 품질·요청·시간·비용:
+  [예비 비교 기술 증거](preliminary-comparison-20260916.md)
+- 이 26과제는 목적·후보 중심으로 선택한 예비 표본이며 전체 89과제를 대표하는
+  무작위 표본이 아니다.
+- 공개 지시문을 쉽게 풀어 썼지만, 과제 내장 채점기의 모든 세부 검사를 새 문서에
+  다시 구현하거나 독립 검증한 것은 아니다.

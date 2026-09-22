@@ -38,35 +38,35 @@ class OutcomeCostPlanTests(unittest.TestCase):
         self.assertEqual(calculated_cost, Decimal("22.3333885"))
         self.assertEqual(cost_per_pass, Decimal("0.5583347125"))
         for value in (
-            "26 tasks and 104 conditions",
-            "40 `pass`",
-            "64 `wrong_answer`",
+            "26과제·104조건",
+            "`pass` 40조건",
+            "`wrong_answer` 64조건",
             "`$22.3333885 ÷ 40 = $0.5583347125`",
         ):
             self.assertIn(value, self.text)
 
     def test_quality_and_cost_boundaries_are_not_merged(self):
         for phrase in (
-            "Pass-Attributed Cost",
-            "Normal Non-Pass Cost After Grading",
-            "Cost Before Quality Judgment",
-            "Cancelled before start",
-            "rather than an actual invoice",
-            "not customer acceptance",
-            "Three-decimal rounded costs in public tables are not summed",
-            "Program-Wide Cost per Pass",
-            "This value is not calculated now",
+            "통과 귀속 비용",
+            "정상 채점 후 미통과 비용",
+            "품질 판정 전 비용",
+            "시작 전 취소",
+            "실제 청구서가 아니라",
+            "고객 수락이 아니라",
+            "공개 표의 3자리 반올림 비용을 더해 정밀 수치처럼 쓰지 않는다",
+            "프로그램 전체 통과 1건당 비용",
+            "이 값은 지금 계산하지 않는다",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.text)
 
     def test_long_tail_cost_keeps_its_scope_and_unknown_amount(self):
         for phrase in (
-            "Long-running attempts",
+            "장기 5개 실행 시도(`attempt`)",
             "`$87.771254`",
             "`$0.1294175`",
-            "Pre-quality-judgment cost",
-            "not the program-wide sum of all pre-quality-judgment costs",
+            "품질 판정 전 비용",
+            "프로그램 전체의 품질 판정 전 비용 합계가 아니다",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.text)

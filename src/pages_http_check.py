@@ -351,7 +351,7 @@ def audit_references(
     local_http_attempted = 0
     fragment_total = 0
     query_total = 0
-    percent_encoded_fragments = 0
+    percent_encoded_hangul_fragments = 0
     root_absolute_inside = 0
     root_absolute_outside = 0
     external_kinds: Counter[str] = Counter()
@@ -398,8 +398,9 @@ def audit_references(
             raw_fragment = urlsplit(value).fragment
             if raw_fragment:
                 fragment_total += 1
-                if "%" in raw_fragment:
-                    percent_encoded_fragments += 1
+                decoded_fragment = unquote(raw_fragment)
+                if "%" in raw_fragment and any("가" <= character <= "힣" for character in decoded_fragment):
+                    percent_encoded_hangul_fragments += 1
             resolved, resolution_error = resolve_local_reference(
                 value,
                 source_relative,
@@ -500,7 +501,7 @@ def audit_references(
         "local_reference_http_requests_succeeded": local_http_success,
         "fragment_references_checked": fragment_total,
         "query_references_checked": query_total,
-        "percent_encoded_fragments_checked": percent_encoded_fragments,
+        "percent_encoded_hangul_fragments_checked": percent_encoded_hangul_fragments,
         "root_absolute_inside_prefix": root_absolute_inside,
         "root_absolute_outside_prefix": root_absolute_outside,
         "errors": [error for error in errors if str(error.get("code", "")).startswith(("local_", "fragment_"))],
@@ -641,14 +642,14 @@ def verify_no_root_fallback(
     return results, errors
 
 
-def verify_fragment_probe(
+def verify_encoded_fragment_probe(
     contract: dict[str, object],
     prefix_root: Path,
     project_prefix: str,
     origin: str,
     port: int,
 ) -> tuple[dict[str, object], list[dict[str, object]]]:
-    probe = contract["probes"]["fragment_navigation"]
+    probe = contract["probes"]["encoded_hangul_fragment"]
     source_path = prefix_root.joinpath(*PurePosixPath(probe["source_file"]).parts)
     parser = parse_html_bytes(source_path.read_bytes(), str(probe["source_file"]))
     occurrences = sum(1 for reference in parser.references if reference["value"] == probe["href"])
@@ -702,7 +703,7 @@ def verify_fragment_probe(
         "passed": passed,
     }
     if not passed:
-        errors.append({"code": "fragment_navigation_probe_failed", **result})
+        errors.append({"code": "encoded_hangul_fragment_probe_failed", **result})
     return result, errors
 
 
@@ -765,7 +766,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
     route_probes: list[dict[str, object]] = []
     redirect_probe: dict[str, object] = {}
     root_fallback_probes: list[dict[str, object]] = []
-    fragment_probe: dict[str, object] = {}
+    encoded_fragment_probe: dict[str, object] = {}
     try:
         file_delivery, found_errors = verify_file_delivery(prefix_root, project_prefix, origin, port)
         errors.extend(found_errors)
@@ -777,7 +778,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         errors.extend(found_errors)
         root_fallback_probes, found_errors = verify_no_root_fallback(contract, origin, port)
         errors.extend(found_errors)
-        fragment_probe, found_errors = verify_fragment_probe(
+        encoded_fragment_probe, found_errors = verify_encoded_fragment_probe(
             contract, prefix_root, project_prefix, origin, port
         )
         errors.extend(found_errors)
@@ -828,7 +829,7 @@ def run(args: argparse.Namespace) -> dict[str, object]:
         "route_probes": route_probes,
         "trailing_slash_redirect_probe": redirect_probe,
         "no_root_fallback_probes": root_fallback_probes,
-        "fragment_navigation_probe": fragment_probe,
+        "encoded_hangul_fragment_probe": encoded_fragment_probe,
         "counting_rule": "HTTP file delivery, logical references, and named route probes are separate denominators and are not added together.",
         "errors": errors,
     }

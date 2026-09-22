@@ -1,47 +1,34 @@
-# Lossy and Lossless Compression: What Is the Difference?
+# 손실 압축과 무손실 압축, 무엇이 다른가
 
-This guide distinguishes `none`, `squeez`, `Headroom`, and `LLMLingua-2` so they are
-not mistaken for the same kind of compression. Here, **lossless compression** means that
-a specified restoration procedure can reproduce the exact source bytes. **Lossy
-compression** discards or changes information and therefore cannot guarantee restoration
-to the same bytes.
+이 문서는 `none`, `squeez`, `Headroom`, `LLMLingua-2`를 같은 종류의 압축으로
+오해하지 않도록 구분한 안내서다. 여기서 **무손실 압축**은 압축한 자료를 정해진
+복원 절차로 되돌렸을 때 원문과 정확히 같은 바이트를 얻을 수 있는 방식이다.
+**손실 압축**은 일부 정보를 버리거나 바꾸므로
+원문과 같은 바이트로 복원된다고 보장할 수 없는 방식이다.
 
-## 30-Second Summary
+## 30초 요약
 
-- `none` does not mean no work; it is the **reference condition without additional
-  compression**.
-- In this repository, Headroom `0.36.5` uses a restricted paths-only configuration and
-  checks byte-for-byte restoration on every transformation. It is called lossless only
-  within that scope.
-- squeez `1.48.4` discards output after the first 30 content lines. LLMLingua-2 `0.2.2`
-  selects which tokens—units used to divide and count text—to retain. Both are lossy and
-  do not guarantee source restoration.
-- Transport compression reduces bytes transmitted over a network, while caching reuses
-  previously processed content. Both differ from shortening the prompt instructions and
-  context sent to the model.
-- Greater compression does not automatically imply safety, quality, lower total API
-  usage, or lower cost. Each requires separate measurement.
+- `none`은 작업을 하지 않는다는 뜻이 아니라, **추가 압축 없이 푸는 기준 조건**이다.
+- 이 저장소에서 `Headroom 0.36.5`는 경로만 묶는 제한된 설정이며, 매번 원문이 바이트 단위로 복원되는지 확인한다. 이 범위에서만 무손실이라고 말한다.
+- `squeez 1.48.4`는 긴 출력의 앞 30개 내용 줄 뒤를 버리고, `LLMLingua-2 0.2.2`는 텍스트를 나눠 세는 단위인 token 중 남길 것을 고른다. 둘 다 원문 복원을 보장하지 않는 손실 압축이다.
+- 전송 압축은 네트워크에서 오가는 바이트를 줄이는 방식이고, 캐시는 이미 처리한 내용을 재사용하는 방식이다. 모델에 보내는 지시와 문맥(prompt) 자체를 줄이는 압축과는 다른 문제다.
+- 압축률이 커도 안전성, 품질, 외부 모델 서비스의 전체 API 사용량 감소, 비용 절감은 자동으로 따라오지 않는다. 각각 따로 재야 한다.
 
-> **Scope for citation**
+> **인용할 때 지킬 범위**
 >
-> “Lossless” applies only to the restricted Headroom `0.36.5` configuration that combines
-> `compact_lossless(text, "paths")` with `path_unheading`. The descriptions of squeez
-> and LLMLingua-2 apply only to the versions and settings validated in this repository.
-> Do not extend this classification to whole-product safety or ranking.
+> 무손실이라는 표현은 `Headroom 0.36.5`의 `compact_lossless(text, "paths")`와 `path_unheading`을 함께 사용한 제한된 설정에만 적용한다. `squeez`와 `LLMLingua-2`는 이 저장소에서 검증한 버전과 설정만 설명한다. 이 분류를 제품 전체의 안전성이나 순위로 옮기지 않는다.
 
-## Three Distinct Layers
+## 먼저 구분할 세 가지
 
-“Compression” can refer to different layers. Unless the reduced layer is stated, bytes,
-tokens, cache, and cost can be misread as one outcome.
+압축이라는 말은 서로 다른 층을 가리킬 수 있다. 어느 층을 줄였는지 밝히지 않으면 바이트, token, 캐시, 비용을 한 결과처럼 잘못 읽게 된다.
 
-| Category | What changes | Source content | Measurement in this repository |
+| 구분 | 무엇이 달라지는가 | 원문 내용 | 이 저장소의 측정 |
 |---|---|---|---|
-| Transport compression | Bytes transferred over a network | May be identical after decompression | Not separately tested |
-| Cache | Reuses earlier computation or input spans | Input string usually unchanged | Observed but not controlled |
-| Prompt-content reduction | Representation of instructions and context sent to the model | May be identical or different | Target of the four-condition comparison |
+| 전송 압축 | 네트워크에서 오가는 바이트 | 풀고 나면 같을 수 있음 | 별도 실험하지 않음 |
+| 캐시 | 이전 계산이나 입력 일부를 재사용 | 보통 입력 문자열은 그대로 | 관측했지만 통제하지 않음 |
+| prompt 내용 축약 | 모델에 보내는 지시와 문맥의 표현 | 같거나 달라질 수 있음 | 네 조건의 비교 대상 |
 
-`gzip` is a common transport-compression example. The code below is a small synthetic
-illustration, not a repository measurement.
+전송 압축의 대표적인 예는 `gzip`이다. 아래 코드는 개념을 설명하기 위한 작은 합성 예제일 뿐, 이 저장소의 측정 결과가 아니다.
 
 ```python
 import gzip
@@ -51,200 +38,160 @@ packed = gzip.compress(source, compresslevel=9, mtime=0)
 assert gzip.decompress(packed) == source
 ```
 
-Even when transmitted bytes decrease, model input tokens may remain unchanged if the
-service decompresses the bytes and supplies the same prompt. A cost change from cache
-usage does not imply a shorter prompt string. Cache was uncontrolled in the preliminary
-comparison, so cache differences are not attributed to compression.
+압축된 전송 바이트가 줄어도 서비스가 압축을 푼 뒤 같은 prompt를 모델에 넘기면 모델 입력 token은 그대로일 수 있다. 캐시 사용량이 달라져 비용이 달라져도 prompt 문자열이 줄었다는 뜻은 아니다. 이 저장소의 예비 비교에서는 캐시를 통제하지 않았으므로 캐시 차이를 압축 효과로 돌리지 않는다.
 
-## What the Four Conditions Actually Do
+## 네 조건은 실제로 무엇을 하는가
 
-### `none`: Reference Without Additional Compression
+### `none`: 추가 압축 없는 기준
 
-`none` returns the input string unchanged. `NoOpCompressor` records the input,
-transformer input, and output as the same string. It is a reference for the other three
-conditions, not a compression method.
+`none`은 입력 문자열을 그대로 돌려준다. 구현의 `NoOpCompressor`는 입력, 변환기 입력, 출력을 같은 문자열로 기록한다. 압축 방식이 아니라 다른 세 조건과 비교하기 위한 기준이다.
 
-- **Validated:** Code contract and synthetic tests showing that the adapter leaves strings unchanged
-- **Not validated:** A guarantee that the model always gives the same answer to the same question
-- **Classification:** No compression
+- **확인한 것:** 어댑터가 문자열을 바꾸지 않는다는 코드 계약과 합성 테스트
+- **확인하지 않은 것:** 같은 질문에 모델이 언제나 같은 답을 한다는 보장
+- **분류:** 압축 없음
 
-Even `temperature=0` does not guarantee deterministic model responses. Two `none` runs
-can differ, and an equal result under another condition does not establish that compression
-had no effect.
+`temperature=0`을 설정해도 모델 응답의 결정성을 보장하지 않는다. 따라서 `none`끼리 결과가 달라질 수 있고, 다른 조건과 결과가 같다고 해서 압축이 영향을 주지 않았다고 확정할 수도 없다.
 
-### `squeez`: Lossy Compression That Discards the Suffix
+### `squeez`: 뒤쪽을 버리는 손실 압축
 
-This repository used squeez `1.48.4` with `wrap "cat input.txt"`. In the reviewed sample,
-it retained the first 30 content lines and discarded the rest. Completion signals or later
-diagnostic messages can disappear, so exact source restoration is impossible.
+이 저장소는 `squeez 1.48.4`의 `wrap "cat input.txt"` 설정을 사용했다. 검토한 표본에서는 앞 30개 내용 줄을 남기고 뒤쪽을 버렸다. 완료 신호나 뒤쪽 진단 메시지가 사라질 수 있으므로 원문을 정확히 복원할 수 없다.
 
-- **Validated:** Executable SHA-256 and version, isolated execution environment, and before-and-after byte counts and content fingerprints
-- **Static measurement scope:** 18 of 107 candidate occurrences and 6 of 27 unique inputs changed
-- **Preliminary native-task observation:** 2 spans in 1 of 26 conditions actually changed
-- **Classification:** Lossy compression
+- **확인한 것:** 실행 파일을 식별하는 SHA-256, 버전, 격리된 실행 환경, 변환 전후 바이트와 내용 지문
+- **정적 측정 범위:** 후보 107출현 가운데 18출현, 27고유 입력 가운데 6개가 바뀜
+- **예비 실제 과제 관측:** 26조건 가운데 1조건의 2구간이 실제로 바뀜
+- **분류:** 손실 압축
 
-The source remains in private evidence, but the model receives no source-restoration tool.
-Any guidance text inserted by squeez is not evidence that the model can recover the source.
+원문은 비공개 증거에 보존하지만 모델에 원문 복원 도구를 제공하지 않는다. `squeez`가 남긴 안내 문구가 있더라도 모델이 원문을 되찾을 수 있다는 증거가 되지는 않는다.
 
-### `Headroom`: Restricted Lossless Paths-Only Configuration
+### `Headroom`: 경로만 묶는 제한된 무손실 설정
 
-This repository used only `compact_lossless(text, "paths")`, not all Headroom `0.36.5`
-features. It displays a repeated directory prefix once and lists file names beneath it.
+이 저장소에서 사용한 것은 `Headroom 0.36.5` 전체 기능이 아니라 `compact_lossless(text, "paths")`뿐이다. 반복되는 디렉터리 접두어를 한 번만 표시하고 파일 이름을 그 아래에 둔다.
 
 ```text
-# synthetic source
+# 합성 원문
 /example/logs/first.log
 /example/logs/second.log
 
-# synthetic transformed text
+# 합성 변환문
 /example/logs/
 first.log
 second.log
 ```
 
-On every call, the adapter reverses the transformed text with `path_unheading` and checks
-that its UTF-8 bytes equal the source. It retains the source if the transformed text is not
-smaller and stops with an error if the displayed line count falls.
+어댑터는 `path_unheading`으로 변환문을 되돌린 뒤 원문과 UTF-8 바이트가 같은지 매 호출마다 확인한다. 변환문이 더 작지 않으면 원문을 그대로 쓰고, 표시 줄 수가 줄면 오류로 중단한다.
 
-- **Validated:** Synthetic preflight, per-call byte-for-byte round trip, and helper-file SHA-256
-- **Static measurement scope:** Restoration matched for all 107 candidate occurrences; 10 occurrences and 3 unique inputs actually changed
-- **Preliminary native-task observation:** 53 spans in 4 of 26 conditions actually changed
-- **Classification:** Lossless compression within a restricted paths-only configuration
+- **확인한 것:** 사전 합성 점검과 매 호출의 바이트 단위 왕복 복원, 도우미 파일 SHA-256
+- **정적 측정 범위:** 후보 107출현 모두 복원 일치, 그중 10출현·3고유 입력이 실제로 바뀜
+- **예비 실제 과제 관측:** 26조건 가운데 4조건의 53구간이 실제로 바뀜
+- **분류:** 경로 전용 제한 설정에서 무손실 압축
 
-Byte restoration establishes that information remains algorithmically recoverable. It
-does not establish that the model interprets grouped paths exactly like the source or that
-task quality remains unchanged. The result does not evaluate other Headroom profiles or
-the whole product.
+바이트 복원은 정보가 알고리즘상 남아 있다는 증거다. 모델이 묶인 경로 표현을 원문과 똑같이 이해한다거나 과제 품질이 유지된다는 증거는 아니다. Headroom의 다른 설정(profile)과 제품 전체도 이 결과로 평가하지 않는다.
 
-### `LLMLingua-2`: Lossy Selection of Tokens to Retain
+### `LLMLingua-2`: 남길 token을 고르는 손실 압축
 
-This repository used LLMLingua-2 `0.2.2`, the trained MeetingBank checkpoint, a fixed
-revision, and `rate=0.5`. It does not write a new generative summary; it selects source
-tokens to retain. Unselected tokens disappear, so byte-for-byte restoration is impossible.
+이 저장소는 `LLMLingua-2 0.2.2`, MeetingBank의 학습된 모델 파일(checkpoint),
+고정 판본(revision)과 `rate=0.5`를 사용했다. 생성형 요약을 새로 쓰는 방식이
+아니라 원문 token 중 남길 것을 고르는 방식이다. 선택되지 않은 token은
+없어지므로 원문을 바이트 단위로 되돌릴 수 없다.
 
-- **Validated:** Model and tokenizer file SHA-256 values, fixed settings, output agreement across worker processes for small synthetic fixtures, and before-and-after content fingerprints and sizes
-- **Static measurement scope:** All 107 candidate occurrences and 27 unique inputs changed
-- **Preliminary native-task observation:** 154 spans in 18 of 26 conditions actually changed
-- **Classification:** Lossy compression
+- **확인한 것:** model·tokenizer 파일 SHA-256, 고정 설정, 작은 합성 입력(fixture)의 작업 프로세스(worker) 간 출력 일치, 변환 전후 내용 지문과 크기
+- **정적 측정 범위:** 후보 107출현·27고유 입력이 모두 바뀜
+- **예비 실제 과제 관측:** 26조건 가운데 18조건의 154구간이 실제로 바뀜
+- **분류:** 손실 압축
 
-In the static sample, `[ERROR]`, `[WARNING]`, parts of version strings, and a word
-indicating refusal disappeared. Equal line count does not establish preserved fields or
-meaning. Matching output hashes in one fixed environment do not guarantee byte equality
-on another CPU or package version.
+정적 표본에서는 `[ERROR]`, `[WARNING]`, 버전 문자열 일부와 거부 상태를 나타내는 단어가 사라진 사례가 있었다. 줄 수가 같아도 필드와 뜻이 보존됐다고 볼 수 없다. 고정 환경에서 같은 출력 hash가 나왔다는 관측도 다른 CPU나 package version의 바이트 일치를 보장하지 않는다.
 
-## Validation Scope
+## 무엇을 어디까지 검증했나
 
-Static measurement and the preliminary native task comparison have different purposes and
-denominators. Static measurement checked size and restoration on stored requests without
-measuring model quality or provider billing. The native comparison solved and graded tasks
-but ran each condition once.
+정적 측정과 실제 과제 예비 비교(native)는 목적과 분모가 다르다. 정적 측정은 저장된 요청에서 변환 전후 크기와 복원 여부를 봤고, 모델 품질과 외부 모델 서비스(provider) 청구를 재지 않았다. 실제 과제 예비 비교는 과제를 풀고 채점했지만 조건당 한 번만 실행했다.
 
-### Static Measurement Conditions
+### 정적 측정 조건
 
-| Item | Fixed scope | Unit measured | Missing |
+| 항목 | 고정 범위 | 측정 단위 | 빠진 것 |
 |---|---|---|---|
-| Sample | 5 purposively selected tasks, 15 historical runs, 56 stored requests | 107 candidate occurrences and 27 unique inputs | Representativeness of customer data |
-| Model calls | 0 `gpt-5.4` and external API calls | Local transformations only | Native quality |
-| Size | UTF-8 bytes and `o200k_base` local tokens | Before and after | Provider-billed tokens |
-| Restoration | 107/107 Headroom candidate occurrences | Matching UTF-8 bytes | Model semantic understanding |
+| 표본 | 목적 선정 5과제·과거 15실행·저장 요청 56개 | 후보 107출현·27고유 입력 | 고객 데이터 대표성 |
+| 모델 호출 | `gpt-5.4`·외부 API 0회 | 로컬 변환만 | native 품질 |
+| 크기 | UTF-8 바이트, `o200k_base` 로컬 token | 변환 전후 값 | provider 청구 token |
+| 복원 | Headroom 후보 107/107출현 | UTF-8 바이트 일치 | 모델의 의미 이해 |
 
-### Preliminary Native-Task Comparison Conditions
+### 실제 과제 예비 비교 조건
 
-| Item | Fixed scope | Observation | Limitation |
+| 항목 | 고정 범위 | 관측 | 한계 |
 |---|---|---|---|
-| Sample | 26 tasks × 4 conditions = 104 conditions | Quality, requests, usage, and transformations by condition | Not 104 independent tasks |
-| Repetitions | One per condition | `pass` or `wrong_answer` | Cannot decide non-inferiority or ranking |
-| String changes | 209 spans in 23 conditions | 2 squeez, 53 Headroom, 154 LLMLingua-2 spans | Changed spans, not full requests |
-| Execution controls | Same pinned tasks and settings | Per-run evidence and restoration regrading | Cache, request count, path, and concurrency uncontrolled |
+| 표본 | 26과제 × 4조건 = 104조건 | 조건별 품질·요청·사용량·변환 | 104개 독립 과제가 아님 |
+| 반복 | 조건당 1회 | `pass` 또는 `wrong_answer` 채점 | 비열등성·순위 판단 불가 |
+| 문자열 변경 | 23조건의 209구간 | `squeez` 2, Headroom 53, LLMLingua-2 154구간 | 전체 요청이 아닌 변경 구간 |
+| 실행 통제 | 같은 고정 과제와 설정 | 실행별 증거와 복원 재채점 | 캐시·요청 수·실행 경로·동시성 미통제 |
 
-**Observation.** Strings were unchanged in all 26 `none` conditions. Actual changes
-appeared in 1 squeez condition, 4 Headroom conditions, and 18 LLMLingua-2 conditions.
-Previously published preliminary evidence includes different quality judgments where the
-actual string-change count was zero.
+**관측.** `none`은 26조건 모두 문자열이 같았다. 실제 변경은 `squeez` 1조건, Headroom 4조건, LLMLingua-2 18조건에서 관측됐다. 이미 공개된 예비 비교에서는 실제 문자열 변경이 없는데도 품질 판정이 달라진 사례가 있었다.
 
-**Possible explanation.** Model request count, execution path, and cache usage differed by
-condition. Whether an input contained a candidate and whether that candidate matched a
-tool's rules can also affect change count.
+**가능한 설명.** 조건마다 모델이 보낸 요청 수와 밟은 실행 경로가 달랐고 캐시 사용량도 달랐다. 입력에 압축 가능한 후보가 있었는지, 해당 후보가 각 도구의 규칙에 맞았는지도 실제 변경 횟수에 영향을 줄 수 있다.
 
-**Limitation.** Each condition ran only once, without first measuring same-condition model
-variability in the comparison. A known verifier false-failure case also existed. Quality
-and cost differences are therefore not established as effects caused by compression.
+**한계.** 조건당 한 번만 실행했고 모델 응답의 흔들림을 같은 비교 안에서 먼저 재지 못했다. 알려진 채점기 거짓 실패 사례도 있었다. 그러므로 품질 차이와 비용 차이를 압축 때문에 생긴 결과로 확정하지 않는다.
 
-## Restorability and Quality Are Different Questions
+## 복원 가능성과 품질은 다른 질문이다
 
-Losslessness asks whether source bytes can be restored. Quality asks whether the model
-produced a correct task result. Neither question substitutes for the other.
+무손실 여부는 원문 바이트를 복원할 수 있는지 묻는다. 품질은 모델이 과제의 정답을 만들었는지 채점한다. 두 질문은 서로 대신할 수 없다.
 
-| Situation | Restorability | Quality requirement |
+| 상황 | 복원 가능성 | 품질 판정에서 필요한 것 |
 |---|---|---|
-| Transport compression | Source must match after decompression | Even with identical model input, response variability is assessed separately |
-| Headroom paths-only | Bytes must match after the specified inverse | Grade whether the model used the grouped paths correctly |
-| `squeez` | Discarded suffix cannot be recovered from the transformed text alone | Grade whether omitted information was needed |
-| `LLMLingua-2` | Discarded tokens cannot be recovered from the transformed text alone | Validate critical fields, states, instructions, and final answer |
+| 전송 압축 | 압축 해제 뒤 원문과 같아야 함 | 모델 입력이 같아도 응답 변동을 따로 봄 |
+| Headroom paths-only | 지정 복원 함수(inverse) 뒤 바이트가 같아야 함 | 모델이 묶인 경로를 올바르게 사용했는지 채점 |
+| `squeez` | 버린 뒤쪽은 원문만으로 복원 불가 | 빠진 정보가 과제에 필요했는지 채점 |
+| `LLMLingua-2` | 버린 token은 원문만으로 복원 불가 | 핵심 필드·상태·지시와 최종 정답을 검증 |
 
-Lossy compression can still `pass` some tasks, while a model can misinterpret a lossless
-representation and produce `wrong_answer`. Conversely, `wrong_answer` is not direct
-evidence that compression deleted information. Task difficulty, response variability,
-execution path, and grader errors may be mixed in.
+손실 압축도 어떤 과제에서는 `pass`할 수 있고, 무손실 표현도 모델이 잘못 해석하면 `wrong_answer`가 될 수 있다. 반대로 `wrong_answer`는 압축 중 정보가 사라졌다는 직접 증거가 아니다. 과제 자체의 난도, 응답 변동, 실행 경로와 채점 오류가 섞일 수 있다.
 
-## Keeping Units Separate
+## 수치를 섞지 않는 법
 
-Before translating a size reduction into cost savings, identify the measured unit.
+크기가 줄었다는 말을 비용 절감으로 옮기기 전에 측정 단위를 확인해야 한다.
 
-| Value | What it counts | Source | What it does not directly establish |
+| 수치 | 무엇을 세는가 | 출처 | 바로 말할 수 없는 것 |
 |---|---|---|---|
-| Transport bytes | Bytes before and after network compression | Transport instrumentation | Reduced model input tokens |
-| Local tokens in changed spans | Tokens recounted only in strings that actually changed | Local `o200k_base` calculation | Reduced total API usage |
-| Full API usage | Input, cached-input, and output tokens across all requests | Provider response | Actual billed amount |
-| Calculated cost | USD from API usage multiplied by a fixed price table | Local calculation | Completed invoice reconciliation |
-| Actual invoice | Amount billed separately by the provider | Billing record | Causal effect of one transformation |
-| Quality | Pass status from a built-in task grader | Verifier | Losslessness |
+| 전송 바이트 | 네트워크에 실린 압축 전후 바이트 | 전송 계측 | 모델 입력 token 감소 |
+| 로컬 변경 구간 token | 실제로 달라진 문자열 구간만 다시 센 token | `o200k_base` 로컬 계산 | 전체 API 사용량 감소 |
+| 전체 API 사용량(usage) | 모든 요청의 입력·캐시·출력 token | provider 응답 | 실제 청구 금액 |
+| 계산 비용 | API 사용량에 고정 가격표를 곱한 USD | 로컬 계산 | 청구서 대사 완료 |
+| 실제 청구서 | provider가 별도로 청구한 금액 | 청구 자료 | 어느 변환만의 인과 효과 |
+| 품질 | 과제 내장 채점의 통과 여부 | verifier | 무손실 여부 |
 
-Even when local changed-span tokens fall, conversation history, retries, and added requests
-can increase total API usage. A lower calculated cost is not called an actual billed amount
-without price-table and invoice reconciliation. Provider-reported cached tokens are part
-of full API usage, not the same as tokens deleted by compression.
+변경 구간의 로컬 token이 줄어도 대화 이력, 재시도와 추가 요청 때문에 전체 API 사용량이 늘 수 있다. 계산 비용이 줄어도 가격표와 청구서가 대사되지 않았다면 실제 청구액이라고 쓰지 않는다. 캐시 token도 provider가 보고한 전체 API 사용량의 일부이며, 압축으로 삭제한 token과 같은 값이 아니다.
 
-## Safe Decision Sequence
+## 안전하게 판단하는 순서
 
-1. **Choose the boundary.** Separate reducing transport bytes, changing prompt content, and using cache.
-2. **Define restoration.** A method called lossless must reproduce the exact source bytes after its specified inverse.
-3. **Define protection scope.** Exclude instructions, code, structured data, and identifiers that must not change.
-4. **Measure quality separately.** Actual task grading and verifier validation are required regardless of lossiness.
-5. **Measure usage and cost separately.** Record local tokens, provider usage, calculated cost, and invoices independently.
-6. **Decide after repetition.** Do not rank safety or compressors by differences smaller than same-condition variability.
+1. **경계를 고른다.** 전송 바이트를 줄일지, prompt 내용을 바꿀지, 캐시를 활용할지 먼저 나눈다.
+2. **복원 기준을 정한다.** 무손실이라고 부르려면 지정한 inverse 뒤 원문과 바이트 단위로 같아야 한다.
+3. **보호 범위를 정한다.** 지시, 코드, 구조화 자료와 식별자처럼 바꾸면 안 되는 구간을 압축 대상에서 뺀다.
+4. **품질을 별도로 잰다.** 손실 여부와 관계없이 실제 과제 채점과 채점기 검증이 필요하다.
+5. **사용량과 비용을 별도로 잰다.** 로컬 token, provider usage, 계산 비용, 청구서를 각각 기록한다.
+6. **반복 뒤 결정한다.** 같은 조건의 흔들림보다 작은 차이로 압축기 순위나 안전성을 정하지 않는다.
 
-Current public evidence cannot decide product adoption, compressor ranking, quality
-non-inferiority, or population cost savings. Before lossy compression is applied to
-customer data, define critical-field preservation, repeated evaluation, verifier
-validation, and stopping criteria.
+현재 공개 증거로는 네 도구의 제품 도입, 압축기 순위, 품질 비열등성, 모집단 비용 절감률을 결정할 수 없다. 특히 손실 압축을 고객 자료에 적용하려면 핵심 필드 보존 기준, 반복 평가, 채점기 검증과 중단 조건을 먼저 정해야 한다.
 
-## Ten Questions Remaining Before Further Validation
+## 다음 검증 전에 남은 열 가지 질문
 
-This table identifies design gaps in current evidence; it is not approval for a new
-experiment.
+아래 표는 새 실험을 승인하는 계획이 아니라, 현재 증거에서 비어 있는 설계 자리를 표시한다.
 
-| No. | Question | Current answer | Gap |
+| 번호 | 질문 | 현재 답 | 빈자리 |
 |---:|---|---|---|
-| 1 | What decision would the result support? | Could inform whether lossy compression is acceptable | Adoption criterion remains undefined |
-| 2 | What would falsify the hypothesis? | One restoration mismatch rejects a lossless claim | Quality-rejection rule for lossy compression remains undefined |
-| 3 | How many axes moved? | Request count, path, cache, and concurrency differed alongside compression | Compression axis not isolated |
-| 4 | Was variability measured first? | Preliminary comparison ran once per condition | Same-condition repetition needed |
-| 5 | Who validates the judge? | Built-in verifier and restoration regrade were used | Known false-failure effect needs review |
-| 6 | Was configuration actually controlled? | `temperature=0` was recorded | Determinism not guaranteed |
-| 7 | What does the tool measure? | Bytes, local tokens, usage, cost, and quality are separate | Invoice reconciliation is separate |
-| 8 | Does input favor one side? | Conservatively identified log candidates from a public benchmark | Customer-input representativeness unknown |
-| 9 | When does it stop? | Historical execution protocol is recorded | New customer-validation stopping rules need prior agreement |
-| 10 | Is it tied to a customer environment? | Public Terminal-Bench 2.1 observation | Cannot generalize to customer data |
+| 1 | 결과로 무엇을 정하나 | 손실 압축 허용 여부를 가르는 데 쓸 수 있음 | 도입 결정 기준은 미확정 |
+| 2 | 무엇이 가설을 틀렸다고 하나 | 무손실은 한 번의 복원 불일치로 기각 | 손실 압축의 품질 기각 기준은 미확정 |
+| 3 | 몇 축이 움직였나 | 압축 조건 외 요청 수·경로·캐시·동시성이 달랐음 | 압축 축만 분리하지 못함 |
+| 4 | 흔들림을 먼저 쟀나 | 예비 비교는 조건당 1회 | 같은 조건 반복이 필요 |
+| 5 | 판정자를 누가 검증하나 | 내장 채점기(verifier)와 복원 재채점을 사용 | 알려진 거짓 실패의 영향 점검 필요 |
+| 6 | 설정이 실제 통제됐나 | `temperature=0`을 기록 | 결정성은 보장되지 않음 |
+| 7 | 도구가 무엇을 재나 | 바이트·로컬 token·usage·비용·품질을 분리 | 실제 청구서 대사는 별도 |
+| 8 | 입력이 한쪽에 유리한가 | 보수적으로 식별한 공개 벤치마크(benchmark) 로그 후보 | 고객 입력 대표성 미확인 |
+| 9 | 언제 멈추나 | 과거 실행 규약은 기록돼 있음 | 새 고객 검증의 중단 조건은 사전 합의 필요 |
+| 10 | 고객 특수성에 묶였나 | 공개 Terminal-Bench 2.1 관측 | 고객 데이터에는 일반화할 수 없음 |
 
-## Public Evidence
+## 공개 근거
 
-- [Static compressor measurements](../compressors.md): static transformation scope, examples, and units for three tools
-- [Technical preliminary-comparison evidence](preliminary-comparison-20260916.md): quality, actual changes, usage, and cost scope for 26 tasks and 104 conditions
-- [Public preliminary-comparison aggregate JSON](../../../data/experiment/preliminary-comparison-summary.json): changed-condition and span counts by condition
-- [Native execution contract](../../native-contract.md): fixed profiles and protection, restoration, and instrumentation boundaries
-- [Compressor implementations](../../../src/compressors.py): `NoOpCompressor`, `SqueezCompressor`, `HeadroomPathsCompressor`, and `LLMLingua2Compressor`
-- [Synthetic compressor tests](../../../tests/test_native_compressors.py): Headroom round-trip restoration and LLMLingua worker validation
+- [압축기 정적 측정](../compressors.md): 세 도구의 정적 변환 범위, 예시와 단위
+- [예비 비교 기술 증거](preliminary-comparison-20260916.md): 26과제·104조건의 품질, 실제 변경, usage와 비용 범위
+- [예비 비교 공개 집계 JSON](../../../data/experiment/preliminary-comparison-summary.json): 조건별 변경 조건과 구간 수
+- [native 실행 계약](../../native-contract.md): 네 조건의 고정 profile, 보호·복원·계측 경계
+- [압축기 구현](../../../src/compressors.py): `NoOpCompressor`, `SqueezCompressor`, `HeadroomPathsCompressor`, `LLMLingua2Compressor`
+- [압축기 합성 테스트](../../../tests/test_native_compressors.py): Headroom 왕복 복원과 LLMLingua worker 검증
 
-Examples use only public material and small synthetic strings. They exclude customer
-source, service endpoints, credentials, internal addresses, and personal paths.
+이 문서의 예시는 공개 자료와 작은 합성 문자열만 사용한다. 고객 원본, 서비스 연결 주소, 인증 정보, 내부 주소와 개인 경로는 포함하지 않는다.

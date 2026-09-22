@@ -1,41 +1,41 @@
-# Static Compressor Measurements
+# 압축기 정적 측정
 
-**Evidence status:** Between 2026-09-11 and 2026-09-13 UTC, compressors were applied statically to stored requests for these measurements. There were 0 `gpt-5.4` calls and 0 native grading runs. LLMLingua-2's own local compressor inference is recorded separately.
+**증거 상태:** 2026-09-11부터 2026-09-13 UTC까지 저장 요청에 압축기를 정적으로 적용한 측정이다. `gpt-5.4` 호출과 native 채점은 0회다. LLMLingua-2 자체의 로컬 압축기 추론은 별도로 기록한다.
 
-## Shared Sample and Denominators
+## 공통 표본과 분모
 
-| Item | Value | Classification |
+| 항목 | 값 | 성격 |
 | --- | ---: | --- |
-| Input | 5 purposively selected tasks, 15 historical runs, 56 stored requests | Fixed sample |
-| Identified candidates | 107 occurrences, 27 unique inputs | Classification judgment |
-| Protected content | 2,169 spans, 697,187 UTF-8 bytes | Measurement and validation |
-| Full message content | 824,301 UTF-8 bytes | Measurement denominator |
-| Full local tokens | 242,937 `o200k_base` tokens | tiktoken `0.14.0` calculation denominator |
-| `gpt-5.4` and external API calls | 0 | Execution record |
-| LLMLingua-2 local inferences | 107 in this measurement | Execution record |
+| 입력 | 목적 선정 5과제·과거 15실행·저장 요청 56개 | 고정 표본 |
+| 식별된 후보 | 107출현·27고유 입력 | 분류 판단 |
+| 보호 대상 | 2,169구간·697,187 UTF-8바이트 | 측정·검증 |
+| 전체 본문 | 824,301 UTF-8바이트 | 측정 분모 |
+| 전체 로컬 token | 242,937 `o200k_base` token | tiktoken `0.14.0` 계산 분모 |
+| `gpt-5.4`·외부 API 호출 | 0회 | 실행 기록 |
+| LLMLingua-2 로컬 추론 | 본 측정 107회 | 실행 기록 |
 
-The 127,114 candidate bytes are 15.42% of the full message content. This is the **identified candidate scope, not a validated upper bound**. Code, mixed-code spans, structured data, instructions, and uncertain spans were not added merely to increase the candidate count.
+후보 127,114바이트는 전체 본문의 15.42%다. 이는 **식별된 후보 범위이지 검증된 상한이 아니다.** 코드, 코드가 섞인 구간, 구조화 자료, 지시문과 불확실한 구간은 후보를 늘리기 위해 포함하지 않았다.
 
-Occurrence counts include retransmitted conversation history. Do not interpret 107 occurrences as 107 independent tasks or inputs. The reductions below are local values counted after serializing the full message content again; they are not provider-billed tokens or quality results.
+출현 수는 대화 이력 재전송을 포함한다. 107출현을 107개의 독립 과제나 독립 입력으로 해석하지 않는다. 아래 감소율은 전체 message content를 다시 직렬화해 센 로컬 값이며, 제공자 청구 token이나 품질 결과가 아니다.
 
-## Static Size
+## 정적 크기
 
-| Tool and profile | Actual behavior | Total local tokens | Token reduction | Total UTF-8 bytes | Byte reduction | Changed occurrences and unique inputs | Classification |
+| 도구·프로필 | 실제 동작 | 전체 로컬 token | token 감소 | 전체 UTF-8바이트 | byte 감소 | 변경 출현·고유 입력 | 성격 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
-| squeez `1.48.4` | Discards content after the first 30 content lines | 242,937 → 208,594 | 34,343; 14.1366% | 824,301 → 750,030 | 74,271; 9.0102% | 18/107; 6/27 | Measurement, calculation, and discard classification |
-| Headroom `0.36.5` paths-only | Groups common path prefixes | 242,937 → 242,457 | 480; 0.1976% | 824,301 → 823,111 | 1,190; 0.1444% | 10/107; 3/27 | Measurement, calculation, and grouping classification |
-| LLMLingua-2 `0.2.2`, `rate=0.5` | Selects and discards tokens within lines | 242,937 → 214,682 | 28,255; 11.6306% | 824,301 → 761,302 | 62,999; 7.6427% | 107/107; 27/27 | Measurement, calculation, and token-selection classification |
+| squeez `1.48.4` | 앞 30개 내용 줄 뒤를 버림 | 242,937 → 208,594 | 34,343·14.1366% | 824,301 → 750,030 | 74,271·9.0102% | 18/107·6/27 | 측정·계산·버리기 분류 |
+| Headroom `0.36.5` paths-only | 공통 경로 접두어를 묶음 | 242,937 → 242,457 | 480·0.1976% | 824,301 → 823,111 | 1,190·0.1444% | 10/107·3/27 | 측정·계산·묶기 분류 |
+| LLMLingua-2 `0.2.2`, `rate=0.5` | 줄 안 token을 선택해 버림 | 242,937 → 214,682 | 28,255·11.6306% | 824,301 → 761,302 | 62,999·7.6427% | 107/107·27/27 | 측정·계산·token 선택 분류 |
 
-These are static input sizes for three interventions with different quality characteristics. Reduction rate alone does not establish tool ranking, billed savings, or native quality.
+세 값은 품질이 다른 개입의 정적 입력 크기다. 감소율만으로 도구의 우열, 청구 절감, native 품질을 판정하지 않는다.
 
-## squeez Example
+## squeez 표본
 
-**Sample and denominator:** 18 changed occurrences and 6 unique inputs. Ten occurrences are file lists and eight are package-installation output. The discarded suffixes contain 1,362 lines and 78,382 UTF-8 bytes; after added metadata, the net reduction is 74,271 bytes. **Classification:** Measurement, calculation, and transformation classification.
+**표본·분모:** 변경 18출현·6고유 입력. 10출현은 파일 목록, 8출현은 패키지 설치 출력이다. 삭제된 뒤쪽은 1,362줄·78,382 UTF-8바이트이며, 메타데이터 추가 뒤 순감소는 74,271바이트다. **성격:** 측정·계산·변환 분류.
 
-The processed public example below replaces identifiers and locations with placeholders.
+아래는 식별자와 위치 정보를 자리표시자로 바꾼 가공 공개본이다.
 
 ```text
-# before, excerpt after the 30th content line
+# before, 30번째 내용 줄 뒤의 일부
 Fetched 2316 kB in 0s (26.5 MB/s)
 ...
 Setting up nginx (1.22.1-9+deb12u9) ...
@@ -44,17 +44,17 @@ invoke-rc.d: policy-rc.d denied execution of start.
 Processing triggers for libc-bin (2.36-9+deb12u10) ...
 
 # after
-[first 30 content lines]
+[앞 30개 내용 줄]
 [... 54 lines truncated]
 ```
 
-The first 30 content lines remain, but later installation diagnostics and completion signals disappear. In one compound command, an earlier listing filled all 30 lines and deleted all 10 lines of a subsequent `find` result. Native quality degradation was not measured in this sample.
+앞 30개 내용 줄은 남지만 설치 후반 진단과 완료 신호가 사라졌다. 한 복합 명령에서는 앞선 목록이 30줄을 채워 뒤따르는 `find` 결과 10줄 전체가 삭제됐다. 이 표본에서 실제 native 품질 저하는 측정하지 않았다.
 
-## Headroom Example
+## Headroom 표본
 
-**Sample and denominator:** 10 occurrences and 3 unique inputs changed among 107 candidate occurrences and 27 unique inputs. Reverse transformation reproduced the original bytes for 107/107 occurrences, and there were 0 reductions in displayed line count. **Classification:** Measurement, validation, and grouping classification.
+**표본·분모:** 후보 107출현·27고유 입력 가운데 10출현·3고유 입력 변경. 107/107출현을 역변환했을 때 원문과 byte 단위로 같았고, 표시 줄 감소는 0건이다. **성격:** 측정·검증·묶기 분류.
 
-The processed public example below replaces a private location with `<LOG_DIR>`.
+아래는 비공개 위치를 `<LOG_DIR>`로 바꾼 가공 공개본이다.
 
 ```text
 # before
@@ -69,19 +69,19 @@ The processed public example below replaces a private location with `<LOG_DIR>`.
 2025-07-03_auth.log
 ```
 
-The common prefix appears once while all file entries remain. This result measures only the restricted profile that permits `compact_lossless(text, "paths")`, not the full Headroom product.
+공통 접두어를 한 번만 표시하고 파일 항목은 남긴다. 이 결과는 Headroom 전체 제품이 아니라 `compact_lossless(text, "paths")`만 허용한 제한 프로필의 측정이다.
 
-### Measurement Scope Versus Product Features
+### 측정 범위와 제품 기능의 구분
 
-**Classification:** Public-source review and classification judgment. This repository has 0 static measurements and 0 native executions using the settings below.
+**성격:** 공개 소스 확인·분류 판단. 이 저장소에서 아래 설정을 적용한 정적 측정과 native 실행은 모두 0회다.
 
-Within the reviewed Headroom `0.36.5` paths-only configuration, we did not observe location controls that distinguish types of messages or tool results for compression. This finding cannot be generalized to the entire Headroom product.
+우리가 확인한 Headroom `0.36.5` paths-only 설정 범위에서는 압축할 메시지나 툴 결과를 종류별로 나누는 위치 제어가 관측되지 않았다. 이 판단을 Headroom 제품 전체로 일반화할 수는 없다.
 
-Headroom `0.37.0`'s [`coding` profile](https://github.com/headroomlabs-ai/headroom/blob/v0.37.0/headroom/agent_savings.py) configures tool search, deduplication across turns, lossy compression after lossless processing, file-read protection, analytical-context protection, and AST-based code compression. [`DEFAULT_EXCLUDE_TOOLS`](https://github.com/headroomlabs-ai/headroom/blob/v0.37.0/headroom/config.py) excludes `Read`, `Glob`, `Grep`, `Write`, `Edit`, web search and fetch, raw-content retrieval, and `view`-family tools. `DEFAULT_VERBATIM_EXCLUDE_TOOLS` in the same source separately leaves web search and fetch, raw-content retrieval, and `view`-family tools byte-for-byte unchanged. File-read protection also identifies reads through bash-family commands. Analytical-context protection skips code compression when the latest user request indicates analysis, review, audit, security, bug, debugging, correction, or error intent. The AST path uses tree-sitter to parse code, retain structure, and reduce function bodies. The size, preservation, and quality effects of this configuration on the repository's 56 stored requests have not been measured.
+Headroom `0.37.0`의 [`coding` 프로필](https://github.com/headroomlabs-ai/headroom/blob/v0.37.0/headroom/agent_savings.py)은 툴 검색, turn 간 중복 제거, 무손실 처리 뒤 손실 압축, 파일 읽기 보호, 분석 문맥 보호와 AST 기반 코드 압축을 설정한다. [`DEFAULT_EXCLUDE_TOOLS`](https://github.com/headroomlabs-ai/headroom/blob/v0.37.0/headroom/config.py)는 `Read`, `Glob`, `Grep`, `Write`, `Edit`, 웹 검색·가져오기, 원문 회수와 `view` 계열 툴을 제외한다. 같은 소스의 `DEFAULT_VERBATIM_EXCLUDE_TOOLS`는 웹 검색·가져오기, 원문 회수와 `view` 계열 툴을 바이트 그대로 두도록 별도로 지정한다. 파일 읽기 보호는 bash 계열 읽기 명령도 식별하고, 분석 문맥 보호는 최근 사용자 요청에 분석·리뷰·감사·보안·버그·디버그·수정·오류 등의 의도가 있으면 코드 압축을 건너뛴다. AST 기반 경로는 tree-sitter로 코드를 파싱해 구조를 남기고 함수 본문을 줄인다. 해당 설정이 이 저장소의 56개 저장 요청에서 만드는 크기·보존·품질 변화는 아직 측정하지 않았다.
 
-## LLMLingua-2 Example
+## LLMLingua-2 표본
 
-**Sample and denominator:** All 107 candidate occurrences and 27 unique inputs changed. Of 2,375 nonempty source lines, 0 remained byte-identical. **Classification:** Measurement and token-selection classification.
+**표본·분모:** 후보 107출현·27고유 입력 전부 변경. 원문에서 비어 있지 않은 2,375줄 중 byte 단위로 그대로 남은 줄은 0개다. **성격:** 측정·token 선택 분류.
 
 ```text
 # before
@@ -97,14 +97,14 @@ invoke-rc.d: policy-rc.d denied execution of start.
 .. execution.
 ```
 
-Line counts stayed unchanged in all 107 occurrences, but `[ERROR]` and `[WARNING]` disappeared, and `1.22.1` split into `. 22. 1`. In `policy-rc.d denied execution`, `denied` disappeared, so the refusal state is not preserved and can be read in the opposite sense. Preserved line boundaries do not imply preserved fields, identifiers, or states.
+107출현 모두 줄 수는 같았지만 `[ERROR]`와 `[WARNING]`이 사라졌고, `1.22.1`은 `. 22. 1`로 갈라졌다. `policy-rc.d denied execution`에서는 `denied`가 사라져 거부 상태를 보존하지 않으며 반대로 읽힐 수 있다. 줄 경계 보존이 필드, 식별자, 상태 보존을 뜻하지 않는다.
 
-LLMLingua-2 was measured on a system without a GPU running Linux kernel `3.10.102`, 8 CPUs, and 31 GiB RAM. It used Python `3.10.12`, llmlingua `0.2.2`, torch `2.13.0+cpu`, and model revision `ebaba9b0e874dadd3003ffcff828e4397e568089`. Compression time for one candidate span had a minimum of 2.20 seconds, mean of 4.13 seconds, and maximum of 15.60 seconds, with a denominator of 107.
+LLMLingua-2 측정은 GPU 없는 Linux kernel `3.10.102`, 8 CPU, 31 GiB RAM에서 수행했다. Python `3.10.12`, llmlingua `0.2.2`, torch `2.13.0+cpu`, model revision `ebaba9b0e874dadd3003ffcff828e4397e568089`을 사용했다. 후보 한 구간의 압축 시간은 최소 2.20초, 평균 4.13초, 최대 15.60초였고 분모는 107회다.
 
-For 25 input hashes and 105 occurrences within the same process, each input hash produced one output hash. Re-transforming three representative inputs in two separate processes also produced the same output SHA-256. This observation does not guarantee byte equality on another CPU or package version.
+같은 process의 입력 hash 25개·105출현은 각각 출력 hash가 하나였다. 별도 process 두 개에서 대표 입력 3개를 다시 변환했을 때도 출력 SHA-256이 같았다. 이 관측은 다른 CPU나 package version의 byte equality를 보장하지 않는다.
 
-## Tool-Review Scope
+## 도구 검토 범위
 
-**Classification judgment:** Among the eight reviewed tools, we did not find a currently reproducible summarization path that accepts arbitrary logs or command output, preserves required meaning, and offers controllable loss. Some products provide separate rule-based or generative summarization paths, but the three profiles fixed for the preliminary study perform discarding, grouping, and token selection, respectively.
+**분류 판단:** 검토한 8개 도구 가운데 임의의 로그·명령 출력을 받아 필요한 뜻을 보존하고, 손실 정도를 조절할 수 있으며, 현재 조건에서 재현 가능한 요약 경로는 확인되지 않았다. 일부 제품에는 별도의 규칙 요약이나 생성 모델 요약 경로가 있지만, 1차에 고정한 세 프로필은 각각 버리기, 묶기, token 선택이다.
 
-This classification applies only to summarization paths. It does not mean that features such as tool-level exclusions or file-read protection are absent.
+이 분류 판단은 요약 경로에 한정한다. 툴 단위 제외나 파일 읽기 보호 같은 위치 제어 기능이 없다는 뜻은 아니다.

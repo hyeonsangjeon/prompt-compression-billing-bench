@@ -18,9 +18,9 @@ wrap with [Guide](guide.md#target) and ![Diagram](../figures/example.svg).
 fenced **literal**
 ```
 
-**Strong phrase** follows CommonMark strong syntax.
+**강조 문구**는 CommonMark strong이다.
 
-**Strong phrase (example)**uses the project extension.
+**강조 문구(예시)**는 project extension이다.
 
 2 ** 3
 

@@ -1,24 +1,21 @@
-# Execution ledgers
+# 실행 원장
 
-- [`static.toml`](static.toml) is the ledger for fixed-input static measurement.
-- [`demo.toml`](demo.toml) is an example ledger that checks the contract with synthetic data.
-- [`native.template.toml`](native.template.toml) is the native ledger template that must be
-  completed before a live model run. It separates the fixed schema-version-4 safety limits
-  from the initially empty cost approval and UTC deadline.
-- [`screening.template.toml`](screening.template.toml) fixes the Terminal-Bench 2.1
-  screening rules and the schema-version-4 termination and cost-record fields.
-- [`recovery.template.toml`](recovery.template.toml) is a non-operational template that
-  fixes local squeez source-recovery, lifetime, and authentication boundaries while
-  external exposure is disabled.
-- [`accountless-native.json`](accountless-native.json) is the cached quickstart ledger. It
-  fixes one public GSM8K item, local-only Qwen2.5 0.5B asset and runtime fingerprints,
-  generation settings, a 300-second attempt limit, a 120-second no-progress limit, and
-  zero retries. It is separate from the existing Ollama ledger and does not authorize a
-  model download or package installation.
-- [`cache-reuse.template.json`](cache-reuse.template.json) is a non-operational template
-  that fixes the `{none,squeez} × {0,1,2}` cache-reuse axis for a five-task bundle,
-  concurrency 1, the 10→20 stability rule, distinct provider/local/computed/invoice
-  units, and 14 runtime gates. It remains `no_go` until every gate and separate leader
-  approval are verified.
+- [`static.toml`](static.toml)은 고정 입력 정적 측정의 원장이다.
+- [`demo.toml`](demo.toml)은 합성 자료로 계약을 확인하는 예제 원장이다.
+- [`native.template.toml`](native.template.toml)은 실제 모델 실행 전 채워야 하는
+  native 원장 템플릿이다. schema version 4의 고정 안전 상한과 비어 있는 비용
+  승인·UTC deadline을 분리한다.
+- [`screening.template.toml`](screening.template.toml)은 Terminal-Bench 2.1
+  선별 규칙과 schema version 4의 종료·비용 기록 필드를 고정한다.
+- [`recovery.template.toml`](recovery.template.toml)은 외부 노출을 끈 상태로
+  로컬 squeez 원문 회수·수명·인증 경계를 고정한 비운영 템플릿이다.
+- [`accountless-native.json`](accountless-native.json)은 공개 GSM8K 한 항목,
+  로컬 전용 Qwen2.5 0.5B 자산·런타임 지문, 생성 설정, 300초 attempt,
+  120초 no-progress, retry 0을 고정한 cached quickstart 원장이다. 기존
+  Ollama 원장과 별개이며 모델 다운로드나 패키지 설치를 승인하지 않는다.
+- [`cache-reuse.template.json`](cache-reuse.template.json)은 고정 5과제 bundle의
+  `{none,squeez} × {0,1,2}` cache reuse 축, concurrency 1, 10→20 안정 규칙,
+  provider/local/computed/invoice 단위와 14개 runtime 관문을 고정한 비운영
+  템플릿이다. 모든 관문과 별도 리더 승인이 확인되기 전에는 `no_go`다.
 
-Templates record environment-variable names, never credential values.
+템플릿에는 자격 증명 값 대신 환경 변수 이름만 기록한다.

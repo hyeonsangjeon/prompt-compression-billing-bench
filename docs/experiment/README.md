@@ -1,113 +1,107 @@
-# Experiment records
+# 실험 기록
 
-This file is the **complete experiment index** for the designs, decisions, and
-measurement summaries from every study. Start the current first-study material
-with the [preliminary compression comparison](01-preliminary-comparison/README.md).
-Private source records and temporary artifacts are not included in the public
-documentation.
+이 파일은 모든 차수의 실험 설계, 판단 기록과 측정 요약을 찾는 **전체 실험
+인덱스**다. 이번 1차 공유 자료는
+[1차 예비 압축 비교](01-preliminary-comparison/README.md)에서 시작한다.
+비공개 원본과 임시 산출물은 공개 문서에 넣지 않는다.
 
-## Records by study
+## 실험별 기록
 
-| Study | Status | Starting document | Scope |
+| 차수 | 상태 | 시작 문서 | 범위 |
 |---|---|---|---|
-| First preliminary compression comparison | Completed preliminary observations | [First-study overview](01-preliminary-comparison/README.md) | 26 tasks × 4 conditions, one run per condition |
-| Third benchmark candidate: SWE-Lancer | Evaluation complete, deferred | [Candidate evaluation](swe-lancer-candidate-evaluation-20260920.md) | One pre-execution gate for one fixed task; zero live traces |
+| 1차 예비 압축 비교 | 완료된 예비 관측 | [1차 실험 한 장 요약](01-preliminary-comparison/README.md) | 26과제 × 4조건, 조건당 1회 |
+| SWE-Lancer 3차 후보 평가 | 보류로 평가 완료 | [후보 평가](swe-lancer-candidate-evaluation-20260920.md) | 고정 1과제의 실행 전 관문 1회, 실제 trace 0건 |
 
-Add a new experiment as `02-<experiment-name>/README.md` only after its execution
-conditions and scope have been fixed. Do not create an empty directory or result
-document in advance for a second experiment that has not started.
+새 실험은 실행 조건과 범위가 정해진 뒤 `02-<실험명>/README.md` 형식으로 추가한다.
+아직 시작하지 않은 2차 실험의 빈 폴더나 결과 문서는 미리 만들지 않는다.
 
-## First-study materials
+## 1차 공유 자료
 
-1. Read the [first-study overview](01-preliminary-comparison/README.md) for the conditions, main results, and outcome-linked costs in one sequence.
-2. Read the [26 task descriptions](01-preliminary-comparison/tasks.md) for each task, its public pass target, and its time, request, and cost observations.
-3. Read the [task-level changed-condition matrix](01-preliminary-comparison/metrics.md) for the 23 conditions with changed text, the corresponding `none` rows, and the 55 compressed conditions with no text change.
-4. Read the [plain-language results](01-preliminary-comparison/plain-language-results-20260917.md) for the findings and limits across 26 tasks and 104 conditions.
-5. Read the [experiment-design review appendix](01-preliminary-comparison/experiment-briefing-20260919.md) for the decisions the evidence can support now and the remaining design gaps.
-6. Read the [lossy and lossless compression guide](01-preliminary-comparison/lossless-lossy-compression-20260919.md) for the recoverability of the four conditions and the distinction between recoverability, quality, and cost.
-7. Read the [visualization appendix](01-preliminary-comparison/visualization-guide-20260919.md) for the ten EDA figures and the preliminary-comparison charts separated by unit.
-8. Read the [preliminary-comparison technical evidence](01-preliminary-comparison/preliminary-comparison-20260916.md) for condition-level values, run identifiers, and SHA-256 verification values.
-9. Read the [outcome cost accounting](01-preliminary-comparison/outcome-cost-accounting-20260918.md) for passed, normally failed, and pre-judgment costs and for the portions that still cannot be allocated by outcome.
+1. [1차 실험 한 장 요약](01-preliminary-comparison/README.md)에서 실험 조건, 핵심 결과와 결과별 비용을 한 흐름으로 확인한다.
+2. [1차 실험 26과제 설명](01-preliminary-comparison/tasks.md)에서 과제별 문제, 공개 통과 대상, 시간·요청·비용을 확인한다.
+3. [과제별 변경 조건 대조표](01-preliminary-comparison/metrics.md)에서 문자열이 달라진 23조건과 같은 과제의 `none`, 변경 0인 압축 조건 55개를 확인한다.
+4. [공유용 쉬운 설명](01-preliminary-comparison/plain-language-results-20260917.md)에서 26개 과제·104개 조건의 결과와 한계를 읽는다.
+5. [실험 설계 검토 부록](01-preliminary-comparison/experiment-briefing-20260919.md)에서 지금 정할 수 있는 것과 실험 설계의 빈자리를 확인한다.
+6. [손실·무손실 압축 안내](01-preliminary-comparison/lossless-lossy-compression-20260919.md)에서 네 조건의 복원 가능성과 품질·비용의 차이를 확인한다.
+7. [시각화 부록](01-preliminary-comparison/visualization-guide-20260919.md)에서 EDA 10개와 단위별 예비 비교 차트를 확인한다.
+8. [예비 비교 기술 증거](01-preliminary-comparison/preliminary-comparison-20260916.md)에서 조건별 세부 수치, 실행 식별자와 SHA-256 검증값을 확인한다.
+9. [결과별 비용 집계](01-preliminary-comparison/outcome-cost-accounting-20260918.md)에서 통과·정상 미통과·품질 판정 전 비용과 아직 나눌 수 없는 범위를 확인한다.
 
-## Shared execution guidance
+## 공통 실행 안내
 
-1. Read the [next paid-run safety policy](execution-safety-policy.md) for call, cost, time, request, and output limits and the classification of technically incomplete outcomes.
-2. Read the [real-data connection guide](data-connection-guide-20260919.md) for the sequence from preparation outside the public repository through no-call checks, explicit execution, and result verification.
-3. Read the [single-task YAML guide](../../README.md#try-it-in-five-minutes) for the default no-call check and the explicit live-execution boundary.
+1. [다음 유료 실행 안전 정책](execution-safety-policy.md)에서 호출·비용·시간·요청·출력 상한과 기술 미완료 분류를 확인한다.
+2. [실데이터 연결 가이드](data-connection-guide-20260919.md)에서 원본을 공개 저장소에 올리지 않고 준비·무호출 확인·명시적 실행·결과 검증까지 잇는 방법을 확인한다.
+3. [실제 1과제 YAML 안내](../../README.md#try-it-in-five-minutes)에서 기본 무호출 확인과 명시적 실제 실행 경계를 확인한다.
 
-## Separate candidate evaluation
+## 별도 후보 평가
 
-- [SWE-Lancer third-benchmark candidate evaluation](swe-lancer-candidate-evaluation-20260920.md): a deferred conclusion after checking the fixed task from the official README through its pre-execution gate. No worker, model, or provider started, so there is no live trace or grader result.
+- [SWE-Lancer 3차 벤치마크 후보 평가](swe-lancer-candidate-evaluation-20260920.md): 공식 README의 고정 1과제를 실행 전 관문까지 확인한 보류 결론. worker·model·provider가 시작되지 않아 실제 trace나 grader 결과는 없다.
 
-## Current status
+## 현재 상태
 
-| Work item | Current status | Sample and denominator | Evidence type |
+| 작업 | 현재 상태 | 표본·분모 | 증거 성격 |
 | --- | --- | --- | --- |
-| Existing baseline with no additional compression | Completed on 2026-09-14 UTC, but inconclusive under the preregistered rule | Five purpose-selected tasks × 20 repetitions = 100 native `trial` records | Measurement aggregated from private source records |
-| Static compressor application | Input size and transformation samples checked for three compressors | 56 stored requests; 107 candidate occurrences and 27 unique inputs | Static measurement with no model call |
-| Terminal-Bench 2.1 screening | Source records for 24 formal `attempt` records under the earlier limit policy are preserved: 12 cumulative quality outcomes, 11 completed technical exclusions, and one incomplete evidence record. Provider execution also ran and ended after the limits were removed. The 26 tasks with complete evidence feed the preliminary comparison below. Five long-tail runs ended before grading and are excluded from the primary analysis as quality-undetermined. | All 89 tasks; quality denominator of 12 among the 24 earlier formal `attempt` records; one diagnostic and five long-tail runs excluded from that denominator | Operationally closed; preregistered screening and repeated evaluation incomplete |
-| Preliminary compression comparison | One completed `none`, squeez, Headroom, and LLMLingua-2 condition for each of 26 tasks; 40 passes and 64 `wrong_answer` outcomes | 26 tasks × 4 conditions = 104 condition observations, not 104 independent tasks | Preliminary observations from one first-run task, five tasks whose candidates were confirmed in preserved records, and 20 tasks that link a new `none` run to recovery evidence after the candidate pool was exhausted; representativeness across all 89 tasks, non-inferiority, and population savings are not established |
-| Outcome cost accounting | Exact outcome-cost joins for 9 of the 104 completed conditions, with five long-tail quality-undetermined runs kept separate | Confirmed subtotal for 4 passes and 5 normal failures; 95 remaining conditions unallocated by outcome | Program-wide cost per pass and invoice reconciliation remain undetermined |
-| Preregistered evaluation | Not run | Exact task set to be fixed after screening and `ceil(1,412/K)` repetitions | Not measured |
+| 기존 추가 압축 없는 기준선 | 2026-09-14 UTC에 완료했으나 사전 규칙에 따라 판정 불가 | 목적 선정 5과제 × 20회 = 100 native `trial` | 비공개 원본 집계 측정 |
+| 압축기 정적 적용 | 세 압축기의 입력 크기와 변환 표본 확인 | 저장 요청 56개, 후보 107출현·27고유 입력 | 모델 호출 없는 정적 측정 |
+| Terminal-Bench 2.1 선별 | 이전 제한 정책의 정식 `attempt` 24개 원본 보존; 누적 품질 결과 12개, 완료된 기술 제외 11개, 증거 불완전 1개. 제한 제거 뒤 provider 실행도 수행·종료했으며, 증거가 완결된 26과제는 아래 예비 비교에 연결했다. 장기 꼬리 5개는 채점 전 품질 미확정으로 주 분석에서 제외했다. | 전체 89과제; 기존 정식 `attempt` 24개 중 품질 분모 12개; 단일 진단과 장기 꼬리 5개는 분모 제외 | 운영 종료; 사전 고정 선별·반복 평가 미완료 |
+| 예비 압축 비교 | 26과제에서 `none`·squeez·Headroom·LLMLingua-2 각 1회 완결; pass 40개·wrong_answer 64개 | 26과제 × 4조건 = 104개 조건 관측; 104개 독립 과제가 아님 | 첫 실행 과제 1개, 보존 기록에서 후보를 확인한 5개, 후보 소진 뒤 새 `none` 실행과 복구 증거를 연결한 20개의 예비 관측; 전체 89개 대표성·비열등성·모집단 절감 미확립 |
+| 결과별 비용 집계 | 완결 104조건 중 정확한 결과·비용 결합 9조건, 장기 품질 미확정 5개를 분리 | pass 4개·정상 미통과 5개의 확인 소계; 나머지 95조건은 결과별 미배분 | 프로그램 전체 통과 1건당 비용·실제 청구서 대사 미확정 |
+| 사전 고정 평가 | 미실행 | 선별 뒤 확정될 정확한 과제 집합과 `ceil(1,412/K)`회 반복 | 미측정 |
 
-## Current decisions
+## 현재 결정
 
-- New model execution and experiment restarts stopped after the user's decision at `2026-09-17 23:59 KST`.
-- The public primary analysis is fixed to the 26 tasks and 104 conditions for which all four conditions completed. The five long-tail runs that ended before grading remain quality-undetermined and are not part of the primary analysis.
-- The preregistered repeated evaluation was not run.
-- Any future paid execution requires separate approval and must apply every limit in a schema-version-4 ledger and the [safety policy](execution-safety-policy.md).
+- `2026-09-17 23:59 KST` 사용자 결정 뒤 새 모델 실행과 실험 재시작을 중지했다.
+- 공개 주 분석은 네 조건이 완결된 26과제·104조건으로 고정한다. 채점 전 종료한 장기 꼬리 5개는 품질 미확정이며 주 분석에 넣지 않는다.
+- 사전 고정 반복 평가는 실행하지 않았다.
+- 향후 유료 실행은 별도 승인 뒤 schema version 4 원장과 [안전 정책](execution-safety-policy.md)의 상한을 모두 적용해야 한다.
 
-## Original preregistered plan and conditions for resuming
+## 당시 사전 계획과 향후 재개 조건
 
-The quality and sampling rules below are the plan recorded at the time, not a
-current execution plan. If a separate decision resumes the work, retain these
-rules and also apply the current schema-version-4 safety boundary.
+아래 품질·표본 규칙은 당시 사전 계획이며 현재 실행 계획이 아니다. 향후 재개를
+별도로 결정하면 이 규칙을 유지하되, 실행 경계는 현재 schema version 4 안전 정책을
+함께 적용한다.
 
-- Screen all 89 tasks from the fixed Terminal-Bench 2.1 revision without additional compression.
-- Evaluate only the exact task-ID set that passes at least 18 of up to 20 valid outcomes per task.
-- During evaluation, compare `none`, squeez `1.48.4`, Headroom `0.36.5`, and LLMLingua-2 `0.2.2` at the same insertion point.
-- The allowed quality reduction is 5 percentage points, and the required directly attributable cost reduction is 10%. Both are preregistered policy thresholds.
-- The quality-plan target is 1,412 pairs per comparison, with `ceil(1,412/K)` repetitions per task.
-- Screening can start only after all preparation and preservation checks pass before a model call.
-- A new paid run applies 60 provider HTTP attempts per attempt, 2,048 output tokens, 8,000,000 request bytes, 2,400 elapsed seconds, and preapproved per-attempt and whole-run cost limits and a UTC deadline. External provider constraints and every cost and time measurement are recorded separately.
-- The original plan was to continue the comparison under the existing selection rule through `2026-09-17` and use the real outcomes available by then to set the first-study publication scope. That date was not a process termination timer.
+- Terminal-Bench 2.1 고정 revision의 89과제를 추가 압축 없는 조건으로 선별한다.
+- 과제당 최대 20개 유효 결과 중 18회 이상 통과한 정확한 과제 ID 집합만 평가한다.
+- 평가에서는 `none`, squeez `1.48.4`, Headroom `0.36.5`, LLMLingua-2 `0.2.2`를 같은 위치에서 비교한다.
+- 허용 품질 저하는 5퍼센트포인트, 필요한 직접 귀속 비용 절감은 10%다. 둘 다 사전 정책 문턱이다.
+- 품질 계획 목표는 비교당 1,412쌍이며 과제당 반복 수는 `ceil(1,412/K)`다.
+- 모델 호출 전 준비와 보존 검사가 모두 통과해야 선별을 시작한다.
+- 새 유료 실행에는 attempt당 provider HTTP 시도 60회, 2,048 출력 token, 8,000,000 요청 byte, 2,400초 경과 시간과 사전 승인한 attempt·전체 실행 비용 상한·UTC deadline을 적용한다. 외부 provider 제약과 모든 비용·시간 측정도 별도로 기록한다.
+- 당시 계획은 `2026-09-17`까지 기존 선정 규칙으로 비교를 계속하고, 그때까지 확보한 실제 결과로 1차 공유 범위를 정하는 것이었다. 이 날짜는 process 종료 타이머가 아니었다.
 
-## Document index
+## 문서 색인
 
-### Shared experiment records and contracts
+### 공통 실험 기록과 계약
 
-- [Original first-study protocol](protocol.md): fixed record for the five purpose-selected tasks
-- [Original baseline](baseline.md): results and limits for 100 native `trial` records
-- [Static compressor measurements](compressors.md): size changes and transformation samples for 56 stored requests
-- [Screening protocol](screening-protocol.md): 89-task inventory, 18/20 rule, failures and retries, and the nginx verifier
-- [Evaluation protocol](evaluation-protocol.md): four conditions, quality and cost thresholds, repetition formula, and confidence interval
-- [Reproducibility contract](reproducibility-contract.md): execution evidence, stop and resume behavior, verifier reruns, and Blob retrieval
-- [Next paid-run safety policy](execution-safety-policy.md): call, cost, time, request, and output limits, progress signals, and quality-undetermined termination categories
+- [기존 1차 실험 규약](protocol.md): 목적 선정 5과제 실험의 고정 기록
+- [기존 기준선](baseline.md): 100개 native `trial` 결과와 한계
+- [압축기 정적 측정](compressors.md): 저장 요청 56개의 크기 변화와 변환 표본
+- [선별 규약](screening-protocol.md): 89과제 목록, 18/20 판정, 실패·재시도와 nginx verifier
+- [평가 규약](evaluation-protocol.md): 네 조건, 품질·비용 문턱, 반복 공식과 신뢰구간
+- [재현 계약](reproducibility-contract.md): 실행 증거, 중단·재개, verifier 재실행과 Blob 회수
+- [다음 유료 실행 안전 정책](execution-safety-policy.md): 호출·비용·시간·요청·출력 상한, 진행 신호와 품질 미확정 종료 분류
 
-### First-study materials
+### 1차 공유 자료
 
-- [First-study overview](01-preliminary-comparison/README.md): shareable document that presents the conditions, main observations, and outcome-linked costs in one sequence
-- [Descriptions of the 26 tasks](01-preliminary-comparison/tasks.md): plain descriptions, public pass targets, and time, request, and cost observations for each task
-- [Task-level changed-condition matrix](01-preliminary-comparison/metrics.md): local tokens, verdicts, and costs for 23 changed conditions and their corresponding `none` rows, plus 55 compressed conditions with no change
-- [Experiment-design review appendix](01-preliminary-comparison/experiment-briefing-20260919.md): measurement stages, current conclusions, and the ten experiment-design questions
-- [Lossy and lossless compression guide](01-preliminary-comparison/lossless-lossy-compression-20260919.md): differences among transport compression, caching, and prompt shortening, and the actual recovery boundary of the four conditions
-- [Visualization appendix](01-preliminary-comparison/visualization-guide-20260919.md): ten EDA figures, the measurement flow, and preliminary-comparison charts separated by unit
-- [Plain-language results](01-preliminary-comparison/plain-language-results-20260917.md): findings and limits for 26 tasks and 104 conditions, written for a non-specialist reader
-- [Outcome cost accounting](01-preliminary-comparison/outcome-cost-accounting-20260918.md): passed, normally failed, and pre-judgment costs, including confirmed subtotals and undetermined portions
-- [Outcome cost accounting plan](01-preliminary-comparison/outcome-cost-accounting-plan-20260918.md): planned accounting for passes, normal post-judgment failures, pre-judgment costs, and calculated cost per passing condition
-- [Preliminary-comparison technical evidence](01-preliminary-comparison/preliminary-comparison-20260916.md): condition-level quality, usage, transformations, cost ranges, run identifiers, and source hashes
+- [1차 실험 한 장 요약](01-preliminary-comparison/README.md): 실험 조건, 핵심 관측과 결과별 비용을 한 장 흐름으로 정리한 공유용 문서
+- [1차 실험 26과제 설명](01-preliminary-comparison/tasks.md): 과제별 쉬운 설명, 공개 통과 대상과 네 조건의 시간·요청·비용
+- [과제별 변경 조건 대조표](01-preliminary-comparison/metrics.md): 변경 23조건의 로컬 토큰·판정·비용과 같은 과제 `none`, 변경 0인 압축 조건 55개
+- [실험 설계 검토 부록](01-preliminary-comparison/experiment-briefing-20260919.md): 측정 단계, 현재 결론과 실험 설계 10문항
+- [손실·무손실 압축 안내](01-preliminary-comparison/lossless-lossy-compression-20260919.md): 전송 압축·캐시·prompt 축약의 차이와 네 조건의 실제 복원 범위
+- [시각화 부록](01-preliminary-comparison/visualization-guide-20260919.md): EDA 10개, 측정 흐름과 단위별 예비 비교 차트
+- [공유용 쉬운 설명](01-preliminary-comparison/plain-language-results-20260917.md): 26과제·104조건을 비전문가가 먼저 읽을 수 있게 풀어 쓴 결과와 한계
+- [결과별 비용 집계](01-preliminary-comparison/outcome-cost-accounting-20260918.md): 통과·정상 미통과·품질 판정 전 비용, 확인 소계와 미확정 범위
+- [결과별 비용 집계 계획](01-preliminary-comparison/outcome-cost-accounting-plan-20260918.md): 통과·정상 채점 후 미통과·품질 판정 전 비용과 통과 조건 1건당 계산 비용의 범위
+- [예비 비교 기술 증거](01-preliminary-comparison/preliminary-comparison-20260916.md): 조건별 품질, 사용량, 변환, 비용 범위, 실행 식별자와 원본 해시
 
-### Shared application guidance and decision records
+### 공통 적용 안내와 판단 기록
 
-- [Real-data connection guide](data-connection-guide-20260919.md): procedure for preparing one real task outside the public repository, running a no-call check, executing, and verifying the result
-- [Decision record](decisions.md): fixed decisions and their evidence
+- [실데이터 연결 가이드](data-connection-guide-20260919.md): 고객 원본을 공개 저장소에 올리지 않는 실제 1과제 준비, 무호출 확인, 실행과 결과 검증 절차
+- [판단 기록](decisions.md): 확정한 선택과 근거
 
-## Interpreting document status
+## 문서 상태 해석
 
-The baseline, static application, and preliminary comparison are different
-measurements. Static application made no model call and did not measure quality
-or billed cost. The preliminary comparison has one run per condition and is not
-the preregistered evaluation of all 89 tasks. Do not cite its observed cost
-differences as a causal compression savings rate or an adoption decision.
+기준선, 정적 적용, 예비 비교는 서로 다른 측정이다. 정적 적용은 모델을 호출하지 않았고 품질이나 청구 비용을 재지 않았다. 예비 비교는 조건당 1회이며 전체 89개 과제의 사전 고정 평가가 아니므로, 관측된 비용 차이를 압축의 인과적 절감률이나 도입 판단으로 인용하지 않는다.
 
-Static candidates are an **identified candidate range, not a validated ceiling**.
+정적 후보는 **식별된 후보 범위이지 검증된 상한이 아니다.**
