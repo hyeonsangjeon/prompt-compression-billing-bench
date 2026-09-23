@@ -228,6 +228,7 @@ have not been validated.
 | Provider-backed Cache execution with zero valid cycles and no comparison | [English execution result](docs_en/results/cache-reuse-execution-20260923.md) |
 | Current protocol, baseline, static compressors and open decisions | [Experiment record](docs/experiment/README.md) |
 | Deferred SWE-Lancer candidate evaluation and no-trace boundary | [SWE-Lancer candidate evaluation](docs/experiment/swe-lancer-candidate-evaluation-20260920.md) |
+| SWE-Lancer fixed trace with zero valid protocol traces and zero provider calls | [English fixed-trace result](docs_en/results/swe-lancer-fixed-trace-20260923.md) |
 | Unsupported paths and readiness gaps | [Status](STATUS.md) |
 | What may be shared and what stays private | [Publication grades](docs/publication.md) |
 | Third-party provenance and exact license copies | [Third-party notices](THIRD_PARTY_NOTICES.md) |

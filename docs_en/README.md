@@ -21,6 +21,10 @@ part of its byte-identity inventory:
   actual provider execution reached 18 successful calls, but the attempted
   cycle was invalid and produced zero valid cycles, so no cache comparison was
   produced.
+- [SWE-Lancer fixed-trace result](results/swe-lancer-fixed-trace-20260923.md) —
+  two runner groups breached the one-execution contract and both timed out
+  during sandbox startup, before any provider or grader call; zero valid
+  protocol traces were produced.
 
 Current English-only implementation guides remain at their established paths:
 

@@ -76,6 +76,8 @@ PUBLIC_FILES = {
     "docs_en/publication.md", "docs_en/static-contract.md",
     "docs_en/results/cache-reuse-execution-20260923.md",
     "tests/test_cache_execution_report.py",
+    "docs_en/results/swe-lancer-fixed-trace-20260923.md",
+    "tests/test_swe_lancer_fixed_trace_report.py",
     "docs/experiment/README.md", "docs/experiment/protocol.md", "docs/experiment/baseline.md",
     "docs/experiment/compressors.md", "docs/experiment/decisions.md",
     "docs/experiment/screening-protocol.md", "docs/experiment/evaluation-protocol.md",
