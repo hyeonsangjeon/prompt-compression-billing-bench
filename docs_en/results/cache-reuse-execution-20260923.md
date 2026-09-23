@@ -58,6 +58,13 @@ and tree `63f969519c93a58faf800ed91cc464f9b955fe2b`.
 | Item | Sealed condition |
 |---|---|
 | Source | Commit `e78a32edca9d5ce4f991700e3a299d72164e94be`; tree `63f969519c93a58faf800ed91cc464f9b955fe2b` |
+| Execution window | The sealed public-safe evidence available for this report does not retain an execution date/time window or timezone. The run-manifest hash is preserved below; no timestamp was inferred from publication or chat metadata. |
+| Provider and model | Provider `foundry`; model `gpt-5.4`; provider-reported revision `gpt-5.4-2026-03-05` |
+| API and endpoint type | `openai_v1_chat_completions` through a project-scoped Foundry endpoint binding; the endpoint value and resource identifier are not published |
+| Generation settings | Temperature `0`; reasoning effort `none`; `determinism_claimed=false`. Temperature `0` does not establish deterministic request counts. |
+| Runtime boundary | Project-owned private Linux runtime using managed identity; serial concurrency `1`; hash-bound namespace/isolation and external-matching-traffic evidence. Runtime names, identifiers, paths, and endpoint values are not published. |
+| Judge account | The native task verifier applied only to completed task trials; `3/5` is descriptive for those five trials. The sealed report contains no evidence of independent judge validation. |
+| Fixed price source | Admitted fixed schedule checked at `2026-09-22T14:30:31.954Z`; its source reference is retained privately and bound by the cache/native ledger SHA-256 values below. No separate source reference is published. |
 | Conditions | `{none, squeez}` |
 | Reuse levels | `{0, 1, 2}`, ordered `0 -> 1 -> 2` |
 | Task population | Five fixed tasks in every cell; two eligible and three `not_applicable` for the primary cache denominator |

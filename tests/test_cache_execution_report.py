@@ -79,6 +79,34 @@ class CacheExecutionReportTests(unittest.TestCase):
         self.assertNotIn(REPORT_RELATIVE, pages["source_allowlist"])
         self.assertNotIn(REPORT_RELATIVE, snapshot)
 
+    def test_measurement_conditions_preserve_runtime_and_judging_contract(self):
+        conditions = self.report.split("## Measurement conditions", 1)[1].split(
+            "\n## ", 1
+        )[0]
+        protected_conditions = (
+            "The sealed public-safe evidence available for this report does not "
+            "retain an execution date/time window or timezone.",
+            "Provider `foundry`; model `gpt-5.4`; provider-reported revision "
+            "`gpt-5.4-2026-03-05`",
+            "`openai_v1_chat_completions` through a project-scoped Foundry endpoint binding",
+            "Temperature `0`; reasoning effort `none`; `determinism_claimed=false`.",
+            "Project-owned private Linux runtime using managed identity; serial concurrency `1`",
+            "hash-bound namespace/isolation and external-matching-traffic evidence",
+            "The native task verifier applied only to completed task trials; `3/5` is descriptive",
+            "The sealed report contains no evidence of independent judge validation.",
+            "Admitted fixed schedule checked at `2026-09-22T14:30:31.954Z`",
+            "bound by the cache/native ledger SHA-256 values below",
+        )
+        for literal in protected_conditions:
+            with self.subTest(literal=literal):
+                self.assertIn(literal, conditions)
+
+        self.assertIn(
+            "Temperature `0` was configured, but that setting does not establish "
+            "deterministic request counts.",
+            " ".join(self.report.split()),
+        )
+
     def test_report_links_resolve_and_private_shapes_are_absent(self):
         links = re.findall(r"(?<!!)\[[^\]]+\]\(([^)#]+)(?:#[^)]+)?\)", self.report)
         self.assertEqual(links, ["../../docs/cache-reuse.md"])
