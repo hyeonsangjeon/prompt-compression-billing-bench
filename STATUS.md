@@ -21,10 +21,15 @@ The static first-page renderer, independent Markdown comparison, repository-pref
 HTTP simulation and configured Chromium viewport checks are implemented. The
 repository still does not enable or deploy GitHub Pages.
 
-The fixed one-task SWE-Lancer candidate reached its bounded execution gate once
-and was deferred. Source, catalog, task-row, runtime and image-manifest pins
-matched, but credential, provider-price/revision and isolated-sandbox admission
-did not. No worker, model, provider request, trace or grader started.
+The historical one-task SWE-Lancer no-trace admission remains preserved. A
+later project-owned carrier passed admission, but the fixed-trace execution
+produced zero valid protocol traces. Two runner groups appeared against the
+one-execution contract, and both timed out during sandbox startup before a
+provider request or grader call. The first followed a failed initial
+pre-dispatch verification; the guarded second start observed
+`allow_internet=true` despite `disable_internet=true` being configured. The
+result is protocol-invalid, cleanup survivors were zero, and the VM was
+deallocated.
 
 The Project 15 Cache path passed its current admission and reached provider
 execution. It stopped during the first attempted cycle after 18 successful
@@ -43,7 +48,7 @@ was deallocated.
 | 2. One execution ledger | **Implemented; compressor execution pending** | Static and opt-in native ledgers fix their distinct paths. The native path checks committed source, benchmark files, image/dependency pins, four condition profiles, the eight-worker LLMLingua pool with complete candidate input, wire settings, one persistent cooperative deployment queue and managed-identity result retrieval. Historical preliminary native records have no harness dollar, call-count, output, request-size or phase/run-time stop and are not rewritten. Schema v4 governs future provider execution and requires provider-call, output-token, request-size, attempt-wall and progress boundaries plus positive per-attempt and whole-run calculated-cost ceilings and a future UTC deadline, all approved together. The none baseline used an approved historical ledger; the public template remains deliberately unapproved. External-caller isolation is not automatically verified. |
 | 3. Record provenance | **Implemented for static runs, the none baseline and the accountless proof** | Each row separates provider usage, local counts, calculated deltas, classification and invoice-unreconciled cost. The accountless record binds task, source, config, model assets and runtime hashes and labels measured/synthetic/projected status. The measured baseline records source SHA and exact snapshots. Old sanitized native evidence has no source SHA and is not retroactively upgraded. |
 | 4. Drift safeguards | **Rule executed; baseline inconclusive** | The five-repetition gate allowed collection to continue, the 10-repetition halves differed, and the total-20 halves still differed. The rule stopped comparison as inconclusive. These operational rules are not proof of statistical stability or equivalence. Private raw measurements cannot be rerun by public CI. |
-| 5. Unsupported cases | **Explicit, not solved** | A narrow source-bound live log classifier and Terminal adapter exist. A disabled same-host squeez recovery contract now verifies source bytes and local lifecycle controls, but it is not an agent-visible service. The one-task SWE-Lancer candidate evaluation closed as deferred after a fail-closed preflight; it produced no trace or grader result. No general benchmark adapter, DeepSWE execution, semantic log-preservation proof or recovery-cost result exists. Native judge subcheck gaps remain disclosed, not regraded away. |
+| 5. Unsupported cases | **Explicit, not solved** | A narrow source-bound live log classifier and Terminal adapter exist. A disabled same-host squeez recovery contract now verifies source bytes and local lifecycle controls, but it is not an agent-visible service. The later SWE-Lancer fixed-trace attempt is preserved as protocol-invalid: two sandbox startups timed out, zero provider or grader calls occurred, and no valid trace or quality result exists. No general benchmark adapter, DeepSWE execution, semantic log-preservation proof or recovery-cost result exists. Native judge subcheck gaps remain disclosed, not regraded away. |
 | 6. Layered README | **Implemented** | Scope first, chart/method limits next, the cached accountless command and boundary, then provider/native details behind links. The local static first page preserves its source hierarchy without adding an independent result summary. The static renderer does not itself prove the accountless result or deploy GitHub Pages. |
 | 7. Terminology | **Implemented** | Candidate range, message-content denominator, tool display, local tokenizer and unavailable billing are defined at use. No tool display is named a billed-token result. |
 | 8. Failure paths | **Partial** | The accountless path distinguishes preflight, native non-pass, execution failure and run-ID collision; it enforces 300-second attempt, 120-second no-progress and zero-retry limits. Missing dependencies/resources, dirty/wrong source, cross-worker verification-input drift, malformed partitions, explicit process/tool exits and invalid UTF-8 stop explicitly elsewhere. The disabled squeez recovery path also distinguishes exit-zero not-found, rejects identity, expiry, replay and quota failures before supplier execution, and refuses unsafe cleanup. Future schema-v4 provider execution additionally enforces call, output, request-size, attempt-wall, progress, calculated-cost and UTC-deadline boundaries; these safety stops remain technical incomplete with unknown quality, not wrong answers. Historical comparison records remain unchanged. Blob failures preserve an atomic local payload for retry/resume and block a complete status; collection-host checksum verification and VM cleanup remain external conditions for each future run. |
@@ -60,7 +65,7 @@ was deallocated.
 - Validate tool-specific semantic anchors during the comparison; result retrieval is separate from an agent-visible recovery experiment and has no recovery-token claim.
 - Keep the local recovery template disabled unless an operator supplies a transactional authorization and quota store. Multi-user or remote exposure is a separate operational scope, not a claim of the completed same-host contract.
 - Port the remaining EDA/classification pipelines away from private layouts and review their figure/table data. Only the reviewed candidate-share aggregate renderer is in this source layout.
-- If SWE-Lancer is revisited, provide a task-owned Docker/Alcatraz endpoint, verify credential permission without recording its value, pin the official model revision and prices, and rerun the same task with a fresh deadline. This is a separate follow-up, not an unrecorded success condition for the completed candidate evaluation.
+- If SWE-Lancer is revisited under a separate project item, first enforce the one-execution gate, make the task-container internet-disabled predicate fail closed, and isolate the sandbox startup timeout. The current two-group result cannot be continued or reclassified as a valid trace.
 
 ## Owner decisions outside this technical release
 
@@ -96,6 +101,8 @@ do not deploy the generated site.
 See [SWE-Lancer candidate evaluation](docs/experiment/swe-lancer-candidate-evaluation-20260920.md)
 for the one-task fail-closed observation, the zero-request boundary and the
 conditions required before any future trace attempt.
+See the [SWE-Lancer fixed-trace result](docs_en/results/swe-lancer-fixed-trace-20260923.md)
+for the later protocol-invalid sandbox-startup outcome and its zero-call boundary.
 See [Accountless native quickstart](docs/accountless-native.md) for the measured
 cached boundary, the preserved recorder red, source rights and exit diagnostics.
 
