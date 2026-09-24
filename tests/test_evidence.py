@@ -6,7 +6,30 @@ import unittest
 from pathlib import Path
 
 from accounting import totals
-from evidence import audit_files, check, repeat_result_text, result_text, timing_comparison_text, validate_public_files
+from evidence import PUBLIC_FILES, audit_files, check, repeat_result_text, result_text, timing_comparison_text, validate_public_files
+
+
+FOLLOW_UP_PUBLIC_FILES = (
+    "docs/experiment/02-follow-up/README.md",
+    "docs/experiment/02-follow-up/cache-reuse/README.md",
+    "docs/experiment/02-follow-up/swe-lancer/README.md",
+    "docs_en/experiment/02-follow-up/README.md",
+    "docs_en/experiment/02-follow-up/cache-reuse/README.md",
+    "docs_en/experiment/02-follow-up/cache-reuse/execution-20260923.md",
+    "docs_en/experiment/02-follow-up/swe-lancer/README.md",
+    "docs_en/experiment/02-follow-up/swe-lancer/fixed-trace-20260923.md",
+    "docs_en/results/cache-reuse-execution-20260923.md",
+    "docs_en/results/swe-lancer-fixed-trace-20260923.md",
+    "src/cache_execution_figure.py",
+    "src/swe_protocol_figure.py",
+    "figures/follow-up/cache-execution-denominators-ko.svg",
+    "figures/follow-up/cache-execution-denominators-en.svg",
+    "figures/follow-up/swe-protocol-outcome-ko.svg",
+    "figures/follow-up/swe-protocol-outcome-en.svg",
+    "tests/test_cache_execution_figure.py",
+    "tests/test_swe_protocol_figure.py",
+    "tests/test_follow_up_figure_display_binding.py",
+)
 
 
 class EvidenceContractTests(unittest.TestCase):
@@ -107,6 +130,16 @@ class PublicationAuditTests(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("synthetic publication-boundary fixture\n")
         return path
+
+    def test_follow_up_files_are_explicitly_graded_but_not_pages_sources(self):
+        source_root = Path(__file__).resolve().parents[1]
+        publication = (source_root / "docs/publication.md").read_text(encoding="utf-8")
+        pages = json.loads((source_root / "config/pages-static.json").read_text(encoding="utf-8"))
+        for relative_path in FOLLOW_UP_PUBLIC_FILES:
+            with self.subTest(path=relative_path):
+                self.assertIn(relative_path, PUBLIC_FILES)
+                self.assertIn(f"`{relative_path}`", publication)
+                self.assertNotIn(relative_path, pages["source_allowlist"])
 
     def test_known_private_requests_are_ignored_but_not_publishable(self):
         for relative_path in ("prompt_eda_round2.md", "prompt_eda_round2 (1).md", "prompt_design_final.md", "prompt_repo_first_commit.md"):

@@ -5,6 +5,12 @@ This public-source layout includes an inconclusive measured none baseline and a
 but not the preregistered repeated evaluation. Static compressor measurements
 remain separate from native quality.
 
+The current documentation entry is the [follow-up study](docs/experiment/02-follow-up/README.md),
+with independent [Cache reuse](docs/experiment/02-follow-up/cache-reuse/README.md)
+and [SWE-Lancer](docs/experiment/02-follow-up/swe-lancer/README.md) summaries. The
+[Korean](docs/experiment/README.md) and [English](docs_en/experiment/README.md)
+experiment indexes remain preserved historical records rather than current status pages.
+
 The cached accountless quickstart now has a real offline local-model invocation
 and exact-answer native verdict. Its corrected integrated run completed in 7.761
 seconds with `wrong_format`; that result establishes path completion, not model
@@ -29,7 +35,8 @@ provider request or grader call. The first followed a failed initial
 pre-dispatch verification; the guarded second start observed
 `allow_internet=true` despite `disable_internet=true` being configured. The
 result is protocol-invalid, cleanup survivors were zero, and the VM was
-deallocated.
+deallocated. The [complete measured report](docs_en/experiment/02-follow-up/swe-lancer/fixed-trace-20260923.md)
+retains the exact conditions and quotation boundary.
 
 The Project 15 Cache path passed its current admission and reached provider
 execution. It stopped during the first attempted cycle after 18 successful
@@ -38,7 +45,8 @@ its reuse-0 predecessor had only two requests. The cycle was invalid, the valid
 cycle denominator was zero, and no cache comparison or Cache-effect estimate
 was produced. The partial-cycle cached-input value of zero is provider usage,
 not a miss rate. No replacement ran, cleanup survivors were zero, and the VM
-was deallocated.
+was deallocated. The [complete measured report](docs_en/experiment/02-follow-up/cache-reuse/execution-20260923.md)
+retains the exact denominators and non-claims.
 
 ## Nine checks
 
@@ -101,7 +109,7 @@ do not deploy the generated site.
 See [SWE-Lancer candidate evaluation](docs/experiment/swe-lancer-candidate-evaluation-20260920.md)
 for the one-task fail-closed observation, the zero-request boundary and the
 conditions required before any future trace attempt.
-See the [SWE-Lancer fixed-trace result](docs_en/results/swe-lancer-fixed-trace-20260923.md)
+See the [SWE-Lancer fixed-trace result](docs_en/experiment/02-follow-up/swe-lancer/fixed-trace-20260923.md)
 for the later protocol-invalid sandbox-startup outcome and its zero-call boundary.
 See [Accountless native quickstart](docs/accountless-native.md) for the measured
 cached boundary, the preserved recorder red, source rights and exit diagnostics.

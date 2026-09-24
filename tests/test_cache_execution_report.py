@@ -7,8 +7,10 @@ from evidence import PUBLIC_FILES
 
 
 ROOT = Path(__file__).resolve().parents[1]
-REPORT_PATH = ROOT / "docs_en/results/cache-reuse-execution-20260923.md"
+REPORT_PATH = ROOT / "docs_en/experiment/02-follow-up/cache-reuse/execution-20260923.md"
 REPORT_RELATIVE = REPORT_PATH.relative_to(ROOT).as_posix()
+LEGACY_PATH = ROOT / "docs_en/results/cache-reuse-execution-20260923.md"
+LEGACY_RELATIVE = LEGACY_PATH.relative_to(ROOT).as_posix()
 TEST_RELATIVE = "tests/test_cache_execution_report.py"
 
 EVIDENCE_HASHES = {
@@ -71,13 +73,25 @@ class CacheExecutionReportTests(unittest.TestCase):
         pages = json.loads((ROOT / "config/pages-static.json").read_text(encoding="utf-8"))
 
         self.assertIn(f"]({REPORT_RELATIVE})", root_readme)
-        self.assertIn("](results/cache-reuse-execution-20260923.md)", english_index)
+        self.assertIn("](experiment/02-follow-up/cache-reuse/execution-20260923.md)", english_index)
         self.assertIn("valid cycle denominator was zero", " ".join(status.split()))
         self.assertIn(REPORT_RELATIVE, publication)
+        self.assertIn(LEGACY_RELATIVE, publication)
         self.assertIn(REPORT_RELATIVE, PUBLIC_FILES)
+        self.assertIn(LEGACY_RELATIVE, PUBLIC_FILES)
         self.assertIn(TEST_RELATIVE, PUBLIC_FILES)
         self.assertNotIn(REPORT_RELATIVE, pages["source_allowlist"])
         self.assertNotIn(REPORT_RELATIVE, snapshot)
+
+    def test_legacy_url_is_one_hop_notice_to_the_complete_report(self):
+        notice = LEGACY_PATH.read_text(encoding="utf-8")
+        links = re.findall(r"(?<!!)\[[^\]]+\]\(([^)#]+)(?:#[^)]+)?\)", notice)
+        self.assertEqual(links, ["../experiment/02-follow-up/cache-reuse/execution-20260923.md"])
+        self.assertEqual((LEGACY_PATH.parent / links[0]).resolve(), REPORT_PATH.resolve())
+        self.assertEqual(notice.count("]("), 1)
+        self.assertIn("one-hop compatibility notice", notice)
+        self.assertNotIn("| Cycles |", notice)
+        self.assertNotIn("65,423", notice)
 
     def test_measurement_conditions_preserve_runtime_and_judging_contract(self):
         conditions = self.report.split("## Measurement conditions", 1)[1].split(
@@ -109,7 +123,7 @@ class CacheExecutionReportTests(unittest.TestCase):
 
     def test_report_links_resolve_and_private_shapes_are_absent(self):
         links = re.findall(r"(?<!!)\[[^\]]+\]\(([^)#]+)(?:#[^)]+)?\)", self.report)
-        self.assertEqual(links, ["../../docs/cache-reuse.md"])
+        self.assertEqual(links, ["../../../../docs/cache-reuse.md"])
         for target in links:
             self.assertTrue((REPORT_PATH.parent / target).resolve().is_file())
 

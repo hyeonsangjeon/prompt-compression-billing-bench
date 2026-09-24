@@ -1,8 +1,19 @@
 # prompt-compression-billing-bench
 
-Documentation: [Korean experiment records](docs/experiment/README.md) ·
+Documentation: [current Korean follow-up](docs/experiment/02-follow-up/README.md) ·
+[current English follow-up](docs_en/experiment/02-follow-up/README.md) ·
+[Korean experiment records](docs/experiment/README.md) (preserved historical index) ·
 [English GBB documentation](docs_en/README.md) ·
 [snapshot provenance](docs_en/SNAPSHOT.md)
+
+The current follow-up keeps its two attempted studies separate:
+[Cache reuse (한국어)](docs/experiment/02-follow-up/cache-reuse/README.md) ·
+[Cache reuse (English)](docs_en/experiment/02-follow-up/cache-reuse/README.md) ·
+[SWE-Lancer (한국어)](docs/experiment/02-follow-up/swe-lancer/README.md) ·
+[SWE-Lancer (English)](docs_en/experiment/02-follow-up/swe-lancer/README.md).
+The [Korean](docs/experiment/README.md) and
+[English](docs_en/experiment/README.md) experiment indexes are preserved historical
+records; their older status text is not the current follow-up entry.
 
 ## In three seconds
 
@@ -38,10 +49,10 @@ then use the [plain-language Korean summary](docs/experiment/01-preliminary-comp
 the [Korean experiment-design appendix](docs/experiment/01-preliminary-comparison/experiment-briefing-20260919.md)
 and [plain-language visualization guide](docs/experiment/01-preliminary-comparison/visualization-guide-20260919.md),
 then use the [technical evidence report](docs/experiment/01-preliminary-comparison/preliminary-comparison-20260916.md)
-for condition-level figures, run identifiers and hashes. The broader
+for condition-level figures, run identifiers and hashes. The preserved historical
 [experiment record (Korean)](docs/experiment/README.md) separates the fixed protocol,
 the measured none baseline, static compressor measurements, preliminary comparison
-and open decisions. The none baseline completed 20 repetitions but stopped
+and open decisions as recorded before the current follow-up. The none baseline completed 20 repetitions but stopped
 inconclusive under its predeclared rule; the preliminary comparison is one run per
 condition, not the preregistered repeated evaluation.
 
@@ -225,10 +236,11 @@ have not been validated.
 | Accountless native execution and historical evidence | [Local native runner](docs/local-native.md) |
 | Opt-in Foundry path, workload metrics and proposed baseline rule | [Native contract](docs/native-contract.md) |
 | Hash-bound cache runtime launcher and its still-required owner context | [Cache reuse contract](docs/cache-reuse.md) |
-| Provider-backed Cache execution with zero valid cycles and no comparison | [English execution result](docs_en/results/cache-reuse-execution-20260923.md) |
-| Current protocol, baseline, static compressors and open decisions | [Experiment record](docs/experiment/README.md) |
+| Provider-backed Cache execution with zero valid cycles and no comparison | [Complete English execution result](docs_en/experiment/02-follow-up/cache-reuse/execution-20260923.md) |
+| Current follow-up study and separate Cache/SWE reading paths | [한국어](docs/experiment/02-follow-up/README.md) · [English](docs_en/experiment/02-follow-up/README.md) |
+| Historical protocol, baseline, static compressors and open decisions | [Preserved experiment record](docs/experiment/README.md) |
 | Deferred SWE-Lancer candidate evaluation and no-trace boundary | [SWE-Lancer candidate evaluation](docs/experiment/swe-lancer-candidate-evaluation-20260920.md) |
-| SWE-Lancer fixed trace with zero valid protocol traces and zero provider calls | [English fixed-trace result](docs_en/results/swe-lancer-fixed-trace-20260923.md) |
+| SWE-Lancer fixed trace with zero valid protocol traces and zero provider calls | [Complete English fixed-trace result](docs_en/experiment/02-follow-up/swe-lancer/fixed-trace-20260923.md) |
 | Unsupported paths and readiness gaps | [Status](STATUS.md) |
 | What may be shared and what stays private | [Publication grades](docs/publication.md) |
 | Third-party provenance and exact license copies | [Third-party notices](THIRD_PARTY_NOTICES.md) |
