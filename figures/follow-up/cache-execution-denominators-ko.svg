@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="900" viewBox="0 0 1040 900" role="img" aria-labelledby="title desc">
+<title id="title">Cache 실행 분모와 무효 중단</title>
+<desc id="desc">사이클, 실행 묶음, 과제 실행의 계획과 관측을 서로 다른 단위로 표시하고, 선행 요청이 없었던 논리 요청 순번 3의 제공자 전송 전 중단을 보인다.</desc>
+<metadata>source-report-sha256:9c07682a067aea18d253c869f5fe0711dc3c695de5b1636b7bfe7d95b0f907f3</metadata>
+<rect width="1040" height="900" fill="#ffffff"/>
+<g font-family="sans-serif" font-variant-numeric="tabular-nums">
+<text x="30" y="42" font-size="27" font-weight="700" fill="#17202a">Cache 실행 분모와 무효 중단</text>
+<text x="30" y="72" font-size="17" font-weight="400" fill="#44515f">첫 불완전 무효 사이클 · 단위별 계획과 관측</text>
+<text x="30" y="112" font-size="20" font-weight="700" fill="#17202a">1. 단위별 분모</text>
+<rect x="30" y="130" width="300" height="205" rx="12" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
+<text x="48" y="162" font-size="21" font-weight="700" fill="#17202a">사이클</text>
+<text x="48" y="194" font-size="17" font-weight="700" fill="#2457a6">계획 · 유효 10개</text>
+<text x="48" y="230" font-size="16" font-weight="400" fill="#17202a">관측 · 1개 시도</text>
+<text x="48" y="260" font-size="16" font-weight="400" fill="#17202a">0개 유효 (관측)</text>
+<text x="48" y="290" font-size="16" font-weight="400" fill="#17202a">1개 무효 · 대체 0개</text>
+<rect x="370" y="130" width="300" height="205" rx="12" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
+<text x="388" y="162" font-size="21" font-weight="700" fill="#17202a">실행 묶음</text>
+<text x="388" y="194" font-size="17" font-weight="700" fill="#2457a6">계획 · 60개</text>
+<text x="388" y="230" font-size="16" font-weight="400" fill="#17202a">관측 · 2개 시작</text>
+<text x="388" y="260" font-size="16" font-weight="400" fill="#17202a">1개 완결</text>
+<text x="388" y="290" font-size="16" font-weight="400" fill="#17202a">1개 미완결·무효</text>
+<rect x="710" y="130" width="300" height="205" rx="12" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
+<text x="728" y="162" font-size="21" font-weight="700" fill="#17202a">과제 실행</text>
+<text x="728" y="194" font-size="17" font-weight="700" fill="#2457a6">계획 · 300개</text>
+<text x="728" y="230" font-size="16" font-weight="400" fill="#17202a">관측 · 6개 시작</text>
+<text x="728" y="260" font-size="16" font-weight="400" fill="#17202a">5개 완결</text>
+<text x="728" y="290" font-size="16" font-weight="400" fill="#17202a">1개 미완결</text>
+<text x="30" y="385" font-size="20" font-weight="700" fill="#17202a">2. 논리 요청 순번 3에서 중단</text>
+<rect x="30" y="405" width="225" height="145" rx="10" fill="#ffffff" stroke="#52708f" stroke-width="2"/>
+<text x="142" y="442" font-size="16" font-weight="700" fill="#17202a" text-anchor="middle">none · 재사용 0</text>
+<text x="142" y="476" font-size="16" font-weight="400" fill="#17202a" text-anchor="middle">실행 묶음 완결</text>
+<text x="142" y="510" font-size="16" font-weight="400" fill="#17202a" text-anchor="middle">선행 요청 2개</text>
+<path d="M259,478 H275" stroke="#44515f" stroke-width="3"/>
+<path d="M275,478 l-8,-6 v12 z" fill="#44515f"/>
+<rect x="280" y="405" width="225" height="145" rx="10" fill="#ffffff" stroke="#52708f" stroke-width="2"/>
+<text x="392" y="442" font-size="16" font-weight="700" fill="#17202a" text-anchor="middle">none · 재사용 1</text>
+<text x="392" y="476" font-size="16" font-weight="400" fill="#17202a" text-anchor="middle">cancel-async-tasks</text>
+<text x="392" y="510" font-size="16" font-weight="400" fill="#17202a" text-anchor="middle">현재 순번 3 도달</text>
+<path d="M509,478 H525" stroke="#44515f" stroke-width="3"/>
+<path d="M525,478 l-8,-6 v12 z" fill="#44515f"/>
+<rect x="530" y="405" width="225" height="145" rx="10" fill="#ffffff" stroke="#b45309" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="642" y="442" font-size="16" font-weight="700" fill="#17202a" text-anchor="middle">비교할 선행 요청 없음</text>
+<text x="642" y="476" font-size="16" font-weight="400" fill="#17202a" text-anchor="middle">재사용 0에는</text>
+<text x="642" y="510" font-size="16" font-weight="400" fill="#17202a" text-anchor="middle">순번 3 요청이 없음</text>
+<path d="M759,478 H775" stroke="#44515f" stroke-width="3"/>
+<path d="M775,478 l-8,-6 v12 z" fill="#44515f"/>
+<rect x="780" y="405" width="225" height="145" rx="10" fill="#ffffff" stroke="#b45309" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="892" y="442" font-size="16" font-weight="700" fill="#17202a" text-anchor="middle">제공자 전송 전 거부</text>
+<text x="892" y="476" font-size="16" font-weight="400" fill="#17202a" text-anchor="middle">접두부 비교·길이</text>
+<text x="892" y="510" font-size="16" font-weight="400" fill="#17202a" text-anchor="middle">측정하지 않음</text>
+<text x="30" y="605" font-size="20" font-weight="700" fill="#17202a">3. 무효 부분 실행의 설명값</text>
+<rect x="30" y="625" width="300" height="120" rx="10" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
+<text x="48" y="657" font-size="16" font-weight="700" fill="#17202a">성공한 제공자 호출</text>
+<text x="48" y="691" font-size="20" font-weight="700" fill="#2457a6">18회</text>
+<text x="48" y="722" font-size="16" font-weight="400" fill="#44515f">조건·재사용 비교 아님</text>
+<rect x="370" y="625" width="300" height="120" rx="10" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
+<text x="388" y="657" font-size="16" font-weight="700" fill="#17202a">완결 과제 실행 품질</text>
+<text x="388" y="691" font-size="20" font-weight="700" fill="#2457a6">3/5 통과</text>
+<text x="388" y="722" font-size="16" font-weight="400" fill="#44515f">조건별 품질 비교 아님</text>
+<rect x="710" y="625" width="300" height="120" rx="10" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
+<text x="728" y="657" font-size="16" font-weight="700" fill="#17202a">과제 층</text>
+<text x="728" y="684" font-size="20" font-weight="700" fill="#2457a6">대상 2</text>
+<text x="728" y="709" font-size="20" font-weight="700" fill="#2457a6">not_applicable 3</text>
+<text x="728" y="735" font-size="16" font-weight="400" fill="#44515f">서로 다른 상태</text>
+<rect x="30" y="775" width="980" height="95" rx="10" fill="#fff7ed" stroke="#b45309" stroke-width="2"/>
+<text x="50" y="811" font-size="16" font-weight="700" fill="#7c2d12">cached input 0 tokens · API 사용량이며 미스율 또는 Cache 효과 추정값이 아님</text>
+<text x="50" y="847" font-size="16" font-weight="700" fill="#7c2d12">유효 사이클 0개 · Cache 효과, 절감, 순위, 재사용 대비, 안정성은 계산하지 않음</text>
+</g></svg>
