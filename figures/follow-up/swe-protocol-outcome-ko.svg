@@ -1,59 +1,56 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="970" viewBox="0 0 1040 970" role="img" aria-labelledby="title desc">
-<title id="title">SWE-Lancer 프로토콜 무효 실행과 정리</title>
-<desc id="desc">계획한 고정 실행 1회와 관측된 실행 결과 묶음 2개를 순서대로 보이고, 검증 실패, 네트워크 설정 모순, 시작 시간 초과와 측정되지 않은 상태를 분리한다.</desc>
-<metadata>source-report-sha256:fbb6c7feae38c5fefc6251c5445116099af945284f6b5825a56e4a3213ba4ea4</metadata>
-<rect width="1040" height="970" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="1408" viewBox="0 0 390 1408" role="img" aria-labelledby="title desc">
+<title id="title">SWE-Lancer 실행: 유효 기록과 모델 평가 전 중단</title>
+<desc id="desc">고정 실행 1회 계획과 관측된 실행 결과 묶음 2개를 순서대로 보여 준다. 두 묶음은 모두 모델·채점기 호출 전 격리 실행 환경 시작 시간 초과로 끝났다.</desc>
+<metadata>source-report-sha256:1c7308daf6e8066d28e809f86c3bb5373081e4a3066713f128e4079945de0301</metadata>
+<rect width="390" height="1408" fill="#ffffff"/>
 <g font-family="sans-serif" font-variant-numeric="tabular-nums">
-<text x="30" y="42" font-size="27" font-weight="700" fill="#17202a">SWE-Lancer 프로토콜 무효 실행과 정리</text>
-<text x="30" y="72" font-size="17" font-weight="400" fill="#44515f">고정 후보 28565_1001 · 유효 프로토콜 실행 기록 0개</text>
-<rect x="30" y="100" width="300" height="62" rx="10" fill="#f7f9fb" stroke="#2457a6" stroke-width="2"/>
-<text x="180" y="139" font-size="17" font-weight="700" fill="#2457a6" text-anchor="middle">계획 · 고정 실행 1회</text>
-<rect x="370" y="100" width="300" height="62" rx="10" fill="#f7f9fb" stroke="#7c3aed" stroke-width="2"/>
-<text x="520" y="139" font-size="17" font-weight="700" fill="#7c3aed" text-anchor="middle">관측 · 실행 결과 묶음 2개</text>
-<rect x="710" y="100" width="300" height="62" rx="10" fill="#f7f9fb" stroke="#b45309" stroke-width="2"/>
-<text x="860" y="139" font-size="17" font-weight="700" fill="#b45309" text-anchor="middle">유효 기록 · 0개 (관측)</text>
-<rect x="30" y="200" width="460" height="280" rx="12" fill="#fffaf5" stroke="#b45309" stroke-width="2" stroke-dasharray="8 5"/>
-<text x="52" y="238" font-size="21" font-weight="700" fill="#b45309">실행 결과 묶음 1</text>
-<text x="52" y="278" font-size="17" font-weight="700" fill="#17202a">초기 검증 27/29</text>
-<text x="52" y="317" font-size="17" font-weight="400" fill="#17202a">실패 · task.row</text>
-<text x="52" y="356" font-size="17" font-weight="400" fill="#17202a">실패 · image.config</text>
-<text x="52" y="395" font-size="17" font-weight="400" fill="#17202a">격리 실행 환경 시작 시간 초과</text>
-<rect x="550" y="200" width="460" height="280" rx="12" fill="#fffaf5" stroke="#b42318" stroke-width="2" stroke-dasharray="8 5"/>
-<text x="572" y="238" font-size="21" font-weight="700" fill="#b42318">실행 결과 묶음 2</text>
-<text x="572" y="278" font-size="17" font-weight="700" fill="#17202a">보정 뒤 검증 31/31</text>
-<text x="572" y="317" font-size="17" font-weight="400" fill="#17202a">1회 실행 규칙 위반</text>
-<text x="572" y="356" font-size="17" font-weight="400" fill="#17202a">설정 · disable_internet=true</text>
-<text x="572" y="395" font-size="17" font-weight="400" fill="#17202a">관측 · allow_internet=true</text>
-<text x="572" y="434" font-size="17" font-weight="400" fill="#17202a">격리 실행 환경 시작 시간 초과</text>
-<path d="M500,340 H535" stroke="#44515f" stroke-width="3"/>
-<path d="M545,340 l-10,-7 v14 z" fill="#44515f"/>
-<text x="30" y="530" font-size="20" font-weight="700" fill="#17202a">관측 단위와 상태</text>
-<rect x="30" y="555" width="300" height="120" rx="10" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
-<text x="48" y="586" font-size="17" font-weight="700" fill="#17202a">격리 실행 환경</text>
-<text x="48" y="621" font-size="16" font-weight="700" fill="#2457a6">시작 2 · 준비 0</text>
-<text x="48" y="653" font-size="16" font-weight="400" fill="#44515f">시간 초과 2</text>
-<rect x="370" y="555" width="300" height="120" rx="10" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
-<text x="388" y="586" font-size="17" font-weight="700" fill="#17202a">호출</text>
-<text x="388" y="621" font-size="16" font-weight="700" fill="#2457a6">제공자/모델/API/채점기</text>
-<text x="388" y="653" font-size="16" font-weight="400" fill="#44515f">0/0/0/0 (관측)</text>
-<rect x="710" y="555" width="300" height="120" rx="10" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
-<text x="728" y="586" font-size="17" font-weight="700" fill="#17202a">오류 결과 행</text>
-<text x="728" y="621" font-size="16" font-weight="700" fill="#2457a6">2개 · 시작 오류 표시</text>
-<text x="728" y="653" font-size="16" font-weight="400" fill="#44515f">채점 실패 아님</text>
-<rect x="30" y="700" width="300" height="120" rx="10" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
-<text x="48" y="731" font-size="17" font-weight="700" fill="#17202a">상태</text>
-<text x="48" y="766" font-size="16" font-weight="700" fill="#2457a6">채점기 not_run</text>
-<text x="48" y="788" font-size="16" font-weight="400" fill="#44515f">종료 unknown</text>
-<text x="48" y="811" font-size="16" font-weight="400" fill="#44515f">품질 not_measured</text>
-<rect x="370" y="700" width="300" height="120" rx="10" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
-<text x="388" y="731" font-size="17" font-weight="700" fill="#17202a">비용</text>
-<text x="388" y="766" font-size="16" font-weight="700" fill="#2457a6">API 계산 USD 0.000000</text>
-<text x="388" y="788" font-size="16" font-weight="400" fill="#44515f">청구서 not_measured</text>
-<text x="388" y="811" font-size="16" font-weight="400" fill="#44515f">호스트 not_measured</text>
-<rect x="710" y="700" width="300" height="120" rx="10" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
-<text x="728" y="731" font-size="17" font-weight="700" fill="#17202a">정리</text>
-<text x="728" y="766" font-size="16" font-weight="700" fill="#2457a6">남은 항목 0</text>
-<text x="728" y="798" font-size="16" font-weight="400" fill="#44515f">컨테이너·프로세스·작업공간·규칙</text>
-<rect x="30" y="855" width="980" height="82" rx="10" fill="#fff7ed" stroke="#b45309" stroke-width="2"/>
-<text x="50" y="905" font-size="17" font-weight="700" fill="#7c2d12">통과율, 순위, 후보 품질, 안정성, 대표 비용을 판단하지 않음</text>
+<text x="18" y="38" font-size="23" font-weight="700" fill="#17202a">SWE-Lancer 실행이 멈춘 지점</text>
+<text x="18" y="68" font-size="18" font-weight="400" fill="#44515f">계획 1회와 관측된 두 실행 결과 묶음</text>
+<rect x="18" y="92" width="354" height="112" rx="12" fill="#f7f9fb" stroke="#52708f" stroke-width="2"/>
+<text x="34" y="124" font-size="18" font-weight="700" fill="#2457a6">계획 · 고정 실행 1회</text>
+<text x="34" y="156" font-size="18" font-weight="700" fill="#7c3aed">관측 · 실행 결과 묶음 2개</text>
+<text x="34" y="188" font-size="18" font-weight="700" fill="#b45309">유효 프로토콜 실행 기록 · 0개</text>
+<text x="18" y="246" font-size="20" font-weight="700" fill="#17202a">두 실행 결과 묶음의 순서</text>
+<rect x="18" y="264" width="354" height="158" rx="12" fill="#fffaf5" stroke="#b45309" stroke-width="2" stroke-dasharray="8 5"/>
+<text x="34" y="294" font-size="20" font-weight="700" fill="#b45309">실행 결과 묶음 1</text>
+<text x="34" y="325" font-size="18" font-weight="700" fill="#17202a">초기 검증 27/29</text>
+<text x="34" y="350" font-size="18" font-weight="400" fill="#17202a">실패 · task.row</text>
+<text x="34" y="375" font-size="18" font-weight="400" fill="#17202a">실패 · image.config</text>
+<text x="34" y="400" font-size="18" font-weight="400" fill="#17202a">격리 실행 환경 시작 시간 초과</text>
+<rect x="18" y="448" width="354" height="198" rx="12" fill="#fffaf5" stroke="#b42318" stroke-width="2" stroke-dasharray="8 5"/>
+<text x="34" y="478" font-size="20" font-weight="700" fill="#b42318">실행 결과 묶음 2</text>
+<text x="34" y="509" font-size="18" font-weight="700" fill="#17202a">보정 뒤 검증 31/31</text>
+<text x="34" y="534" font-size="18" font-weight="400" fill="#17202a">1회 실행 규칙 위반</text>
+<text x="34" y="559" font-size="18" font-weight="400" fill="#17202a">설정 · disable_internet=true</text>
+<text x="34" y="584" font-size="18" font-weight="400" fill="#17202a">관측 · allow_internet=true</text>
+<text x="34" y="609" font-size="18" font-weight="400" fill="#17202a">격리 실행 환경 시작 시간 초과</text>
+<path d="M195,424 V441" stroke="#44515f" stroke-width="3"/>
+<path d="M195,445 l-7,-10 h14 z" fill="#44515f"/>
+<text x="18" y="690" font-size="20" font-weight="700" fill="#17202a">중단 뒤 남은 상태</text>
+<rect x="18" y="708" width="354" height="108" rx="10" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
+<text x="34" y="735" font-size="19" font-weight="700" fill="#17202a">격리 실행 환경</text>
+<text x="34" y="763" font-size="18" font-weight="700" fill="#2457a6">시작 2회 · 준비 0회</text>
+<text x="34" y="786" font-size="18" font-weight="400" fill="#44515f">시작 시간 초과 2회</text>
+<rect x="18" y="824" width="354" height="108" rx="10" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
+<text x="34" y="851" font-size="19" font-weight="700" fill="#17202a">호출과 유효 기록</text>
+<text x="34" y="879" font-size="18" font-weight="700" fill="#2457a6">제공자/모델/API/채점기</text>
+<text x="34" y="902" font-size="18" font-weight="400" fill="#44515f">0/0/0/0 (관측)</text>
+<text x="34" y="925" font-size="18" font-weight="400" fill="#44515f">유효 기록 0개</text>
+<rect x="18" y="940" width="354" height="108" rx="10" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
+<text x="34" y="967" font-size="19" font-weight="700" fill="#17202a">오류 결과 행</text>
+<text x="34" y="995" font-size="18" font-weight="700" fill="#2457a6">2개 · 시작 오류 표시</text>
+<text x="34" y="1018" font-size="18" font-weight="400" fill="#44515f">채점 실패 아님</text>
+<rect x="18" y="1056" width="354" height="108" rx="10" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
+<text x="34" y="1083" font-size="19" font-weight="700" fill="#17202a">측정 상태</text>
+<text x="34" y="1111" font-size="18" font-weight="700" fill="#2457a6">채점기 not_run</text>
+<text x="34" y="1134" font-size="18" font-weight="400" fill="#44515f">종료 unknown</text>
+<text x="34" y="1157" font-size="18" font-weight="400" fill="#44515f">품질 not_measured</text>
+<text x="18" y="1195" font-size="20" font-weight="700" fill="#17202a">이 그림이 보여 주지 못하는 것</text>
+<rect x="18" y="1212" width="354" height="175" rx="10" fill="#fff7ed" stroke="#b45309" stroke-width="2"/>
+<text x="34" y="1241" font-size="18" font-weight="700" fill="#7c2d12">유효 기록 0개 · 채점기 not_run</text>
+<text x="34" y="1266" font-size="18" font-weight="700" fill="#7c2d12">통과율·순위 결과 없음</text>
+<text x="34" y="1291" font-size="18" font-weight="700" fill="#7c2d12">후보 품질 결과 없음</text>
+<text x="34" y="1316" font-size="18" font-weight="700" fill="#7c2d12">안정성 결과 없음</text>
+<text x="34" y="1341" font-size="18" font-weight="700" fill="#7c2d12">오류 행과 호출 0만으로</text>
+<text x="34" y="1366" font-size="18" font-weight="700" fill="#7c2d12">모델 품질 판단 불가</text>
 </g></svg>

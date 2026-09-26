@@ -14,11 +14,15 @@ from .protection import digest
 
 ROOT = Path(__file__).resolve().parents[1]
 REPORT = ROOT / "docs_en/experiment/02-follow-up/cache-reuse/execution-20260923.md"
-REPORT_SHA256 = "9c07682a067aea18d253c869f5fe0711dc3c695de5b1636b7bfe7d95b0f907f3"
+REPORT_SHA256 = "9639c2f21142378727082d0b3b142348b15941b8e1c538232c9b10f5075f058c"
 OUTPUTS = {
     "ko": ROOT / "figures/follow-up/cache-execution-denominators-ko.svg",
     "en": ROOT / "figures/follow-up/cache-execution-denominators-en.svg",
 }
+SVG_WIDTH = 390
+SVG_HEIGHT = 1152
+CARD_X = 18
+CARD_WIDTH = 354
 FACTS = {
     "plan": {"cycles": 10, "bundles": 60, "task_trials": 300},
     "observed": {
@@ -51,54 +55,79 @@ FACTS = {
     },
     "terminal_status": "stopped_invalid_cycle",
 }
-REPORT_CLAUSES = (
-    (
-        "source",
-        "| Source | Commit `e78a32edca9d5ce4f991700e3a299d72164e94be`; tree `63f969519c93a58faf800ed91cc464f9b955fe2b` |",
+REPORT_RECORD = {
+    "source_commit": "e78a32edca9d5ce4f991700e3a299d72164e94be",
+    "source_tree": "63f969519c93a58faf800ed91cc464f9b955fe2b",
+    "conditions": "none,squeez",
+    "reuse_order": "0,1,2",
+    "tasks_per_cell": 5,
+    "concurrency": 1,
+    "initial_valid_cycles": 10,
+    "initial_bundles": 60,
+    "initial_task_trials": 300,
+    "maximum_valid_cycles": 20,
+    "cycles_attempted": 1,
+    "cycles_valid": 0,
+    "cycles_invalid": 1,
+    "replacement_cycles": 0,
+    "bundles_started": 2,
+    "bundles_complete": 1,
+    "bundles_incomplete": 1,
+    "task_trials_started": 6,
+    "task_trials_complete": 5,
+    "task_trials_incomplete": 1,
+    "successful_provider_calls": 18,
+    "input_tokens": 65423,
+    "cached_input_tokens": 0,
+    "output_tokens": 9690,
+    "input_cost_usd": "0.1635575",
+    "output_cost_usd": "0.14535",
+    "total_cost_usd": "0.3089075",
+    "invoice_status": "not_measured",
+    "completed_trial_quality": "3/5",
+    "eligible_tasks": 2,
+    "not_applicable_tasks": 3,
+    "stop_condition": "none",
+    "stop_reuse": 1,
+    "predecessor_reuse": 0,
+    "stop_task": "cancel-async-tasks",
+    "stop_ordinal": 3,
+    "predecessor_request_count": 2,
+    "dispatch_status": "rejected_before_dispatch",
+    "terminal_status": "stopped_invalid_cycle",
+    "execution_time_status": "date_window_timezone_not_retained",
+    "cache_comparison_status": "not_computed_zero_valid_cycles",
+    "cached_input_interpretation": "input_subset_not_additive_not_effect_or_miss_rate",
+    "quality_scope": "completed_trials_only_not_condition_or_general_quality",
+}
+REPORT_SEMANTIC_PATTERNS = {
+    "comparison non-finding": r"no Cache-effect (?:estimate|comparison)[^.]*computed",
+    "cached-input boundary": (
+        r"cached input[^.]{0,250}not (?:an |a Cache-)?effect estimate"
+        r"[^.]{0,120}not (?:a )?miss rate"
     ),
-    ("plan units", "10 valid cycles; 60 useful bundles; 300 task trials"),
-    ("task strata", "two eligible and three `not_applicable` for the primary cache denominator"),
-    ("terminal status", "The terminal status was `stopped_invalid_cycle`."),
-    ("cycle counts", "| Cycles | 10 initially | 1 | 0 | 1 | 0 |"),
-    ("bundle counts", "| Bundles | 60 initially | 2 | 1 | 1 | 0 |"),
-    ("task-trial counts", "| Task trials | 300 initially | 6 | 5 | 1 | 0 |"),
-    ("provider calls", "| Successful provider calls | 18 |"),
-    (
-        "cached-input boundary",
-        "| Cached input | 0 | API-reported, partial invalid cycle; not a Cache-effect estimate or miss rate |",
+    "invoice boundary": r"not a reconciled invoice",
+    "quality boundary": r"not a `none` versus `squeez` comparison[^.]*general model-quality claim",
+    "absent pair": r"No differing prefix or prefix length was measured for the absent ordinal-3 pair",
+    "time boundary": r"does not retain an execution date, time window, or timezone",
+    "task strata": r"two eligible and three `not_applicable` for the primary cache denominator",
+    "causal uncertainty": (
+        r"(?:evidence|record|run)[^.]{0,80}(?:did not|could not)[^.]{0,80}"
+        r"(?:isolate|determine|establish)[^.]{0,240}"
+        r"(?:request-count difference|difference in request counts)"
     ),
-    (
-        "quality boundary",
-        "Five completed task trials produced native quality outcomes, and 3 of 5 passed. The sixth started task trial was incomplete.",
+}
+REPORT_FORBIDDEN_PATTERNS = {
+    "causal promotion": (
+        r"(?:evidence|record|run)[^.]{0,80}"
+        r"(?:established|proved|showed|demonstrated)[^.]{0,120}"
+        r"compression caused[^.]{0,120}(?:request-count difference|difference in request counts)"
     ),
-    (
-        "ordinal stop",
-        "`cancel-async-tasks` reached logical request ordinal `3`, while its reuse `0` predecessor had only `2` requests.",
-    ),
-    (
-        "missing predecessor",
-        "Prefix validation therefore had no same-task predecessor at ordinal `3` and rejected the request before provider dispatch.",
-    ),
-    (
-        "invalid treatment",
-        "The cycle was preserved as invalid. No outer retry or replacement was performed.",
-    ),
-    (
-        "non-claim boundary",
-        "With zero valid cycles, the run cannot support a cache comparison, a Cache-effect estimate, a reuse contrast, or the predeclared stability comparison.",
-    ),
-)
+}
 
 
 def _normalized(value: str) -> str:
     return " ".join(value.split())
-
-
-def validate_report(markdown: str) -> None:
-    normalized = _normalized(markdown)
-    for label, clause in REPORT_CLAUSES:
-        if _normalized(clause) not in normalized:
-            raise ValueError(f"Cache report changed: {label}")
 
 
 def _row_cells(markdown: str, label: str) -> list[str]:
@@ -127,86 +156,138 @@ def _initial_count(value: str, label: str) -> int:
     return _integer(match.group(1), label)
 
 
-def parse_report_facts(markdown: str) -> dict:
-    number_words = {"zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5}
-    strata = re.search(
-        r"Task population\s*\|\s*Five fixed tasks in every cell; "
-        r"(\w+) eligible and (\w+) `not_applicable` for the primary cache denominator\s*\|",
-        markdown,
-    )
-    if strata is None or strata.group(1) not in number_words or strata.group(2) not in number_words:
-        raise ValueError("Cache report task strata changed")
+def _record_value(markdown: str, field: str) -> str:
+    cells = _row_cells(markdown, f"`{field}`")
+    if len(cells) != 2 or re.fullmatch(r"`[^`]+`", cells[1]) is None:
+        raise ValueError(f"Cache report fact record changed: {field}")
+    return cells[1][1:-1]
 
+
+def parse_report_record(markdown: str) -> dict:
+    parsed = {}
+    for field, expected in REPORT_RECORD.items():
+        value = _record_value(markdown, field)
+        parsed[field] = _integer(value, field) if isinstance(expected, int) else value
+    return parsed
+
+
+def parse_report_facts(markdown: str) -> dict:
+    record = parse_report_record(markdown)
+    return {
+        "plan": {
+            "cycles": record["initial_valid_cycles"],
+            "bundles": record["initial_bundles"],
+            "task_trials": record["initial_task_trials"],
+        },
+        "observed": {
+            "cycles_attempted": record["cycles_attempted"],
+            "cycles_valid": record["cycles_valid"],
+            "cycles_invalid": record["cycles_invalid"],
+            "replacement": record["replacement_cycles"],
+            "bundles_started": record["bundles_started"],
+            "bundles_complete": record["bundles_complete"],
+            "bundles_incomplete": record["bundles_incomplete"],
+            "task_trials_started": record["task_trials_started"],
+            "task_trials_complete": record["task_trials_complete"],
+            "task_trials_incomplete": record["task_trials_incomplete"],
+        },
+        "stop": {
+            "condition": record["stop_condition"],
+            "reuse": record["stop_reuse"],
+            "predecessor_reuse": record["predecessor_reuse"],
+            "task": record["stop_task"],
+            "ordinal": record["stop_ordinal"],
+            "predecessor_requests": record["predecessor_request_count"],
+            "dispatch": record["dispatch_status"],
+        },
+        "descriptive": {
+            "successful_provider_calls": record["successful_provider_calls"],
+            "completed_trial_quality": record["completed_trial_quality"],
+            "eligible_tasks": record["eligible_tasks"],
+            "not_applicable_tasks": record["not_applicable_tasks"],
+            "cached_input_tokens": record["cached_input_tokens"],
+        },
+        "terminal_status": record["terminal_status"],
+    }
+
+
+def _visible_denominators(markdown: str) -> dict:
     cycle_cells = _row_cells(markdown, "Cycles")
     bundle_cells = _row_cells(markdown, "Bundles")
     trial_cells = _row_cells(markdown, "Task trials")
     if any(len(cells) != 6 for cells in (cycle_cells, bundle_cells, trial_cells)):
         raise ValueError("Cache report denominator columns changed")
-
-    stop = re.search(
-        r"During `(?P<condition>[^`]+)`, reuse\s*`(?P<reuse>\d+)`, "
-        r"`(?P<task>[^`]+)` reached logical request ordinal `(?P<ordinal>\d+)`, "
-        r"while its reuse\s*`(?P<predecessor_reuse>\d+)` predecessor had only "
-        r"`(?P<predecessor_requests>\d+)` requests\.",
-        markdown,
-    )
-    if stop is None:
-        raise ValueError("Cache report ordinal stop changed")
-    if (
-        "rejected the request before provider dispatch" not in _normalized(markdown)
-        or "No outer retry or replacement was performed" not in _normalized(markdown)
-    ):
-        raise ValueError("Cache report stop treatment changed")
-
-    terminal = re.search(r"The terminal status was `([^`]+)`\.", markdown)
-    quality = re.search(
-        r"(\d+) of (\d+) passed\.\s+The sixth started task trial was incomplete\.",
-        markdown,
-    )
-    if terminal is None or quality is None:
-        raise ValueError("Cache report terminal or quality status changed")
-
-    provider_calls = _row_cells(markdown, "Successful provider calls")
-    cached_input = _row_cells(markdown, "Cached input")
-    if len(provider_calls) != 2 or len(cached_input) != 3:
-        raise ValueError("Cache report descriptive columns changed")
-
     return {
-        "plan": {
-            "cycles": _initial_count(cycle_cells[1], "cycles"),
-            "bundles": _initial_count(bundle_cells[1], "bundles"),
-            "task_trials": _initial_count(trial_cells[1], "task trials"),
-        },
-        "observed": {
-            "cycles_attempted": _integer(cycle_cells[2], "cycles attempted"),
-            "cycles_valid": _integer(cycle_cells[3], "cycles valid"),
-            "cycles_invalid": _integer(cycle_cells[4], "cycles invalid"),
-            "replacement": _integer(cycle_cells[5], "cycle replacement"),
-            "bundles_started": _integer(bundle_cells[2], "bundles started"),
-            "bundles_complete": _integer(bundle_cells[3], "bundles complete"),
-            "bundles_incomplete": _integer(bundle_cells[4], "bundles incomplete"),
-            "task_trials_started": _integer(trial_cells[2], "task trials started"),
-            "task_trials_complete": _integer(trial_cells[3], "task trials complete"),
-            "task_trials_incomplete": _integer(trial_cells[4], "task trials incomplete"),
-        },
-        "stop": {
-            "condition": stop.group("condition"),
-            "reuse": int(stop.group("reuse")),
-            "predecessor_reuse": int(stop.group("predecessor_reuse")),
-            "task": stop.group("task"),
-            "ordinal": int(stop.group("ordinal")),
-            "predecessor_requests": int(stop.group("predecessor_requests")),
-            "dispatch": "rejected_before_dispatch",
-        },
-        "descriptive": {
-            "successful_provider_calls": _integer(provider_calls[1], "successful provider calls"),
-            "completed_trial_quality": f"{quality.group(1)}/{quality.group(2)}",
-            "eligible_tasks": number_words[strata.group(1)],
-            "not_applicable_tasks": number_words[strata.group(2)],
-            "cached_input_tokens": _integer(cached_input[1], "cached input"),
-        },
-        "terminal_status": terminal.group(1),
+        "initial_valid_cycles": _initial_count(cycle_cells[1], "cycles"),
+        "cycles_attempted": _integer(cycle_cells[2], "cycles attempted"),
+        "cycles_valid": _integer(cycle_cells[3], "cycles valid"),
+        "cycles_invalid": _integer(cycle_cells[4], "cycles invalid"),
+        "replacement_cycles": _integer(cycle_cells[5], "cycle replacement"),
+        "initial_bundles": _initial_count(bundle_cells[1], "bundles"),
+        "bundles_started": _integer(bundle_cells[2], "bundles started"),
+        "bundles_complete": _integer(bundle_cells[3], "bundles complete"),
+        "bundles_incomplete": _integer(bundle_cells[4], "bundles incomplete"),
+        "initial_task_trials": _initial_count(trial_cells[1], "task trials"),
+        "task_trials_started": _integer(trial_cells[2], "task trials started"),
+        "task_trials_complete": _integer(trial_cells[3], "task trials complete"),
+        "task_trials_incomplete": _integer(trial_cells[4], "task trials incomplete"),
     }
+
+
+def validate_report(markdown: str) -> None:
+    record = parse_report_record(markdown)
+    if record != REPORT_RECORD:
+        raise ValueError("Cache canonical factual record changed")
+    if parse_report_facts(markdown) != FACTS:
+        raise ValueError("Cache accepted facts differ from the canonical report")
+
+    visible = _visible_denominators(markdown)
+    for field, value in visible.items():
+        if value != record[field]:
+            raise ValueError(f"Cache visible denominator differs from fact record: {field}")
+
+    source = _row_cells(markdown, "Source")
+    source_match = (
+        re.fullmatch(r"Commit `([0-9a-f]{40})`; tree `([0-9a-f]{40})`", source[1])
+        if len(source) == 2
+        else None
+    )
+    if (
+        len(source) != 2
+        or source_match is None
+        or source_match.groups() != (record["source_commit"], record["source_tree"])
+    ):
+        raise ValueError("Cache visible source differs from fact record")
+
+    visible_rows = {
+        "successful_provider_calls": ("Successful provider calls", 1),
+        "input_tokens": ("Input", 1),
+        "cached_input_tokens": ("Cached input", 1),
+        "output_tokens": ("Output", 1),
+    }
+    for field, (label, column) in visible_rows.items():
+        cells = _row_cells(markdown, label)
+        if _integer(cells[column], field) != record[field]:
+            raise ValueError(f"Cache visible value differs from fact record: {field}")
+
+    visible_costs = {
+        "input_cost_usd": "Input cost",
+        "output_cost_usd": "Output cost",
+        "total_cost_usd": "Total calculated cost",
+    }
+    for field, label in visible_costs.items():
+        cells = _row_cells(markdown, label)
+        if len(cells) != 3 or cells[1] != f'${record[field]}':
+            raise ValueError(f"Cache visible cost differs from fact record: {field}")
+
+    narrative = markdown.split("## Factual guard record", 1)[0]
+    normalized = _normalized(narrative)
+    for label, pattern in REPORT_SEMANTIC_PATTERNS.items():
+        if re.search(pattern, normalized, flags=re.IGNORECASE) is None:
+            raise ValueError(f"Cache report semantic boundary changed: {label}")
+    for label, pattern in REPORT_FORBIDDEN_PATTERNS.items():
+        if re.search(pattern, normalized, flags=re.IGNORECASE) is not None:
+            raise ValueError(f"Cache report forbidden claim introduced: {label}")
 
 
 def load_facts(path: Path = REPORT, expected_sha256: str = REPORT_SHA256) -> dict:
@@ -223,25 +304,27 @@ def load_facts(path: Path = REPORT, expected_sha256: str = REPORT_SHA256) -> dic
 
 COPY = {
     "ko": {
-        "title": "Cache 실행 분모와 무효 중단",
-        "description_start": "사이클, 실행 묶음, 과제 실행의 계획과 관측을 서로 다른 단위로 표시하고,",
-        "subtitle": "첫 불완전 무효 사이클 · 단위별 계획과 관측",
-        "section_denominators": "1. 단위별 분모",
-        "section_context": "3. 무효 부분 실행의 설명값",
-        "claim_boundary": "Cache 효과, 절감, 순위, 재사용 대비, 안정성은 계산하지 않음",
+        "title": "Cache 비교: 계획, 부분 실행과 중단",
+        "display_title": "Cache 비교가 멈춘 지점",
+        "subtitle": "계획과 관측을 같은 단위 안에서 비교",
+        "section_denominators": "계획과 관측",
+        "section_stop": "짝이 없는 요청에서 멈춘 순서",
+        "context_title": "부분 실행이 말해 주는 범위",
+        "claim_boundary": ("Cache·재사용 효과 계산 안 함", "압축 효과 계산 안 함"),
     },
     "en": {
-        "title": "Cache execution denominators and invalid stop",
-        "description_start": "Cycles, bundles, and task trials keep separate plan and observation units.",
-        "subtitle": "First incomplete invalid cycle · plan and observation by unit",
-        "section_denominators": "1. Denominators by unit",
-        "section_context": "3. Descriptive values from the invalid partial run",
-        "claim_boundary": "no Cache effect, savings, ranking, reuse contrast, or stability result",
+        "title": "Cache comparison: plan, partial run, and stop",
+        "display_title": "Cache comparison stop",
+        "subtitle": "Plan and observation by unit",
+        "section_denominators": "Plan and observation",
+        "section_stop": "Stop at the unmatched request",
+        "context_title": "What the partial run shows",
+        "claim_boundary": ("No Cache/reuse effect computed", "No compression effect computed"),
     },
 }
 COPY_SHA256 = {
-    "ko": "754faa03259959fbe90f9bb8e9fc63f5b398c4dceb2deac4a305385baaa2a2e6",
-    "en": "93bfb5edb19b929dbd2f7e126dcfb98d20a8a962b53ab895f01f03e4b547dae8",
+    "ko": "26ad1c3c8597705e2bab90ebbaee7a18e7f8c6fbd0d133560709587212e245d3",
+    "en": "b5b220ed974d5e19e8a3bfa4e3e0d31f54102f855624bc17a61c79380842919d",
 }
 
 
@@ -260,126 +343,134 @@ def build_display(facts: dict, language: str) -> dict:
     observed = facts["observed"]
     stop = facts["stop"]
     descriptive = facts["descriptive"]
+    if stop["dispatch"] != "rejected_before_dispatch":
+        raise ValueError("Cache stop display differs from the canonical dispatch status")
     if language == "ko":
         return {
             **copy,
             "description": (
-                f'{copy["description_start"]} 선행 요청이 없었던 논리 요청 순번 '
-                f'{stop["ordinal"]}의 제공자 전송 전 중단을 보인다.'
+                f'사이클, 실행 묶음, 과제 실행의 계획과 관측을 단위별로 비교하고, '
+                f'선행 요청이 없었던 논리 요청 순번 {stop["ordinal"]}에서 현재 요청을 '
+                "제공자 전송 전에 거부한 흐름을 보여 준다."
             ),
             "cards": (
-                ("사이클", f'계획 · 유효 {plan["cycles"]}개', (
-                    f'관측 · {observed["cycles_attempted"]}개 시도',
-                    f'{observed["cycles_valid"]}개 유효 (관측)',
-                    f'{observed["cycles_invalid"]}개 무효 · 대체 {observed["replacement"]}개',
-                )),
-                ("실행 묶음", f'계획 · {plan["bundles"]}개', (
-                    f'관측 · {observed["bundles_started"]}개 시작',
-                    f'{observed["bundles_complete"]}개 완결',
-                    f'{observed["bundles_incomplete"]}개 미완결·무효',
-                )),
-                ("과제 실행", f'계획 · {plan["task_trials"]}개', (
-                    f'관측 · {observed["task_trials_started"]}개 시작',
-                    f'{observed["task_trials_complete"]}개 완결',
-                    f'{observed["task_trials_incomplete"]}개 미완결',
-                )),
+                (
+                    "사이클",
+                    f'계획 · 유효 {plan["cycles"]}개',
+                    (
+                        f'관측 · {observed["cycles_attempted"]}개 시도 · {observed["cycles_valid"]}개 유효',
+                        f'{observed["cycles_invalid"]}개 무효 · 대체 {observed["replacement"]}개',
+                    ),
+                ),
+                (
+                    "실행 묶음",
+                    f'계획 · {plan["bundles"]}개',
+                    (
+                        f'관측 · {observed["bundles_started"]}개 시작 · {observed["bundles_complete"]}개 완결',
+                        f'{observed["bundles_incomplete"]}개 미완결·무효',
+                    ),
+                ),
+                (
+                    "과제 실행",
+                    f'계획 · {plan["task_trials"]}개',
+                    (
+                        f'관측 · {observed["task_trials_started"]}개 시작 · {observed["task_trials_complete"]}개 완결',
+                        f'{observed["task_trials_incomplete"]}개 미완결',
+                    ),
+                ),
             ),
-            "section_stop": f'2. 논리 요청 순번 {stop["ordinal"]}에서 중단',
             "flow": (
                 (
+                    "1. 선행 실행",
                     f'{stop["condition"]} · 재사용 {stop["predecessor_reuse"]}',
-                    "실행 묶음 완결",
                     f'선행 요청 {stop["predecessor_requests"]}개',
                 ),
                 (
+                    "2. 현재 실행",
                     f'{stop["condition"]} · 재사용 {stop["reuse"]}',
-                    stop["task"],
-                    f'현재 순번 {stop["ordinal"]} 도달',
+                    f'{stop["task"]} · 순번 {stop["ordinal"]}',
                 ),
                 (
-                    "비교할 선행 요청 없음",
-                    f'재사용 {stop["predecessor_reuse"]}에는',
-                    f'순번 {stop["ordinal"]} 요청이 없음',
+                    "3. 비교 쌍 없음",
+                    f'선행 실행에는 요청 {stop["predecessor_requests"]}개',
+                    f'순번 {stop["ordinal"]}의 선행 요청 없음',
                 ),
-                ("제공자 전송 전 거부", "접두부 비교·길이", "측정하지 않음"),
+                (
+                    "4. 검증 중단",
+                    "현재 요청을 제공자 전송 전 거부",
+                    "접두부 차이·길이 측정 없음",
+                ),
             ),
             "context": (
-                ("성공한 제공자 호출", (f'{descriptive["successful_provider_calls"]}회',), "조건·재사용 비교 아님"),
-                ("완결 과제 실행 품질", (f'{descriptive["completed_trial_quality"]} 통과',), "조건별 품질 비교 아님"),
-                (
-                    "과제 층",
-                    (
-                        f'대상 {descriptive["eligible_tasks"]}',
-                        f'not_applicable {descriptive["not_applicable_tasks"]}',
-                    ),
-                    "서로 다른 상태",
-                ),
+                "부분 실행 설명값",
+                f'성공한 제공자 응답 {descriptive["successful_provider_calls"]}회',
+                f'완결 과제: {descriptive["completed_trial_quality"]} 통과',
+                f'유효 사이클 {observed["cycles_valid"]}개',
+                *copy["claim_boundary"],
             ),
-            "cached_note": (
-                f'cached input {descriptive["cached_input_tokens"]} tokens · '
-                "API 사용량이며 미스율 또는 Cache 효과 추정값이 아님"
-            ),
-            "claim_boundary": f'유효 사이클 {observed["cycles_valid"]}개 · {copy["claim_boundary"]}',
         }
     return {
         **copy,
         "description": (
-            f'{copy["description_start"]} The flow shows the pre-dispatch stop at ordinal '
-            f'{stop["ordinal"]} when no predecessor request existed.'
+            "Cycles, bundles, and task trials compare plan with observation within each unit. "
+            f'The sequence ends before provider dispatch at ordinal {stop["ordinal"]}, where '
+            "no predecessor request existed."
         ),
         "cards": (
-            ("Cycles", f'PLAN · {plan["cycles"]} valid', (
-                f'OBSERVED · {observed["cycles_attempted"]} attempted',
-                f'{observed["cycles_valid"]} valid (observed)',
-                f'{observed["cycles_invalid"]} invalid · {observed["replacement"]} replacement',
-            )),
-            ("Bundles", f'PLAN · {plan["bundles"]}', (
-                f'OBSERVED · {observed["bundles_started"]} started',
-                f'{observed["bundles_complete"]} complete',
-                f'{observed["bundles_incomplete"]} incomplete / invalid',
-            )),
-            ("Task trials", f'PLAN · {plan["task_trials"]}', (
-                f'OBSERVED · {observed["task_trials_started"]} started',
-                f'{observed["task_trials_complete"]} complete',
-                f'{observed["task_trials_incomplete"]} incomplete',
-            )),
+            (
+                "Cycles",
+                f'PLAN · {plan["cycles"]} valid',
+                (
+                    f'OBSERVED · {observed["cycles_attempted"]} attempted · {observed["cycles_valid"]} valid',
+                    f'{observed["cycles_invalid"]} invalid · {observed["replacement"]} replacement',
+                ),
+            ),
+            (
+                "Bundles",
+                f'PLAN · {plan["bundles"]}',
+                (
+                    f'OBSERVED · {observed["bundles_started"]} started · {observed["bundles_complete"]} complete',
+                    f'{observed["bundles_incomplete"]} incomplete / invalid',
+                ),
+            ),
+            (
+                "Task trials",
+                f'PLAN · {plan["task_trials"]}',
+                (
+                    f'OBSERVED · {observed["task_trials_started"]} started · {observed["task_trials_complete"]} complete',
+                    f'{observed["task_trials_incomplete"]} incomplete',
+                ),
+            ),
         ),
-        "section_stop": f'2. Stop at logical request ordinal {stop["ordinal"]}',
         "flow": (
             (
+                "1. Predecessor run",
                 f'{stop["condition"]} · reuse {stop["predecessor_reuse"]}',
-                "bundle complete",
                 f'{stop["predecessor_requests"]} predecessor requests',
             ),
             (
+                "2. Current run",
                 f'{stop["condition"]} · reuse {stop["reuse"]}',
-                stop["task"],
-                f'current ordinal {stop["ordinal"]} reached',
+                f'{stop["task"]} · ordinal {stop["ordinal"]}',
             ),
             (
-                "No request to pair",
-                f'reuse {stop["predecessor_reuse"]} had no',
-                f'request at ordinal {stop["ordinal"]}',
+                "3. No request pair",
+                f'predecessor run had {stop["predecessor_requests"]} requests',
+                f'no request at ordinal {stop["ordinal"]}',
             ),
-            ("Rejected pre-dispatch", "no prefix comparison", "or length measurement"),
+            (
+                "4. Validation stop",
+                "current request rejected pre-dispatch",
+                "no prefix difference/length measured",
+            ),
         ),
         "context": (
-            ("Successful provider calls", (str(descriptive["successful_provider_calls"]),), "not a condition contrast"),
-            ("Completed-trial quality", (f'{descriptive["completed_trial_quality"]} passed',), "not condition quality"),
-            (
-                "Task strata",
-                (
-                    f'{descriptive["eligible_tasks"]} eligible',
-                    f'{descriptive["not_applicable_tasks"]} not_applicable',
-                ),
-                "distinct statuses",
-            ),
+            "Partial-run context",
+            f'{descriptive["successful_provider_calls"]} successful provider responses',
+            f'Completed trials: {descriptive["completed_trial_quality"]} passed',
+            f'{observed["cycles_valid"]} valid cycles',
+            *copy["claim_boundary"],
         ),
-        "cached_note": (
-            f'cached input {descriptive["cached_input_tokens"]} tokens · '
-            "API usage, not a miss rate or Cache-effect estimate"
-        ),
-        "claim_boundary": f'{observed["cycles_valid"]} valid cycles · {copy["claim_boundary"]}',
     }
 
 
@@ -412,70 +503,71 @@ def render_svg_from_display(facts: dict, language: str, display: dict) -> str:
     validate_display(facts, language, display)
     copy = display
     elements = [
-        '<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="900" viewBox="0 0 1040 900" role="img" aria-labelledby="title desc">',
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{SVG_WIDTH}" height="{SVG_HEIGHT}" viewBox="0 0 {SVG_WIDTH} {SVG_HEIGHT}" role="img" aria-labelledby="title desc">',
         f'<title id="title">{escape(copy["title"])}</title>',
         f'<desc id="desc">{escape(copy["description"])}</desc>',
         f'<metadata>source-report-sha256:{REPORT_SHA256}</metadata>',
-        '<rect width="1040" height="900" fill="#ffffff"/>',
+        f'<rect width="{SVG_WIDTH}" height="{SVG_HEIGHT}" fill="#ffffff"/>',
         '<g font-family="sans-serif" font-variant-numeric="tabular-nums">',
     ]
-    _text(elements, 30, 42, copy["title"], size=27, weight=700)
-    _text(elements, 30, 72, copy["subtitle"], size=17, fill="#44515f")
-    _text(elements, 30, 112, copy["section_denominators"], size=20, weight=700)
+    _text(elements, CARD_X, 38, copy["display_title"], size=24, weight=700)
+    _text(elements, CARD_X, 68, copy["subtitle"], size=18, fill="#44515f")
+    _text(elements, CARD_X, 108, copy["section_denominators"], size=20, weight=700)
 
-    card_positions = (30, 370, 710)
-    for card_x, (name, plan, observations) in zip(card_positions, copy["cards"], strict=True):
+    for card_index, (name, plan, observations) in enumerate(copy["cards"]):
+        card_y = 124 + 124 * card_index
         elements.append(
-            f'<rect x="{card_x}" y="130" width="300" height="205" rx="12" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>'
+            f'<rect x="{CARD_X}" y="{card_y}" width="{CARD_WIDTH}" height="114" rx="12" '
+            'fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>'
         )
-        _text(elements, card_x + 18, 162, name, size=21, weight=700)
-        _text(elements, card_x + 18, 194, plan, size=17, weight=700, fill="#2457a6")
+        _text(elements, CARD_X + 16, card_y + 28, name, size=20, weight=700)
+        _text(elements, CARD_X + 16, card_y + 56, plan, size=18, weight=700, fill="#2457a6")
         for line_index, line in enumerate(observations):
-            _text(elements, card_x + 18, 230 + 30 * line_index, line, size=16)
+            _text(elements, CARD_X + 16, card_y + 82 + 22 * line_index, line, size=18)
 
-    _text(elements, 30, 385, copy["section_stop"], size=20, weight=700)
-    flow_positions = (30, 280, 530, 780)
-    for flow_index, (flow_x, lines) in enumerate(zip(flow_positions, copy["flow"], strict=True)):
+    _text(elements, CARD_X, 522, copy["section_stop"], size=20, weight=700)
+    flow_y_positions = (544, 644, 744, 844)
+    for flow_index, (flow_y, lines) in enumerate(zip(flow_y_positions, copy["flow"], strict=True)):
         border = "#b45309" if flow_index >= 2 else "#52708f"
         dash = ' stroke-dasharray="7 5"' if flow_index >= 2 else ""
         elements.append(
-            f'<rect x="{flow_x}" y="405" width="225" height="145" rx="10" fill="#ffffff" '
+            f'<rect x="{CARD_X}" y="{flow_y}" width="{CARD_WIDTH}" height="82" rx="10" fill="#ffffff" '
             f'stroke="{border}" stroke-width="2"{dash}/>'
         )
         for line_index, line in enumerate(lines):
             _text(
                 elements,
-                flow_x + 112,
-                442 + 34 * line_index,
+                SVG_WIDTH // 2,
+                flow_y + 25 + 23 * line_index,
                 line,
-                size=16,
+                size=18,
                 weight=700 if line_index == 0 else 400,
                 anchor="middle",
             )
         if flow_index < 3:
             elements.append(
-                f'<path d="M{flow_x + 229},478 H{flow_x + 245}" stroke="#44515f" stroke-width="3"/>'
+                f'<path d="M{SVG_WIDTH // 2},{flow_y + 84} V{flow_y + 96}" stroke="#44515f" stroke-width="3"/>'
             )
             elements.append(
-                f'<path d="M{flow_x + 245},478 l-8,-6 v12 z" fill="#44515f"/>'
+                f'<path d="M{SVG_WIDTH // 2},{flow_y + 99} l-6,-9 h12 z" fill="#44515f"/>'
             )
 
-    _text(elements, 30, 605, copy["section_context"], size=20, weight=700)
-    for card_x, (label, values, qualifier) in zip(card_positions, copy["context"], strict=True):
-        elements.append(
-            f'<rect x="{card_x}" y="625" width="300" height="120" rx="10" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>'
-        )
-        _text(elements, card_x + 18, 657, label, size=16, weight=700)
-        value_y = 684 if len(values) == 2 else 691
-        for line_index, value in enumerate(values):
-            _text(elements, card_x + 18, value_y + 25 * line_index, value, size=20, weight=700, fill="#2457a6")
-        _text(elements, card_x + 18, 735 if len(values) == 2 else 722, qualifier, size=16, fill="#44515f")
-
+    _text(elements, CARD_X, 946, copy["context_title"], size=20, weight=700)
     elements.append(
-        '<rect x="30" y="775" width="980" height="95" rx="10" fill="#fff7ed" stroke="#b45309" stroke-width="2"/>'
+        f'<rect x="{CARD_X}" y="962" width="{CARD_WIDTH}" height="170" rx="10" '
+        'fill="#fff7ed" stroke="#b45309" stroke-width="2"/>'
     )
-    _text(elements, 50, 811, copy["cached_note"], size=16, weight=700, fill="#7c2d12")
-    _text(elements, 50, 847, copy["claim_boundary"], size=16, weight=700, fill="#7c2d12")
+    context_colors = ("#7c2d12", "#17202a", "#44515f", "#7c2d12", "#7c2d12", "#7c2d12")
+    for line_index, (line, color) in enumerate(zip(copy["context"], context_colors, strict=True)):
+        _text(
+            elements,
+            CARD_X + 16,
+            990 + 24 * line_index,
+            line,
+            size=18,
+            weight=700 if line_index in (0, 3, 4, 5) else 400,
+            fill=color,
+        )
     elements.append("</g></svg>")
     return "\n".join(elements) + "\n"
 

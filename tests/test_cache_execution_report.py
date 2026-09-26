@@ -4,6 +4,7 @@ import re
 import unittest
 
 from evidence import PUBLIC_FILES
+from src.cache_execution_figure import REPORT_RECORD, parse_report_record, validate_report
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -37,9 +38,9 @@ class CacheExecutionReportTests(unittest.TestCase):
         cls.report = REPORT_PATH.read_text(encoding="utf-8")
 
     def test_report_preserves_the_sealed_result_and_nonfinding(self):
+        self.assertEqual(parse_report_record(self.report), REPORT_RECORD)
+        validate_report(self.report)
         protected_literals = (
-            "Actual provider-backed execution occurred, but the comparison produced zero",
-            "The terminal status was `stopped_invalid_cycle`.",
             "| Cycles | 10 initially | 1 | 0 | 1 | 0 |",
             "| Bundles | 60 initially | 2 | 1 | 1 | 0 |",
             "| Task trials | 300 initially | 6 | 5 | 1 | 0 |",
@@ -50,19 +51,45 @@ class CacheExecutionReportTests(unittest.TestCase):
             "| Input | 65,423 |",
             "| Cached input | 0 |",
             "| Output | 9,690 |",
+            "| Input cost | $0.1635575 |",
+            "| Output cost | $0.14535 |",
+            "| Total calculated cost | $0.3089075 |",
             "3 of 5 passed",
-            "No outer retry or replacement",
-            "The run did not isolate why the request widths differed.",
-            "The extension did not run.",
             "Actual calculated cost before the integrity stop was `$0.3089075`.",
         )
         for literal in protected_literals:
             with self.subTest(literal=literal):
                 self.assertIn(literal, self.report)
 
+        normalized = " ".join(self.report.split())
+        for literal in (
+            "No differing prefix or prefix length was measured for the absent ordinal-3 pair",
+            "no outer retry or replacement",
+            "the stability comparison and extension did not run",
+        ):
+            with self.subTest(literal=literal):
+                self.assertIn(literal, normalized)
+
         found_hashes = re.findall(r"\b[0-9a-f]{64}\b", self.report)
         self.assertEqual(set(found_hashes), set(EVIDENCE_HASHES.values()))
         self.assertEqual(len(found_hashes), len(EVIDENCE_HASHES))
+
+    def test_report_answers_the_reader_questions_without_strengthening_the_result(self):
+        normalized = " ".join(self.report.split())
+        semantic_patterns = (
+            r"Prompt caching is not the reuse of a stored answer",
+            r"Compression is a separate intervention",
+            r"comparable individual requests from the same task at the same logical ordinal",
+            r"18 provider calls succeeded.*Six task trials started and five completed",
+            r"zero valid cycles",
+            r"Cached input is a subset of input rather than an additional amount",
+            r"not a reconciled invoice",
+            r"not a `none` versus `squeez` comparison.*general model-quality claim",
+            r"evidence did not isolate whether the request-count difference came from",
+        )
+        for pattern in semantic_patterns:
+            with self.subTest(pattern=pattern):
+                self.assertRegex(normalized, pattern)
 
     def test_navigation_publication_and_snapshot_boundaries(self):
         root_readme = (ROOT / "README.md").read_text(encoding="utf-8")
@@ -98,8 +125,7 @@ class CacheExecutionReportTests(unittest.TestCase):
             "\n## ", 1
         )[0]
         protected_conditions = (
-            "The sealed public-safe evidence available for this report does not "
-            "retain an execution date/time window or timezone.",
+            "does not retain an execution date, time window, or timezone",
             "Provider `foundry`; model `gpt-5.4`; provider-reported revision "
             "`gpt-5.4-2026-03-05`",
             "`openai_v1_chat_completions` through a project-scoped Foundry endpoint binding",
@@ -116,8 +142,8 @@ class CacheExecutionReportTests(unittest.TestCase):
                 self.assertIn(literal, conditions)
 
         self.assertIn(
-            "Temperature `0` was configured, but that setting does not establish "
-            "deterministic request counts.",
+            "Temperature `0` and reasoning effort `none` were configured, but those "
+            "settings do not establish deterministic request counts.",
             " ".join(self.report.split()),
         )
 

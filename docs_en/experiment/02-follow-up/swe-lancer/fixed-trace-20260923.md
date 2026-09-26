@@ -1,20 +1,37 @@
-# SWE-Lancer Fixed Trace Result: Zero Valid Protocol Traces
+# SWE-Lancer Fixed Execution Report: Zero Valid Protocol Traces
 
-## Finding
+## What the execution needed to show
 
-The fixed candidate did not produce a valid provider-backed trace. Two runner
-groups were observed, although the sealed plan allowed exactly one execution.
-Both stopped while the sandbox computer was starting, before any logical model
-request, provider HTTP attempt, tool call, or grader call. The terminal result
+A software-task benchmark needs more than a model answer. For this record to be
+admissible, the selected task row, image, solver, model, API, and safety settings
+first had to pass their pre-dispatch checks. The sandbox then had to become
+ready, the solver had to issue any model and tool requests, the grader had to
+evaluate the result, and the runner had to seal the trace and cleanup state.
+
+The question was whether preselected candidate `28565_1001` could complete that
+chain once under the fixed contract. A **valid protocol trace** means exactly
+one execution that starts only after every pre-dispatch predicate passes,
+retains the configured sandbox isolation, and preserves its result and cleanup.
+A runner output group or local result row alone does not meet that definition.
+
+## What happened
+
+Initial pre-dispatch verification passed `27/29` checks and failed `task.row`
+and `image.config`. A first runner group nevertheless appeared after that
+failed record. It ended in `computer_startup_timeout` while waiting for the
+sandbox computer to become ready.
+
+After owner-controlled inputs were corrected, verification passed `31/31`.
+That later result did not erase the initial `27/29` record. A second runner
+group then appeared even though the sealed plan allowed exactly one execution.
+During its guarded start, the private observer recorded
+`allow_internet=true` while the command configured `disable_internet=true`.
+The second group also ended in `computer_startup_timeout`.
+
+Both groups stopped during sandbox startup, before any logical model request,
+provider HTTP attempt, API call, tool call, or grader call. The terminal result
 is therefore `invalid_protocol_trace`, not a task pass, task failure, provider
-failure, or grader outcome.
-
-Three predicates invalidate the result. The first runner group began after the
-initial pre-dispatch verification had passed `27/29` checks and failed
-`task.row` and `image.config`. A corrected verification later passed `31/31`,
-but a second runner group breached the one-execution rule. During the guarded
-second start, the private observer recorded `allow_internet=true` even though
-the command configured `disable_internet=true`.
+failure, or grader outcome. The valid-protocol-trace count is `0`.
 
 > **Public quotation boundary.** Any quotation of this result must retain all
 > of the following: two runner groups were observed against a one-execution
@@ -22,7 +39,7 @@ the command configured `disable_internet=true`.
 > startup timeout before provider dispatch; provider/model/API/grader calls
 > were `0`; and the result does not measure candidate quality or cost.
 
-## What was attempted
+## Fixed design
 
 This was a descriptive execution of one fixed configuration, not an A/B test.
 Candidate `28565_1001` was selected from the single `ic_swe` example in the
@@ -63,22 +80,23 @@ permitted.
 | Selected row | 2,761 UTF-8 bytes; SHA-256 `ff7ea7f9d37739a30adff1d26f51eb3baee87a1cad421d4e1cc17c26adb19702` |
 | Image | Linux/amd64; manifest `sha256:b6ee529bbc589b251d2e287aa28068ea4f7e69b3eac2927b393091ac968e7587`; config `sha256:3ac386d8f793eb2c3fdef76766b551bb2c04da8b7dd9703a01b561c293b82400` |
 | Runtime | `nanoeval_alcatraz.alcatraz_computer_interface:AlcatrazComputerRuntime`; environment `alcatraz.clusters.local:LocalConfig`; project-owned private Linux carrier |
-| Provider and model | Provider `openai`; model setting `openai/gpt-4o`; request model `gpt-4o`; reported revision `gpt-4o-2024-11-20` |
+| Provider and model | Provider `openai`; model setting `openai/gpt-4o`; request model `gpt-4o`; revision `gpt-4o-2024-11-20` pinned and verified in the admitted contract before dispatch. No inference response occurred. |
 | API and private boundary | `openai-v1-chat-completions`; admitted credential and sandbox endpoint environment bindings were present, but their values and identities are not published |
 | Execution settings | Concurrency `1`; multiprocessing disabled; runner retries `0`; SDK retries `0`; registry pull disabled; Slack disabled; no determinism claim |
 | Sandbox network setting | The command configured `disable_internet=true`; the guarded start observed `allow_internet=true`, so the isolation predicate did not hold |
-| Evidence window | `2026-09-23T02:12:29Z` to `2026-09-23T02:18:27.355804Z`, UTC; derived from UTC run-group names and private run-log modification times |
+| Evidence window | `2026-09-23T02:12:29Z` to `2026-09-23T02:18:27.355804Z`, UTC; derived from UTC runner-group names and private run-log modification times, not an independently timed workload duration |
 | Deadline | `2026-09-23T02:36:39Z`; the observed execution evidence ended before the deadline |
 | Price schedule | `USD 2.50` per million input tokens and `USD 10.00` per million output tokens; retained only as the admitted calculation schedule |
-| Judge | The benchmark grader was not invoked. Independent grader validation was not available in the sealed evidence. |
+| Judge | The benchmark grader was not invoked. The sealed evidence inspected for this report contains no independent grader-validation evidence. |
 | Public evidence grade | Sanitized aggregate and hash-only evidence; no raw task, reference, message, solver, catalog, review, endpoint, credential, private path, runtime identifier, or raw trace text |
 
 ## Admission and protocol result
 
 The fresh carrier admission exited `0` with `status=ready` and `ready=true`.
 Independent carrier verification passed `98/98` checks, and carrier negative
-controls passed `11/11`. Those results established the carrier input contract;
-they did not make a later trace valid.
+controls passed `11/11`. Those checks established the carrier input and evidence
+contracts they were designed to inspect. They did not validate model or grader
+quality and did not make a later trace valid.
 
 | Gate or denominator | Result |
 |---|---:|
@@ -95,7 +113,8 @@ they did not make a later trace valid.
 
 The plan's `replacement_attempts=0` field does not reconcile the two observed
 runner groups. The report preserves the contradiction rather than treating the
-second group as an allowed replacement.
+second group as an allowed replacement. Likewise, the final `31/31` gate did
+not erase the initial `27/29` failures or retroactively authorize either group.
 
 ## Execution counts
 
@@ -141,31 +160,34 @@ an inferred exit code.
 | Invoice | `not_measured` | No billing reconciliation was performed |
 | Host-compute cost | `not_measured` | No independent host-cost observation was sealed |
 
-The benchmark grader was not invoked, so task pass is `not_measured`. Each
-runner group wrote one `correct=False` row after the startup error. Those rows
-are error placeholders and must not be quoted as two graded failures or as a
-quality denominator.
+Neither runner group reached provider dispatch, so no provider response existed
+from which to read token usage. The input and output zeros are aggregate counters
+for that state. Cached-input and reasoning fields are
+`not_applicable_no_provider_call` because those values would have come from a
+provider response. Applying the admitted prices to the recorded provider usage
+produces `USD 0.000000`; that calculated amount is not a reconciled invoice and
+does not establish zero host-compute cost. Invoice and host-compute cost are both
+`not_measured`.
 
-## Why the trace is invalid
+The benchmark grader was not invoked, so task pass is `not_measured`. The two
+`correct=False` rows are startup-error placeholders, not graded failures, and
+must not be quoted as a quality denominator.
 
-**Observation.** The initial pre-dispatch record failed two checks. A first
-runner group nevertheless appeared immediately afterward and ended with
-`computer_startup_timeout`. After the owner-controlled corrections, the final
-pre-dispatch verification passed `31/31`, but a second runner group created a
-second execution record. Its guard recorded `allow_internet=true` while the
-fixed command configured `disable_internet=true`. It also ended with
-`computer_startup_timeout`, before any provider request or grader call.
+## What the evidence can and cannot explain
 
-**Possible explanation.** Both private run logs ended while waiting for the
-sandbox computer to start. That is consistent with a sandbox-startup problem,
-but the evidence did not isolate whether image startup, runtime wiring,
-container health, network handling, or another mechanism caused it.
+The evidence directly establishes the two-group history, the initial failed
+checks, the later green gate, the network-setting contradiction, and two
+sandbox startup timeouts before provider or grader dispatch. Both private run
+logs ended while waiting for the sandbox computer to start. That pattern is
+consistent with a startup-stage problem, but it does not identify the cause.
+The evidence did not isolate whether image startup, runtime wiring, container
+health, network handling, or another mechanism produced the timeouts.
 
-**Limits.** The two-group history breaches the one-execution contract, and the
-observed network flag breaches the admitted isolation condition. The evidence
-therefore supports zero valid protocol traces. It does not support a candidate
-pass/fail judgment, provider reliability claim, model-quality claim, token or
-cost distribution, causal explanation, stability estimate, pass rate, ranking,
+The two-group history breaches the one-execution contract, and the observed
+network flag breaches the admitted isolation condition. The evidence therefore
+supports zero valid protocol traces. It does not support a candidate pass/fail
+judgment, provider reliability claim, model-quality claim, token or cost
+distribution, causal explanation, stability estimate, pass rate, ranking,
 non-inferiority conclusion, representative performance claim, or population
 cost estimate. A new execution would require a separate project item; it cannot
 be treated as a continuation or replacement for this result.
@@ -198,6 +220,66 @@ and network-rule survivors. The private raw trace remained no-clobber with mode
 passed `14/14`, privacy findings were `0`, and the focused repository suite
 passed `45/45`. The VM reached `deallocated` at
 `2026-09-23T03:01:53.152209Z`.
+
+## Factual guard record
+
+The figure generator and focused tests read this stable record rather than
+depending on explanatory sentence wording or Markdown line wrapping. The record
+repeats admitted public facts; it does not add evidence, make the execution valid,
+or change the report's quotation boundary.
+
+| Field | Value |
+|---|---|
+| `source_commit` | `cf8960a6121e91c8ec6a796d470009a27504bf61` |
+| `source_tree` | `70e0961bf2a3009d9a2c8e36471744be81775daa` |
+| `upstream_commit` | `51052cede8cc608f95bb00346635e03759013e5a` |
+| `candidate` | `28565_1001` |
+| `split` | `diamond` |
+| `task_type` | `ic_swe` |
+| `task_count` | `1` |
+| `planned_fixed_executions` | `1` |
+| `initial_checks` | `27/29` |
+| `initial_failure_1` | `task.row` |
+| `initial_failure_2` | `image.config` |
+| `final_checks` | `31/31` |
+| `runner_groups` | `2` |
+| `valid_protocol_traces` | `0` |
+| `replacement_attempts` | `0` |
+| `sandbox_startup_attempts` | `2` |
+| `sandbox_ready` | `0` |
+| `sandbox_startup_timeouts` | `2` |
+| `provider_calls` | `0` |
+| `model_calls` | `0` |
+| `api_calls` | `0` |
+| `grader_calls` | `0` |
+| `tool_calls` | `0` |
+| `tool_results` | `0` |
+| `provider_usage_records` | `0` |
+| `trace_events` | `3` |
+| `runner_result_rows` | `2` |
+| `network_configured` | `disable_internet=true` |
+| `network_observed` | `allow_internet=true` |
+| `runner_group_1_outcome` | `computer_startup_timeout` |
+| `runner_group_2_outcome` | `computer_startup_timeout` |
+| `provider_input_tokens` | `0` |
+| `provider_output_tokens` | `0` |
+| `cached_input_status` | `not_applicable_no_provider_call` |
+| `reasoning_status` | `not_applicable_no_provider_call` |
+| `calculated_api_cost` | `USD 0.000000` |
+| `provider_reported_cost_status` | `not_measured` |
+| `invoice_status` | `not_measured` |
+| `host_cost_status` | `not_measured` |
+| `runner_exit_status` | `unknown` |
+| `grader_status` | `not_run` |
+| `task_quality_status` | `not_measured` |
+| `error_row_meaning` | `startup_error_placeholder_not_graded_failure` |
+| `cleanup_survivors` | `0` |
+| `model_revision` | `gpt-4o-2024-11-20` |
+| `model_revision_basis` | `pinned_verified_pre_dispatch_no_inference_response` |
+| `evidence_window_start_utc` | `2026-09-23T02:12:29Z` |
+| `evidence_window_end_utc` | `2026-09-23T02:18:27.355804Z` |
+| `evidence_window_basis` | `runner_group_names_and_private_log_mtimes_not_workload_latency` |
+| `terminal_status` | `invalid_protocol_trace` |
 
 ## Evidence hashes
 
@@ -251,7 +333,8 @@ passed `45/45`. The VM reached `deallocated` at
 | Focused repository test log | `6f0a196684be31fe01e825e0ddae71ec3352645e058b0927ee82d739a591648a` |
 
 This report is post-snapshot material. It does not modify the preserved English
-snapshot, Korean documents, historical candidate evaluation, or private trace.
+snapshot, preserved historical Korean records, historical candidate evaluation,
+or private trace.
 See the [SWE-Lancer candidate evaluation](../../swe-lancer-candidate-evaluation-20260920.md)
 for the earlier no-trace boundary and the
 [runtime-owner handoff](../../../../docs/runtime-owner-handoff.md) for the public

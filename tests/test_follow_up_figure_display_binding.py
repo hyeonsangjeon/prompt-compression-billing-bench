@@ -35,8 +35,8 @@ class FollowUpFigureDisplayBindingTests(unittest.TestCase):
             with self.subTest(language=language):
                 display = deepcopy(swe_figure.build_display(facts, language))
                 outcomes = list(display["outcomes"])
-                label, value, _ = outcomes[3]
-                outcomes[3] = (label, value, (mutation,))
+                label, _ = outcomes[3]
+                outcomes[3] = (label, (mutation,))
                 display["outcomes"] = tuple(outcomes)
                 with self.assertRaisesRegex(ValueError, "displayed facts"):
                     swe_figure.render_svg_from_display(facts, language, display)
