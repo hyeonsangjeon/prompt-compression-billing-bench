@@ -14,13 +14,15 @@ from .protection import digest
 
 ROOT = Path(__file__).resolve().parents[1]
 REPORT = ROOT / "docs_en/experiment/02-follow-up/swe-lancer/fixed-trace-20260923.md"
-REPORT_SHA256 = "fbb6c7feae38c5fefc6251c5445116099af945284f6b5825a56e4a3213ba4ea4"
+REPORT_SHA256 = "1c7308daf6e8066d28e809f86c3bb5373081e4a3066713f128e4079945de0301"
 OUTPUTS = {
     "ko": ROOT / "figures/follow-up/swe-protocol-outcome-ko.svg",
     "en": ROOT / "figures/follow-up/swe-protocol-outcome-en.svg",
 }
-OUTCOME_BOX_WIDTH = 300
-OUTCOME_TEXT_INSET = 18
+SVG_WIDTH = 390
+SVG_HEIGHT = 1408
+OUTCOME_BOX_WIDTH = 354
+OUTCOME_TEXT_INSET = 16
 FACTS = {
     "candidate": "28565_1001",
     "plan": {"fixed_executions": 1},
@@ -46,54 +48,95 @@ FACTS = {
         "invoice": "not_measured",
         "host_cost": "not_measured",
         "calculated_api_cost": "USD 0.000000",
+        "error_row_meaning": "startup_error_placeholder_not_graded_failure",
     },
 }
-REPORT_CLAUSES = (
-    (
-        "source",
-        "| Repository source | Commit `cf8960a6121e91c8ec6a796d470009a27504bf61`; tree `70e0961bf2a3009d9a2c8e36471744be81775daa` |",
+REPORT_RECORD = {
+    "source_commit": "cf8960a6121e91c8ec6a796d470009a27504bf61",
+    "source_tree": "70e0961bf2a3009d9a2c8e36471744be81775daa",
+    "upstream_commit": "51052cede8cc608f95bb00346635e03759013e5a",
+    "candidate": "28565_1001",
+    "split": "diamond",
+    "task_type": "ic_swe",
+    "task_count": 1,
+    "planned_fixed_executions": 1,
+    "initial_checks": "27/29",
+    "initial_failure_1": "task.row",
+    "initial_failure_2": "image.config",
+    "final_checks": "31/31",
+    "runner_groups": 2,
+    "valid_protocol_traces": 0,
+    "replacement_attempts": 0,
+    "sandbox_startup_attempts": 2,
+    "sandbox_ready": 0,
+    "sandbox_startup_timeouts": 2,
+    "provider_calls": 0,
+    "model_calls": 0,
+    "api_calls": 0,
+    "grader_calls": 0,
+    "tool_calls": 0,
+    "tool_results": 0,
+    "provider_usage_records": 0,
+    "trace_events": 3,
+    "runner_result_rows": 2,
+    "network_configured": "disable_internet=true",
+    "network_observed": "allow_internet=true",
+    "runner_group_1_outcome": "computer_startup_timeout",
+    "runner_group_2_outcome": "computer_startup_timeout",
+    "provider_input_tokens": 0,
+    "provider_output_tokens": 0,
+    "cached_input_status": "not_applicable_no_provider_call",
+    "reasoning_status": "not_applicable_no_provider_call",
+    "calculated_api_cost": "USD 0.000000",
+    "provider_reported_cost_status": "not_measured",
+    "invoice_status": "not_measured",
+    "host_cost_status": "not_measured",
+    "runner_exit_status": "unknown",
+    "grader_status": "not_run",
+    "task_quality_status": "not_measured",
+    "error_row_meaning": "startup_error_placeholder_not_graded_failure",
+    "cleanup_survivors": 0,
+    "model_revision": "gpt-4o-2024-11-20",
+    "model_revision_basis": "pinned_verified_pre_dispatch_no_inference_response",
+    "evidence_window_start_utc": "2026-09-23T02:12:29Z",
+    "evidence_window_end_utc": "2026-09-23T02:18:27.355804Z",
+    "evidence_window_basis": "runner_group_names_and_private_log_mtimes_not_workload_latency",
+    "terminal_status": "invalid_protocol_trace",
+}
+REPORT_SEMANTIC_PATTERNS = {
+    "zero valid trace non-finding": r"valid-protocol-trace count (?:is|was) `?0`?",
+    "ungraded error rows": r"`correct=False` rows?[^.]{0,180}(?:not graded failures|not (?:a )?grader outcome)",
+    "causal uncertainty": (
+        r"(?:evidence|record)[^.]{0,100}(?:did not|does not|could not)[^.]{0,100}"
+        r"(?:isolate|identify|establish)[^.]{0,220}(?:cause|caused|produced the timeouts|mechanism)"
     ),
-    ("one-execution plan", "| Planned fixed executions | 1 |"),
-    ("initial checks", "| Initial pre-dispatch verification | 27/29; failed `task.row`, `image.config` |"),
-    ("final checks", "| Final pre-dispatch verification | 31/31 |"),
-    ("runner groups", "| Runner groups observed | 2 |"),
-    ("valid traces", "| Valid protocol traces | 0 |"),
-    ("sandbox starts", "| Sandbox startup attempts | 2 |"),
-    ("sandbox ready", "| Sandbox ready | 0 |"),
-    ("timeouts", "| Sandbox startup timeouts | 2 |"),
-    (
-        "network contradiction",
-        "The command configured `disable_internet=true`; the guarded start observed `allow_internet=true`, so the isolation predicate did not hold",
+    "revision basis": r"gpt-4o-2024-11-20.{0,220}before dispatch.{0,220}No inference response occurred",
+    "evidence-window provenance": (
+        r"derived from UTC runner-group names and private run-log modification times"
+        r"[^.]{0,160}not an independently timed workload duration"
     ),
-    ("provider calls", "| Provider calls | 0 |"),
-    ("model calls", "| Model calls | 0 |"),
-    ("API calls", "| API calls | 0 |"),
-    ("grader calls", "| Grader calls | 0 |"),
-    ("runner exit", "the runner process exit code is unknown"),
-    (
-        "usage status",
-        "| Provider-reported cached input tokens | `not_applicable_no_provider_call` | No provider response existed |",
+    "carrier boundary": r"did not validate model or grader quality.{0,180}did not make a later trace valid",
+    "network contradiction": r"configured `disable_internet=true`[^.]{0,180}(?:recorded|observed) `allow_internet=true`",
+    "runner exit unknown": r"runner process exit code is unknown",
+    "grader quality status": r"grader was not invoked[^.]{0,120}task pass is `not_measured`",
+    "quality non-claim": r"does not support a candidate pass/fail judgment[^.]{0,500}population cost estimate",
+    "usage and cost boundary": (
+        r"no provider response existed.{0,160}read token usage"
+        r".{0,220}input and output zeros are aggregate counters"
+        r".{0,500}not a reconciled invoice"
+        r".{0,180}does not establish zero host-compute cost"
     ),
-    ("calculated cost", "| Calculated API cost | `USD 0.000000` | Zero dispatched provider requests and zero provider usage; not an invoice |"),
-    ("invoice", "| Invoice | `not_measured` | No billing reconciliation was performed |"),
-    ("host cost", "| Host-compute cost | `not_measured` | No independent host-cost observation was sealed |"),
-    (
-        "ungraded rows",
-        "Those rows are error placeholders and must not be quoted as two graded failures or as a quality denominator.",
+}
+REPORT_FORBIDDEN_PATTERNS = {
+    "causal promotion": (
+        r"(?:evidence|record)[^.]{0,100}(?:established|proved|showed|demonstrated)"
+        r"[^.]{0,180}(?:image|network|runtime|container|sandbox)[^.]{0,120}caused"
     ),
-    (
-        "quality status",
-        "The benchmark grader was not invoked, so task pass is `not_measured`.",
-    ),
-    (
-        "cleanup",
-        "Post-result verification found `0` container, process, workspace, Docker-network, and network-rule survivors.",
-    ),
-    (
-        "non-claim boundary",
-        "It does not support a candidate pass/fail judgment, provider reliability claim, model-quality claim, token or cost distribution, causal explanation, stability estimate, pass rate, ranking, non-inferiority conclusion, representative performance claim, or population cost estimate.",
-    ),
-)
+    "graded-error promotion": r"`correct=False` rows?[^.]{0,120}(?:are|were) graded failures",
+    "inference-observed revision": r"gpt-4o-2024-11-20[^.]{0,120}observed in an inference response",
+    "zero-host-cost promotion": r"(?:host cost|host-compute cost)[^.]{0,80}(?:was|is) (?:USD )?0",
+    "runner-exit promotion": r"runner process exit code (?:was|is) (?:`?0`?|successful)",
+}
 
 
 def _normalized(value: str) -> str:
@@ -101,10 +144,101 @@ def _normalized(value: str) -> str:
 
 
 def validate_report(markdown: str) -> None:
-    normalized = _normalized(markdown)
-    for label, clause in REPORT_CLAUSES:
-        if _normalized(clause) not in normalized:
-            raise ValueError(f"SWE report changed: {label}")
+    record = parse_report_record(markdown)
+    if record != REPORT_RECORD:
+        raise ValueError("SWE canonical factual record changed")
+    if parse_report_facts(markdown) != FACTS:
+        raise ValueError("SWE accepted facts differ from the canonical report")
+
+    visible_rows = {
+        "planned_fixed_executions": "Planned fixed executions",
+        "runner_groups": "Runner groups observed",
+        "valid_protocol_traces": "Valid protocol traces",
+        "replacement_attempts": "Replacement attempts recorded by the plan",
+        "sandbox_startup_attempts": "Sandbox startup attempts",
+        "sandbox_ready": "Sandbox ready",
+        "provider_calls": "Provider calls",
+        "model_calls": "Model calls",
+        "api_calls": "API calls",
+        "grader_calls": "Grader calls",
+        "provider_usage_records": "Provider usage records",
+        "trace_events": "Trace events",
+        "runner_result_rows": "Runner result rows",
+        "sandbox_startup_timeouts": "Sandbox startup timeouts",
+    }
+    for field, label in visible_rows.items():
+        value = _integer(_single_value(markdown, label, 2), label)
+        if value != record[field]:
+            raise ValueError(f"SWE visible value differs from fact record: {field}")
+
+    tool_cells = _row_cells(markdown, "Tool calls / results")
+    expected_tools = f'{record["tool_calls"]} / {record["tool_results"]}'
+    if len(tool_cells) != 2 or tool_cells[1] != expected_tools:
+        raise ValueError("SWE visible tool counts differ from fact record")
+
+    provider_usage_rows = {
+        "provider_input_tokens": "Provider-reported input tokens",
+        "provider_output_tokens": "Provider-reported output tokens",
+    }
+    for field, label in provider_usage_rows.items():
+        if _integer(_single_value(markdown, label, 3), label) != record[field]:
+            raise ValueError(f"SWE visible usage differs from fact record: {field}")
+
+    initial = _single_value(markdown, "Initial pre-dispatch verification", 2)
+    expected_initial = (
+        f'{record["initial_checks"]}; failed `{record["initial_failure_1"]}`, '
+        f'`{record["initial_failure_2"]}`'
+    )
+    if initial != expected_initial:
+        raise ValueError("SWE visible initial checks differ from fact record")
+    if _single_value(markdown, "Final pre-dispatch verification", 2) != record["final_checks"]:
+        raise ValueError("SWE visible final checks differ from fact record")
+
+    group_rows = re.findall(
+        r"^\|\s*(?:1|2)\s*\|\s*`[^`]+` to `[^`]+`\s*\|\s*`([^`]+)`\s*\|\s*\d+\s*\|$",
+        markdown,
+        flags=re.MULTILINE,
+    )
+    expected_group_outcomes = [
+        record["runner_group_1_outcome"],
+        record["runner_group_2_outcome"],
+    ]
+    if group_rows != expected_group_outcomes:
+        raise ValueError("SWE visible runner-group outcomes differ from fact record")
+
+    source = _row_cells(markdown, "Repository source")
+    expected_source = f'Commit `{record["source_commit"]}`; tree `{record["source_tree"]}`'
+    if len(source) != 2 or source[1] != expected_source:
+        raise ValueError("SWE visible source differs from fact record")
+
+    network = _row_cells(markdown, "Sandbox network setting")
+    if (
+        len(network) != 2
+        or f'`{record["network_configured"]}`' not in network[1]
+        or f'`{record["network_observed"]}`' not in network[1]
+    ):
+        raise ValueError("SWE visible network status differs from fact record")
+
+    status_rows = {
+        "cached_input_status": "Provider-reported cached input tokens",
+        "reasoning_status": "Provider-reported reasoning tokens",
+        "calculated_api_cost": "Calculated API cost",
+        "provider_reported_cost_status": "Provider-reported cost",
+        "invoice_status": "Invoice",
+        "host_cost_status": "Host-compute cost",
+    }
+    for field, label in status_rows.items():
+        if _single_value(markdown, label, 3) != record[field]:
+            raise ValueError(f"SWE visible status differs from fact record: {field}")
+
+    narrative = markdown.split("## Factual guard record", 1)[0]
+    normalized = _normalized(narrative)
+    for label, pattern in REPORT_SEMANTIC_PATTERNS.items():
+        if re.search(pattern, normalized, flags=re.IGNORECASE) is None:
+            raise ValueError(f"SWE report semantic boundary changed: {label}")
+    for label, pattern in REPORT_FORBIDDEN_PATTERNS.items():
+        if re.search(pattern, normalized, flags=re.IGNORECASE) is not None:
+            raise ValueError(f"SWE report forbidden claim introduced: {label}")
 
 
 def _row_cells(markdown: str, label: str, columns: int | None = None) -> list[str]:
@@ -136,72 +270,58 @@ def _single_value(markdown: str, label: str, columns: int | None = None) -> str:
     return value
 
 
-def parse_report_facts(markdown: str) -> dict:
-    candidate_cells = _row_cells(markdown, "Candidate")
-    candidate = re.fullmatch(r"`([^`]+)`; split `diamond`; type `ic_swe`; task count `1`", candidate_cells[1])
-    initial = re.fullmatch(
-        r"(\d+/\d+); failed `([^`]+)`, `([^`]+)`",
-        _single_value(markdown, "Initial pre-dispatch verification"),
-    )
-    network = re.search(
-        r"The command configured `([^`]+)`; the guarded start observed `([^`]+)`, "
-        r"so the isolation predicate did not hold",
-        markdown,
-    )
-    group_rows = re.findall(
-        r"^\|\s*(?:1|2)\s*\|\s*`[^`]+` to `[^`]+`\s*\|\s*`([^`]+)`\s*\|\s*\d+\s*\|$",
-        markdown,
-        flags=re.MULTILINE,
-    )
-    calculated_cost = _single_value(markdown, "Calculated API cost", 3)
-    cleanup = re.search(
-        r"Post-result verification found `([0-9]+)` container, process, workspace, Docker-network,\s+"
-        r"and network-rule survivors\.",
-        markdown,
-    )
-    if candidate is None or initial is None or network is None or len(group_rows) != 2 or cleanup is None:
-        raise ValueError("SWE report structured fact changed")
-    normalized = _normalized(markdown)
-    if "the runner process exit code is unknown" not in normalized:
-        raise ValueError("SWE report runner exit changed")
-    if "The benchmark grader was not invoked, so task pass is `not_measured`." not in normalized:
-        raise ValueError("SWE report grader or quality status changed")
+def _record_value(markdown: str, field: str) -> str:
+    cells = _row_cells(markdown, f"`{field}`", 2)
+    if re.fullmatch(r"`[^`]+`", cells[1]) is None:
+        raise ValueError(f"SWE report fact record changed: {field}")
+    return cells[1][1:-1]
 
-    calls = [
-        _integer(_single_value(markdown, label), label)
-        for label in ("Provider calls", "Model calls", "API calls", "Grader calls")
-    ]
+
+def parse_report_record(markdown: str) -> dict:
+    parsed = {}
+    for field, expected in REPORT_RECORD.items():
+        value = _record_value(markdown, field)
+        parsed[field] = _integer(value, field) if isinstance(expected, int) else value
+    return parsed
+
+
+def parse_report_facts(markdown: str) -> dict:
+    record = parse_report_record(markdown)
     return {
-        "candidate": candidate.group(1),
-        "plan": {"fixed_executions": _integer(_single_value(markdown, "Planned fixed executions"), "planned executions")},
+        "candidate": record["candidate"],
+        "plan": {"fixed_executions": record["planned_fixed_executions"]},
         "observed": {
-            "initial_checks": initial.group(1),
-            "initial_failures": (initial.group(2), initial.group(3)),
-            "final_checks": _single_value(markdown, "Final pre-dispatch verification"),
-            "runner_groups": _integer(_single_value(markdown, "Runner groups observed"), "runner groups"),
-            "sandbox_startup_attempts": _integer(
-                _single_value(markdown, "Sandbox startup attempts"), "sandbox startup attempts"
+            "initial_checks": record["initial_checks"],
+            "initial_failures": (record["initial_failure_1"], record["initial_failure_2"]),
+            "final_checks": record["final_checks"],
+            "runner_groups": record["runner_groups"],
+            "sandbox_startup_attempts": record["sandbox_startup_attempts"],
+            "sandbox_ready": record["sandbox_ready"],
+            "sandbox_startup_timeouts": record["sandbox_startup_timeouts"],
+            "provider_model_api_grader_calls": "/".join(
+                str(record[field])
+                for field in ("provider_calls", "model_calls", "api_calls", "grader_calls")
             ),
-            "sandbox_ready": _integer(_single_value(markdown, "Sandbox ready"), "sandbox ready"),
-            "sandbox_startup_timeouts": _integer(
-                _single_value(markdown, "Sandbox startup timeouts"), "sandbox startup timeouts"
+            "valid_protocol_traces": record["valid_protocol_traces"],
+            "runner_result_rows": record["runner_result_rows"],
+            "cleanup_survivors": record["cleanup_survivors"],
+            "runner_group_outcomes": (
+                record["runner_group_1_outcome"],
+                record["runner_group_2_outcome"],
             ),
-            "provider_model_api_grader_calls": "/".join(str(value) for value in calls),
-            "valid_protocol_traces": _integer(
-                _single_value(markdown, "Valid protocol traces"), "valid protocol traces"
-            ),
-            "runner_result_rows": _integer(_single_value(markdown, "Runner result rows"), "runner result rows"),
-            "cleanup_survivors": int(cleanup.group(1)),
-            "runner_group_outcomes": tuple(group_rows),
         },
-        "network": {"configured": network.group(1), "observed": network.group(2)},
+        "network": {
+            "configured": record["network_configured"],
+            "observed": record["network_observed"],
+        },
         "statuses": {
-            "grader": "not_run",
-            "runner_exit": "unknown",
-            "task_quality": "not_measured",
-            "invoice": _single_value(markdown, "Invoice", 3),
-            "host_cost": _single_value(markdown, "Host-compute cost", 3),
-            "calculated_api_cost": calculated_cost,
+            "grader": record["grader_status"],
+            "runner_exit": record["runner_exit_status"],
+            "task_quality": record["task_quality_status"],
+            "invoice": record["invoice_status"],
+            "host_cost": record["host_cost_status"],
+            "calculated_api_cost": record["calculated_api_cost"],
+            "error_row_meaning": record["error_row_meaning"],
         },
     }
 
@@ -220,23 +340,27 @@ def load_facts(path: Path = REPORT, expected_sha256: str = REPORT_SHA256) -> dic
 
 COPY = {
     "ko": {
-        "title": "SWE-Lancer 프로토콜 무효 실행과 정리",
-        "description_end": "검증 실패, 네트워크 설정 모순, 시작 시간 초과와 측정되지 않은 상태를 분리한다.",
-        "outcome_title": "관측 단위와 상태",
-        "claim_boundary": "통과율, 순위, 후보 품질, 안정성, 대표 비용을 판단하지 않음",
+        "title": "SWE-Lancer 실행: 유효 기록과 모델 평가 전 중단",
+        "display_title": "SWE-Lancer 실행이 멈춘 지점",
+        "subtitle": "계획 1회와 관측된 두 실행 결과 묶음",
+        "sequence_title": "두 실행 결과 묶음의 순서",
+        "outcome_title": "중단 뒤 남은 상태",
+        "context_title": "이 그림이 보여 주지 못하는 것",
+        "claim_boundary": ("통과율·순위 결과 없음", "후보 품질 결과 없음", "안정성 결과 없음"),
     },
     "en": {
-        "title": "SWE-Lancer protocol-invalid execution and cleanup",
-        "description_end": (
-            "Gate failures, the network-setting contradiction, startup timeouts, and unmeasured states remain separate."
-        ),
-        "outcome_title": "Observed units and statuses",
-        "claim_boundary": "No pass rate, ranking, candidate-quality, stability, or population-cost conclusion",
+        "title": "SWE-Lancer execution: stopped before a valid trace or model evaluation",
+        "display_title": "SWE-Lancer execution stop",
+        "subtitle": "One plan · two runner groups",
+        "sequence_title": "The two runner groups in order",
+        "outcome_title": "What remained after the stop",
+        "context_title": "What the figure cannot show",
+        "claim_boundary": ("No pass-rate or ranking result", "No candidate-quality result", "No stability result"),
     },
 }
 COPY_SHA256 = {
-    "ko": "33ca1793120932a1a643535d7db3c10be8547100dfaa4c1436727c09e4543133",
-    "en": "c03a9396f2fe31b8da6fde6ef7984b5524b91e617c1d4fe68c32b02d8bbe5572",
+    "ko": "290f61530f02a10f8474a1247d9c2d3e1aa32a88c338df0d847614ae786e89ec",
+    "en": "4d4a0a8bfa2fbec7ceb5955a6a4273b9758f2fc34f20ab201ca9c19482554d95",
 }
 
 
@@ -265,20 +389,21 @@ def build_display(facts: dict, language: str) -> dict:
     }
     if any(outcome not in outcome_labels[language] for outcome in group_outcomes):
         raise ValueError("SWE runner-group display status differs from the canonical report")
+    if statuses["error_row_meaning"] != "startup_error_placeholder_not_graded_failure":
+        raise ValueError("SWE error-row display meaning differs from the canonical report")
     if language == "ko":
         return {
             **copy,
             "description": (
-                f'계획한 고정 실행 {plan["fixed_executions"]}회와 관측된 실행 결과 묶음 '
-                f'{observed["runner_groups"]}개를 순서대로 보이고, {copy["description_end"]}'
+                f'고정 실행 {plan["fixed_executions"]}회 계획과 관측된 실행 결과 묶음 '
+                f'{observed["runner_groups"]}개를 순서대로 보여 준다. 두 묶음은 모두 '
+                "모델·채점기 호출 전 격리 실행 환경 시작 시간 초과로 끝났다."
             ),
-            "subtitle": (
-                f'고정 후보 {facts["candidate"]} · 유효 프로토콜 실행 기록 '
-                f'{observed["valid_protocol_traces"]}개'
+            "summary": (
+                f'계획 · 고정 실행 {plan["fixed_executions"]}회',
+                f'관측 · 실행 결과 묶음 {observed["runner_groups"]}개',
+                f'유효 프로토콜 실행 기록 · {observed["valid_protocol_traces"]}개',
             ),
-            "plan": f'계획 · 고정 실행 {plan["fixed_executions"]}회',
-            "observed": f'관측 · 실행 결과 묶음 {observed["runner_groups"]}개',
-            "valid": f'유효 기록 · {observed["valid_protocol_traces"]}개 (관측)',
             "group_one_title": f"실행 결과 묶음 {group_numbers[0]}",
             "group_one_lines": (
                 f'초기 검증 {observed["initial_checks"]}',
@@ -297,51 +422,54 @@ def build_display(facts: dict, language: str) -> dict:
             "outcomes": (
                 (
                     "격리 실행 환경",
-                    f'시작 {observed["sandbox_startup_attempts"]} · 준비 {observed["sandbox_ready"]}',
-                    (f'시간 초과 {observed["sandbox_startup_timeouts"]}',),
+                    (
+                        f'시작 {observed["sandbox_startup_attempts"]}회 · 준비 {observed["sandbox_ready"]}회',
+                        f'시작 시간 초과 {observed["sandbox_startup_timeouts"]}회',
+                    ),
                 ),
-                ("호출", "제공자/모델/API/채점기", (f'{observed["provider_model_api_grader_calls"]} (관측)',)),
+                (
+                    "호출과 유효 기록",
+                    (
+                        "제공자/모델/API/채점기",
+                        f'{observed["provider_model_api_grader_calls"]} (관측)',
+                        f'유효 기록 {observed["valid_protocol_traces"]}개',
+                    ),
+                ),
                 (
                     "오류 결과 행",
-                    f'{observed["runner_result_rows"]}개 · 시작 오류 표시',
-                    ("채점 실패 아님",),
+                    (
+                        f'{observed["runner_result_rows"]}개 · 시작 오류 표시',
+                        "채점 실패 아님",
+                    ),
                 ),
                 (
-                    "상태",
-                    f'채점기 {statuses["grader"]}',
+                    "측정 상태",
                     (
+                        f'채점기 {statuses["grader"]}',
                         f'종료 {statuses["runner_exit"]}',
                         f'품질 {statuses["task_quality"]}',
                     ),
                 ),
-                (
-                    "비용",
-                    f'API 계산 {statuses["calculated_api_cost"]}',
-                    (
-                        f'청구서 {statuses["invoice"]}',
-                        f'호스트 {statuses["host_cost"]}',
-                    ),
-                ),
-                (
-                    "정리",
-                    f'남은 항목 {observed["cleanup_survivors"]}',
-                    ("컨테이너·프로세스·작업공간·규칙",),
-                ),
             ),
             "group_outcomes": group_outcomes,
+            "context": (
+                f'유효 기록 {observed["valid_protocol_traces"]}개 · 채점기 {statuses["grader"]}',
+                *copy["claim_boundary"],
+                "오류 행과 호출 0만으로",
+                "모델 품질 판단 불가",
+            ),
         }
     return {
         **copy,
         "description": (
             f'{plan["fixed_executions"]} planned fixed execution and {observed["runner_groups"]} observed runner groups '
-            f'are shown in order. {copy["description_end"]}'
+            "are shown in order. Both groups ended in sandbox startup timeout before model or grader dispatch."
         ),
-        "subtitle": (
-            f'Fixed candidate {facts["candidate"]} · {observed["valid_protocol_traces"]} valid protocol traces'
+        "summary": (
+            f'PLAN · {plan["fixed_executions"]} fixed execution',
+            f'OBSERVED · {observed["runner_groups"]} runner groups',
+            f'VALID PROTOCOL TRACES · {observed["valid_protocol_traces"]}',
         ),
-        "plan": f'PLAN · {plan["fixed_executions"]} fixed execution',
-        "observed": f'OBSERVED · {observed["runner_groups"]} runner groups',
-        "valid": f'VALID TRACES · {observed["valid_protocol_traces"]} observed',
         "group_one_title": f"Runner group {group_numbers[0]}",
         "group_one_lines": (
             f'Initial gate {observed["initial_checks"]}',
@@ -360,38 +488,42 @@ def build_display(facts: dict, language: str) -> dict:
         "outcomes": (
             (
                 "Sandbox",
-                f'{observed["sandbox_startup_attempts"]} starts · {observed["sandbox_ready"]} ready',
-                (f'{observed["sandbox_startup_timeouts"]} startup timeouts',),
+                (
+                    f'{observed["sandbox_startup_attempts"]} starts · {observed["sandbox_ready"]} ready',
+                    f'{observed["sandbox_startup_timeouts"]} startup timeouts',
+                ),
             ),
-            ("Calls", "provider/model/API/grader", (f'{observed["provider_model_api_grader_calls"]} observed',)),
+            (
+                "Calls and valid traces",
+                (
+                    "provider/model/API/grader",
+                    f'{observed["provider_model_api_grader_calls"]} observed',
+                    f'{observed["valid_protocol_traces"]} valid traces',
+                ),
+            ),
             (
                 "Error result rows",
-                f'{observed["runner_result_rows"]} · startup placeholders',
-                ("not graded failures",),
+                (
+                    f'{observed["runner_result_rows"]} · startup placeholders',
+                    "not graded failures",
+                ),
             ),
             (
-                "Statuses",
-                f'grader {statuses["grader"]}',
+                "Measurement states",
                 (
+                    f'grader {statuses["grader"]}',
                     f'exit {statuses["runner_exit"]}',
                     f'quality {statuses["task_quality"]}',
                 ),
             ),
-            (
-                "Costs",
-                f'API calc {statuses["calculated_api_cost"]}',
-                (
-                    f'invoice {statuses["invoice"]}',
-                    f'host {statuses["host_cost"]}',
-                ),
-            ),
-            (
-                "Cleanup",
-                f'{observed["cleanup_survivors"]} survivors',
-                ("container/process/workspace/rule",),
-            ),
         ),
         "group_outcomes": group_outcomes,
+        "context": (
+            f'{observed["valid_protocol_traces"]} valid traces · grader {statuses["grader"]}',
+            *copy["claim_boundary"],
+            "Error rows and zero calls",
+            "do not measure model quality",
+        ),
     }
 
 
@@ -426,61 +558,74 @@ def render_svg_from_display(facts: dict, language: str, display: dict) -> str:
     validate_display(facts, language, display)
     copy = display
     elements = [
-        '<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="970" viewBox="0 0 1040 970" role="img" aria-labelledby="title desc">',
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{SVG_WIDTH}" height="{SVG_HEIGHT}" viewBox="0 0 {SVG_WIDTH} {SVG_HEIGHT}" role="img" aria-labelledby="title desc">',
         f'<title id="title">{escape(copy["title"])}</title>',
         f'<desc id="desc">{escape(copy["description"])}</desc>',
         f'<metadata>source-report-sha256:{REPORT_SHA256}</metadata>',
-        '<rect width="1040" height="970" fill="#ffffff"/>',
+        f'<rect width="{SVG_WIDTH}" height="{SVG_HEIGHT}" fill="#ffffff"/>',
         '<g font-family="sans-serif" font-variant-numeric="tabular-nums">',
     ]
-    _text(elements, 30, 42, copy["title"], size=27, weight=700)
-    _text(elements, 30, 72, copy["subtitle"], size=17, fill="#44515f")
-
-    summary = ((30, copy["plan"], "#2457a6"), (370, copy["observed"], "#7c3aed"), (710, copy["valid"], "#b45309"))
-    for summary_x, label, color in summary:
-        elements.append(
-            f'<rect x="{summary_x}" y="100" width="300" height="62" rx="10" fill="#f7f9fb" stroke="{color}" stroke-width="2"/>'
-        )
-        _text(elements, summary_x + 150, 139, label, size=17, weight=700, fill=color, anchor="middle")
-
-    group_specs = (
-        (30, copy["group_one_title"], copy["group_one_lines"], "#b45309"),
-        (550, copy["group_two_title"], copy["group_two_lines"], "#b42318"),
-    )
-    for group_x, title, lines, color in group_specs:
-        elements.append(
-            f'<rect x="{group_x}" y="200" width="460" height="280" rx="12" fill="#fffaf5" '
-            f'stroke="{color}" stroke-width="2" stroke-dasharray="8 5"/>'
-        )
-        _text(elements, group_x + 22, 238, title, size=21, weight=700, fill=color)
-        for line_index, line in enumerate(lines):
-            _text(elements, group_x + 22, 278 + 39 * line_index, line, size=17, weight=700 if line_index == 0 else 400)
-    elements.append('<path d="M500,340 H535" stroke="#44515f" stroke-width="3"/>')
-    elements.append('<path d="M545,340 l-10,-7 v14 z" fill="#44515f"/>')
-
-    _text(elements, 30, 530, copy["outcome_title"], size=20, weight=700)
-    outcome_positions = ((30, 555), (370, 555), (710, 555), (30, 700), (370, 700), (710, 700))
-    for (outcome_x, outcome_y), (label, value, qualifiers) in zip(outcome_positions, copy["outcomes"], strict=True):
-        elements.append(
-            f'<rect x="{outcome_x}" y="{outcome_y}" width="{OUTCOME_BOX_WIDTH}" height="120" rx="10" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>'
-        )
-        _text(elements, outcome_x + OUTCOME_TEXT_INSET, outcome_y + 31, label, size=17, weight=700)
-        _text(elements, outcome_x + OUTCOME_TEXT_INSET, outcome_y + 66, value, size=16, weight=700, fill="#2457a6")
-        qualifier_y = outcome_y + (88 if len(qualifiers) == 2 else 98)
-        for line_index, qualifier in enumerate(qualifiers):
-            _text(
-                elements,
-                outcome_x + OUTCOME_TEXT_INSET,
-                qualifier_y + 23 * line_index,
-                qualifier,
-                size=16,
-                fill="#44515f",
-            )
+    _text(elements, 18, 38, copy["display_title"], size=23, weight=700)
+    _text(elements, 18, 68, copy["subtitle"], size=18, fill="#44515f")
 
     elements.append(
-        '<rect x="30" y="855" width="980" height="82" rx="10" fill="#fff7ed" stroke="#b45309" stroke-width="2"/>'
+        '<rect x="18" y="92" width="354" height="112" rx="12" fill="#f7f9fb" '
+        'stroke="#52708f" stroke-width="2"/>'
     )
-    _text(elements, 50, 905, copy["claim_boundary"], size=17, weight=700, fill="#7c2d12")
+    summary_colors = ("#2457a6", "#7c3aed", "#b45309")
+    for line_index, (label, color) in enumerate(zip(copy["summary"], summary_colors, strict=True)):
+        _text(elements, 34, 124 + 32 * line_index, label, size=18, weight=700, fill=color)
+
+    _text(elements, 18, 246, copy["sequence_title"], size=20, weight=700)
+    group_specs = (
+        (264, 158, copy["group_one_title"], copy["group_one_lines"], "#b45309"),
+        (448, 198, copy["group_two_title"], copy["group_two_lines"], "#b42318"),
+    )
+    for group_y, group_height, title, lines, color in group_specs:
+        elements.append(
+            f'<rect x="18" y="{group_y}" width="354" height="{group_height}" rx="12" fill="#fffaf5" '
+            f'stroke="{color}" stroke-width="2" stroke-dasharray="8 5"/>'
+        )
+        _text(elements, 34, group_y + 30, title, size=20, weight=700, fill=color)
+        for line_index, line in enumerate(lines):
+            _text(elements, 34, group_y + 61 + 25 * line_index, line, size=18, weight=700 if line_index == 0 else 400)
+    elements.append('<path d="M195,424 V441" stroke="#44515f" stroke-width="3"/>')
+    elements.append('<path d="M195,445 l-7,-10 h14 z" fill="#44515f"/>')
+
+    _text(elements, 18, 690, copy["outcome_title"], size=20, weight=700)
+    outcome_positions = (708, 824, 940, 1056)
+    for outcome_y, (label, lines) in zip(outcome_positions, copy["outcomes"], strict=True):
+        elements.append(
+            f'<rect x="18" y="{outcome_y}" width="{OUTCOME_BOX_WIDTH}" height="108" rx="10" '
+            'fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>'
+        )
+        _text(elements, 18 + OUTCOME_TEXT_INSET, outcome_y + 27, label, size=19, weight=700)
+        for line_index, line in enumerate(lines):
+            _text(
+                elements,
+                18 + OUTCOME_TEXT_INSET,
+                outcome_y + 55 + 23 * line_index,
+                line,
+                size=18,
+                weight=700 if line_index == 0 else 400,
+                fill="#2457a6" if line_index == 0 else "#44515f",
+            )
+
+    _text(elements, 18, 1195, copy["context_title"], size=20, weight=700)
+    elements.append(
+        '<rect x="18" y="1212" width="354" height="175" rx="10" fill="#fff7ed" '
+        'stroke="#b45309" stroke-width="2"/>'
+    )
+    for line_index, line in enumerate(copy["context"]):
+        _text(
+            elements,
+            34,
+            1241 + 25 * line_index,
+            line,
+            size=18,
+            weight=700,
+            fill="#7c2d12",
+        )
     elements.append("</g></svg>")
     return "\n".join(elements) + "\n"
 

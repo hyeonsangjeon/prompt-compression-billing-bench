@@ -1,57 +1,83 @@
-# SWE-Lancer Fixed Trace: Zero Valid Protocol Traces
+# SWE-Lancer Fixed Execution: Why It Stopped Before Model Dispatch
 
 This page is a short substudy summary and reading guide. The
 [complete measured report](fixed-trace-20260923.md) remains the evidence source for exact
 conditions, hashes, controls, and the public quotation boundary.
 
-## Result first
+## What the execution was meant to establish
 
-The fixed candidate did not produce a valid provider-backed trace. One execution was
-planned, but two **runner groups** were observed. A runner group is a separate private
-output group left by the runner; it is not a provider request or a valid trace. Both
-groups timed out while the sandbox was starting, before any logical model request,
-provider HTTP attempt, or grader call. The observed valid-protocol-trace count was `0`.
+The fixed candidate was supposed to follow one complete path. Before execution, the
+selected task row, image, solver, model, and API settings would be checked. The sandbox
+would then start, the solver would use the model and any required tools, the grader would
+evaluate the result, and the runner would seal both the trace and cleanup state. A valid
+protocol trace records that whole chain; it is not merely a directory or an error row left
+by the runner.
 
-- **Question:** Could the preselected candidate `28565_1001` produce one actual trace
-  under the fixed provider, sandbox, grader, and safety contract?
-- **Fixed design:** Split `diamond`, one `ic_swe` task, pinned solver, catalog, selected
-  row and image, concurrency `1`, runner retries `0`, SDK retries `0`, and exactly one
-  planned execution.
-- **Observation:** Initial pre-dispatch verification passed `27/29` checks and failed
-  `task.row` and `image.config`. Corrected verification passed `31/31`, but a second
-  runner group appeared and the guard observed `allow_internet=true` against configured
-  `disable_internet=true`. Both groups ended in startup timeout.
-- **Limit:** The two `correct=False` rows are startup-error placeholders, not graded
-  failures. They do not support task quality, pass rate, ranking, stability, or population
-  cost.
+The plan fixed candidate `28565_1001`, split `diamond`, one `ic_swe` task, the solver,
+catalog, selected row, and image. It also fixed concurrency `1`, runner retries `0`, SDK
+retries `0`, and exactly one execution. Revision `gpt-4o-2024-11-20` was pinned and
+verified in the admitted contract before dispatch. It was not observed in an inference
+response, because no inference response occurred.
 
-A valid protocol trace required exactly one execution to start after every pre-dispatch
-predicate passed, retain the fixed sandbox-isolation contract, and seal its result and
-cleanup.
+## What actually happened
+
+Initial pre-dispatch verification passed `27` of `29` checks and failed `task.row` and
+`image.config`. A first **runner group** nevertheless appeared after that failed record and
+ended in `computer_startup_timeout` while waiting for the sandbox computer to become ready.
+A runner group is a separate private output group left by the runner. It is not a provider
+request, a model call, or a valid trace.
+
+After owner-controlled inputs were corrected, verification passed `31/31`. The later
+green record did not erase the earlier failure. A second runner group then appeared even
+though the plan allowed only one execution. During that guarded start, the observer saw
+`allow_internet=true` against configured `disable_internet=true`. The second group also
+ended in startup timeout.
+
+Both groups stopped before any logical model request, provider HTTP attempt, API or tool
+call, or grader call. The valid-protocol-trace count was therefore `0`. The two
+`correct=False` rows are startup-error placeholders, not graded failures. They cannot be
+used to calculate task quality, pass rate, ranking, stability, or population cost.
 
 ## Protocol execution flow
 
-[![One fixed execution was planned, but two runner groups were observed. Initial pre-dispatch verification passed 27 of 29 checks and failed task.row and image.config; the first runner group ended in a sandbox startup timeout. Corrected verification later passed 31 of 31, but a second runner group breached the one-execution rule, observed allow_internet=true against configured disable_internet=true, and also timed out during startup. The sandbox had two startup attempts and zero ready states. Provider, model, API, and grader calls were 0/0/0/0. Valid protocol traces were zero, the grader was not run, runner exit was unknown, and task quality, invoice, and host cost were not measured. Two error result rows are not graded failures, and cleanup survivors were zero.](../../../../figures/follow-up/swe-protocol-outcome-en.svg)](../../../../figures/follow-up/swe-protocol-outcome-en.svg)
+The figure answers why one planned execution produced no valid trace or model evaluation.
+First compare the plan with the observed number of runner groups, then read the two groups
+in time order. The final status blocks separate sandbox preparation, dispatch, and grading
+so that one zero is not mistaken for another.
 
-*The figure keeps the one-execution plan, two observed runner groups, gate states,
-network-setting contradiction, startup timeouts, and cleanup in sequence. Valid protocol
-traces and grader executions were zero. Open the link to view the SVG at full size.*
+[![One planned execution and two observed runner groups, both ending in sandbox startup timeout before model or grader dispatch and leaving zero valid traces.](../../../../figures/follow-up/swe-protocol-outcome-en.svg)](../../../../figures/follow-up/swe-protocol-outcome-en.svg)
+
+*Both runner groups ended during sandbox preparation. The error rows are therefore not
+graded failures, and zero calls do not establish model quality or total execution cost.
+Open the linked SVG at its source size; every status and value is retained in the text
+alternative below.*
 
 ### Complete text alternative
 
-| Gate or status | Plan | Observation and interpretation |
-|---|---|---|
-| Fixed execution | Exactly 1 | 2 runner groups; the second breached the one-execution rule |
-| Initial gate and group 1 | Every pre-dispatch predicate must pass | 27/29; failed `task.row` and `image.config`, then `computer_startup_timeout` |
-| Corrected gate and group 2 | Recheck owner-controlled inputs | 31/31; a second group then appeared and ended in `computer_startup_timeout` |
-| Network isolation | `disable_internet=true` | Guarded start observed `allow_internet=true`; the isolation predicate did not hold |
-| Sandbox | Prepare the sandbox for the one fixed execution | 2 startup attempts; 0 ready; 2 startup timeouts |
-| Calls | Fixed provider, model, API, and grader | Provider/model/API/grader `0/0/0/0` observed |
-| Trace and grader | Target of 1 valid protocol trace | 0 valid; grader `not_run` |
-| Error result rows | Keep startup errors separate from grading | 2 `correct=False` startup-error placeholders, not graded failures; task quality `not_measured` |
-| Runner and cost status | Keep measurement units separate | Runner exit `unknown`; calculated API cost `USD 0.000000`; invoice and host cost `not_measured`. This does not establish zero host cost. |
-| Cleanup | Require zero survivors | 0 container, process, workspace, Docker-network, and network-rule survivors |
-| Claim boundary | Quality claims require a valid trace and grader result | No pass rate, ranking, candidate-quality, stability, or population-cost conclusion |
+- **Fixed execution.** Exactly `1` was planned, but `2` runner groups were observed. The
+  second group breached the one-execution rule.
+- **Initial gate and group 1.** Every pre-dispatch predicate had to pass. Verification was
+  `27/29`; `task.row` and `image.config` failed, and the first group then ended in
+  `computer_startup_timeout`.
+- **Corrected gate and group 2.** Owner-controlled inputs were rechecked at `31/31`. A
+  second group then appeared and also ended in `computer_startup_timeout`.
+- **Network isolation.** The command configured `disable_internet=true`, while the guarded
+  start observed `allow_internet=true`. The isolation predicate did not hold.
+- **Sandbox.** The plan was to prepare the sandbox for the one fixed execution. There were
+  `2` startup attempts, `0` ready states, and `2` startup timeouts.
+- **Calls.** Provider/model/API/grader calls were observed at `0/0/0/0`.
+- **Trace and grader.** The target was `1` valid protocol trace. There were `0` valid traces,
+  and the grader was `not_run`.
+- **Error result rows.** The `2` `correct=False` rows are startup-error placeholders, not
+  graded failures. Task quality is `not_measured`.
+- **Runner and cost status.** Runner exit is `unknown`; calculated API cost is
+  `USD 0.000000`; invoice and host cost are each `not_measured`. This does not establish
+  zero host cost.
+- **Cleanup.** There were `0` container, process, workspace, Docker-network, or network-rule
+  survivors.
+- **Claim boundary.** Quality claims require a valid trace and grader result. The record
+  supports no pass-rate, ranking, candidate-quality, stability, or population-cost
+  conclusion.
 
 ## Measurement conditions
 
@@ -72,26 +98,6 @@ before task content was viewed. The earlier
 [candidate evaluation](../../swe-lancer-candidate-evaluation-20260920.md) records the
 historical admission boundary, not the later protocol-invalid execution result.
 
-## Execution record
-
-| Gate or denominator | Observation |
-|---|---:|
-| Planned fixed executions | 1 |
-| Initial pre-dispatch verification | 27/29; failed `task.row`, `image.config` |
-| Final pre-dispatch verification | 31/31 |
-| Runner groups observed | 2 |
-| Sandbox startup attempts / timeouts | 2 / 2 |
-| Sandbox ready | 0 |
-| Valid protocol traces | 0 |
-| Provider / model / API / grader calls | 0 / 0 / 0 / 0 |
-| Cleanup survivors | 0 |
-
-The first group appeared after the initial failed check record and ended in
-`computer_startup_timeout`. After owner-controlled corrections, the final verification
-passed `31/31`, but the second group breached the one-execution rule and preserved the
-network-flag contradiction before ending in the same timeout. The later `31/31` result
-did not erase the initial `27/29` result or authorize the second group.
-
 ## Usage, cost, and quality
 
 | Item | Status | Meaning |
@@ -104,23 +110,30 @@ did not erase the initial `27/29` result or authorize the second group.
 | Runner exit | `unknown` | No runner-execution record was sealed |
 | Grader / task quality | `not_run` / `not_measured` | Error rows are not grader outcomes |
 
-Zero model or API calls do not make this a successful or cost-free benchmark.
+Neither runner group reached provider dispatch, so no provider response existed from which
+to read usage fields. The input and output zeros are aggregate counters for that state;
+cached and reasoning tokens are `not_applicable_no_provider_call` because those fields
+would have come from a provider response. Applying the admitted price schedule to the
+recorded provider usage yields `USD 0.000000`. That calculated amount is not a reconciled
+invoice and does not establish zero host cost; invoice and host cost are both
+`not_measured`. Zero model or API calls also do not make this a successful benchmark or a
+quality result.
 
-## Why the trace is invalid
+## What the observations can support
 
-**Observation.** An extra runner group appeared, and the second guarded start observed
-`allow_internet=true`. Both groups ended in sandbox startup timeout before provider and
-grader dispatch.
+The record directly shows an extra runner group, a guarded start with
+`allow_internet=true`, and two sandbox startup timeouts before provider and grader
+dispatch. Both private run logs ended while waiting for the sandbox computer to start.
+That pattern is consistent with a startup-stage problem, but the evidence did not isolate
+image startup, runtime wiring, container health, network handling, or another mechanism as
+the cause.
 
-**Possible explanation.** Both private run logs ended while waiting for the sandbox
-computer to start. That pattern is consistent with a startup problem, but the evidence
-did not isolate image startup, runtime wiring, container health, network handling, or
-another mechanism.
-
-**Limits.** The two-group history breached the one-execution contract, and the network
-flag breached the isolation condition. The record therefore cannot establish task pass
-or failure, provider reliability, model quality, causality, pass rate, ranking, stability,
-non-inferiority, representative performance, or population cost.
+The two-group history breached the one-execution contract, and the network flag breached
+the isolation condition. The record therefore cannot establish task pass or failure,
+provider reliability, model quality, causality, pass rate, ranking, stability,
+non-inferiority, representative performance, or population cost. Admission, carrier,
+hash, schema, and cleanup checks validate their own evidence boundaries; they are not
+independent model- or grader-quality validation.
 
 ## Further reading
 

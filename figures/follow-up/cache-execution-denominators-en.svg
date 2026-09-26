@@ -1,68 +1,56 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="900" viewBox="0 0 1040 900" role="img" aria-labelledby="title desc">
-<title id="title">Cache execution denominators and invalid stop</title>
-<desc id="desc">Cycles, bundles, and task trials keep separate plan and observation units. The flow shows the pre-dispatch stop at ordinal 3 when no predecessor request existed.</desc>
-<metadata>source-report-sha256:9c07682a067aea18d253c869f5fe0711dc3c695de5b1636b7bfe7d95b0f907f3</metadata>
-<rect width="1040" height="900" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="1152" viewBox="0 0 390 1152" role="img" aria-labelledby="title desc">
+<title id="title">Cache comparison: plan, partial run, and stop</title>
+<desc id="desc">Cycles, bundles, and task trials compare plan with observation within each unit. The sequence ends before provider dispatch at ordinal 3, where no predecessor request existed.</desc>
+<metadata>source-report-sha256:9639c2f21142378727082d0b3b142348b15941b8e1c538232c9b10f5075f058c</metadata>
+<rect width="390" height="1152" fill="#ffffff"/>
 <g font-family="sans-serif" font-variant-numeric="tabular-nums">
-<text x="30" y="42" font-size="27" font-weight="700" fill="#17202a">Cache execution denominators and invalid stop</text>
-<text x="30" y="72" font-size="17" font-weight="400" fill="#44515f">First incomplete invalid cycle · plan and observation by unit</text>
-<text x="30" y="112" font-size="20" font-weight="700" fill="#17202a">1. Denominators by unit</text>
-<rect x="30" y="130" width="300" height="205" rx="12" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
-<text x="48" y="162" font-size="21" font-weight="700" fill="#17202a">Cycles</text>
-<text x="48" y="194" font-size="17" font-weight="700" fill="#2457a6">PLAN · 10 valid</text>
-<text x="48" y="230" font-size="16" font-weight="400" fill="#17202a">OBSERVED · 1 attempted</text>
-<text x="48" y="260" font-size="16" font-weight="400" fill="#17202a">0 valid (observed)</text>
-<text x="48" y="290" font-size="16" font-weight="400" fill="#17202a">1 invalid · 0 replacement</text>
-<rect x="370" y="130" width="300" height="205" rx="12" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
-<text x="388" y="162" font-size="21" font-weight="700" fill="#17202a">Bundles</text>
-<text x="388" y="194" font-size="17" font-weight="700" fill="#2457a6">PLAN · 60</text>
-<text x="388" y="230" font-size="16" font-weight="400" fill="#17202a">OBSERVED · 2 started</text>
-<text x="388" y="260" font-size="16" font-weight="400" fill="#17202a">1 complete</text>
-<text x="388" y="290" font-size="16" font-weight="400" fill="#17202a">1 incomplete / invalid</text>
-<rect x="710" y="130" width="300" height="205" rx="12" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
-<text x="728" y="162" font-size="21" font-weight="700" fill="#17202a">Task trials</text>
-<text x="728" y="194" font-size="17" font-weight="700" fill="#2457a6">PLAN · 300</text>
-<text x="728" y="230" font-size="16" font-weight="400" fill="#17202a">OBSERVED · 6 started</text>
-<text x="728" y="260" font-size="16" font-weight="400" fill="#17202a">5 complete</text>
-<text x="728" y="290" font-size="16" font-weight="400" fill="#17202a">1 incomplete</text>
-<text x="30" y="385" font-size="20" font-weight="700" fill="#17202a">2. Stop at logical request ordinal 3</text>
-<rect x="30" y="405" width="225" height="145" rx="10" fill="#ffffff" stroke="#52708f" stroke-width="2"/>
-<text x="142" y="442" font-size="16" font-weight="700" fill="#17202a" text-anchor="middle">none · reuse 0</text>
-<text x="142" y="476" font-size="16" font-weight="400" fill="#17202a" text-anchor="middle">bundle complete</text>
-<text x="142" y="510" font-size="16" font-weight="400" fill="#17202a" text-anchor="middle">2 predecessor requests</text>
-<path d="M259,478 H275" stroke="#44515f" stroke-width="3"/>
-<path d="M275,478 l-8,-6 v12 z" fill="#44515f"/>
-<rect x="280" y="405" width="225" height="145" rx="10" fill="#ffffff" stroke="#52708f" stroke-width="2"/>
-<text x="392" y="442" font-size="16" font-weight="700" fill="#17202a" text-anchor="middle">none · reuse 1</text>
-<text x="392" y="476" font-size="16" font-weight="400" fill="#17202a" text-anchor="middle">cancel-async-tasks</text>
-<text x="392" y="510" font-size="16" font-weight="400" fill="#17202a" text-anchor="middle">current ordinal 3 reached</text>
-<path d="M509,478 H525" stroke="#44515f" stroke-width="3"/>
-<path d="M525,478 l-8,-6 v12 z" fill="#44515f"/>
-<rect x="530" y="405" width="225" height="145" rx="10" fill="#ffffff" stroke="#b45309" stroke-width="2" stroke-dasharray="7 5"/>
-<text x="642" y="442" font-size="16" font-weight="700" fill="#17202a" text-anchor="middle">No request to pair</text>
-<text x="642" y="476" font-size="16" font-weight="400" fill="#17202a" text-anchor="middle">reuse 0 had no</text>
-<text x="642" y="510" font-size="16" font-weight="400" fill="#17202a" text-anchor="middle">request at ordinal 3</text>
-<path d="M759,478 H775" stroke="#44515f" stroke-width="3"/>
-<path d="M775,478 l-8,-6 v12 z" fill="#44515f"/>
-<rect x="780" y="405" width="225" height="145" rx="10" fill="#ffffff" stroke="#b45309" stroke-width="2" stroke-dasharray="7 5"/>
-<text x="892" y="442" font-size="16" font-weight="700" fill="#17202a" text-anchor="middle">Rejected pre-dispatch</text>
-<text x="892" y="476" font-size="16" font-weight="400" fill="#17202a" text-anchor="middle">no prefix comparison</text>
-<text x="892" y="510" font-size="16" font-weight="400" fill="#17202a" text-anchor="middle">or length measurement</text>
-<text x="30" y="605" font-size="20" font-weight="700" fill="#17202a">3. Descriptive values from the invalid partial run</text>
-<rect x="30" y="625" width="300" height="120" rx="10" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
-<text x="48" y="657" font-size="16" font-weight="700" fill="#17202a">Successful provider calls</text>
-<text x="48" y="691" font-size="20" font-weight="700" fill="#2457a6">18</text>
-<text x="48" y="722" font-size="16" font-weight="400" fill="#44515f">not a condition contrast</text>
-<rect x="370" y="625" width="300" height="120" rx="10" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
-<text x="388" y="657" font-size="16" font-weight="700" fill="#17202a">Completed-trial quality</text>
-<text x="388" y="691" font-size="20" font-weight="700" fill="#2457a6">3/5 passed</text>
-<text x="388" y="722" font-size="16" font-weight="400" fill="#44515f">not condition quality</text>
-<rect x="710" y="625" width="300" height="120" rx="10" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
-<text x="728" y="657" font-size="16" font-weight="700" fill="#17202a">Task strata</text>
-<text x="728" y="684" font-size="20" font-weight="700" fill="#2457a6">2 eligible</text>
-<text x="728" y="709" font-size="20" font-weight="700" fill="#2457a6">3 not_applicable</text>
-<text x="728" y="735" font-size="16" font-weight="400" fill="#44515f">distinct statuses</text>
-<rect x="30" y="775" width="980" height="95" rx="10" fill="#fff7ed" stroke="#b45309" stroke-width="2"/>
-<text x="50" y="811" font-size="16" font-weight="700" fill="#7c2d12">cached input 0 tokens · API usage, not a miss rate or Cache-effect estimate</text>
-<text x="50" y="847" font-size="16" font-weight="700" fill="#7c2d12">0 valid cycles · no Cache effect, savings, ranking, reuse contrast, or stability result</text>
+<text x="18" y="38" font-size="24" font-weight="700" fill="#17202a">Cache comparison stop</text>
+<text x="18" y="68" font-size="18" font-weight="400" fill="#44515f">Plan and observation by unit</text>
+<text x="18" y="108" font-size="20" font-weight="700" fill="#17202a">Plan and observation</text>
+<rect x="18" y="124" width="354" height="114" rx="12" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
+<text x="34" y="152" font-size="20" font-weight="700" fill="#17202a">Cycles</text>
+<text x="34" y="180" font-size="18" font-weight="700" fill="#2457a6">PLAN · 10 valid</text>
+<text x="34" y="206" font-size="18" font-weight="400" fill="#17202a">OBSERVED · 1 attempted · 0 valid</text>
+<text x="34" y="228" font-size="18" font-weight="400" fill="#17202a">1 invalid · 0 replacement</text>
+<rect x="18" y="248" width="354" height="114" rx="12" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
+<text x="34" y="276" font-size="20" font-weight="700" fill="#17202a">Bundles</text>
+<text x="34" y="304" font-size="18" font-weight="700" fill="#2457a6">PLAN · 60</text>
+<text x="34" y="330" font-size="18" font-weight="400" fill="#17202a">OBSERVED · 2 started · 1 complete</text>
+<text x="34" y="352" font-size="18" font-weight="400" fill="#17202a">1 incomplete / invalid</text>
+<rect x="18" y="372" width="354" height="114" rx="12" fill="#f7f9fb" stroke="#7a8794" stroke-width="2"/>
+<text x="34" y="400" font-size="20" font-weight="700" fill="#17202a">Task trials</text>
+<text x="34" y="428" font-size="18" font-weight="700" fill="#2457a6">PLAN · 300</text>
+<text x="34" y="454" font-size="18" font-weight="400" fill="#17202a">OBSERVED · 6 started · 5 complete</text>
+<text x="34" y="476" font-size="18" font-weight="400" fill="#17202a">1 incomplete</text>
+<text x="18" y="522" font-size="20" font-weight="700" fill="#17202a">Stop at the unmatched request</text>
+<rect x="18" y="544" width="354" height="82" rx="10" fill="#ffffff" stroke="#52708f" stroke-width="2"/>
+<text x="195" y="569" font-size="18" font-weight="700" fill="#17202a" text-anchor="middle">1. Predecessor run</text>
+<text x="195" y="592" font-size="18" font-weight="400" fill="#17202a" text-anchor="middle">none · reuse 0</text>
+<text x="195" y="615" font-size="18" font-weight="400" fill="#17202a" text-anchor="middle">2 predecessor requests</text>
+<path d="M195,628 V640" stroke="#44515f" stroke-width="3"/>
+<path d="M195,643 l-6,-9 h12 z" fill="#44515f"/>
+<rect x="18" y="644" width="354" height="82" rx="10" fill="#ffffff" stroke="#52708f" stroke-width="2"/>
+<text x="195" y="669" font-size="18" font-weight="700" fill="#17202a" text-anchor="middle">2. Current run</text>
+<text x="195" y="692" font-size="18" font-weight="400" fill="#17202a" text-anchor="middle">none · reuse 1</text>
+<text x="195" y="715" font-size="18" font-weight="400" fill="#17202a" text-anchor="middle">cancel-async-tasks · ordinal 3</text>
+<path d="M195,728 V740" stroke="#44515f" stroke-width="3"/>
+<path d="M195,743 l-6,-9 h12 z" fill="#44515f"/>
+<rect x="18" y="744" width="354" height="82" rx="10" fill="#ffffff" stroke="#b45309" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="195" y="769" font-size="18" font-weight="700" fill="#17202a" text-anchor="middle">3. No request pair</text>
+<text x="195" y="792" font-size="18" font-weight="400" fill="#17202a" text-anchor="middle">predecessor run had 2 requests</text>
+<text x="195" y="815" font-size="18" font-weight="400" fill="#17202a" text-anchor="middle">no request at ordinal 3</text>
+<path d="M195,828 V840" stroke="#44515f" stroke-width="3"/>
+<path d="M195,843 l-6,-9 h12 z" fill="#44515f"/>
+<rect x="18" y="844" width="354" height="82" rx="10" fill="#ffffff" stroke="#b45309" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="195" y="869" font-size="18" font-weight="700" fill="#17202a" text-anchor="middle">4. Validation stop</text>
+<text x="195" y="892" font-size="18" font-weight="400" fill="#17202a" text-anchor="middle">current request rejected pre-dispatch</text>
+<text x="195" y="915" font-size="18" font-weight="400" fill="#17202a" text-anchor="middle">no prefix difference/length measured</text>
+<text x="18" y="946" font-size="20" font-weight="700" fill="#17202a">What the partial run shows</text>
+<rect x="18" y="962" width="354" height="170" rx="10" fill="#fff7ed" stroke="#b45309" stroke-width="2"/>
+<text x="34" y="990" font-size="18" font-weight="700" fill="#7c2d12">Partial-run context</text>
+<text x="34" y="1014" font-size="18" font-weight="400" fill="#17202a">18 successful provider responses</text>
+<text x="34" y="1038" font-size="18" font-weight="400" fill="#44515f">Completed trials: 3/5 passed</text>
+<text x="34" y="1062" font-size="18" font-weight="700" fill="#7c2d12">0 valid cycles</text>
+<text x="34" y="1086" font-size="18" font-weight="700" fill="#7c2d12">No Cache/reuse effect computed</text>
+<text x="34" y="1110" font-size="18" font-weight="700" fill="#7c2d12">No compression effect computed</text>
 </g></svg>

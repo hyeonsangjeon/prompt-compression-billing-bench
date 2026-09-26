@@ -4,6 +4,7 @@ import re
 import unittest
 
 from evidence import PUBLIC_FILES
+from src.swe_protocol_figure import REPORT_RECORD, parse_report_record, validate_report
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -60,9 +61,10 @@ class SweLancerFixedTraceReportTests(unittest.TestCase):
         cls.report = REPORT_PATH.read_text(encoding="utf-8")
 
     def test_report_preserves_terminal_outcome_and_zero_call_boundary(self):
+        self.assertEqual(parse_report_record(self.report), REPORT_RECORD)
+        validate_report(self.report)
         normalized = " ".join(self.report.split())
         protected_literals = (
-            "The fixed candidate did not produce a valid provider-backed trace.",
             "The terminal result is therefore `invalid_protocol_trace`",
             "Initial pre-dispatch verification | 27/29; failed `task.row`, `image.config`",
             "Final pre-dispatch verification | 31/31",
@@ -91,12 +93,13 @@ class SweLancerFixedTraceReportTests(unittest.TestCase):
         protected_conditions = (
             "`2026-09-23T02:12:29Z` to `2026-09-23T02:18:27.355804Z`, UTC",
             "Provider `openai`; model setting `openai/gpt-4o`",
-            "reported revision `gpt-4o-2024-11-20`",
+            "revision `gpt-4o-2024-11-20` pinned and verified in the admitted contract before dispatch",
+            "No inference response occurred.",
             "`openai-v1-chat-completions`",
             "Concurrency `1`; multiprocessing disabled; runner retries `0`; SDK retries `0`",
             "The command configured `disable_internet=true`; the guarded start observed `allow_internet=true`",
             "The benchmark grader was not invoked.",
-            "Independent grader validation was not available",
+            "contains no independent grader-validation evidence",
             "`USD 2.50` per million input tokens and `USD 10.00` per million output tokens",
         )
         for literal in protected_conditions:
@@ -114,15 +117,14 @@ class SweLancerFixedTraceReportTests(unittest.TestCase):
         ):
             self.assertIn(literal, self.report)
 
-    def test_observation_explanation_limits_and_quotation_boundary_remain(self):
+    def test_chronology_causal_uncertainty_and_quotation_boundary_remain(self):
         normalized = " ".join(self.report.split())
         self.assertIn("> **Public quotation boundary.**", self.report)
-        self.assertIn("**Observation.**", self.report)
-        self.assertIn("**Possible explanation.**", self.report)
-        self.assertIn("**Limits.**", self.report)
+        self.assertIn("## What happened", self.report)
+        self.assertIn("## What the evidence can and cannot explain", self.report)
         self.assertIn(
             "the evidence did not isolate whether image startup, runtime wiring,",
-            normalized,
+            normalized.lower(),
         )
         self.assertIn(
             "It does not support a candidate pass/fail judgment",
@@ -132,6 +134,20 @@ class SweLancerFixedTraceReportTests(unittest.TestCase):
             "A new execution would require a separate project item",
             normalized,
         )
+        self.assertIn(
+            "no provider response existed from which to read token usage",
+            normalized,
+        )
+        self.assertIn(
+            "The input and output zeros are aggregate counters for that state",
+            normalized,
+        )
+        self.assertIn(
+            "does not establish zero host-compute cost",
+            normalized,
+        )
+        self.assertIn("preserved historical Korean records", normalized)
+        self.assertNotIn("snapshot, Korean documents, historical", normalized)
 
     def test_navigation_publication_and_snapshot_boundaries(self):
         root_readme = (ROOT / "README.md").read_text(encoding="utf-8")
