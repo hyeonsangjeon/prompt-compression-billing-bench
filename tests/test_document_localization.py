@@ -52,6 +52,18 @@ def content_tree_sha256(
     digest = hashlib.sha256()
     for label, path in entries:
         content = path.read_bytes()
+        if label == "docs/experiment/data-connection-guide-20260919.md":
+            # Reverse only the documented anonymization for historical hash checks.
+            for current, historical, expected in (
+                ("사용자가", "KT가", 6),
+                ("사용자의", "KT의", 1),
+            ):
+                current_bytes = current.encode("utf-8")
+                if content.count(current_bytes) != expected:
+                    raise AssertionError(
+                        f"expected {expected} anonymized spans {current!r} in {label}"
+                    )
+                content = content.replace(current_bytes, historical.encode("utf-8"))
         if replacements and label in replacements:
             before, after = replacements[label]
             if content.count(before) != 1:

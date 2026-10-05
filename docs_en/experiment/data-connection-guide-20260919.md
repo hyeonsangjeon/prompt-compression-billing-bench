@@ -1,6 +1,6 @@
 # Live-Data Connection Guide
 
-Follow this sequence when KT runs one real task in its own environment without placing
+Follow this sequence when a user runs one real task in their own environment without placing
 source data in the public repository. A **no-call preflight** checks configuration and file
 connections without calling an external model provider. The **result JSON** stores
 execution state, usage, judgment, and file fingerprints in machine-readable form. A
@@ -24,7 +24,7 @@ This documentation work made no model or provider call. It describes only the pu
 
 The current public path is not a generic runner for arbitrary customer-data formats. It
 runs one task from the public index at a pinned Terminal-Bench 2.1 revision using a
-KT-managed private benchmark checkout and execution environment.
+user-managed private benchmark checkout and execution environment.
 
 - **Supported:** Connect a supported benchmark checkout, private execution inventory and
   file hashes, and provider settings inside the customer environment without copying them
@@ -39,7 +39,7 @@ The first connection succeeds when one pinned real benchmark task runs under the
 inside the customer environment and its result JSON validates. One result does not decide
 product adoption, a compression effect, or general quality.
 
-## Values KT Supplies and Values the Repository Fixes
+## Values the User Supplies and Values the Repository Fixes
 
 ### Values Supplied Only in the Customer Environment
 
@@ -50,7 +50,7 @@ descriptions.
 
 | Environment-variable name | Role | Publication |
 | --- | --- | --- |
-| `FOUNDRY_ENDPOINT` | KT-approved model endpoint | Value remains private |
+| `FOUNDRY_ENDPOINT` | user-approved model endpoint | Value remains private |
 | `SCREENING_OPERATIONAL_LEDGER` | Path to private execution ledger containing approvals | File and path remain private |
 | `TERMINAL_BENCH_ROOT` | Benchmark checkout at the pinned revision | Source and path remain private |
 | `SCREENING_INVENTORY` | Path to hash-calculated execution inventory | Source and path remain private |
@@ -59,11 +59,11 @@ descriptions.
 | `TIKTOKEN_CACHE_DIR` | Data path for the pinned tokenizer | Value remains private |
 | `NATIVE_BLOB_ACCOUNT_URL`, `NATIVE_BLOB_SPOOL_ROOT` | Storage and retrieval locations for private execution evidence | Values remain private |
 
-Authentication is supplied through a KT-approved platform identity or secret-management
+Authentication is supplied through a user-approved platform identity or secret-management
 procedure. Do not store keys or tokens in YAML or execution ledgers.
 
-In public YAML, KT may select a task ID from the public index and a result JSON name under
-`runs/`. YAML selecting another task must also be committed in a KT private fork or
+In public YAML, the user may select a task ID from the public index and a result JSON name under
+`runs/`. YAML selecting another task must also be committed in a private fork or
 approved source branch and run from a clean `HEAD`.
 
 ### Values Fixed and Validated by the Repository
@@ -141,7 +141,7 @@ output: runs/readme-benchmark-result.json
 The YAML contains only the endpoint's **environment-variable name**, not its address. It
 also contains no source-data path. Start with this file unchanged. To select another
 supported task, change only `benchmark.task` and a nonconflicting `runs/` JSON name,
-then commit the YAML in KT's private fork or approved source branch. The runner confirms
+then commit the YAML in the user's private fork or approved source branch. The runner confirms
 that the source checkout is clean, including untracked files.
 
 ## 3. Check Without Calling a Model

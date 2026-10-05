@@ -1,6 +1,6 @@
 # 실데이터 연결 가이드
 
-KT가 원본 데이터를 공개 저장소에 올리지 않고 자체 환경에서 실제 1과제를 실행하려면 아래 순서대로 진행한다. 여기서 **무호출 확인(preflight)**은 설정과 파일 연결을 검사하되 외부 모델 서비스(provider)의 API를 호출하지 않는 단계다. **결과 JSON**은 실행 상태, 사용량, 판정과 파일 지문을 기계가 읽을 수 있게 남긴 파일이며, **JSON 구조 규칙(Schema)**이 필수 항목과 값의 형식을 정한다.
+사용자가 원본 데이터를 공개 저장소에 올리지 않고 자체 환경에서 실제 1과제를 실행하려면 아래 순서대로 진행한다. 여기서 **무호출 확인(preflight)**은 설정과 파일 연결을 검사하되 외부 모델 서비스(provider)의 API를 호출하지 않는 단계다. **결과 JSON**은 실행 상태, 사용량, 판정과 파일 지문을 기계가 읽을 수 있게 남긴 파일이며, **JSON 구조 규칙(Schema)**이 필수 항목과 값의 형식을 정한다.
 
 ## 30초 요약
 
@@ -14,7 +14,7 @@ KT가 원본 데이터를 공개 저장소에 올리지 않고 자체 환경에�
 
 ## 먼저 확인할 지원 범위
 
-현재 공개 경로는 임의의 고객 데이터 형식을 받는 범용 실행기가 아니다. 고정된 Terminal-Bench 2.1 revision과 공개 과제 색인에 있는 과제 하나를, KT가 관리하는 비공개 벤치마크 소스 사본(checkout)과 실행 환경에서 돌리는 경로다.
+현재 공개 경로는 임의의 고객 데이터 형식을 받는 범용 실행기가 아니다. 고정된 Terminal-Bench 2.1 revision과 공개 과제 색인에 있는 과제 하나를, 사용자가 관리하는 비공개 벤치마크 소스 사본(checkout)과 실행 환경에서 돌리는 경로다.
 
 - **가능:** 고객사 환경에 둔 지원 benchmark checkout, 비공개 실행 대상·파일 해시 목록(inventory)과 provider 설정을 공개 저장소에 복사하지 않고 연결한다.
 - **불가능:** 고객사 고유 문서나 새 과제를 YAML에 적는 것만으로 실행한다. 공개 과제 색인에 없는 과제는 무호출 확인에서 거부된다.
@@ -22,7 +22,7 @@ KT가 원본 데이터를 공개 저장소에 올리지 않고 자체 환경에�
 
 첫 연결은 고정된 실제 benchmark 과제 하나가 고객사 환경에서 계약대로 실행되고 결과 JSON까지 검증되면 성공이다. 이 한 번의 결과로 제품 도입, 압축 효과나 일반적인 품질을 판단하지 않는다.
 
-## KT가 준비하는 값과 저장소가 고정하는 값
+## 사용자가 준비하는 값과 저장소가 고정하는 값
 
 ### 고객사 환경에서만 준비하는 값
 
@@ -30,7 +30,7 @@ KT가 원본 데이터를 공개 저장소에 올리지 않고 자체 환경에�
 
 | 환경변수 이름 | 값의 역할 | 공개 여부 |
 | --- | --- | --- |
-| `FOUNDRY_ENDPOINT` | KT가 승인한 모델 연결 주소 | 값은 비공개 |
+| `FOUNDRY_ENDPOINT` | 사용자가 승인한 모델 연결 주소 | 값은 비공개 |
 | `SCREENING_OPERATIONAL_LEDGER` | 승인 내용을 채운 비공개 실행 원장 경로 | 파일과 경로 모두 비공개 |
 | `TERMINAL_BENCH_ROOT` | 고정 revision의 benchmark checkout 경로 | 원본과 경로 모두 비공개 |
 | `SCREENING_INVENTORY` | 해시를 계산한 실행 inventory 경로 | 원본과 경로 모두 비공개 |
@@ -39,9 +39,9 @@ KT가 원본 데이터를 공개 저장소에 올리지 않고 자체 환경에�
 | `TIKTOKEN_CACHE_DIR` | 토큰 수를 세는 고정 도구(tokenizer)의 자료 경로 | 값은 비공개 |
 | `NATIVE_BLOB_ACCOUNT_URL`, `NATIVE_BLOB_SPOOL_ROOT` | 비공개 실행 증거의 저장·회수 위치 | 값은 비공개 |
 
-인증은 KT가 승인한 플랫폼 인증 주체(identity) 또는 비밀 관리 절차로 공급한다. 키와 token을 YAML이나 실행 원장에 기록하지 않는다.
+인증은 사용자가 승인한 플랫폼 인증 주체(identity) 또는 비밀 관리 절차로 공급한다. 키와 token을 YAML이나 실행 원장에 기록하지 않는다.
 
-KT가 공개 YAML에서 고를 수 있는 것은 공개 색인에 있는 과제 ID와 `runs/` 아래 결과 JSON 이름이다. 다른 과제를 고른 YAML도 source checkout 안에 commit한 뒤 깨끗한 `HEAD`에서 실행해야 한다.
+사용자가 공개 YAML에서 고를 수 있는 것은 공개 색인에 있는 과제 ID와 `runs/` 아래 결과 JSON 이름이다. 다른 과제를 고른 YAML도 source checkout 안에 commit한 뒤 깨끗한 `HEAD`에서 실행해야 한다.
 
 ### 저장소가 고정하고 검증하는 값
 
@@ -110,7 +110,7 @@ condition: none
 output: runs/readme-benchmark-result.json
 ```
 
-YAML에는 endpoint의 **환경변수 이름**만 있고 주소는 없다. 원본 데이터 경로도 없다. 처음에는 이 파일을 그대로 사용한다. 다른 지원 과제를 선택하려면 `benchmark.task`와 충돌하지 않는 새 `runs/` JSON 이름만 바꾸고, 변경한 YAML을 KT의 비공개 fork 또는 승인된 source branch에 commit한다. Runner는 untracked 파일까지 포함해 source checkout이 깨끗한지 확인한다.
+YAML에는 endpoint의 **환경변수 이름**만 있고 주소는 없다. 원본 데이터 경로도 없다. 처음에는 이 파일을 그대로 사용한다. 다른 지원 과제를 선택하려면 `benchmark.task`와 충돌하지 않는 새 `runs/` JSON 이름만 바꾸고, 변경한 YAML을 사용자의 비공개 fork 또는 승인된 source branch에 commit한다. Runner는 untracked 파일까지 포함해 source checkout이 깨끗한지 확인한다.
 
 ## 3. 모델을 부르지 않고 먼저 확인한다
 

@@ -1,7 +1,7 @@
 # English Documentation
 
 This directory preserves the reviewed English documentation while the original
-`docs/` paths continue to serve the Korean documents shared with the KT audience.
+`docs/` paths continue to serve the Korean documents shared with the Korean-speaking audience.
 
 ## Current follow-up
 
@@ -24,7 +24,7 @@ supports an effect, ranking, stability, pass-rate, or model-quality conclusion.
 - [Snapshot provenance and hashes](SNAPSHOT.md)
 
 The historical experiment index and snapshot retain their reviewed bytes and older
-status text. Use the current follow-up entry above for the later work.
+status text, except for the [documented customer-name removal](SNAPSHOT.md#customer-name-removal). Use the current follow-up entry above for the later work.
 
 ## Post-snapshot measured results
 

@@ -5,16 +5,27 @@ This directory preserves the English public-documentation state from
 `f2e41a3`; the original paths were restored from
 `6721f48f8968242a7a07cdeca9c2303a8c6579c1` so the Korean documents remain at their established URLs.
 
-This snapshot changes relative links only where the new directory depth
-requires it. It does not add experiment evidence, revise measurements, or
-strengthen any conclusion. Source generators and executable contracts remain
-at the repository root and continue to govern the canonical Korean paths.
+This snapshot adjusts relative links where the new directory depth requires it
+and includes the customer-name removal documented below. It does not add experiment
+evidence, revise measurements, or strengthen any conclusion. Source generators and
+executable contracts remain at the repository root and continue to govern the
+canonical Korean paths.
 
 The 28 restored Korean source artifacts are byte-identical to the reference
-revision after removing one explicit compatibility anchor from
+revision after reversing the documented customer-name removal and removing one
+explicit compatibility anchor from
 `docs/experiment/screening-protocol.md`. That anchor restores the existing
 `#기존-기준선에-미치는-영향` internal link without changing the surrounding
 paragraph, measurement, or claim.
+
+## Customer-name removal
+
+On 2026-10-05, customer-identifying wording in the Korean and English data-connection
+guides was replaced with generic user wording. Instructions and measurements are
+unchanged. Original text remains in Git history. The localization check reverses
+only these Korean wording changes before comparing the historical tree hashes.
+The inventory retains the English source hash and records the current file in the
+snapshot hash column.
 
 ## File inventory
 
@@ -35,7 +46,7 @@ paragraph, measurement, or claim.
 | `docs/experiment/README.md` | [`docs_en/experiment/README.md`](experiment/README.md) | `4a763af52cc38c8625e50fde9aac15be3d5a294db3ad2b236f66dfc808c129d5` | `4a763af52cc38c8625e50fde9aac15be3d5a294db3ad2b236f66dfc808c129d5` |
 | `docs/experiment/baseline.md` | [`docs_en/experiment/baseline.md`](experiment/baseline.md) | `a70ab1a1f55fdfa882ef12a91f2ec84873a855c43de90ff2f9aecb9b4a3bf74e` | `a70ab1a1f55fdfa882ef12a91f2ec84873a855c43de90ff2f9aecb9b4a3bf74e` |
 | `docs/experiment/compressors.md` | [`docs_en/experiment/compressors.md`](experiment/compressors.md) | `be3fe9aa90df2b87dcbae6b7c48c328f3bff7044537bcfdfed4262b6e861b4b4` | `be3fe9aa90df2b87dcbae6b7c48c328f3bff7044537bcfdfed4262b6e861b4b4` |
-| `docs/experiment/data-connection-guide-20260919.md` | [`docs_en/experiment/data-connection-guide-20260919.md`](experiment/data-connection-guide-20260919.md) | `7afd3011c5da5539273e8aef1004f0e1c477af65ef9118e26ef949829e6b4626` | `7afd3011c5da5539273e8aef1004f0e1c477af65ef9118e26ef949829e6b4626` |
+| `docs/experiment/data-connection-guide-20260919.md` | [`docs_en/experiment/data-connection-guide-20260919.md`](experiment/data-connection-guide-20260919.md) | `7afd3011c5da5539273e8aef1004f0e1c477af65ef9118e26ef949829e6b4626` | `775b69d504d541f25e8395a9d4d2b43ade203d50b7c679c768108f590923d1d7` |
 | `docs/experiment/decisions.md` | [`docs_en/experiment/decisions.md`](experiment/decisions.md) | `25fb95cc6d5f6a19ced8ad4ed463d8f89ec8ca8a75d7679810a7345caee0ef30` | `25fb95cc6d5f6a19ced8ad4ed463d8f89ec8ca8a75d7679810a7345caee0ef30` |
 | `docs/experiment/evaluation-protocol.md` | [`docs_en/experiment/evaluation-protocol.md`](experiment/evaluation-protocol.md) | `1dd88faf3a5608d1b4127bfb96ef6374f4f14a3d1630f731e460070dc1b5a166` | `1dd88faf3a5608d1b4127bfb96ef6374f4f14a3d1630f731e460070dc1b5a166` |
 | `docs/experiment/execution-safety-policy.md` | [`docs_en/experiment/execution-safety-policy.md`](experiment/execution-safety-policy.md) | `9bc0b5c19afe5b920e9a459c6ce67015ae92791348ff66335f1c1211d824213a` | `9bc0b5c19afe5b920e9a459c6ce67015ae92791348ff66335f1c1211d824213a` |
