@@ -44,14 +44,15 @@ class FakeBlobClient:
 
 
 class BlockingBlobClient(FakeBlobClient):
-    def __init__(self):
+    def __init__(self, release_timeout=5):
         super().__init__()
         self.entered = threading.Event()
         self.release = threading.Event()
+        self.release_timeout = release_timeout
 
     def put_file(self, name, path, sha256):
         self.entered.set()
-        if not self.release.wait(2):
+        if not self.release.wait(self.release_timeout):
             raise TimeoutError("synthetic release timeout")
         return super().put_file(name, path, sha256)
 
@@ -78,7 +79,42 @@ class BlobRetrievalTests(unittest.TestCase):
             timer.start()
             self.addCleanup(timer.cancel)
             report = spool.finish(0)
+            if report["finish_state"] == "still_uploading":
+                report = spool.finish(2)
         self.assertEqual(report["upload_state"], "uploaded")
+        self.assertEqual(report["finish_state"], "completed")
+        self.assertFalse(report["worker_alive"])
+        self.assertTrue(report["worker_terminated"])
+
+    def test_finish_reports_delayed_upload_without_hiding_live_worker_or_removing_files(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            payload = root / "result.tar"
+            payload.write_bytes(b"delayed-result")
+            client = BlockingBlobClient()
+            spool = make_spool(root / "spool", client)
+            staged = spool.stage_file(payload, "adapter-preflight", kind="software_preflight", metadata={})
+            self.assertTrue(client.entered.wait(1))
+
+            report = spool.finish(0)
+            state_path = next((root / "spool").glob("*/adapter-preflight/state.json"))
+            local_payload = state_path.parent / "payload.tar"
+            state = json.loads(state_path.read_bytes())
+
+            self.assertEqual(report["finish_state"], "still_uploading")
+            self.assertEqual(report["upload_state"], "retrieval_pending")
+            self.assertTrue(report["worker_alive"])
+            self.assertFalse(report["worker_terminated"])
+            self.assertEqual(state["upload_state"], "uploading")
+            self.assertEqual(local_payload.read_bytes(), b"delayed-result")
+            self.assertNotIn(staged["payload"]["blob"], client.blobs)
+
+            client.release.set()
+            completed = spool.finish(3)
+        self.assertEqual(completed["upload_state"], "uploaded")
+        self.assertEqual(completed["finish_state"], "completed")
+        self.assertFalse(completed["worker_alive"])
+        self.assertTrue(completed["worker_terminated"])
 
     def test_real_sized_payload_retries_and_uploads_manifest_last(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -92,6 +128,7 @@ class BlobRetrievalTests(unittest.TestCase):
             waited = spool.wait_for_upload(["adapter-preflight"], 3)
             report = spool.finish(3)
         self.assertEqual(report["upload_state"], "uploaded")
+        self.assertEqual(report["finish_state"], "completed")
         self.assertEqual(waited["status"], "uploaded")
         self.assertEqual(report["items"][0]["attempts"], 3)
         self.assertEqual(report["items"][0]["payload"]["bytes"], payload_size)
@@ -114,6 +151,7 @@ class BlobRetrievalTests(unittest.TestCase):
             state = json.loads(state_path.read_bytes())
             retained = local_payload.read_bytes()
         self.assertEqual(report["upload_state"], "retrieval_pending")
+        self.assertEqual(report["finish_state"], "failed")
         self.assertEqual(state["upload_state"], "failed")
         self.assertEqual(state["last_error_category"], "service_unavailable")
         self.assertIsNone(state["upload_wall_seconds"])
@@ -135,7 +173,9 @@ class BlobRetrievalTests(unittest.TestCase):
             )
             recovered = resumed.finish(2)
         self.assertEqual(failed["upload_state"], "retrieval_pending")
+        self.assertEqual(failed["finish_state"], "failed")
         self.assertEqual(recovered["upload_state"], "uploaded")
+        self.assertEqual(recovered["finish_state"], "completed")
         self.assertEqual(recovered["items"][0]["attempts"], 2)
         self.assertTrue(any(name.endswith("/manifest.json") for name in resumed_client.calls))
 

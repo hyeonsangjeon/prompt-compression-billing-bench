@@ -8,6 +8,8 @@ This directory preserves the reviewed English documentation while the original
 - [Follow-up study entry](experiment/02-follow-up/README.md)
 - [Cache reuse summary](experiment/02-follow-up/cache-reuse/README.md)
 - [SWE-Lancer summary](experiment/02-follow-up/swe-lancer/README.md)
+- [First-study cost briefing](experiment/results-briefing-en.md)
+- [Copy-ready GBB share text](experiment/gbb-share-en.md)
 
 These are independent substudies. The Cache attempt produced zero valid cycles,
 and the SWE-Lancer attempt produced zero valid protocol traces. Neither record
@@ -39,6 +41,9 @@ are not part of its byte-identity inventory:
   two runner groups breached the one-execution contract and both timed out
   during sandbox startup, before any provider or grader call; zero valid
   protocol traces were produced.
+- [First-study cost briefing](experiment/results-briefing-en.md) and
+  [CSV table](experiment/results-briefing-en.csv) — a short English briefing
+  on the first-study cost differences, using existing public aggregate values.
 
 Current English-only implementation guides remain at their established paths:
 

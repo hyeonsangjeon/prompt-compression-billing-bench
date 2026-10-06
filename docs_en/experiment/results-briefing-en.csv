@@ -1,0 +1,5 @@
+compression_condition,grader_passes,grader_denominator,runs_with_changed_input,changed_input_denominator,calculated_api_cost_usd_exact,calculated_api_cost_display,difference_from_no_additional_compression_percent_exact,difference_from_no_additional_compression_display
+No additional compression,11,26,0,26,5.61866,$5.62,0,Reference
+squeez,10,26,1,26,6.663187,$6.66,18.590322247653347,+18.6%
+Headroom,9,26,4,26,5.3620835,$5.36,-4.566506960734418,−4.6%
+LLMLingua-2,10,26,18,26,4.689458,$4.69,-16.537786589685087,−16.5%

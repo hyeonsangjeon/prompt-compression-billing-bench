@@ -578,15 +578,23 @@ class BlobSpool:
                 self._public_state(json.loads((directory / "state.json").read_bytes()))
                 for _item_id, directory in sorted(self.items.items())
             ]
+            worker_alive = self.worker.is_alive()
+        completed = not records or all(
+            record["upload_state"] == "uploaded" and record["remote_verified_at"] for record in records
+        )
+        still_uploading = worker_alive and any(
+            record["upload_state"] in ("pending", "uploading") for record in records
+        )
         return {
             "schema_version": 1, "kind": "native_blob_retrieval",
             "account_url_sha256": self.account_url_sha256,
             "container": self.client.container, "prefix": self.prefix,
             "run_id": self.run_id, "source_commit": self.source_commit,
             "ledger_sha256": self.ledger_sha256, "condition": self.condition,
-            "upload_state": "no_complete_items" if not records else "uploaded" if all(
-                record["upload_state"] == "uploaded" and record["remote_verified_at"] for record in records
-            ) else "retrieval_pending",
+            "upload_state": "no_complete_items" if not records else "uploaded" if completed else "retrieval_pending",
+            "finish_state": "completed" if completed else "still_uploading" if still_uploading else "failed",
+            "worker_alive": worker_alive,
+            "worker_terminated": not worker_alive,
             "items": records, "nas_read_verification": "pending_external",
             "credentials_recorded": False,
         }
